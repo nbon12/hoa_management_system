@@ -1,4 +1,5 @@
 using HOAManagementCompany.Components;
+using HOAManagementCompany.Services;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.EntityFrameworkCore.PostgreSQL; // Add this line
 
@@ -13,7 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
-
+builder.Services.AddScoped<ViolationService>(); 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

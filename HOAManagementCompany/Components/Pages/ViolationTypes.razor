@@ -1,0 +1,96 @@
+@page "/violationtypes"
+@inject HOAManagementCompany.Services.ViolationService ViolationService
+@inject NavigationManager Navigation 
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Violation Types</PageTitle>
+
+<h1>Violation Types</h1>
+
+<p>
+    <a href="/violationtypes/create" class="btn btn-primary">Add New Violation Type</a>
+</p>
+
+@if (violationTypes == null)
+{
+    <p><em>Loading violation types...</em></p>
+}
+else if (!violationTypes.Any())
+{
+    <p>No violation types found. Click "Add New Violation Type" to get started.</p>
+}
+else
+{
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var type in violationTypes)
+            {
+                <tr>
+                    <td>@type.Id</td>
+                    <td>@type.Name</td>
+                    <td>@type.CovenantText</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(type.Id))">Edit</button>
+                        <button class="btn btn-sm btn-danger" @onclick="(() => DeleteViolationType(type.Id))">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<HOAManagementCompany.Models.ViolationType>? violationTypes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadViolationTypes();
+    }
+
+    private async Task LoadViolationTypes()
+    {
+        try
+        {
+            violationTypes = await ViolationService.GetViolationTypesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log the exception, display a user-friendly error
+            Console.WriteLine($"Error loading violation types: {ex.Message}");
+            // In a real app, you might set an error message property to display on the page
+        }
+    }
+
+    private void NavigateToEdit(Guid id)
+    {
+        Navigation.NavigateTo($"/violationtypes/edit/{id}");
+    }
+
+    private async Task DeleteViolationType(Guid id)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this violation type?");
+        if (confirmed)
+        {
+            try
+            {
+                //await ViolationService.DeleteViolationTypeAsync(id);
+                await LoadViolationTypes(); // Reload the list after successful deletion
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deleting violation type: {ex.Message}");
+                // Handle deletion errors, e.g., if there are related violations, you might get a foreign key constraint error.
+                // You could show a message to the user that it cannot be deleted due to existing violations.
+                await JsRuntime.InvokeVoidAsync("alert", $"Error: Could not delete violation type. It might be in use. Details: {ex.Message}");
+            }
+        }
+    }
+}
