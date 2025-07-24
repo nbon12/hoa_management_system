@@ -1,4 +1,5 @@
 @page "/violationtypes"
+@rendermode InteractiveServer
 @inject HOAManagementCompany.Services.ViolationService ViolationService
 @inject NavigationManager Navigation 
 @inject IJSRuntime JsRuntime
@@ -39,7 +40,8 @@ else
                     <td>@type.CovenantText</td>
                     <td>
                         <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(type.Id))">Edit</button>
-                        <button class="btn btn-sm btn-danger" @onclick="(() => DeleteViolationType(type.Id))">Delete</button>
+                        <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolationType(type.Id))">Delete</button>
+                        <button class="btn btn-sm btn-danger" @onclick="(async () => await TestPrint(type.Id))">TestPrint</button>
                     </td>
                 </tr>
             }
@@ -81,7 +83,7 @@ else
         {
             try
             {
-                //await ViolationService.DeleteViolationTypeAsync(id);
+                await ViolationService.DeleteViolationTypeAsync(id);
                 await LoadViolationTypes(); // Reload the list after successful deletion
             }
             catch (Exception ex)
@@ -93,4 +95,11 @@ else
             }
         }
     }
+
+    private async Task TestPrint(Guid typeId)
+    {
+        Console.WriteLine("TestPrint prints: " + typeId);
+        await JsRuntime.InvokeVoidAsync("console.log", "TestPrint from client: " + typeId);
+    }
+
 }
