@@ -38,10 +38,10 @@ else
 
 @code {
 [Parameter]
-public Guid Id { get; set; } // <--- CHANGE HERE: Type is Guid
+public Guid Id { get; set; } 
 
 private ViolationType violationType = new ViolationType();
-private bool IsCreating => Id == Guid.Empty; // <--- NEW HELPER PROPERTY
+private bool IsCreating => Id == Guid.Empty; 
 
 protected override async Task OnInitializedAsync()
 {
