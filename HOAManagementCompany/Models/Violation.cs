@@ -22,4 +22,9 @@ public class Violation
     
     [Required(ErrorMessage = "Occurrence date is required.")]
     public DateTime OccurrenceDate { get; set; } = DateTime.UtcNow;
+    
+    [Required(ErrorMessage = "Violation type is required.")]
+    public Guid ViolationTypeId { get; set; }
+    
+    public ViolationType? ViolationType { get; set; }
 }

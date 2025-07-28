@@ -28,6 +28,7 @@ else
             <tr>
                 <th>ID</th>
                 <th>Description</th>
+                <th>Type</th>
                 <th>Status</th>
                 <th>Occurrence Date</th>
                 <th>Actions</th>
@@ -39,6 +40,7 @@ else
                 <tr>
                     <td>@violation.Id</td>
                     <td>@violation.Description</td>
+                    <td>@(violation.ViolationType?.Name ?? "Unknown")</td>
                     <td>
                         <span class="badge @(violation.Status == ViolationStatus.Open ? "bg-warning" : "bg-success")">
                             @violation.Status

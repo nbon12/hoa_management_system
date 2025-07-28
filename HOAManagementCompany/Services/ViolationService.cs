@@ -51,13 +51,18 @@ namespace HOAManagementCompany.Services
         public async Task<Violation?> GetViolationByIdAsync(Guid id)
         {
             using var context = _dbContextFactory.CreateDbContext();
-            return await context.Violations.FindAsync(id);
+            return await context.Violations
+                .Include(v => v.ViolationType)
+                .FirstOrDefaultAsync(v => v.Id == id);
         }
         
         public async Task<List<Violation>> GetViolationsAsync()
         {
             using var context = _dbContextFactory.CreateDbContext();
-            return await context.Violations.OrderByDescending(v => v.OccurrenceDate).ToListAsync();
+            return await context.Violations
+                .Include(v => v.ViolationType)
+                .OrderByDescending(v => v.OccurrenceDate)
+                .ToListAsync();
         }
         
         public async Task AddViolationAsync(Violation violation)

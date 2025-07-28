@@ -15,6 +15,21 @@
     <ValidationSummary />
 
     <div class="form-group mb-3">
+        <label for="violationTypeId">Violation Type:</label>
+        <InputSelect id="violationTypeId" class="form-control" @bind-Value="violation.ViolationTypeId">
+            <option value="">-- Select Violation Type --</option>
+            @if (violationTypes != null)
+            {
+                @foreach (var type in violationTypes)
+                {
+                    <option value="@type.Id">@type.Name</option>
+                }
+            }
+        </InputSelect>
+        <ValidationMessage For="@(() => violation.ViolationTypeId)" />
+    </div>
+
+    <div class="form-group mb-3">
         <label for="description">Description:</label>
         <InputText id="description" class="form-control" @bind-Value="violation.Description" />
         <ValidationMessage For="@(() => violation.Description)" />
@@ -46,10 +61,21 @@
     public Guid? Id { get; set; }
 
     private Violation violation = new();
+    private List<ViolationType>? violationTypes;
     private bool IsEdit => Id.HasValue;
 
     protected override async Task OnInitializedAsync()
     {
+        // Load violation types for the dropdown
+        try
+        {
+            violationTypes = await ViolationService.GetViolationTypesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading violation types: {ex.Message}");
+        }
+
         if (IsEdit && Id.HasValue)
         {
             var existingViolation = await ViolationService.GetViolationByIdAsync(Id.Value);
