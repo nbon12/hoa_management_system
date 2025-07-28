@@ -68,15 +68,14 @@ else
     {
         if (IsCreating) // Create new
         {
-    // If Guid.NewGuid() was not set in OnInitializedAsync for creation,
-    // EF Core will assign one when Add() is called and SaveChangesAsync().
-    // But if you need it before SaveChanges (e.g., for logging), it's good to set it.
-    // Ensure violationType.Id is set to a new GUID before adding if you haven't already.
+            // If Guid.NewGuid() was not set in OnInitializedAsync for creation,
+            // EF Core will assign one when Add() is called and SaveChangesAsync().
+            // But if you need it before SaveChanges (e.g., for logging), it's good to set it.
+            // Ensure violationType.Id is set to a new GUID before adding if you haven't already.
             if (violationType.Id == Guid.Empty)
             {
                 violationType.Id = Guid.NewGuid();
             }
-
             await ViolationService.AddViolationTypeAsync(violationType);
             Console.WriteLine($"Created new ViolationType: {violationType.Name} with ID: {violationType.Id}");
         }

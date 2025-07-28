@@ -1,0 +1,98 @@
+@page "/violations/create"
+@page "/violations/edit/{Id:guid}"
+@rendermode InteractiveServer
+@using HOAManagementCompany.Models
+@inject HOAManagementCompany.Services.ViolationService ViolationService
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+
+<PageTitle>@(IsEdit ? "Edit Violation" : "Create Violation")</PageTitle>
+
+<h1>@(IsEdit ? "Edit Violation" : "Create Violation")</h1>
+
+<EditForm Model="violation" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group mb-3">
+        <label for="description">Description:</label>
+        <InputText id="description" class="form-control" @bind-Value="violation.Description" />
+        <ValidationMessage For="@(() => violation.Description)" />
+    </div>
+
+    <div class="form-group mb-3">
+        <label for="status">Status:</label>
+        <InputSelect id="status" class="form-control" @bind-Value="violation.Status">
+            <option value="@ViolationStatus.Open">Open</option>
+            <option value="@ViolationStatus.Closed">Closed</option>
+        </InputSelect>
+        <ValidationMessage For="@(() => violation.Status)" />
+    </div>
+
+    <div class="form-group mb-3">
+        <label for="occurrenceDate">Occurrence Date:</label>
+        <InputDate id="occurrenceDate" class="form-control" @bind-Value="violation.OccurrenceDate" />
+        <ValidationMessage For="@(() => violation.OccurrenceDate)" />
+    </div>
+
+    <div class="form-group">
+        <button type="submit" class="btn btn-primary">@(IsEdit ? "Update" : "Create")</button>
+        <a href="/violations" class="btn btn-secondary">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private Violation violation = new();
+    private bool IsEdit => Id.HasValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEdit && Id.HasValue)
+        {
+            var existingViolation = await ViolationService.GetViolationByIdAsync(Id.Value);
+            if (existingViolation != null)
+            {
+                violation = existingViolation;
+            }
+            else
+            {
+                await JsRuntime.InvokeVoidAsync("alert", "Violation not found.");
+                Navigation.NavigateTo("/violations");
+                return;
+            }
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Ensure the date is stored as UTC
+            if (violation.OccurrenceDate.Kind != DateTimeKind.Utc)
+            {
+                violation.OccurrenceDate = DateTime.SpecifyKind(violation.OccurrenceDate, DateTimeKind.Utc);
+            }
+            
+            if (IsEdit)
+            {
+                await ViolationService.UpdateViolationAsync(violation);
+                await JsRuntime.InvokeVoidAsync("alert", "Violation updated successfully!");
+            }
+            else
+            {
+                violation.Id = Guid.NewGuid();
+                await ViolationService.AddViolationAsync(violation);
+                await JsRuntime.InvokeVoidAsync("alert", "Violation created successfully!");
+            }
+            
+            Navigation.NavigateTo("/violations");
+        }
+        catch (Exception ex)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+} 
