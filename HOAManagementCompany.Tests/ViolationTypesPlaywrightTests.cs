@@ -258,15 +258,14 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Wait for the loading canary to disappear (page is fully loaded)
         await WaitForPageToLoadAsync();
 
+        // Set up dialog handler BEFORE clicking the delete button
+        _page.Dialog += async (sender, e) => await e.AcceptAsync();
+
         // Act - Click delete button and confirm
         // Use a more specific selector and wait for the element to be visible
         var deleteButton = _page.Locator($"tr:has-text('{violationTypeToDelete.Name}') button:has-text('Delete')");
         await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await deleteButton.ClickAsync();
-        
-        // Handle the confirmation dialog by accepting it
-        _page.Dialog += async (sender, e) => await e.AcceptAsync();
-        await _page.WaitForTimeoutAsync(1000);
 
         // Assert - Wait for page to load and verify we're on the right page
         await WaitForViolationTypesPageToLoadAsync();
@@ -292,15 +291,14 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Wait for the loading canary to disappear (page is fully loaded)
         await WaitForPageToLoadAsync();
 
+        // Set up dialog handler BEFORE clicking the delete button
+        _page.Dialog += async (sender, e) => await e.DismissAsync();
+
         // Act - Click delete button but cancel
         // Use a more specific selector and wait for the element to be visible
         var deleteButton = _page.Locator($"tr:has-text('{violationTypeToKeep.Name}') button:has-text('Delete')");
         await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
         await deleteButton.ClickAsync();
-        
-        // Handle the confirmation dialog by dismissing it
-        _page.Dialog += async (sender, e) => await e.DismissAsync();
-        await _page.WaitForTimeoutAsync(1000);
 
         // Assert - Only check for violation types with our namespace
         await _page.WaitForSelectorAsync($"text={violationTypeToKeep.Name}");
