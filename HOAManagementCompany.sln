@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HOAManagementCompany", "HOAManagementCompany\HOAManagementCompany.csproj", "{AC4F994D-3B43-4F72-A322-7136DBD5C370}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HOAManagementCompany.Tests", "HOAManagementCompany.Tests\HOAManagementCompany.Tests.csproj", "{B5A56C9B-A14F-4F9B-AFC1-82D00663AA01}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{AC4F994D-3B43-4F72-A322-7136DBD5C370}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AC4F994D-3B43-4F72-A322-7136DBD5C370}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AC4F994D-3B43-4F72-A322-7136DBD5C370}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5A56C9B-A14F-4F9B-AFC1-82D00663AA01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5A56C9B-A14F-4F9B-AFC1-82D00663AA01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5A56C9B-A14F-4F9B-AFC1-82D00663AA01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5A56C9B-A14F-4F9B-AFC1-82D00663AA01}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
