@@ -68,6 +68,7 @@ jobs:
     - name: Run Playwright tests
       run: dotnet test --configuration Debug --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal
       env:
+        PLAYWRIGHT_HEADLESS: "true"
         ASPNETCORE_ENVIRONMENT: Development
         ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=postgres;Password=postgres"
     
