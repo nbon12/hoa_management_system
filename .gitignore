@@ -1,0 +1,40 @@
+# JetBrains IDEs (Rider, IntelliJ IDEA, etc.)
+.idea/
+
+# Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+
+# NuGet packages
+*.nupkg
+# The "packages" folder can be used to store NuGet packages.
+# It is better to restore packages during build than to commit them.
+packages/
+# End of NuGet
+
+# Logs
+*.log
+
+# Misc
+.vs/
+*.user
+*.suo
+*.sln.docstates
+*.vsp
+*.pdb
+*.opendata
+*.VC.opendata
+*.aps
+*.bsc
+*.sbr
+*.res
+*.pch
+*.idb
+*.obj
+*.lib
+*.ncb
+*.resource
+*.sdf
+*.tlog
+_ReSharper.*/
+[Tt]humbs.db 
