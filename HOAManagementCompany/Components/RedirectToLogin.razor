@@ -1,0 +1,18 @@
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using Microsoft.JSInterop
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (string.IsNullOrEmpty(returnUrl))
+        {
+            await JS.InvokeVoidAsync("window.location.href", "/Identity/Account/Login");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("window.location.href", $"/Identity/Account/Login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+        }
+    }
+} 

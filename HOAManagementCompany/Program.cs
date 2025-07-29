@@ -1,7 +1,9 @@
 using HOAManagementCompany.Components;
 using HOAManagementCompany.Services;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL; // Add this line
+using Npgsql.EntityFrameworkCore.PostgreSQL;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,11 +11,29 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddControllers();
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
                        throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+// Add Identity services
+builder.Services.AddDefaultIdentity<IdentityUser>(options => {
+    options.SignIn.RequireConfirmedAccount = false;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequiredLength = 6;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<ApplicationDbContext>();
+
+// Add authentication state
+builder.Services.AddCascadingAuthenticationState();
+
 builder.Services.AddScoped<ViolationService>(); 
 var app = builder.Build();
 
@@ -27,11 +47,22 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Add authentication and authorization middleware
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapControllers();
+
+// Add Identity endpoints
+app.MapIdentityApi<IdentityUser>();
+
+// Seed data
+await ApplicationDbContext.SeedDataAsync(app.Services);
 
 app.Run();

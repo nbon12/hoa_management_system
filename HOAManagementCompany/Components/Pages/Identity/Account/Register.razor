@@ -1,0 +1,104 @@
+@page "/Identity/Account/Register"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Mvc
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.JSInterop
+@inject UserManager<IdentityUser> UserManager
+@inject SignInManager<IdentityUser> SignInManager
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Register - HOA Management</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h2>Create a new account</h2>
+            </div>
+            <div class="card-body">
+                <EditForm Model="@Input" OnValidSubmit="HandleValidSubmit" FormName="registerForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="form-group mb-3">
+                        <label for="email">Email</label>
+                        <InputText id="email" class="form-control" @bind-Value="Input.Email" />
+                        <ValidationMessage For="@(() => Input.Email)" />
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label for="password">Password</label>
+                        <InputText type="password" id="password" class="form-control" @bind-Value="Input.Password" />
+                        <ValidationMessage For="@(() => Input.Password)" />
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label for="confirmPassword">Confirm password</label>
+                        <InputText type="password" id="confirmPassword" class="form-control" @bind-Value="Input.ConfirmPassword" />
+                        <ValidationMessage For="@(() => Input.ConfirmPassword)" />
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">Register</button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(ErrorMessage))
+                    {
+                        <div class="alert alert-danger mt-3">
+                            @ErrorMessage
+                        </div>
+                    }
+                </EditForm>
+
+                <div class="mt-3">
+                    <p>
+                        Already have an account? <a href="/Identity/Account/Login">Log in</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    public string ErrorMessage { get; set; } = string.Empty;
+
+    public class RegisterInput
+    {
+        [Required]
+        [EmailAddress]
+        [Display(Name = "Email")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Password")]
+        public string Password { get; set; } = string.Empty;
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirm password")]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
+    public RegisterInput Input { get; set; } = new();
+
+    private async Task HandleValidSubmit()
+    {
+        var user = new IdentityUser { UserName = Input.Email, Email = Input.Email };
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        
+        if (result.Succeeded)
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false);
+            await JS.InvokeVoidAsync("window.location.href", "/");
+        }
+        else
+        {
+            ErrorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+} 
