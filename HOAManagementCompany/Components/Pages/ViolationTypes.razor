@@ -14,7 +14,9 @@
 
 @if (violationTypes == null)
 {
-    <p><em>Loading violation types...</em></p>
+    <div id="page-loading-canary" class="alert alert-info">
+        <i class="fas fa-spinner fa-spin"></i> Loading violation types...
+    </div>
 }
 else if (!violationTypes.Any())
 {

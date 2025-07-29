@@ -9,9 +9,11 @@
 
 <h3>@(IsCreating ? "Create New" : "Edit") Violation Type</h3>
 
-@if (violationType == null && !IsCreating) @* Adjust logic here for loading state *@
+@if (violationType == null && !IsCreating)
 {
-<p><em>Loading...</em></p>
+    <div id="form-loading-canary" class="alert alert-info">
+        <i class="fas fa-spinner fa-spin"></i> Loading violation type...
+    </div>
 }
 else
 {

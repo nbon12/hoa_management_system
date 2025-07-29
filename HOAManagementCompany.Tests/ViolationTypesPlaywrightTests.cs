@@ -75,7 +75,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Act - Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Assert - Only check for violation types with our namespace
         await _page.WaitForSelectorAsync($"text={violationType1.Name}");
@@ -94,7 +97,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         // Arrange - Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Click "Add New Violation Type" button
         await _page.ClickAsync("text=Add New Violation Type");
@@ -109,6 +115,11 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Assert - Only check for violation types with our namespace
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+        
         await _page.WaitForSelectorAsync($"text={newViolationTypeName}");
         await _page.WaitForSelectorAsync($"text={newCovenantText}");
         var createdViolationType = (await ViolationService.GetViolationTypesAsync()).FirstOrDefault(vt => vt.Name == newViolationTypeName && vt.CovenantText == newCovenantText);
@@ -121,7 +132,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Arrange - Create a test violation type
         var originalViolationType = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_Original_Name", $"{_adminUserName} original covenant text");
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Click edit button for the violation type
         await _page.ClickAsync($"tr:has-text('{originalViolationType.Name}') button:has-text('Edit')");
@@ -142,6 +156,11 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Assert - Only check for violation types with our namespace
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+        
         await _page.WaitForSelectorAsync($"text={updatedName}");
         await _page.WaitForSelectorAsync($"text={updatedCovenantText}");
         var updatedViolationType = await ViolationService.GetViolationTypeByIdAsync(originalViolationType.Id);
@@ -156,13 +175,12 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Arrange - Create a test violation type
         var violationTypeToDelete = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_To_Delete", $"{_adminUserName} violation type to delete");
         
-        // Navigate to ViolationTypes page and wait for it to load
+        // Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
         
-        // Wait for the table to be fully loaded
-        await _page.WaitForSelectorAsync("table");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Click delete button and confirm
         // Use a more specific selector and wait for the element to be visible
@@ -176,6 +194,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Assert - Verify the violation type is removed from the list
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
         
         // Wait for the row to be removed from the table
         var row = _page.Locator($"tr:has-text('{violationTypeToDelete.Name}')");
@@ -192,13 +214,12 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Arrange - Create a test violation type
         var violationTypeToKeep = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_To_Keep", $"{_adminUserName} violation type to keep");
         
-        // Navigate to ViolationTypes page and wait for it to load
+        // Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
         
-        // Wait for the table to be fully loaded
-        await _page.WaitForSelectorAsync("table");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Click delete button but cancel
         // Use a more specific selector and wait for the element to be visible
@@ -222,7 +243,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         // Arrange - Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Click "Add New Violation Type" button
         await _page.ClickAsync("text=Add New Violation Type");
@@ -235,6 +259,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Assert - Verify we're redirected back to the list
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
     }
 
     [Fact]
@@ -248,6 +276,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Assert - Verify we're redirected back to the list page
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
     }
 
     [Fact]
@@ -258,13 +290,12 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         var relatedViolation = await CreateTestViolationAsync(_testNamespace, violationTypeWithViolations.Id, $"{_adminUserName} related violation");
 
-        // Navigate to ViolationTypes page and wait for it to load
+        // Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
         
-        // Wait for the table to be fully loaded
-        await _page.WaitForSelectorAsync("table");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Try to delete violation type with related violations
         // Use a more specific selector and wait for the element to be visible
@@ -298,7 +329,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         // Arrange - Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Check if there are any violation types with our test namespace
         var allViolationTypes = await ViolationService.GetViolationTypesAsync();
@@ -332,7 +366,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         // Arrange - Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act 1: Create a new violation type
         await _page.ClickAsync("text=Add New Violation Type");
@@ -344,6 +381,11 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.FillAsync("#covenantText", workflowCovenantText);
         await _page.ClickAsync("button[type='submit']");
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+        
         await _page.WaitForSelectorAsync($"text={workflowViolationTypeName}");
 
         // Act 2: Read the violation type (verify it's in the list)
@@ -360,6 +402,11 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.FillAsync("#covenantText", updatedCovenantText);
         await _page.ClickAsync("button[type='submit']");
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+        
         await _page.WaitForSelectorAsync($"text={updatedName}");
 
         // Act 4: Delete the violation type
@@ -392,6 +439,11 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         // Arrange - Navigate to create form
         await _page.ClickAsync("text=Violation Types");
+        
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+        
         await _page.ClickAsync("text=Add New Violation Type");
         await _page.WaitForSelectorAsync("h3:has-text('Create New Violation Type')");
 
@@ -408,8 +460,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Arrange - Navigate to ViolationTypes page
         await _page.ClickAsync("text=Violation Types");
         
-        // Wait for the page to load
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // Wait for the loading canary to disappear (page is fully loaded)
+        await _page.WaitForSelectorAsync("#page-loading-canary", 
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
 
         // Act - Verify table structure
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
