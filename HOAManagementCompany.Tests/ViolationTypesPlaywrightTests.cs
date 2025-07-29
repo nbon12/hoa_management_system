@@ -154,35 +154,36 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     public async Task Admin_CanDeleteViolationType()
     {
         // Arrange - Create a test violation type
-        var violationTypeToDelete = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_To_Delete", $"{_adminUserName} violation type to be deleted");
+        var violationTypeToDelete = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_To_Delete", $"{_adminUserName} violation type to delete");
+        
+        // Navigate to ViolationTypes page and wait for it to load
         await _page.ClickAsync("text=Violation Types");
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
-        await _page.WaitForSelectorAsync($"text={violationTypeToDelete.Name}");
+        
+        // Wait for the table to be fully loaded
+        await _page.WaitForSelectorAsync("table");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-        // Act - Click delete button and handle confirmation dialog
-        var dialogHandled = false;
-        _page.Dialog += async (sender, e) => {
-            await e.AcceptAsync();
-            dialogHandled = true;
-        };
-        await _page.ClickAsync($"tr:has-text('{violationTypeToDelete.Name}') button:has-text('Delete')");
+        // Act - Click delete button and confirm
+        // Use a more specific selector and wait for the element to be visible
+        var deleteButton = _page.Locator($"tr:has-text('{violationTypeToDelete.Name}') button:has-text('Delete')");
+        await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await deleteButton.ClickAsync();
+        
+        // Handle the confirmation dialog by accepting it
+        _page.Dialog += async (sender, e) => await e.AcceptAsync();
+        await _page.WaitForTimeoutAsync(1000);
 
-        // Wait for the dialog to be handled
-        for (int i = 0; i < 10 && !dialogHandled; i++)
-        {
-            await Task.Delay(100);
-        }
-
-        // Wait for the row to be removed from the DOM
-        await _page.WaitForSelectorAsync($"tr:has-text('{violationTypeToDelete.Name}')", new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
-
-        // Assert - Ensure the row is gone
-        var rows = await _page.QuerySelectorAllAsync("tbody tr");
-        foreach (var row in rows)
-        {
-            var text = await row.TextContentAsync();
-            Assert.DoesNotContain(violationTypeToDelete.Name, text);
-        }
+        // Assert - Verify the violation type is removed from the list
+        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the row to be removed from the table
+        var row = _page.Locator($"tr:has-text('{violationTypeToDelete.Name}')");
+        await row.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached });
+        
+        // Verify in database
+        var deletedViolationType = await ViolationService.GetViolationTypeByIdAsync(violationTypeToDelete.Id);
+        Assert.Null(deletedViolationType);
     }
 
     [Fact]
@@ -190,11 +191,22 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         // Arrange - Create a test violation type
         var violationTypeToKeep = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_To_Keep", $"{_adminUserName} violation type to keep");
+        
+        // Navigate to ViolationTypes page and wait for it to load
         await _page.ClickAsync("text=Violation Types");
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the table to be fully loaded
+        await _page.WaitForSelectorAsync("table");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         // Act - Click delete button but cancel
-        await _page.ClickAsync($"tr:has-text('{violationTypeToKeep.Name}') button:has-text('Delete')");
+        // Use a more specific selector and wait for the element to be visible
+        var deleteButton = _page.Locator($"tr:has-text('{violationTypeToKeep.Name}') button:has-text('Delete')");
+        await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await deleteButton.ClickAsync();
+        
+        // Handle the confirmation dialog by dismissing it
         _page.Dialog += async (sender, e) => await e.DismissAsync();
         await _page.WaitForTimeoutAsync(1000);
 
@@ -246,12 +258,21 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         var relatedViolation = await CreateTestViolationAsync(_testNamespace, violationTypeWithViolations.Id, $"{_adminUserName} related violation");
 
-        // Navigate to ViolationTypes page
+        // Navigate to ViolationTypes page and wait for it to load
         await _page.ClickAsync("text=Violation Types");
         await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        
+        // Wait for the table to be fully loaded
+        await _page.WaitForSelectorAsync("table");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         // Act - Try to delete violation type with related violations
-        await _page.ClickAsync($"tr:has-text('{violationTypeWithViolations.Name}') button:has-text('Delete')");
+        // Use a more specific selector and wait for the element to be visible
+        var deleteButton = _page.Locator($"tr:has-text('{violationTypeWithViolations.Name}') button:has-text('Delete')");
+        await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        await deleteButton.ClickAsync();
+        
+        // Handle the confirmation dialog by accepting it
         _page.Dialog += async (sender, e) => await e.AcceptAsync();
         await _page.WaitForTimeoutAsync(1000);
 
