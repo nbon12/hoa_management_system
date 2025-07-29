@@ -90,6 +90,153 @@ public class ViolationIntegrationTests : TestBase
     }
 
     [Fact]
+    public async Task UpdateViolation_ViolationTypeId_ShouldModifyData()
+    {
+        var ns = nameof(UpdateViolation_ViolationTypeId_ShouldModifyData);
+        try
+        {
+            // Arrange
+            var originalViolationType = await CreateTestViolationTypeAsync(ns, "ORIGINAL_TYPE", "Original covenant");
+            var newViolationType = await CreateTestViolationTypeAsync(ns, "NEW_TYPE", "New covenant");
+            var violation = await CreateTestViolationAsync(ns, originalViolationType.Id, "Test violation", ViolationStatus.Open);
+            var originalId = violation.Id;
+            
+            // Act
+            violation.ViolationTypeId = newViolationType.Id;
+            await DbContext.SaveChangesAsync();
+            
+            // Assert
+            var updatedViolation = await DbContext.Violations
+                .Include(v => v.ViolationType)
+                .FirstOrDefaultAsync(v => v.Id == originalId);
+            Assert.NotNull(updatedViolation);
+            Assert.Equal(newViolationType.Id, updatedViolation.ViolationTypeId);
+            Assert.NotNull(updatedViolation.ViolationType);
+            Assert.Equal($"{ns}_NEW_TYPE", updatedViolation.ViolationType.Name);
+        }
+        finally
+        {
+            await CleanupTestNamespaceAsync(ns);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateViolation_ViolationTypeId_UsingService_ShouldModifyData()
+    {
+        var ns = nameof(UpdateViolation_ViolationTypeId_UsingService_ShouldModifyData);
+        try
+        {
+            // Arrange
+            var originalViolationType = await CreateTestViolationTypeAsync(ns, "ORIGINAL_TYPE", "Original covenant");
+            var newViolationType = await CreateTestViolationTypeAsync(ns, "NEW_TYPE", "New covenant");
+            var violation = await CreateTestViolationAsync(ns, originalViolationType.Id, "Test violation", ViolationStatus.Open);
+            var originalId = violation.Id;
+            
+            // Act - Use the service method
+            violation.ViolationTypeId = newViolationType.Id;
+            var violationService = ServiceProvider.GetRequiredService<HOAManagementCompany.Services.ViolationService>();
+            await violationService.UpdateViolationAsync(violation);
+            
+            // Assert
+            var updatedViolation = await violationService.GetViolationByIdAsync(originalId);
+            Assert.NotNull(updatedViolation);
+            Assert.Equal(newViolationType.Id, updatedViolation.ViolationTypeId);
+            Assert.NotNull(updatedViolation.ViolationType);
+            Assert.Equal($"{ns}_NEW_TYPE", updatedViolation.ViolationType.Name);
+        }
+        finally
+        {
+            await CleanupTestNamespaceAsync(ns);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateViolation_ViolationTypeId_WithNavigationProperty_ShouldModifyData()
+    {
+        var ns = nameof(UpdateViolation_ViolationTypeId_WithNavigationProperty_ShouldModifyData);
+        try
+        {
+            // Arrange - Simulate the frontend scenario
+            var originalViolationType = await CreateTestViolationTypeAsync(ns, "ORIGINAL_TYPE", "Original covenant");
+            var newViolationType = await CreateTestViolationTypeAsync(ns, "NEW_TYPE", "New covenant");
+            var violation = await CreateTestViolationAsync(ns, originalViolationType.Id, "Test violation", ViolationStatus.Open);
+            var originalId = violation.Id;
+            
+            // Simulate loading the violation with navigation property (like the frontend does)
+            var violationService = ServiceProvider.GetRequiredService<HOAManagementCompany.Services.ViolationService>();
+            var loadedViolation = await violationService.GetViolationByIdAsync(originalId);
+            Assert.NotNull(loadedViolation);
+            Assert.NotNull(loadedViolation.ViolationType);
+            Assert.Equal($"{ns}_ORIGINAL_TYPE", loadedViolation.ViolationType.Name);
+            
+            // Act - Change ViolationTypeId (like the frontend dropdown does)
+            loadedViolation.ViolationTypeId = newViolationType.Id;
+            // Clear the navigation property (like our fix does)
+            loadedViolation.ViolationType = null;
+            
+            // Update using the service
+            await violationService.UpdateViolationAsync(loadedViolation);
+            
+            // Assert
+            var updatedViolation = await violationService.GetViolationByIdAsync(originalId);
+            Assert.NotNull(updatedViolation);
+            Assert.Equal(newViolationType.Id, updatedViolation.ViolationTypeId);
+            Assert.NotNull(updatedViolation.ViolationType);
+            Assert.Equal($"{ns}_NEW_TYPE", updatedViolation.ViolationType.Name);
+        }
+        finally
+        {
+            await CleanupTestNamespaceAsync(ns);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateViolation_ViolationTypeId_FrontendScenario_ShouldModifyData()
+    {
+        var ns = nameof(UpdateViolation_ViolationTypeId_FrontendScenario_ShouldModifyData);
+        try
+        {
+            // Arrange - Simulate the frontend scenario exactly
+            var originalViolationType = await CreateTestViolationTypeAsync(ns, "ORIGINAL_TYPE", "Original covenant");
+            var newViolationType = await CreateTestViolationTypeAsync(ns, "NEW_TYPE", "New covenant");
+            
+            // Create violation with ViolationType navigation property loaded (like frontend does)
+            var violation = await CreateTestViolationAsync(ns, originalViolationType.Id, "Test violation", ViolationStatus.Open);
+            
+            // Simulate what the frontend does - load with navigation property
+            var loadedViolation = await DbContext.Violations
+                .Include(v => v.ViolationType)
+                .FirstOrDefaultAsync(v => v.Id == violation.Id);
+            
+            Assert.NotNull(loadedViolation);
+            Assert.Equal(originalViolationType.Id, loadedViolation.ViolationTypeId);
+            Assert.Equal(originalViolationType.Id, loadedViolation.ViolationType?.Id);
+            
+            // Act - Simulate user changing the dropdown (like our OnViolationTypeChanged method)
+            loadedViolation.ViolationTypeId = newViolationType.Id;
+            loadedViolation.ViolationType = newViolationType; // Update navigation property like our frontend does
+            
+            // Update using the service (like frontend does)
+            var violationService = ServiceProvider.GetRequiredService<HOAManagementCompany.Services.ViolationService>();
+            await violationService.UpdateViolationAsync(loadedViolation);
+            
+            // Assert - Verify the update worked
+            var updatedViolation = await DbContext.Violations
+                .Include(v => v.ViolationType)
+                .FirstOrDefaultAsync(v => v.Id == violation.Id);
+            
+            Assert.NotNull(updatedViolation);
+            Assert.Equal(newViolationType.Id, updatedViolation.ViolationTypeId);
+            Assert.Equal(newViolationType.Id, updatedViolation.ViolationType?.Id);
+            Assert.Equal(newViolationType.Name, updatedViolation.ViolationType?.Name);
+        }
+        finally
+        {
+            await CleanupTestNamespaceAsync(ns);
+        }
+    }
+
+    [Fact]
     public async Task DeleteViolation_ShouldRemoveFromDatabase()
     {
         var ns = nameof(DeleteViolation_ShouldRemoveFromDatabase);

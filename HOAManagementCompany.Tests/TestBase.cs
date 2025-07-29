@@ -34,6 +34,15 @@ public abstract class TestBase : IDisposable
             builder.SetMinimumLevel(LogLevel.Information);
         });
 
+        // Add services
+        services.AddDbContextFactory<ApplicationDbContext>(options =>
+        {
+            options.UseNpgsql(connectionString);
+            options.EnableSensitiveDataLogging();
+            options.EnableDetailedErrors();
+        });
+        services.AddScoped<HOAManagementCompany.Services.ViolationService>();
+
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<ApplicationDbContext>();
         

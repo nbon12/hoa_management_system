@@ -75,7 +75,21 @@ namespace HOAManagementCompany.Services
         public async Task UpdateViolationAsync(Violation violation)
         {
             using var context = _dbContextFactory.CreateDbContext();
-            context.Violations.Update(violation);
+            
+            // Get the existing violation from the database
+            var existingViolation = await context.Violations.FindAsync(violation.Id);
+            if (existingViolation == null)
+            {
+                throw new InvalidOperationException($"Violation with ID {violation.Id} not found.");
+            }
+            
+            // Update the properties
+            existingViolation.Description = violation.Description;
+            existingViolation.Status = violation.Status;
+            existingViolation.OccurrenceDate = violation.OccurrenceDate;
+            existingViolation.ViolationTypeId = violation.ViolationTypeId;
+            
+            // Save changes
             await context.SaveChangesAsync();
         }
         
