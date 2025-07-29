@@ -60,7 +60,7 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
             Console.WriteLine($"Page content when canary didn't disappear: {pageContent}");
             
             // Also check if there are any console errors
-            var consoleMessages = await _page.EvaluateAsync<string>("() => { return window.console && window.console.logs ? window.console.logs.join('\\n') : 'No console logs available'; }");
+            var consoleMessages = await _page.EvaluateAsync<string>("() => { return window.console && window.console.logs ? window.console.logs.join('\\\n') : 'No console logs available'; }");
             Console.WriteLine($"Console messages: {consoleMessages}");
             
             throw;
@@ -423,9 +423,6 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         } else {
             Console.WriteLine($"[TIMING] Violation type name NOT found in page content");
         }
-        // Check for any console errors
-        var consoleErrors = await _page.EvaluateAsync<string>("() => { return window.console && window.console.errors ? window.console.errors.join("\n") : "No console errors"; }");
-        Console.WriteLine($"[TIMING] Console errors: {consoleErrors}");
         
         
         var waitForVisibleStartTime = DateTime.UtcNow;
