@@ -12,11 +12,11 @@ jobs:
     
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16-alpine
         env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: test_hoa
+          POSTGRES_PASSWORD: HXCKFJ3498fajjAJR94
+          POSTGRES_USER: sequestria1
+          POSTGRES_DB: hoa_management_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -36,13 +36,10 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     
-    - name: Build
-      run: dotnet build --no-restore
-    
     - name: Wait for PostgreSQL
       run: |
         echo "Waiting for PostgreSQL to be ready..."
-        while ! pg_isready -h localhost -p 5432 -U postgres; do
+        while ! pg_isready -h localhost -p 5432 -U sequestria1; do
           sleep 1
         done
         echo "PostgreSQL is ready!"
@@ -53,18 +50,36 @@ jobs:
         echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
     
     - name: Run database migrations
-      run: dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+      run: dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
       env:
-        ASPNETCORE_ENVIRONMENT: Development
+        ASPNETCORE_ENVIRONMENT: Test
     
-    - name: Run integration tests
-      run: |
-        cd HOAManagementCompany.Tests
-        dotnet test --verbosity normal --logger "console;verbosity=detailed"
+    - name: Build & Install
+      run: dotnet build HOAManagementCompany.Tests/HOAManagementCompany.Tests.csproj --configuration Debug
+
+    - name: Run Integration Tests
+      run: dotnet test --configuration Debug --filter "FullyQualifiedName~IntegrationTests" --verbosity normal
       env:
-        ASPNETCORE_ENVIRONMENT: Development
-        # Override the connection string for tests to use the test database
-        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+        ASPNETCORE_ENVIRONMENT: Test
+        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
+
+    - name: Ensure browsers are installed
+      run: pwsh $(find HOAManagementCompany.Tests/bin/Debug -name playwright.ps1) install --with-deps
+
+    - name: Start Blazor App
+      run: |
+        dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj --configuration Debug --urls=http://localhost:5212 &
+        sleep 10
+      env:
+        ASPNETCORE_ENVIRONMENT: Test
+        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
+
+    - name: Run Playwright tests
+      run: dotnet test --configuration Debug --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal
+      env:
+        PLAYWRIGHT_HEADLESS: "true"
+        ASPNETCORE_ENVIRONMENT: Test
+        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
     
     - name: Upload test results
       uses: actions/upload-artifact@v4

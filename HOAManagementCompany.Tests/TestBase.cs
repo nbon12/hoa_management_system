@@ -11,6 +11,7 @@ public abstract class TestBase : IDisposable
     protected readonly ApplicationDbContext DbContext;
     protected readonly IServiceProvider ServiceProvider;
     private static readonly Random _random = new Random();
+    protected HOAManagementCompany.Services.ViolationService ViolationService => ServiceProvider.GetRequiredService<HOAManagementCompany.Services.ViolationService>();
 
     protected TestBase()
     {

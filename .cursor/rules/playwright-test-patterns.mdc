@@ -1,0 +1,195 @@
+# Playwright Test Patterns
+
+## Core Principles
+
+### 1. Test Data Isolation with Namespaced Data
+- **ALWAYS** use unique, randomly generated namespaces for test data
+- Each test must create its own data and clean up only its own data
+- Never assume a clean database state
+- Use `await GenerateUniqueTestNamespaceAsync()` for unique prefixes
+
+```csharp
+private string _testNamespace = await GenerateUniqueTestNamespaceAsync();
+private string _adminUserName = $"Admin_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{new Random().Next(1000, 9999)}";
+```
+
+### 2. Proper Test Data Cleanup
+- **NEVER** put cleanup in `DisposeAsync()` - it runs after each test method
+- **ALWAYS** call cleanup at the end of each individual test method that creates data
+- Use `await CleanupTestNamespaceAsync(_testNamespace);` at the end of each test
+
+```csharp
+[Fact]
+public async Task Admin_CanCreateNewViolationType()
+{
+    // Test implementation...
+    
+    // ALWAYS cleanup at the end of the test method
+    await CleanupTestNamespaceAsync(_testNamespace);
+}
+```
+
+### 3. Reliable Page Loading Strategy
+- Use `LoadState.DOMContentLoaded` instead of `LoadState.NetworkIdle` for faster, more reliable waiting
+- Add small fixed delays after DOM content loaded to allow Blazor to render
+- Wait for specific elements rather than generic page loads
+
+```csharp
+private async Task WaitForPageToLoadAsync()
+{
+    await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+    await _page.WaitForTimeoutAsync(100); // Allow Blazor to render
+}
+
+private async Task WaitForViolationTypesPageToLoadAsync()
+{
+    await WaitForPageToLoadAsync();
+    await _page.WaitForSelectorAsync("#page-loading-canary", new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+}
+```
+
+### 4. Dialog Handling
+- **ALWAYS** set up dialog handlers BEFORE clicking buttons that trigger dialogs
+- Use `_page.Dialog += ...` before `ClickAsync()` for delete operations
+
+```csharp
+// Set up dialog handler BEFORE clicking
+_page.Dialog += async dialog => await dialog.AcceptAsync();
+await _page.ClickAsync("button:has-text('Delete')");
+```
+
+### 5. Data Visibility After Navigation
+- After page navigation, use `await _page.ReloadAsync()` to ensure fresh data
+- Wait for specific data to appear after reload to confirm Blazor re-fetched data
+
+```csharp
+await _page.ClickAsync("text=Violation Types");
+await _page.ReloadAsync(); // Ensure fresh data
+await _page.WaitForSelectorAsync("text=" + violationTypeName); // Wait for specific data
+```
+
+### 6. Blazor Component Error Handling
+- Ensure Blazor components handle exceptions gracefully
+- Components should set empty collections on error to hide loading canaries
+- Prevent infinite loading states
+
+```csharp
+catch (Exception ex)
+{
+    Console.WriteLine($"Error loading violation types: {ex.Message}");
+    violationTypes = new List<ViolationType>(); // Hide canary on error
+}
+```
+
+### 7. CI Environment Configuration
+- Use `PLAYWRIGHT_HEADLESS=true` environment variable for CI
+- Ensure consistent database credentials across local and CI
+- Use `ASPNETCORE_ENVIRONMENT=Test` for test-specific settings
+
+### 8. Comprehensive Debugging
+- Add timestamp logging for performance analysis
+- Log page content and URLs for debugging
+- Use detailed error messages for troubleshooting
+
+```csharp
+var startTime = DateTime.UtcNow;
+await _page.ClickAsync("text=Violation Types");
+var endTime = DateTime.UtcNow;
+Console.WriteLine($"[TIMING] Navigation took: {(endTime - startTime).TotalMilliseconds}ms");
+```
+
+## Common Pitfalls to Avoid
+
+### ❌ Don't Do This:
+- Put cleanup in `DisposeAsync()` method
+- Use `LoadState.NetworkIdle` for waiting (too slow in CI)
+- Set up dialog handlers after clicking buttons
+- Assume clean database state
+- Use non-namespaced test data
+- Skip page reloads after navigation
+
+### ✅ Do This:
+- Clean up at the end of each test method
+- Use `LoadState.DOMContentLoaded` + small timeout
+- Set up dialog handlers before clicking
+- Always use namespaced data
+- Reload pages after navigation
+- Wait for specific elements to appear
+
+## Test Structure Template
+
+```csharp
+public class ExamplePlaywrightTests : TestBase, IAsyncLifetime
+{
+    private IBrowser _browser;
+    private IPage _page;
+    private string _testNamespace;
+
+    public async Task InitializeAsync()
+    {
+        _testNamespace = await GenerateUniqueTestNamespaceAsync();
+        // Browser setup...
+    }
+
+    [Fact]
+    public async Task Test_ShouldDoSomething()
+    {
+        // 1. Create test data with namespace
+        var testData = await CreateTestDataAsync(_testNamespace);
+        
+        // 2. Navigate and wait properly
+        await _page.ClickAsync("text=Some Link");
+        await WaitForPageToLoadAsync();
+        
+        // 3. Set up dialog handlers BEFORE clicking
+        _page.Dialog += async dialog => await dialog.AcceptAsync();
+        
+        // 4. Perform actions
+        await _page.ClickAsync("button:has-text('Delete')");
+        
+        // 5. Verify results
+        Assert.True(await _page.IsVisibleAsync("text=Success"));
+        
+        // 6. ALWAYS cleanup at the end
+        await CleanupTestNamespaceAsync(_testNamespace);
+    }
+
+    public async Task DisposeAsync()
+    {
+        // Only dispose browser resources, NOT test data
+        await _browser?.DisposeAsync();
+    }
+}
+```
+
+## Environment Variables for CI
+
+```yaml
+env:
+  PLAYWRIGHT_HEADLESS: "true"
+  ASPNETCORE_ENVIRONMENT: "Test"
+  ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
+```
+
+## Performance Optimization
+
+- Use `LoadState.DOMContentLoaded` instead of `NetworkIdle`
+- Add small fixed timeouts (100ms) instead of waiting for network idle
+- Use specific element selectors instead of generic page loads
+- Minimize page reloads, but use them when data visibility is critical
+
+## Debugging Checklist
+
+When tests fail:
+1. ✅ Check if test data is properly namespaced
+2. ✅ Verify cleanup is at the end of test method, not in DisposeAsync
+3. ✅ Ensure dialog handlers are set up before clicking
+4. ✅ Confirm page loading strategy uses DOMContentLoaded
+5. ✅ Check if page reload is needed after navigation
+6. ✅ Verify Blazor component error handling
+7. ✅ Check CI environment variables and credentials
+
+description:
+globs:
+alwaysApply: false
+---

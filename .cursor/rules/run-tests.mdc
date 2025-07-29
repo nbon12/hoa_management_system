@@ -1,0 +1,5 @@
+---
+description: always run the integration tests after code changes. Always run Blazor Playwright tests in headless mode after code changes.
+globs:
+alwaysApply: true
+---

@@ -1,0 +1,5 @@
+---
+description: whenever Tests create test data, they MUST assume other tests are creating and deleting test data either in parallel, or previous test runs created stale data. THerefore, Test A must create and dispose data that is uniquely and randomly namespaced to it's own run. When it disposes that data, it must only dispose of data that it created during it's run. WHen Test B runs, it must not rely on a clean state, but instead only try to read or delete data that it has created during it's run
+globs:
+alwaysApply: true
+---
