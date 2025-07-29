@@ -16,23 +16,35 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
     private async Task WaitForPageToLoadAsync()
     {
+        var methodStartTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] WaitForPageToLoadAsync started at: {methodStartTime:HH:mm:ss.fff}");
+        
         try
         {
             // First check if the canary is visible
+            var canaryCheckStartTime = DateTime.UtcNow;
             var canaryVisible = await _page.Locator("#page-loading-canary").IsVisibleAsync();
+            var canaryCheckEndTime = DateTime.UtcNow;
+            Console.WriteLine($"[TIMING] Canary visibility check took: {(canaryCheckEndTime - canaryCheckStartTime).TotalMilliseconds}ms");
             Console.WriteLine($"Initial canary visibility: {canaryVisible}");
             
             if (canaryVisible)
             {
+                var waitForDetachedStartTime = DateTime.UtcNow;
                 await _page.WaitForSelectorAsync("#page-loading-canary", 
                     new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached, Timeout = 10000 });
+                var waitForDetachedEndTime = DateTime.UtcNow;
+                Console.WriteLine($"[TIMING] WaitForSelector (detached) took: {(waitForDetachedEndTime - waitForDetachedStartTime).TotalMilliseconds}ms");
                 Console.WriteLine("Canary disappeared successfully");
             }
             else
             {
                 Console.WriteLine("Canary was not visible, page may already be loaded");
                 // Even if canary is not visible, wait for network to be idle
+                var networkIdleStartTime = DateTime.UtcNow;
                 await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                var networkIdleEndTime = DateTime.UtcNow;
+                Console.WriteLine($"[TIMING] WaitForLoadStateAsync (NetworkIdle) took: {(networkIdleEndTime - networkIdleStartTime).TotalMilliseconds}ms");
             }
         }
         catch (TimeoutException)
@@ -47,6 +59,10 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
             
             throw;
         }
+        
+        var methodEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] WaitForPageToLoadAsync completed at: {methodEndTime:HH:mm:ss.fff}");
+        Console.WriteLine($"[TIMING] WaitForPageToLoadAsync total duration: {(methodEndTime - methodStartTime).TotalMilliseconds}ms");
     }
 
     private async Task WaitForViolationTypesPageToLoadAsync()
@@ -332,29 +348,67 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     [Fact]
     public async Task Admin_CanCancelViolationTypeDeletion()
     {
+        var testStartTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Test started at: {testStartTime:HH:mm:ss.fff}");
+        
         // Arrange - Create a test violation type
+        var createStartTime = DateTime.UtcNow;
         var violationTypeToKeep = await CreateTestViolationTypeAsync(_testNamespace, $"{_adminUserName}_To_Keep", $"{_adminUserName} violation type to keep");
+        var createEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] CreateTestViolationTypeAsync took: {(createEndTime - createStartTime).TotalMilliseconds}ms");
         
         // Navigate to ViolationTypes page
+        var navigateStartTime = DateTime.UtcNow;
         await _page.ClickAsync("text=Violation Types");
+        var navigateEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Navigation click took: {(navigateEndTime - navigateStartTime).TotalMilliseconds}ms");
         
         // Wait for the loading canary to disappear (page is fully loaded)
+        var waitStartTime = DateTime.UtcNow;
         await WaitForPageToLoadAsync();
+        var waitEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] WaitForPageToLoadAsync took: {(waitEndTime - waitStartTime).TotalMilliseconds}ms");
 
         // Set up dialog handler BEFORE clicking the delete button
+        var dialogSetupStartTime = DateTime.UtcNow;
         _page.Dialog += async (sender, e) => await e.DismissAsync();
+        var dialogSetupEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Dialog setup took: {(dialogSetupEndTime - dialogSetupStartTime).TotalMilliseconds}ms");
 
         // Act - Click delete button but cancel
         // Use a more specific selector and wait for the element to be visible
+        var locatorStartTime = DateTime.UtcNow;
         var deleteButton = _page.Locator($"tr:has-text('{violationTypeToKeep.Name}') button:has-text('Delete')");
+        var locatorEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Locator creation took: {(locatorEndTime - locatorStartTime).TotalMilliseconds}ms");
+        
+        var waitForVisibleStartTime = DateTime.UtcNow;
         await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+        var waitForVisibleEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] WaitForAsync (visible) took: {(waitForVisibleEndTime - waitForVisibleStartTime).TotalMilliseconds}ms");
+        
+        var clickStartTime = DateTime.UtcNow;
         await deleteButton.ClickAsync();
+        var clickEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] ClickAsync took: {(clickEndTime - clickStartTime).TotalMilliseconds}ms");
 
         // Assert - Only check for violation types with our namespace
+        var assertStartTime = DateTime.UtcNow;
         await _page.WaitForSelectorAsync($"text={violationTypeToKeep.Name}");
+        var assertEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] WaitForSelector (assert) took: {(assertEndTime - assertStartTime).TotalMilliseconds}ms");
+        
+        var dbQueryStartTime = DateTime.UtcNow;
         var existingViolationType = await ViolationService.GetViolationTypeByIdAsync(violationTypeToKeep.Id);
+        var dbQueryEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Database query took: {(dbQueryEndTime - dbQueryStartTime).TotalMilliseconds}ms");
+        
         Assert.NotNull(existingViolationType);
         Assert.Equal(violationTypeToKeep.Name, existingViolationType.Name);
+        
+        var testEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Test completed at: {testEndTime:HH:mm:ss.fff}");
+        Console.WriteLine($"[TIMING] Total test duration: {(testEndTime - testStartTime).TotalMilliseconds}ms");
     }
 
     [Fact]
