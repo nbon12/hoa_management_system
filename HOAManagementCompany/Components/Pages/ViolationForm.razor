@@ -18,7 +18,7 @@
 
     <div class="form-group mb-3">
         <label for="violationTypeId">Violation Type:</label>
-        <InputSelect id="violationTypeId" class="form-control" @bind-Value="violation.ViolationTypeId">
+        <InputSelect id="violationTypeId" class="form-control" @bind-Value="violation.ViolationTypeId" @onchange="OnViolationTypeChanged">
             <option value="">-- Select Violation Type --</option>
             @if (violationTypes != null)
             {
@@ -94,6 +94,20 @@
         }
     }
 
+    private async void OnViolationTypeChanged(ChangeEventArgs e)
+    {
+        // Update the ViolationType navigation property when selection changes
+        if (e.Value != null && Guid.TryParse(e.Value.ToString(), out var newViolationTypeId))
+        {
+            // Find the selected violation type from the loaded list
+            violation.ViolationType = violationTypes?.FirstOrDefault(vt => vt.Id == newViolationTypeId);
+        }
+        else
+        {
+            violation.ViolationType = null;
+        }
+    }
+
     private async Task HandleValidSubmit()
     {
         try
@@ -116,7 +130,7 @@
                 await JsRuntime.InvokeVoidAsync("alert", "Violation created successfully!");
             }
             
-            Navigation.NavigateTo("/violations");
+            Navigation.NavigateTo($"/violations?t={DateTime.UtcNow.Ticks}");
         }
         catch (Exception ex)
         {

@@ -1,0 +1,28 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C# files
+[*.cs]
+indent_style = space
+indent_size = 4
+
+# Entity Framework Update Pattern Rules
+# These comments help developers remember the safe update pattern
+
+# When updating entities with foreign keys, use the SafeUpdateAsync pattern:
+# await SafeUpdateAsync(entity, existingEntity => {
+#     existingEntity.Property = entity.Property;
+#     existingEntity.ForeignKeyId = entity.ForeignKeyId;
+# });
+
+# Avoid using context.Set<T>().Update(entity) for entities with navigation properties
+# This can cause change tracking issues with foreign key relationships 

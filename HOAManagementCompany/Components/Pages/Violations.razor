@@ -13,6 +13,7 @@
 
 <p>
     <a href="/violations/create" class="btn btn-primary">Add New Violation</a>
+    <button class="btn btn-secondary" @onclick="LoadViolations">Refresh</button>
 </p>
 
 @if (violations == null)
@@ -60,11 +61,24 @@ else
 }
 
 @code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? t { get; set; }
+
     private List<HOAManagementCompany.Models.Violation>? violations;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadViolations();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload data if timestamp parameter is present (indicates navigation back from edit/create)
+        if (!string.IsNullOrEmpty(t))
+        {
+            await LoadViolations();
+        }
     }
 
     private async Task LoadViolations()
