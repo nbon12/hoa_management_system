@@ -70,7 +70,8 @@ jobs:
       run: |
         cd HOAManagementCompany.Tests
         dotnet build
-        pwsh bin/Debug/net*/playwright.ps1 install
+        dotnet tool restore
+        dotnet playwright install
 
     - name: Start Blazor App
       run: |
