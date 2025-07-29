@@ -40,11 +40,17 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
             else
             {
                 Console.WriteLine("Canary was not visible, page may already be loaded");
-                // Even if canary is not visible, wait for network to be idle
-                var networkIdleStartTime = DateTime.UtcNow;
-                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                var networkIdleEndTime = DateTime.UtcNow;
-                Console.WriteLine($"[TIMING] WaitForLoadStateAsync (NetworkIdle) took: {(networkIdleEndTime - networkIdleStartTime).TotalMilliseconds}ms");
+                // Instead of waiting for NetworkIdle (which is slow), wait for DOM to be ready
+                var domReadyStartTime = DateTime.UtcNow;
+                await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+                var domReadyEndTime = DateTime.UtcNow;
+                Console.WriteLine($"[TIMING] WaitForLoadStateAsync (DOMContentLoaded) took: {(domReadyEndTime - domReadyStartTime).TotalMilliseconds}ms");
+                
+                // Add a small delay to allow Blazor to render
+                var delayStartTime = DateTime.UtcNow;
+                await _page.WaitForTimeoutAsync(100);
+                var delayEndTime = DateTime.UtcNow;
+                Console.WriteLine($"[TIMING] Small delay took: {(delayEndTime - delayStartTime).TotalMilliseconds}ms");
             }
         }
         catch (TimeoutException)
@@ -162,13 +168,14 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        // Clean up test data
-        await CleanupTestNamespaceAsync(_testNamespace);
-
         // Dispose Playwright resources
         await _page.CloseAsync();
         await _browser.CloseAsync();
         _playwright.Dispose();
+        
+        // Note: We don't clean up test data here because IAsyncLifetime.DisposeAsync()
+        // is called after each individual test, not after all tests in the class.
+        // Each test method should clean up its own data.
     }
 
     [Fact]
@@ -243,6 +250,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.WaitForSelectorAsync("th:has-text('Name')");
         await _page.WaitForSelectorAsync("th:has-text('Description')");
         await _page.WaitForSelectorAsync("th:has-text('Actions')");
+        
+        // Clean up test data
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
@@ -272,6 +282,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.WaitForSelectorAsync($"text={newCovenantText}");
         var createdViolationType = (await ViolationService.GetViolationTypesAsync()).FirstOrDefault(vt => vt.Name == newViolationTypeName && vt.CovenantText == newCovenantText);
         Assert.NotNull(createdViolationType);
+        
+        // Clean up test data
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
@@ -310,6 +323,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         Assert.NotNull(updatedViolationType);
         Assert.Equal(updatedName, updatedViolationType.Name);
         Assert.Equal(updatedCovenantText, updatedViolationType.CovenantText);
+        
+        // Clean up test data
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
@@ -343,6 +359,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Verify in database
         var deletedViolationType = await ViolationService.GetViolationTypeByIdAsync(violationTypeToDelete.Id);
         Assert.Null(deletedViolationType);
+        
+        // Clean up test data (in case deletion failed and we need to clean up)
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
@@ -362,6 +381,12 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.ClickAsync("text=Violation Types");
         var navigateEndTime = DateTime.UtcNow;
         Console.WriteLine($"[TIMING] Navigation click took: {(navigateEndTime - navigateStartTime).TotalMilliseconds}ms");
+        
+        // Refresh the page to ensure we see the newly created data
+        var refreshStartTime = DateTime.UtcNow;
+        await _page.ReloadAsync();
+        var refreshEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Page reload took: {(refreshEndTime - refreshStartTime).TotalMilliseconds}ms");
         
         // Wait for the loading canary to disappear (page is fully loaded)
         var waitStartTime = DateTime.UtcNow;
@@ -409,6 +434,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         var testEndTime = DateTime.UtcNow;
         Console.WriteLine($"[TIMING] Test completed at: {testEndTime:HH:mm:ss.fff}");
         Console.WriteLine($"[TIMING] Total test duration: {(testEndTime - testStartTime).TotalMilliseconds}ms");
+        
+        // Clean up test data
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
@@ -485,6 +513,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Verify in database
         var existingViolationType = await ViolationService.GetViolationTypeByIdAsync(violationTypeWithViolations.Id);
         Assert.NotNull(existingViolationType);
+        
+        // Clean up test data
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
@@ -585,6 +616,9 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         }
         var deletedViolationType = await ViolationService.GetViolationTypeByIdAsync(createdViolationType.Id);
         Assert.Null(deletedViolationType);
+        
+        // Clean up test data (in case deletion failed and we need to clean up)
+        await CleanupTestNamespaceAsync(_testNamespace);
     }
 
     [Fact]
