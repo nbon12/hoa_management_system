@@ -1,6 +1,6 @@
 @page "/violations"
 @rendermode InteractiveServer
-@attribute [Authorize]
+@attribute [Authorize(Policy = "ViolationsRead")]
 @using HOAManagementCompany.Models
 @using Microsoft.AspNetCore.Authorization
 @inject HOAManagementCompany.Services.ViolationService ViolationService
@@ -12,7 +12,11 @@
 <h1>Violations</h1>
 
 <p>
-    <a href="/violations/create" class="btn btn-primary">Add New Violation</a>
+    <AuthorizeView Policy="ViolationsCreate">
+        <Authorized>
+            <a href="/violations/create" class="btn btn-primary">Add New Violation</a>
+        </Authorized>
+    </AuthorizeView>
     <button class="btn btn-secondary" @onclick="LoadViolations">Refresh</button>
 </p>
 
@@ -51,8 +55,16 @@ else
                     </td>
                     <td>@violation.OccurrenceDate.ToLocalTime().ToString("MM/dd/yyyy")</td>
                     <td>
-                        <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(violation.Id))">Edit</button>
-                        <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolation(violation.Id))">Delete</button>
+                        <AuthorizeView Policy="ViolationsUpdate">
+                            <Authorized>
+                                <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(violation.Id))">Edit</button>
+                            </Authorized>
+                        </AuthorizeView>
+                        <AuthorizeView Policy="ViolationsDelete">
+                            <Authorized>
+                                <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolation(violation.Id))">Delete</button>
+                            </Authorized>
+                        </AuthorizeView>
                     </td>
                 </tr>
             }

@@ -1,0 +1,141 @@
+# Service/Repository Safe Update Pattern Rule
+
+When creating or modifying Service or Repository layers that access the database, always use the Safe Update pattern to ensure Entity Framework Foreign Keys are updated properly and tracked correctly.
+
+## Core Requirements
+
+### 1. Use Safe Update Pattern
+- Always use `SafeUpdateAsync<T>()` method from `BaseService` for entity updates
+- Never directly modify entities without fetching them from the database first
+- This prevents EF change tracking issues with navigation properties
+
+### 2. Database Access Patterns
+- Services/Repositories should inherit from `BaseService` when possible
+- Use the `_dbContextFactory` pattern for database access
+- Implement proper entity ID retrieval in derived classes
+
+### 3. Entity Update Guidelines
+- Fetch existing entity from database before updates
+- Apply changes through the update action parameter
+- Let Entity Framework handle change tracking properly
+
+## Implementation Examples
+
+### ✅ Good - Using Safe Update Pattern
+```csharp
+public class ViolationService : BaseService
+{
+    public ViolationService(IDbContextFactory<ApplicationDbContext> dbContextFactory) 
+        : base(dbContextFactory) { }
+
+    public async Task UpdateViolationAsync(Violation violation)
+    {
+        await SafeUpdateAsync(violation, existingViolation =>
+        {
+            existingViolation.Description = violation.Description;
+            existingViolation.Status = violation.Status;
+            existingViolation.ViolationTypeId = violation.ViolationTypeId;
+            // Navigation properties will be properly tracked
+        });
+    }
+
+    protected override object GetEntityId<T>(T entity)
+    {
+        return entity switch
+        {
+            Violation violation => violation.Id,
+            ViolationType violationType => violationType.Id,
+            _ => throw new NotSupportedException($"Entity type {typeof(T).Name} not supported")
+        };
+    }
+}
+```
+
+### ❌ Bad - Direct Entity Modification
+```csharp
+public class ViolationService
+{
+    private readonly ApplicationDbContext _context;
+
+    public async Task UpdateViolationAsync(Violation violation)
+    {
+        // ❌ Bad - Directly updating without fetching from database
+        _context.Violations.Update(violation);
+        await _context.SaveChangesAsync();
+        // This can cause navigation property tracking issues
+    }
+}
+```
+
+### ❌ Bad - Manual Entity Fetching
+```csharp
+public async Task UpdateViolationAsync(Violation violation)
+{
+    using var context = _dbContextFactory.CreateDbContext();
+    
+    // ❌ Bad - Manual fetching without using SafeUpdate pattern
+    var existing = await context.Violations.FindAsync(violation.Id);
+    if (existing != null)
+    {
+        existing.Description = violation.Description;
+        existing.Status = violation.Status;
+        await context.SaveChangesAsync();
+    }
+}
+```
+
+## Service/Repository Structure Pattern
+```csharp
+public class ExampleService : BaseService
+{
+    public ExampleService(IDbContextFactory<ApplicationDbContext> dbContextFactory) 
+        : base(dbContextFactory) { }
+
+    // ✅ Good - Use SafeUpdateAsync for all entity updates
+    public async Task UpdateEntityAsync(Entity entity)
+    {
+        await SafeUpdateAsync(entity, existingEntity =>
+        {
+            // Apply all updates here
+            existingEntity.Property1 = entity.Property1;
+            existingEntity.Property2 = entity.Property2;
+            existingEntity.NavigationPropertyId = entity.NavigationPropertyId;
+        });
+    }
+
+    // ✅ Good - Implement GetEntityId for all entity types
+    protected override object GetEntityId<T>(T entity)
+    {
+        return entity switch
+        {
+            Entity e => e.Id,
+            AnotherEntity ae => ae.Id,
+            _ => throw new NotSupportedException($"Entity type {typeof(T).Name} not supported")
+        };
+    }
+}
+```
+
+## Validation Checklist
+- [ ] Service/Repository inherits from `BaseService`
+- [ ] All entity updates use `SafeUpdateAsync<T>()`
+- [ ] `GetEntityId<T>()` is properly implemented for all entity types
+- [ ] No direct `context.Set<T>().Update()` calls
+- [ ] No manual entity fetching and updating
+- [ ] Navigation properties are properly handled
+
+## Anti-Patterns to Avoid
+1. Direct entity updates without fetching from database
+2. Manual context management without SafeUpdate pattern
+3. Direct `Update()` calls on DbSet
+4. Modifying entities without proper change tracking
+5. Not implementing `GetEntityId<T>()` method
+
+## Benefits of Safe Update Pattern
+- Prevents EF change tracking issues
+- Ensures navigation properties are properly updated
+- Maintains data consistency
+- Reduces bugs related to entity state management
+- Provides consistent update behavior across all services
+
+This rule ensures that all database operations in Service/Repository layers follow the Safe Update pattern for proper Entity Framework behavior.

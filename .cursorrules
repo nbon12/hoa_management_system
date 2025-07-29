@@ -1,0 +1,73 @@
+# Cursor AI Rules for HOA Management Company
+
+## Core Development Rules
+
+### 1. Integration Test Requirements
+- **ALWAYS** run integration tests after making any changes to the codebase
+- **MANDATORY**: Execute `dotnet test --verbosity normal` after any AI-generated code changes
+- **VERIFY**: Ensure all 60+ tests pass before considering changes complete
+- **REPORT**: Provide test results summary showing total tests, passed, failed, and duration
+
+### 2. Test Data Isolation
+- **NAMESPACE RULE**: Always use unique test namespaces to prevent data collisions
+- **DATABASE CONSTRAINTS**: Consider database field length limits BEFORE seeding test data
+- **ABBREVIATION PREFERENCE**: If shorter names are needed, abbreviate method names before removing namespace randomness
+- **CLEANUP**: Ensure proper cleanup of test data after each test
+
+### 3. Service Registration
+- **SCOPED SERVICES**: Register services as `Scoped` for proper request isolation
+- **ABSTRACT CLASSES**: Never register abstract classes directly in DI container
+- **CONTEXT USAGE**: Use regular `DbContext` for scoped services, not `DbContextFactory`
+
+### 4. RBAC System Integrity
+- **PERMISSION CHECKS**: Always verify permission-based authorization works correctly
+- **CONCURRENCY**: Ensure no DbContext concurrency issues in authorization flows
+- **ERROR HANDLING**: Implement graceful error handling in authorization services
+
+### 5. Code Quality Standards
+- **NULL SAFETY**: Use null-conditional operators and null checks appropriately
+- **ASYNC PATTERNS**: Use proper async/await patterns throughout
+- **EXCEPTION HANDLING**: Implement proper exception handling with logging
+- **PERFORMANCE**: Optimize database queries (avoid N+1 problems)
+
+### 6. Database Operations
+- **SINGLE QUERIES**: Prefer single efficient queries over multiple database calls
+- **CHANGE TRACKING**: Clear entity tracking when needed to prevent concurrency issues
+- **TRANSACTIONS**: Use transactions for multi-step operations
+
+### 7. Post-Change Validation
+After ANY changes, the AI must:
+1. **RUN TESTS**: Execute `dotnet test --verbosity normal`
+2. **VERIFY RESULTS**: Confirm all tests pass
+3. **CHECK APPLICATION**: Ensure the application starts and runs correctly
+4. **DOCUMENT**: Provide summary of changes and test results
+
+### 8. Error Resolution Priority
+When errors occur:
+1. **IDENTIFY ROOT CAUSE**: Analyze error messages and stack traces
+2. **FIX IMMEDIATELY**: Address the core issue, not just symptoms
+3. **RETEST**: Run tests again after fixes
+4. **VALIDATE**: Ensure no regressions were introduced
+
+### 9. Integration Test Coverage
+Ensure tests cover:
+- Authentication and authorization flows
+- CRUD operations for all entities
+- Permission-based access control
+- Service layer functionality
+- Database operations and constraints
+- Concurrency scenarios
+
+### 10. Production Readiness
+Before considering any feature complete:
+- All integration tests must pass
+- No concurrency issues
+- Proper error handling implemented
+- Performance optimizations applied
+- Security measures verified
+
+## Enforcement
+- **MANDATORY**: These rules must be followed for every code change
+- **VERIFICATION**: Test results must be provided and verified
+- **DOCUMENTATION**: Changes must be documented with rationale
+- **VALIDATION**: Application must be tested to ensure it runs correctly 

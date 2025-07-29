@@ -1,0 +1,192 @@
+# Foreign Key Relationship Testing Standards Rule
+
+When creating tests for entities with foreign key relationships, ensure all three required test patterns are implemented to verify proper foreign key handling and navigation property updates.
+
+## Required Test Patterns
+
+### 1. Basic Foreign Key Update Test
+- Test updating the foreign key property directly
+- Verify the foreign key is updated in the database
+- Ensure the foreign key value is correctly stored
+
+### 2. Frontend Scenario Test
+- Test updating with navigation properties loaded (using `Include()`)
+- Simulate the exact frontend workflow
+- Verify both foreign key and navigation property are updated
+- Test the complete user interaction flow
+
+### 3. Service Layer Test
+- Test the service method specifically
+- Ensure the service handles the update correctly
+- Verify the Safe Update pattern is used properly
+
+## Implementation Examples
+
+### ✅ Good - Complete Test Suite for Foreign Key Relationships
+```csharp
+[TestFixture]
+public class ViolationForeignKeyTests : TestBase
+{
+    [Test]
+    public async Task UpdateViolationType_ShouldUpdateForeignKey()
+    {
+        // Arrange
+        var violation = await CreateTestViolationAsync();
+        var newViolationType = await CreateTestViolationTypeAsync();
+        
+        // Act - Basic Foreign Key Update Test
+        violation.ViolationTypeId = newViolationType.Id;
+        await _context.SaveChangesAsync();
+        
+        // Assert
+        var updatedViolation = await _context.Violations
+            .FirstAsync(v => v.Id == violation.Id);
+        Assert.That(updatedViolation.ViolationTypeId, Is.EqualTo(newViolationType.Id));
+    }
+
+    [Test]
+    public async Task UpdateViolationType_WithNavigationProperty_ShouldUpdateBoth()
+    {
+        // Arrange - Frontend Scenario Test
+        var violation = await _context.Violations
+            .Include(v => v.ViolationType)
+            .FirstAsync();
+        var newViolationType = await CreateTestViolationTypeAsync();
+        
+        // Act - Simulate frontend workflow
+        violation.ViolationTypeId = newViolationType.Id;
+        violation.ViolationType = newViolationType; // Navigation property update
+        await _context.SaveChangesAsync();
+        
+        // Assert - Verify both foreign key and navigation property
+        var updatedViolation = await _context.Violations
+            .Include(v => v.ViolationType)
+            .FirstAsync(v => v.Id == violation.Id);
+        
+        Assert.That(updatedViolation.ViolationTypeId, Is.EqualTo(newViolationType.Id));
+        Assert.That(updatedViolation.ViolationType.Id, Is.EqualTo(newViolationType.Id));
+    }
+
+    [Test]
+    public async Task ViolationService_UpdateViolationType_ShouldUseSafeUpdatePattern()
+    {
+        // Arrange - Service Layer Test
+        var violationService = new ViolationService(_dbContextFactory);
+        var violation = await CreateTestViolationAsync();
+        var newViolationType = await CreateTestViolationTypeAsync();
+        
+        // Act - Test service method
+        violation.ViolationTypeId = newViolationType.Id;
+        await violationService.UpdateViolationAsync(violation);
+        
+        // Assert - Verify service handled update correctly
+        var updatedViolation = await _context.Violations
+            .Include(v => v.ViolationType)
+            .FirstAsync(v => v.Id == violation.Id);
+        
+        Assert.That(updatedViolation.ViolationTypeId, Is.EqualTo(newViolationType.Id));
+        Assert.That(updatedViolation.ViolationType.Id, Is.EqualTo(newViolationType.Id));
+    }
+}
+```
+
+### ❌ Bad - Incomplete Test Coverage
+```csharp
+[Test]
+public async Task UpdateViolationType_ShouldUpdateForeignKey()
+{
+    // ❌ Bad - Only tests basic foreign key update
+    // Missing frontend scenario and service layer tests
+    
+    var violation = await CreateTestViolationAsync();
+    var newViolationType = await CreateTestViolationTypeAsync();
+    
+    violation.ViolationTypeId = newViolationType.Id;
+    await _context.SaveChangesAsync();
+    
+    var updatedViolation = await _context.Violations
+        .FirstAsync(v => v.Id == violation.Id);
+    Assert.That(updatedViolation.ViolationTypeId, Is.EqualTo(newViolationType.Id));
+}
+```
+
+### ❌ Bad - Missing Navigation Property Testing
+```csharp
+[Test]
+public async Task UpdateViolationType_ShouldUpdateForeignKey()
+{
+    // ❌ Bad - Doesn't test navigation properties
+    // Missing Include() and navigation property verification
+    
+    var violation = await CreateTestViolationAsync();
+    var newViolationType = await CreateTestViolationTypeAsync();
+    
+    violation.ViolationTypeId = newViolationType.Id;
+    await _context.SaveChangesAsync();
+    
+    // Missing navigation property verification
+    var updatedViolation = await _context.Violations
+        .FirstAsync(v => v.Id == violation.Id);
+    Assert.That(updatedViolation.ViolationTypeId, Is.EqualTo(newViolationType.Id));
+}
+```
+
+## Test Structure Template
+```csharp
+[TestFixture]
+public class EntityForeignKeyTests : TestBase
+{
+    [Test]
+    public async Task UpdateForeignKey_ShouldUpdateForeignKeyProperty()
+    {
+        // Basic Foreign Key Update Test
+        // Test direct foreign key property update
+        // Verify database storage
+    }
+
+    [Test]
+    public async Task UpdateForeignKey_WithNavigationProperty_ShouldUpdateBoth()
+    {
+        // Frontend Scenario Test
+        // Use Include() to load navigation properties
+        // Simulate frontend workflow
+        // Verify both foreign key and navigation property
+    }
+
+    [Test]
+    public async Task Service_UpdateForeignKey_ShouldUseSafeUpdatePattern()
+    {
+        // Service Layer Test
+        // Test service method specifically
+        // Verify Safe Update pattern usage
+        // Ensure proper handling
+    }
+}
+```
+
+## Validation Checklist
+- [ ] Basic foreign key update test implemented
+- [ ] Frontend scenario test with Include() implemented
+- [ ] Service layer test implemented
+- [ ] Navigation properties are properly tested
+- [ ] Foreign key values are verified in database
+- [ ] Safe Update pattern is tested in service layer
+- [ ] All three test patterns are present for each foreign key relationship
+
+## Anti-Patterns to Avoid
+1. Testing only foreign key property without navigation properties
+2. Missing Include() in frontend scenario tests
+3. Not testing service layer methods
+4. Skipping navigation property verification
+5. Testing only one aspect of foreign key relationships
+6. Not simulating real frontend workflows
+
+## Benefits of Complete Test Coverage
+- Ensures foreign keys are properly updated
+- Verifies navigation properties work correctly
+- Tests the complete user workflow
+- Validates service layer implementation
+- Prevents EF change tracking issues
+- Ensures data consistency
+
+This rule ensures comprehensive testing of foreign key relationships following the established testing standards.

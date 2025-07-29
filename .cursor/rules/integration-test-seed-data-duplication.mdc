@@ -1,0 +1,99 @@
+# Integration Test Data Isolation Rule
+
+When creating integration tests, always use unique namespaces and identifiers to prevent conflicts between test runs and parallel execution.
+
+## Core Requirements
+
+### 1. Unique Test Data
+- Use unique prefixes: `Test_{timestamp}_{guid}_` or `Test_{methodName}_{guid}_`
+- Include test method name in identifiers
+- Never use static/hardcoded test data
+
+### 2. Database Isolation
+- Use unique database names/schemas per test run
+- Implement proper cleanup between tests
+- Use transaction rollback or separate test databases
+
+### 3. File System Isolation
+- Use unique directories with GUIDs
+- Clean up test files after execution
+- Use temp directories with unique names
+
+## Implementation Examples
+
+### Database Tests
+```csharp
+// ✅ Good
+var uniqueId = $"Test_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}";
+var testUser = new User 
+{ 
+    Email = $"{uniqueId}_user@test.com",
+    UserName = $"{uniqueId}_username"
+};
+
+// ❌ Bad
+var testUser = new User 
+{ 
+    Email = "test@example.com",
+    UserName = "testuser"
+};
+```
+
+### File System Tests
+```csharp
+// ✅ Good
+var testDir = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid():N}");
+Directory.CreateDirectory(testDir);
+
+// ❌ Bad
+var testDir = Path.Combine(Path.GetTempPath(), "TestData");
+```
+
+### API Tests
+```csharp
+// ✅ Good
+var testId = $"test_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}";
+var response = await client.PostAsync("/api/resource", 
+    JsonContent.Create(new { name = $"{testId}_resource" }));
+
+// ❌ Bad
+var response = await client.PostAsync("/api/resource", 
+    JsonContent.Create(new { name = "test_resource" }));
+```
+
+## Test Setup Pattern
+```csharp
+[Test]
+public async Task TestMethod_ShouldDoSomething()
+{
+    // Generate unique identifier for this test
+    var testId = $"Test_{nameof(TestMethod_ShouldDoSomething)}_{Guid.NewGuid():N}";
+    
+    // Use unique data
+    var testData = new TestModel { Name = $"{testId}_data" };
+    
+    // Test logic here...
+    
+    // Cleanup in finally block or test teardown
+}
+```
+
+## Validation Checklist
+- [ ] All test data uses unique namespaces
+- [ ] Database operations are isolated
+- [ ] File operations use unique paths
+- [ ] Proper cleanup implemented
+- [ ] Tests can run in parallel
+- [ ] Tests are idempotent
+
+## Anti-Patterns to Avoid
+1. Static test data (hardcoded values)
+2. Shared state between tests
+3. Incomplete cleanup
+4. Race conditions in parallel execution
+5. External dependencies without isolation
+
+This rule ensures integration tests are robust and conflict-free across all environments.
+alwaysApply: false
+---
+

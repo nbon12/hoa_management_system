@@ -1,6 +1,6 @@
 @page "/violationtypes"
 @rendermode InteractiveServer
-@attribute [Authorize]
+@attribute [Authorize(Policy = "ViolationTypesRead")]
 @using Microsoft.AspNetCore.Authorization
 @inject HOAManagementCompany.Services.ViolationService ViolationService
 @inject NavigationManager Navigation 
@@ -10,9 +10,13 @@
 
 <h1>Violation Types</h1>
 
-<p>
-    <a href="/violationtypes/create" class="btn btn-primary">Add New Violation Type</a>
-</p>
+<AuthorizeView Policy="ViolationTypesCreate">
+    <Authorized>
+        <p>
+            <a href="/violationtypes/create" class="btn btn-primary">Add New Violation Type</a>
+        </p>
+    </Authorized>
+</AuthorizeView>
 
 @if (violationTypes == null)
 {
@@ -41,9 +45,21 @@ else
                     <td>@type.Name</td>
                     <td>@type.CovenantText</td>
                     <td>
-                        <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(type.Id))">Edit</button>
-                        <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolationType(type.Id))">Delete</button>
-                        <button class="btn btn-sm btn-danger" @onclick="(async () => await TestPrint(type.Id))">TestPrint</button>
+                        <AuthorizeView Policy="ViolationTypesUpdate">
+                            <Authorized>
+                                <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(type.Id))">Edit</button>
+                            </Authorized>
+                        </AuthorizeView>
+                        <AuthorizeView Policy="ViolationTypesDelete">
+                            <Authorized>
+                                <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolationType(type.Id))">Delete</button>
+                            </Authorized>
+                        </AuthorizeView>
+                        <AuthorizeView Policy="ViolationTypesRead">
+                            <Authorized>
+                                <button class="btn btn-sm btn-danger" @onclick="(async () => await TestPrint(type.Id))">TestPrint</button>
+                            </Authorized>
+                        </AuthorizeView>
                     </td>
                 </tr>
             }

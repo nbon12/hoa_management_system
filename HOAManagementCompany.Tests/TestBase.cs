@@ -56,14 +56,30 @@ public abstract class TestBase : IDisposable
 
     /// <summary>
     /// Generates a unique test namespace with a random component to prevent conflicts between test runs
+    /// Prioritizes randomness over method name length to ensure database field constraints are met
     /// </summary>
     /// <param name="testMethodName">The name of the test method</param>
-    /// <returns>A unique namespace string</returns>
+    /// <returns>A unique namespace string that fits within database constraints</returns>
     protected string GenerateUniqueTestNamespace(string testMethodName)
     {
         var timestamp = DateTime.UtcNow.ToString("HHmmss");
         var randomSuffix = _random.Next(1000, 9999);
-        return $"{testMethodName}_{timestamp}_{randomSuffix}";
+        
+        // Calculate available space for method name
+        // Most database fields have constraints (e.g., varchar(50), varchar(100))
+        // We prioritize randomness (timestamp + random) over method name length
+        // Format: {methodName}_{timestamp}_{random} = should fit in typical constraints
+        
+        // For most database fields, we assume a conservative limit of 50-100 chars
+        // timestamp = 6 chars, random = 4 chars, separators = 2 chars = 12 chars total
+        // Available space for method name: 50 - 12 = 38 chars (conservative)
+        
+        var maxMethodNameLength = 38;
+        var abbreviatedMethodName = testMethodName.Length > maxMethodNameLength 
+            ? testMethodName.Substring(0, maxMethodNameLength - 3) + "..." 
+            : testMethodName;
+            
+        return $"{abbreviatedMethodName}_{timestamp}_{randomSuffix}";
     }
 
     protected async Task CleanupDatabaseAsync()

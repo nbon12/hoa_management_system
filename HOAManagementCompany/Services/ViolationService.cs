@@ -3,62 +3,57 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Services
 {
-    public class ViolationService : BaseService
+    public class ViolationService
     {
-        public ViolationService(IDbContextFactory<ApplicationDbContext> dbContextFactory) 
-            : base(dbContextFactory)
+        private readonly ApplicationDbContext _context;
+
+        public ViolationService(ApplicationDbContext context)
         {
+            _context = context;
         }
         
         // ViolationType methods
         // NEW METHOD: To get a single Violation Type by Id (useful for edit pages)
         public async Task<ViolationType?> GetViolationTypeByIdAsync(Guid id)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            return await context.ViolationTypes.FindAsync(id);
+            return await _context.ViolationTypes.FindAsync(id);
         }
         public async Task<List<ViolationType>> GetViolationTypesAsync()
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            return await context.ViolationTypes.OrderBy(vt => vt.Name).ToListAsync();
+            return await _context.ViolationTypes.OrderBy(vt => vt.Name).ToListAsync();
         }
         public async Task AddViolationTypeAsync(ViolationType violationType)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            context.ViolationTypes.Add(violationType);
-            await context.SaveChangesAsync();
+            _context.ViolationTypes.Add(violationType);
+            await _context.SaveChangesAsync();
         }
         public async Task UpdateViolationTypeAsync(ViolationType violationType)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            context.ViolationTypes.Update(violationType);
-            await context.SaveChangesAsync();
+            _context.ViolationTypes.Update(violationType);
+            await _context.SaveChangesAsync();
         }
 
         public async Task DeleteViolationTypeAsync(Guid id)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            var violationType = await context.ViolationTypes.FindAsync(id);
+            var violationType = await _context.ViolationTypes.FindAsync(id);
             if (violationType != null)
             {
-                context.ViolationTypes.Remove(violationType);
-                await context.SaveChangesAsync();
+                _context.ViolationTypes.Remove(violationType);
+                await _context.SaveChangesAsync();
             }
         }
         
         // Violation methods
         public async Task<Violation?> GetViolationByIdAsync(Guid id)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            return await context.Violations
+            return await _context.Violations
                 .Include(v => v.ViolationType)
                 .FirstOrDefaultAsync(v => v.Id == id);
         }
         
         public async Task<List<Violation>> GetViolationsAsync()
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            return await context.Violations
+            return await _context.Violations
                 .Include(v => v.ViolationType)
                 .OrderByDescending(v => v.OccurrenceDate)
                 .ToListAsync();
@@ -66,41 +61,33 @@ namespace HOAManagementCompany.Services
         
         public async Task AddViolationAsync(Violation violation)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            context.Violations.Add(violation);
-            await context.SaveChangesAsync();
+            _context.Violations.Add(violation);
+            await _context.SaveChangesAsync();
         }
         
         public async Task UpdateViolationAsync(Violation violation)
         {
-            await SafeUpdateAsync(violation, existingViolation =>
+            var existingViolation = await _context.Violations.FindAsync(violation.Id);
+            if (existingViolation != null)
             {
                 existingViolation.Description = violation.Description;
                 existingViolation.Status = violation.Status;
                 existingViolation.OccurrenceDate = violation.OccurrenceDate;
                 existingViolation.ViolationTypeId = violation.ViolationTypeId;
-            });
+                await _context.SaveChangesAsync();
+            }
         }
         
         public async Task DeleteViolationAsync(Guid id)
         {
-            using var context = _dbContextFactory.CreateDbContext();
-            var violation = await context.Violations.FindAsync(id);
+            var violation = await _context.Violations.FindAsync(id);
             if (violation != null)
             {
-                context.Violations.Remove(violation);
-                await context.SaveChangesAsync();
+                _context.Violations.Remove(violation);
+                await _context.SaveChangesAsync();
             }
         }
 
-        protected override object GetEntityId<T>(T entity) where T : class
-        {
-            return entity switch
-            {
-                Violation violation => violation.Id,
-                ViolationType violationType => violationType.Id,
-                _ => throw new ArgumentException($"Unsupported entity type: {typeof(T).Name}")
-            };
-        }
+
     }
 }

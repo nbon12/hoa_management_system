@@ -10,6 +10,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
     public DbSet<Violation> Violations { get; set; }
     public DbSet<ViolationType> ViolationTypes { get; set; }
+    public DbSet<RolePermission> RolePermissions { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,19 +74,75 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
         }
         else
         {
-            // Ensure existing admin user has Administrator role
-            var userRoles = await userManager.GetRolesAsync(adminUser);
-            
-            // Remove any "Admin" role and replace with "Administrator"
-            if (userRoles.Contains("Admin"))
-            {
-                await userManager.RemoveFromRoleAsync(adminUser, "Admin");
-            }
-            
-            if (!userRoles.Contains(HOAManagementCompany.Constants.Roles.Administrator))
-            {
-                await userManager.AddToRoleAsync(adminUser, HOAManagementCompany.Constants.Roles.Administrator);
-            }
+                    // Ensure existing admin user has Administrator role
+        var userRoles = await userManager.GetRolesAsync(adminUser);
+        
+        // Remove any "Admin" role and replace with "Administrator"
+        if (userRoles.Contains("Admin"))
+        {
+            await userManager.RemoveFromRoleAsync(adminUser, "Admin");
         }
+        
+        if (!userRoles.Contains(HOAManagementCompany.Constants.Roles.Administrator))
+        {
+            await userManager.AddToRoleAsync(adminUser, HOAManagementCompany.Constants.Roles.Administrator);
+        }
+
+        // Seed role permissions
+        await SeedRolePermissionsAsync(scope.ServiceProvider.GetRequiredService<ApplicationDbContext>());
+        }
+    }
+
+    private static async Task SeedRolePermissionsAsync(ApplicationDbContext context)
+    {
+        // Check if permissions already exist
+        if (await context.RolePermissions.AnyAsync())
+            return;
+
+        var permissions = new List<RolePermission>();
+
+        // Administrator permissions - full access to everything
+        var adminPermissions = new[]
+        {
+            Permissions.ViolationsRead, Permissions.ViolationsCreate, Permissions.ViolationsUpdate, Permissions.ViolationsDelete,
+            Permissions.ViolationTypesRead, Permissions.ViolationTypesCreate, Permissions.ViolationTypesUpdate, Permissions.ViolationTypesDelete,
+            Permissions.UsersRead, Permissions.UsersCreate, Permissions.UsersUpdate, Permissions.UsersDelete,
+            Permissions.RolesManage
+        };
+
+        foreach (var permission in adminPermissions)
+        {
+            permissions.Add(new RolePermission
+            {
+                Id = Guid.NewGuid(),
+                RoleName = HOAManagementCompany.Constants.Roles.Administrator,
+                Permission = permission,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        // Board Member permissions - read-only access to violations, read-only access to violation types
+        var boardMemberPermissions = new[]
+        {
+            Permissions.ViolationsRead,
+            Permissions.ViolationTypesRead
+        };
+
+        foreach (var permission in boardMemberPermissions)
+        {
+            permissions.Add(new RolePermission
+            {
+                Id = Guid.NewGuid(),
+                RoleName = HOAManagementCompany.Constants.Roles.BoardMember,
+                Permission = permission,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        // Homeowner permissions - no access to violations or violation types
+        // (No permissions added for homeowners)
+
+        await context.RolePermissions.AddRangeAsync(permissions);
+        await context.SaveChangesAsync();
     }
 }
