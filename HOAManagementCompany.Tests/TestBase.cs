@@ -10,6 +10,7 @@ public abstract class TestBase : IDisposable
 {
     protected readonly ApplicationDbContext DbContext;
     protected readonly IServiceProvider ServiceProvider;
+    private static readonly Random _random = new Random();
 
     protected TestBase()
     {
@@ -51,6 +52,18 @@ public abstract class TestBase : IDisposable
         
         // Clear any existing entity tracking to ensure clean state
         DbContext.ChangeTracker.Clear();
+    }
+
+    /// <summary>
+    /// Generates a unique test namespace with a random component to prevent conflicts between test runs
+    /// </summary>
+    /// <param name="testMethodName">The name of the test method</param>
+    /// <returns>A unique namespace string</returns>
+    protected string GenerateUniqueTestNamespace(string testMethodName)
+    {
+        var timestamp = DateTime.UtcNow.ToString("HHmmss");
+        var randomSuffix = _random.Next(1000, 9999);
+        return $"{testMethodName}_{timestamp}_{randomSuffix}";
     }
 
     protected async Task CleanupDatabaseAsync()

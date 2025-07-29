@@ -27,6 +27,7 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 6;
+    options.User.RequireUniqueEmail = true;
 })
 .AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>();

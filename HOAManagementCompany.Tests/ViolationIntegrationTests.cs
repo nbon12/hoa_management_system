@@ -10,7 +10,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task CreateViolation_ShouldSucceed()
     {
-        var ns = nameof(CreateViolation_ShouldSucceed);
+        var ns = GenerateUniqueTestNamespace(nameof(CreateViolation_ShouldSucceed));
         try
         {
             // Arrange
@@ -42,7 +42,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task ReadViolation_WithViolationType_ShouldIncludeRelatedData()
     {
-        var ns = nameof(ReadViolation_WithViolationType_ShouldIncludeRelatedData);
+        var ns = GenerateUniqueTestNamespace(nameof(ReadViolation_WithViolationType_ShouldIncludeRelatedData));
         try
         {
             // Arrange
@@ -65,7 +65,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task UpdateViolation_ShouldModifyData()
     {
-        var ns = nameof(UpdateViolation_ShouldModifyData);
+        var ns = GenerateUniqueTestNamespace(nameof(UpdateViolation_ShouldModifyData));
         try
         {
             // Arrange
@@ -92,7 +92,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task UpdateViolation_ViolationTypeId_ShouldModifyData()
     {
-        var ns = nameof(UpdateViolation_ViolationTypeId_ShouldModifyData);
+        var ns = GenerateUniqueTestNamespace(nameof(UpdateViolation_ViolationTypeId_ShouldModifyData));
         try
         {
             // Arrange
@@ -100,11 +100,9 @@ public class ViolationIntegrationTests : TestBase
             var newViolationType = await CreateTestViolationTypeAsync(ns, "NEW_TYPE", "New covenant");
             var violation = await CreateTestViolationAsync(ns, originalViolationType.Id, "Test violation", ViolationStatus.Open);
             var originalId = violation.Id;
-            
             // Act
             violation.ViolationTypeId = newViolationType.Id;
             await DbContext.SaveChangesAsync();
-            
             // Assert
             var updatedViolation = await DbContext.Violations
                 .Include(v => v.ViolationType)
@@ -123,7 +121,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task UpdateViolation_ViolationTypeId_UsingService_ShouldModifyData()
     {
-        var ns = nameof(UpdateViolation_ViolationTypeId_UsingService_ShouldModifyData);
+        var ns = GenerateUniqueTestNamespace(nameof(UpdateViolation_ViolationTypeId_UsingService_ShouldModifyData));
         try
         {
             // Arrange
@@ -153,7 +151,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task UpdateViolation_ViolationTypeId_WithNavigationProperty_ShouldModifyData()
     {
-        var ns = nameof(UpdateViolation_ViolationTypeId_WithNavigationProperty_ShouldModifyData);
+        var ns = GenerateUniqueTestNamespace(nameof(UpdateViolation_ViolationTypeId_WithNavigationProperty_ShouldModifyData));
         try
         {
             // Arrange - Simulate the frontend scenario
@@ -193,7 +191,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task UpdateViolation_ViolationTypeId_FrontendScenario_ShouldModifyData()
     {
-        var ns = nameof(UpdateViolation_ViolationTypeId_FrontendScenario_ShouldModifyData);
+        var ns = GenerateUniqueTestNamespace(nameof(UpdateViolation_ViolationTypeId_FrontendScenario_ShouldModifyData));
         try
         {
             // Arrange - Simulate the frontend scenario exactly
@@ -239,7 +237,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task DeleteViolation_ShouldRemoveFromDatabase()
     {
-        var ns = nameof(DeleteViolation_ShouldRemoveFromDatabase);
+        var ns = GenerateUniqueTestNamespace(nameof(DeleteViolation_ShouldRemoveFromDatabase));
         try
         {
             // Arrange
@@ -262,7 +260,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task GetAllViolations_ShouldReturnAllRecords()
     {
-        var ns = nameof(GetAllViolations_ShouldReturnAllRecords);
+        var ns = GenerateUniqueTestNamespace(nameof(GetAllViolations_ShouldReturnAllRecords));
         try
         {
             // Arrange
@@ -288,7 +286,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task GetViolationsByStatus_ShouldFilterCorrectly()
     {
-        var ns = nameof(GetViolationsByStatus_ShouldFilterCorrectly);
+        var ns = GenerateUniqueTestNamespace(nameof(GetViolationsByStatus_ShouldFilterCorrectly));
         try
         {
             // Arrange
@@ -321,7 +319,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task GetViolationsByViolationType_ShouldFilterCorrectly()
     {
-        var ns = nameof(GetViolationsByViolationType_ShouldFilterCorrectly);
+        var ns = GenerateUniqueTestNamespace(nameof(GetViolationsByViolationType_ShouldFilterCorrectly));
         try
         {
             // Arrange
@@ -358,7 +356,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task CreateViolation_WithInvalidViolationTypeId_ShouldThrowException()
     {
-        var ns = nameof(CreateViolation_WithInvalidViolationTypeId_ShouldThrowException);
+        var ns = GenerateUniqueTestNamespace(nameof(CreateViolation_WithInvalidViolationTypeId_ShouldThrowException));
         try
         {
             // Arrange
@@ -386,7 +384,7 @@ public class ViolationIntegrationTests : TestBase
     [Fact]
     public async Task CreateViolation_WithInvalidData_ShouldThrowException()
     {
-        var ns = nameof(CreateViolation_WithInvalidData_ShouldThrowException);
+        var ns = GenerateUniqueTestNamespace(nameof(CreateViolation_WithInvalidData_ShouldThrowException));
         try
         {
             // Arrange

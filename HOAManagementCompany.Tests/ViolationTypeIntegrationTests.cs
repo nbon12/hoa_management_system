@@ -10,7 +10,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task CreateViolationType_ShouldSucceed()
     {
-        var ns = nameof(CreateViolationType_ShouldSucceed);
+        var ns = GenerateUniqueTestNamespace(nameof(CreateViolationType_ShouldSucceed));
         try
         {
             // Arrange
@@ -35,7 +35,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task ReadViolationType_ShouldReturnCorrectData()
     {
-        var ns = nameof(ReadViolationType_ShouldReturnCorrectData);
+        var ns = GenerateUniqueTestNamespace(nameof(ReadViolationType_ShouldReturnCorrectData));
         try
         {
             // Arrange
@@ -60,7 +60,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task UpdateViolationType_ShouldModifyData()
     {
-        var ns = nameof(UpdateViolationType_ShouldModifyData);
+        var ns = GenerateUniqueTestNamespace(nameof(UpdateViolationType_ShouldModifyData));
         try
         {
             // Arrange
@@ -88,7 +88,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task DeleteViolationType_ShouldRemoveFromDatabase()
     {
-        var ns = nameof(DeleteViolationType_ShouldRemoveFromDatabase);
+        var ns = GenerateUniqueTestNamespace(nameof(DeleteViolationType_ShouldRemoveFromDatabase));
         try
         {
             // Arrange
@@ -113,7 +113,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task GetAllViolationTypes_ShouldReturnAllRecords()
     {
-        var ns = nameof(GetAllViolationTypes_ShouldReturnAllRecords);
+        var ns = GenerateUniqueTestNamespace(nameof(GetAllViolationTypes_ShouldReturnAllRecords));
         try
         {
             // Arrange
@@ -139,7 +139,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task CreateViolationType_WithInvalidData_ShouldThrowException()
     {
-        var ns = nameof(CreateViolationType_WithInvalidData_ShouldThrowException);
+        var ns = GenerateUniqueTestNamespace(nameof(CreateViolationType_WithInvalidData_ShouldThrowException));
         try
         {
             // Arrange
@@ -171,7 +171,7 @@ public class ViolationTypeIntegrationTests : TestBase
     [Fact]
     public async Task CreateViolationType_WithDuplicateId_ShouldThrowException()
     {
-        var ns = nameof(CreateViolationType_WithDuplicateId_ShouldThrowException);
+        var ns = GenerateUniqueTestNamespace(nameof(CreateViolationType_WithDuplicateId_ShouldThrowException));
         try
         {
             // Arrange
