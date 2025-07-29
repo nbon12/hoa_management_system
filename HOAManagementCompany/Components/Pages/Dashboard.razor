@@ -2,6 +2,9 @@
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using HOAManagementCompany.Constants
+@inject UserManager<IdentityUser> UserManager
 
 <PageTitle>Dashboard - HOA Management</PageTitle>
 
@@ -29,6 +32,11 @@
                     <div class="card-body">
                         <a href="/violations" class="btn btn-primary me-2">View Violations</a>
                         <a href="/violation-types" class="btn btn-secondary">Manage Violation Types</a>
+                        <AuthorizeView Roles="@HOAManagementCompany.Constants.Roles.Administrator">
+                            <Authorized>
+                                <a href="/user-roles" class="btn btn-warning mt-2">Manage User Roles</a>
+                            </Authorized>
+                        </AuthorizeView>
                     </div>
                 </div>
             </div>
@@ -43,6 +51,7 @@
             <p><strong>Username:</strong> @authContext.User.Identity?.Name</p>
             <p><strong>Authentication Type:</strong> @authContext.User.Identity?.AuthenticationType</p>
             <p><strong>Is Authenticated:</strong> @authContext.User.Identity?.IsAuthenticated</p>
+            <p><strong>Roles:</strong> @string.Join(", ", authContext.User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))</p>
         </div>
     </Authorized>
 </AuthorizeView> 

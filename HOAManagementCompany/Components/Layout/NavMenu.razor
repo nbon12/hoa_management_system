@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@using HOAManagementCompany.Constants
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -25,6 +26,18 @@
                 </div>
             </Authorized>
         </AuthorizeView>
+
+        <AuthorizeView Roles="@HOAManagementCompany.Constants.Roles.Administrator">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="user-roles">
+                        <span class="bi bi-people-fill" aria-hidden="true"></span> User Roles
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="counter">

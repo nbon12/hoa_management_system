@@ -34,7 +34,9 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
 // Add authentication state
 builder.Services.AddCascadingAuthenticationState();
 
-builder.Services.AddScoped<ViolationService>(); 
+builder.Services.AddScoped<ViolationService>();
+builder.Services.AddScoped<UserRoleService>();
+builder.Services.AddHttpContextAccessor(); 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -1,4 +1,5 @@
 using HOAManagementCompany.Models;
+using HOAManagementCompany.Constants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -33,10 +34,24 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-        // Create admin role if it doesn't exist
-        if (!await roleManager.RoleExistsAsync("Admin"))
+        // Create roles if they don't exist
+        var roles = new[] { HOAManagementCompany.Constants.Roles.Administrator, HOAManagementCompany.Constants.Roles.BoardMember, HOAManagementCompany.Constants.Roles.Homeowner };
+        foreach (var roleName in roles)
         {
-            await roleManager.CreateAsync(new IdentityRole("Admin"));
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                await roleManager.CreateAsync(new IdentityRole(roleName));
+            }
+        }
+        
+        // Remove any old "Admin" role if it exists
+        if (await roleManager.RoleExistsAsync("Admin"))
+        {
+            var adminRole = await roleManager.FindByNameAsync("Admin");
+            if (adminRole != null)
+            {
+                await roleManager.DeleteAsync(adminRole);
+            }
         }
 
         // Create default admin user if it doesn't exist
@@ -53,7 +68,23 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             var result = await userManager.CreateAsync(adminUser, "Admin123!");
             if (result.Succeeded)
             {
-                await userManager.AddToRoleAsync(adminUser, "Admin");
+                await userManager.AddToRoleAsync(adminUser, HOAManagementCompany.Constants.Roles.Administrator);
+            }
+        }
+        else
+        {
+            // Ensure existing admin user has Administrator role
+            var userRoles = await userManager.GetRolesAsync(adminUser);
+            
+            // Remove any "Admin" role and replace with "Administrator"
+            if (userRoles.Contains("Admin"))
+            {
+                await userManager.RemoveFromRoleAsync(adminUser, "Admin");
+            }
+            
+            if (!userRoles.Contains(HOAManagementCompany.Constants.Roles.Administrator))
+            {
+                await userManager.AddToRoleAsync(adminUser, HOAManagementCompany.Constants.Roles.Administrator);
             }
         }
     }
