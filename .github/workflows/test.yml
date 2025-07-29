@@ -48,9 +48,7 @@ jobs:
         echo "PostgreSQL is ready!"
     
     - name: Run database migrations
-      run: |
-        cd HOAManagementCompany
-        dotnet ef database update --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+      run: dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
       env:
         ASPNETCORE_ENVIRONMENT: Development
     

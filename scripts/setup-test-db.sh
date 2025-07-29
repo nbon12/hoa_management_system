@@ -20,8 +20,7 @@ psql -h localhost -U postgres -c "CREATE DATABASE test_hoa;" 2>/dev/null || echo
 
 # Run migrations
 echo "Running database migrations..."
-cd HOAManagementCompany
-dotnet ef database update --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
 
 echo "Test database setup complete!"
 echo ""
