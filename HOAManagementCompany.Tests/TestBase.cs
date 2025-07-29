@@ -16,9 +16,13 @@ public abstract class TestBase : IDisposable
         var services = new ServiceCollection();
         
         // Configure database context for testing
+        // Use environment variable for connection string in CI/CD, fallback to local development
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") ??
+                              "Host=localhost;Port=5432;Database=sequestria;Username=sequestria1;Password=HXCKFJ3498fajjAJR94";
+        
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseNpgsql("Host=localhost;Port=5432;Database=sequestria;Username=sequestria1;Password=HXCKFJ3498fajjAJR94");
+            options.UseNpgsql(connectionString);
             options.EnableSensitiveDataLogging();
             options.EnableDetailedErrors();
         });
