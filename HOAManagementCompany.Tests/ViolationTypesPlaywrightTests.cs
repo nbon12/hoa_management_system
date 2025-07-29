@@ -18,8 +18,22 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     {
         try
         {
-            await _page.WaitForSelectorAsync("#page-loading-canary", 
-                new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached, Timeout = 10000 });
+            // First check if the canary is visible
+            var canaryVisible = await _page.Locator("#page-loading-canary").IsVisibleAsync();
+            Console.WriteLine($"Initial canary visibility: {canaryVisible}");
+            
+            if (canaryVisible)
+            {
+                await _page.WaitForSelectorAsync("#page-loading-canary", 
+                    new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached, Timeout = 10000 });
+                Console.WriteLine("Canary disappeared successfully");
+            }
+            else
+            {
+                Console.WriteLine("Canary was not visible, page may already be loaded");
+                // Even if canary is not visible, wait for network to be idle
+                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            }
         }
         catch (TimeoutException)
         {
@@ -40,8 +54,38 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Wait for the loading canary to disappear (page is fully loaded)
         await WaitForPageToLoadAsync();
         
-        // Now verify we're on the right page
-        await _page.WaitForSelectorAsync("h1:has-text('Violation Types')");
+        // Add a small delay to allow Blazor to render the content
+        await _page.WaitForTimeoutAsync(1000);
+        
+        // Debug: Check what's actually on the page
+        var pageTitle = await _page.TitleAsync();
+        Console.WriteLine($"ViolationTypes page title: {pageTitle}");
+        
+        var canaryVisible = await _page.Locator("#page-loading-canary").IsVisibleAsync();
+        Console.WriteLine($"Canary is visible: {canaryVisible}");
+        
+        if (canaryVisible)
+        {
+            await _page.WaitForTimeoutAsync(2000);
+            canaryVisible = await _page.Locator("#page-loading-canary").IsVisibleAsync();
+            Console.WriteLine($"Canary is still visible after 2 seconds: {canaryVisible}");
+        }
+        
+        // Wait for network to be idle (all requests completed)
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        
+        // Now verify we're on the right page with a more robust approach
+        try
+        {
+            await _page.WaitForSelectorAsync("h1:has-text('Violation Types')", new PageWaitForSelectorOptions { Timeout = 10000 });
+        }
+        catch (TimeoutException)
+        {
+            // If h1 is not found, let's check what's actually on the page
+            var pageContent = await _page.ContentAsync();
+            Console.WriteLine($"Page content when h1 not found: {pageContent}");
+            throw;
+        }
     }
 
     public async Task InitializeAsync()
@@ -84,6 +128,12 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         {
             await _page.WaitForSelectorAsync("h1", new PageWaitForSelectorOptions { Timeout = 5000 });
             Console.WriteLine("Application is running and accessible");
+            
+            // Debug: Check what's on the initial page
+            var title = await _page.TitleAsync();
+            var h1Text = await _page.Locator("h1").TextContentAsync();
+            Console.WriteLine($"Page title: {title}");
+            Console.WriteLine($"H1 text: {h1Text}");
         }
         catch (TimeoutException)
         {
