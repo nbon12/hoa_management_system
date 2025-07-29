@@ -301,9 +301,21 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.ClickAsync($"tr:has-text('{originalViolationType.Name}') button:has-text('Edit')");
         await _page.WaitForSelectorAsync("h3:has-text('Edit Violation Type')");
 
+        // Debug: Check what is actually on the page
+        var pageContent = await _page.ContentAsync();
+        Console.WriteLine($"[DEBUG] Page content length: {pageContent.Length}");
+        Console.WriteLine($"[DEBUG] Current page URL: {_page.Url}");
+        if (pageContent.Contains(originalViolationType.Name)) {
+            Console.WriteLine($"[DEBUG] Found violation type name in page content");
+        } else {
+            Console.WriteLine($"[DEBUG] Violation type name NOT found in page content");
+        }
+        
         // Verify form is pre-filled with existing data
         var nameValue = await _page.InputValueAsync("#name");
         var covenantTextValue = await _page.InputValueAsync("#covenantText");
+        Console.WriteLine($"[DEBUG] Name field value: '{nameValue}'");
+        Console.WriteLine($"[DEBUG] Expected name: '{originalViolationType.Name}'");
         Assert.Equal(originalViolationType.Name, nameValue);
         Assert.Equal(originalViolationType.CovenantText, covenantTextValue);
 
