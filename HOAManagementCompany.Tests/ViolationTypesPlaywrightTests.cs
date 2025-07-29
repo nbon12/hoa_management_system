@@ -22,10 +22,15 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Initialize Playwright
         _playwright = await Playwright.CreateAsync();
+        
+        // Check if PLAYWRIGHT_HEADLESS environment variable is set
+        var isHeadless = Environment.GetEnvironmentVariable("PLAYWRIGHT_HEADLESS") == "true";
+        Console.WriteLine($"Playwright Headless Mode: {isHeadless}");
+        
         _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
-            Headless = false, // Set to true for CI/CD
-            SlowMo = 100 // Slow down for debugging
+            Headless = isHeadless, // Use environment variable or default to false for local debugging
+            SlowMo = isHeadless ? 0 : 100 // No slow motion in headless mode for faster execution
         });
         _page = await _browser.NewPageAsync();
 
