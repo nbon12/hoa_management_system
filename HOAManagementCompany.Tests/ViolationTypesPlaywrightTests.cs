@@ -393,6 +393,13 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await WaitForPageToLoadAsync();
         var waitEndTime = DateTime.UtcNow;
         Console.WriteLine($"[TIMING] WaitForPageToLoadAsync took: {(waitEndTime - waitStartTime).TotalMilliseconds}ms");
+        
+        // Wait for the specific violation type to appear in the table
+        var waitForDataStartTime = DateTime.UtcNow;
+        await _page.WaitForSelectorAsync("text=" + violationTypeToKeep.Name);
+        var waitForDataEndTime = DateTime.UtcNow;
+        Console.WriteLine($"[TIMING] Wait for data to appear took: {(waitForDataEndTime - waitForDataStartTime).TotalMilliseconds}ms");
+        
 
         // Set up dialog handler BEFORE clicking the delete button
         var dialogSetupStartTime = DateTime.UtcNow;
@@ -406,6 +413,20 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         var deleteButton = _page.Locator($"tr:has-text('{violationTypeToKeep.Name}') button:has-text('Delete')");
         var locatorEndTime = DateTime.UtcNow;
         Console.WriteLine($"[TIMING] Locator creation took: {(locatorEndTime - locatorStartTime).TotalMilliseconds}ms");
+        Console.WriteLine($"[TIMING] About to call WaitForAsync for delete button");
+        Console.WriteLine($"[TIMING] Looking for button with text: {violationTypeToKeep.Name}");
+        Console.WriteLine($"[TIMING] Current page URL: {_page.Url}");
+        var pageContent = await _page.ContentAsync();
+        Console.WriteLine($"[TIMING] Page content length: {pageContent.Length}");
+        if (pageContent.Contains(violationTypeToKeep.Name)) {
+            Console.WriteLine($"[TIMING] Found violation type name in page content");
+        } else {
+            Console.WriteLine($"[TIMING] Violation type name NOT found in page content");
+        }
+        // Check for any console errors
+        var consoleErrors = await _page.EvaluateAsync<string>("() => { return window.console && window.console.errors ? window.console.errors.join("\n") : "No console errors"; }");
+        Console.WriteLine($"[TIMING] Console errors: {consoleErrors}");
+        
         
         var waitForVisibleStartTime = DateTime.UtcNow;
         await deleteButton.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
