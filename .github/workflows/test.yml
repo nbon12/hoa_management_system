@@ -66,6 +66,25 @@ jobs:
         # Override the connection string for tests to use the test database
         ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
     
+    - name: Install Playwright Browsers
+      run: |
+        cd HOAManagementCompany.Tests
+        dotnet tool install --global Microsoft.Playwright.CLI
+        playwright install
+
+    - name: Start Blazor App
+      run: |
+        dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj --urls=http://localhost:5212 &
+        sleep 10
+
+    - name: Run Playwright frontend tests
+      run: |
+        cd HOAManagementCompany.Tests
+        dotnet test --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+    
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
