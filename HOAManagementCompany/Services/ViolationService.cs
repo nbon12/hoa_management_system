@@ -3,11 +3,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Services
 {
-    public class ViolationService : BaseService
+    public class ViolationService
     {
-        public ViolationService(IDbContextFactory<ApplicationDbContext> dbContextFactory) 
-            : base(dbContextFactory)
+        private readonly IDbContextFactory<ApplicationDbContext> _dbContextFactory;
+        public ViolationService(IDbContextFactory<ApplicationDbContext> dbContextFactory)
         {
+            _dbContextFactory = dbContextFactory;
         }
         
         // ViolationType methods
@@ -73,13 +74,9 @@ namespace HOAManagementCompany.Services
         
         public async Task UpdateViolationAsync(Violation violation)
         {
-            await SafeUpdateAsync(violation, existingViolation =>
-            {
-                existingViolation.Description = violation.Description;
-                existingViolation.Status = violation.Status;
-                existingViolation.OccurrenceDate = violation.OccurrenceDate;
-                existingViolation.ViolationTypeId = violation.ViolationTypeId;
-            });
+            using var context = _dbContextFactory.CreateDbContext();
+            context.Violations.Update(violation);
+            await context.SaveChangesAsync();
         }
         
         public async Task DeleteViolationAsync(Guid id)
@@ -91,16 +88,6 @@ namespace HOAManagementCompany.Services
                 context.Violations.Remove(violation);
                 await context.SaveChangesAsync();
             }
-        }
-
-        protected override object GetEntityId<T>(T entity) where T : class
-        {
-            return entity switch
-            {
-                Violation violation => violation.Id,
-                ViolationType violationType => violationType.Id,
-                _ => throw new ArgumentException($"Unsupported entity type: {typeof(T).Name}")
-            };
         }
     }
 }
