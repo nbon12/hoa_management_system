@@ -10,6 +10,8 @@ namespace HOAManagementCompany.Services
         {
             _dbContextFactory = dbContextFactory;
         }
+        
+        // ViolationType methods
         // NEW METHOD: To get a single Violation Type by Id (useful for edit pages)
         public async Task<ViolationType?> GetViolationTypeByIdAsync(Guid id)
         {
@@ -41,6 +43,49 @@ namespace HOAManagementCompany.Services
             if (violationType != null)
             {
                 context.ViolationTypes.Remove(violationType);
+                await context.SaveChangesAsync();
+            }
+        }
+        
+        // Violation methods
+        public async Task<Violation?> GetViolationByIdAsync(Guid id)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            return await context.Violations
+                .Include(v => v.ViolationType)
+                .FirstOrDefaultAsync(v => v.Id == id);
+        }
+        
+        public async Task<List<Violation>> GetViolationsAsync()
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            return await context.Violations
+                .Include(v => v.ViolationType)
+                .OrderByDescending(v => v.OccurrenceDate)
+                .ToListAsync();
+        }
+        
+        public async Task AddViolationAsync(Violation violation)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            context.Violations.Add(violation);
+            await context.SaveChangesAsync();
+        }
+        
+        public async Task UpdateViolationAsync(Violation violation)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            context.Violations.Update(violation);
+            await context.SaveChangesAsync();
+        }
+        
+        public async Task DeleteViolationAsync(Guid id)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            var violation = await context.Violations.FindAsync(id);
+            if (violation != null)
+            {
+                context.Violations.Remove(violation);
                 await context.SaveChangesAsync();
             }
         }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HOAManagementCompany.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250728234626_Violation")]
+    partial class Violation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -38,12 +41,7 @@ namespace HOAManagementCompany.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("ViolationTypeId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("ViolationTypeId");
 
                     b.ToTable("Violations");
                 });
@@ -81,17 +79,6 @@ namespace HOAManagementCompany.Migrations
                             CovenantText = "Owners must maintain exterior (placeholder)...",
                             Name = "POWERWASH"
                         });
-                });
-
-            modelBuilder.Entity("HOAManagementCompany.Models.Violation", b =>
-                {
-                    b.HasOne("HOAManagementCompany.Models.ViolationType", "ViolationType")
-                        .WithMany()
-                        .HasForeignKey("ViolationTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ViolationType");
                 });
 #pragma warning restore 612, 618
         }

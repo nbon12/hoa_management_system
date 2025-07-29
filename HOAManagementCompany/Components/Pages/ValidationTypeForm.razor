@@ -37,66 +37,60 @@ else
 }
 
 @code {
-[Parameter]
-public Guid Id { get; set; } 
+    [Parameter]
+    public Guid Id { get; set; } 
 
-private ViolationType violationType = new ViolationType();
-private bool IsCreating => Id == Guid.Empty; 
+    private ViolationType violationType = new ViolationType();
+    private bool IsCreating => Id == Guid.Empty;
 
-protected override async Task OnInitializedAsync()
-{
-if (!IsCreating) // If Id is not Guid.Empty, we are in Edit mode
-{
-// Update the ViolationService method to take Guid as well if it doesn't already
-// public async Task<ViolationType?> GetViolationTypeByIdAsync(Guid id)
-var existingViolationType = await ViolationService.GetViolationTypeByIdAsync(Id);
-if (existingViolationType != null)
-{
-violationType = existingViolationType;
-}
-else
-{
-// Handle case where ViolationType with Id is not found
-Console.WriteLine($"ViolationType with ID {Id} not found.");
-Navigation.NavigateTo("/violationtypes"); // Redirect back to list
-}
-}
-else
-{
-// For Create mode, ensure a new Guid is assigned for the new entity
-// EF Core will often do this automatically on Add if Id is Guid,
-// but explicitly setting it can be good practice if you need it earlier.
-violationType.Id = Guid.NewGuid();
-}
-}
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsCreating) // If Id is not Guid.Empty, we are in Edit mode
+        {
+            var existingViolationType = await ViolationService.GetViolationTypeByIdAsync(Id);
+            if (existingViolationType != null)
+            {
+                violationType = existingViolationType;
+            }
+            else
+            {
+                Console.WriteLine($"ViolationType with ID {Id} not found.");
+                Navigation.NavigateTo("/violationtypes"); // Redirect back to list
+            }
+        }
+        else
+        {
+            violationType.Id = Guid.NewGuid();
+        }
+    }
 
-private async Task HandleValidSubmit()
-{
-if (IsCreating) // Create new
-{
-// If Guid.NewGuid() was not set in OnInitializedAsync for creation,
-// EF Core will assign one when Add() is called and SaveChangesAsync().
-// But if you need it before SaveChanges (e.g., for logging), it's good to set it.
-// Ensure violationType.Id is set to a new GUID before adding if you haven't already.
-if (violationType.Id == Guid.Empty)
-{
-violationType.Id = Guid.NewGuid();
-}
-await ViolationService.AddViolationTypeAsync(violationType);
-Console.WriteLine($"Created new ViolationType: {violationType.Name} with ID: {violationType.Id}");
-}
-else // Update existing
-{
-await ViolationService.UpdateViolationTypeAsync(violationType);
-Console.WriteLine($"Updated ViolationType: {violationType.Id} - {violationType.Name}");
-}
+    private async Task HandleValidSubmit()
+    {
+        if (IsCreating) // Create new
+        {
+            // If Guid.NewGuid() was not set in OnInitializedAsync for creation,
+            // EF Core will assign one when Add() is called and SaveChangesAsync().
+            // But if you need it before SaveChanges (e.g., for logging), it's good to set it.
+            // Ensure violationType.Id is set to a new GUID before adding if you haven't already.
+            if (violationType.Id == Guid.Empty)
+            {
+                violationType.Id = Guid.NewGuid();
+            }
+            await ViolationService.AddViolationTypeAsync(violationType);
+            Console.WriteLine($"Created new ViolationType: {violationType.Name} with ID: {violationType.Id}");
+        }
+        else // Update existing
+        {
+            await ViolationService.UpdateViolationTypeAsync(violationType);
+            Console.WriteLine($"Updated ViolationType: {violationType.Id} - {violationType.Name}");
+        }
 
-// Navigate back to the list page after save
-Navigation.NavigateTo("/violationtypes");
-}
+    // Navigate back to the list page after save
+        Navigation.NavigateTo("/violationtypes");
+    }
 
-private void NavigateBack()
-{
-Navigation.NavigateTo("/violationtypes");
-}
+    private void NavigateBack()
+    {
+        Navigation.NavigateTo("/violationtypes");
+    }
 }
