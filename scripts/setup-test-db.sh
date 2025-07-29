@@ -7,6 +7,14 @@ set -e
 
 echo "Setting up test database..."
 
+# Install Entity Framework tools if not already installed
+if ! command -v dotnet-ef &> /dev/null; then
+    echo "Installing Entity Framework tools..."
+    dotnet tool install --global dotnet-ef
+    # Add to PATH if not already there
+    export PATH="$HOME/.dotnet/tools:$PATH"
+fi
+
 # Check if PostgreSQL is running
 if ! pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
     echo "PostgreSQL is not running. Please start PostgreSQL first."

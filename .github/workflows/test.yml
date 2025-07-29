@@ -47,6 +47,11 @@ jobs:
         done
         echo "PostgreSQL is ready!"
     
+    - name: Install Entity Framework tools
+      run: |
+        dotnet tool install --global dotnet-ef
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+    
     - name: Run database migrations
       run: dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
       env:
