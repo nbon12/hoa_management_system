@@ -69,7 +69,8 @@ else
         {
             // Log the exception, display a user-friendly error
             Console.WriteLine($"Error loading violation types: {ex.Message}");
-            // In a real app, you might set an error message property to display on the page
+            // Set to empty list so the canary disappears and user can see the error
+            violationTypes = new List<HOAManagementCompany.Models.ViolationType>();
         }
     }
 

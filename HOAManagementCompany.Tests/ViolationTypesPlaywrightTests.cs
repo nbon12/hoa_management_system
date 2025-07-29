@@ -14,11 +14,44 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
     private string _testNamespace = null!;
     private string _adminUserName = null!;
 
+    private async Task WaitForPageToLoadAsync()
+    {
+        try
+        {
+            await _page.WaitForSelectorAsync("#page-loading-canary", 
+                new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached, Timeout = 10000 });
+        }
+        catch (TimeoutException)
+        {
+            // If canary doesn't disappear, let's see what's on the page
+            var pageContent = await _page.ContentAsync();
+            Console.WriteLine($"Page content when canary didn't disappear: {pageContent}");
+            
+            // Also check if there are any console errors
+            var consoleMessages = await _page.EvaluateAsync<string>("() => { return window.console && window.console.logs ? window.console.logs.join('\\n') : 'No console logs available'; }");
+            Console.WriteLine($"Console messages: {consoleMessages}");
+            
+            throw;
+        }
+    }
+
     public async Task InitializeAsync()
     {
         // Generate unique test namespace
         _testNamespace = $"PLAYWRIGHT_TEST_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{new Random().Next(1000, 9999)}";
         _adminUserName = $"Admin_{DateTime.UtcNow:yyyyMMdd_HHmmss}_{new Random().Next(1000, 9999)}";
+        
+        // Test database connection
+        try
+        {
+            var testViolationTypes = await ViolationService.GetViolationTypesAsync();
+            Console.WriteLine($"Database connection successful. Found {testViolationTypes.Count} violation types.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: Database connection failed: {ex.Message}");
+            throw;
+        }
 
         // Initialize Playwright
         _playwright = await Playwright.CreateAsync();
@@ -36,6 +69,20 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
 
         // Navigate to the application
         await _page.GotoAsync("http://localhost:5212");
+        
+        // Verify the application is running by checking for a basic element
+        try
+        {
+            await _page.WaitForSelectorAsync("h1", new PageWaitForSelectorOptions { Timeout = 5000 });
+            Console.WriteLine("Application is running and accessible");
+        }
+        catch (TimeoutException)
+        {
+            Console.WriteLine("ERROR: Application is not running or not accessible on http://localhost:5212");
+            var pageContent = await _page.ContentAsync();
+            Console.WriteLine($"Page content: {pageContent}");
+            throw;
+        }
     }
 
     public async Task DisposeAsync()
@@ -64,6 +111,38 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         // Assert - Verify we're on the home page
         Assert.Contains("Home", title);
         Assert.Contains("Hello, world!", h1Text ?? "");
+    }
+
+    [Fact]
+    public async Task Admin_CanNavigateDirectlyToViolationTypesPage()
+    {
+        // Act - Navigate directly to ViolationTypes page
+        await _page.GotoAsync("http://localhost:5212/violationtypes");
+        
+        // Debug: Print page content
+        var title = await _page.TitleAsync();
+        Console.WriteLine($"ViolationTypes page title: {title}");
+        
+        // Check if the canary appears
+        var canaryExists = await _page.Locator("#page-loading-canary").IsVisibleAsync();
+        Console.WriteLine($"Canary is visible: {canaryExists}");
+        
+        if (canaryExists)
+        {
+            // Wait a bit and check again
+            await Task.Delay(2000);
+            canaryExists = await _page.Locator("#page-loading-canary").IsVisibleAsync();
+            Console.WriteLine($"Canary is still visible after 2 seconds: {canaryExists}");
+            
+            if (canaryExists)
+            {
+                var pageContent = await _page.ContentAsync();
+                Console.WriteLine($"Page content when canary is stuck: {pageContent}");
+            }
+        }
+        
+        // Assert - Verify we can see the page title
+        Assert.Contains("Violation Types", title);
     }
 
     [Fact]
@@ -245,8 +324,7 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         await _page.ClickAsync("text=Violation Types");
         
         // Wait for the loading canary to disappear (page is fully loaded)
-        await _page.WaitForSelectorAsync("#page-loading-canary", 
-            new PageWaitForSelectorOptions { State = WaitForSelectorState.Detached });
+        await WaitForPageToLoadAsync();
 
         // Act - Click "Add New Violation Type" button
         await _page.ClickAsync("text=Add New Violation Type");
