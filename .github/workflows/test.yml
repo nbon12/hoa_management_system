@@ -55,10 +55,10 @@ jobs:
         ASPNETCORE_ENVIRONMENT: Development
     
     - name: Build & Install
-      run: dotnet build --configuration Debug
+      run: dotnet build HOAManagementCompany.Tests/HOAManagementCompany.Tests.csproj --configuration Debug
 
     - name: Ensure browsers are installed
-      run: pwsh bin/Debug/net8.0/playwright.ps1 install --with-deps
+      run: pwsh $(find HOAManagementCompany.Tests/bin/Debug -name playwright.ps1) install --with-deps
 
     - name: Start Blazor App
       run: |
