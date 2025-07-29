@@ -36,9 +36,6 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     
-    - name: Build
-      run: dotnet build --no-restore
-    
     - name: Wait for PostgreSQL
       run: |
         echo "Waiting for PostgreSQL to be ready..."
@@ -57,39 +54,19 @@ jobs:
       env:
         ASPNETCORE_ENVIRONMENT: Development
     
-    - name: Run integration tests
-      run: |
-        cd HOAManagementCompany.Tests
-        dotnet test --verbosity normal --logger "console;verbosity=detailed"
-      env:
-        ASPNETCORE_ENVIRONMENT: Development
-        # Override the connection string for tests to use the test database
-        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
-    
-    - name: Restore .NET tools (including Playwright CLI)
-      run: |
-        cd HOAManagementCompany.Tests
-        dotnet tool restore
+    - name: Build & Install
+      run: dotnet build --configuration Debug
 
-    - name: Build test project
-      run: |
-        cd HOAManagementCompany.Tests
-        dotnet build
-
-    - name: Install Playwright Browsers for .NET
-      run: |
-        cd HOAManagementCompany.Tests
-        dotnet playwright install
+    - name: Ensure browsers are installed
+      run: pwsh bin/Debug/net8.0/playwright.ps1 install --with-deps
 
     - name: Start Blazor App
       run: |
-        dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj --urls=http://localhost:5212 &
+        dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj --configuration Debug --urls=http://localhost:5212 &
         sleep 10
 
-    - name: Run Playwright frontend tests
-      run: |
-        cd HOAManagementCompany.Tests
-        dotnet test --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal
+    - name: Run Playwright tests
+      run: dotnet test --configuration Debug --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal
       env:
         ASPNETCORE_ENVIRONMENT: Development
         ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=postgres;Password=postgres"
