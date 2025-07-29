@@ -66,11 +66,11 @@ jobs:
         # Override the connection string for tests to use the test database
         ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
     
-    - name: Install Playwright Browsers
+    - name: Install Playwright Browsers for .NET
       run: |
         cd HOAManagementCompany.Tests
-        dotnet tool install --global Microsoft.Playwright.CLI
-        playwright install
+        dotnet build
+        pwsh bin/Debug/net*/playwright.ps1 install
 
     - name: Start Blazor App
       run: |
