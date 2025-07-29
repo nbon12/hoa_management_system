@@ -1,0 +1,75 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_hoa
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --no-restore
+    
+    - name: Wait for PostgreSQL
+      run: |
+        echo "Waiting for PostgreSQL to be ready..."
+        while ! pg_isready -h localhost -p 5432 -U postgres; do
+          sleep 1
+        done
+        echo "PostgreSQL is ready!"
+    
+    - name: Install Entity Framework tools
+      run: |
+        dotnet tool install --global dotnet-ef
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+    
+    - name: Run database migrations
+      run: dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+    
+    - name: Run integration tests
+      run: |
+        cd HOAManagementCompany.Tests
+        dotnet test --verbosity normal --logger "console;verbosity=detailed"
+      env:
+        ASPNETCORE_ENVIRONMENT: Development
+        # Override the connection string for tests to use the test database
+        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: HOAManagementCompany.Tests/TestResults/
+        retention-days: 7 
