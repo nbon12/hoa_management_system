@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using HOAManagementCompany.Models;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Identity;
+using HOAManagementCompany.Services;
 
 namespace HOAManagementCompany.Tests;
 
@@ -10,6 +12,7 @@ public abstract class TestBase : IDisposable
 {
     protected readonly ApplicationDbContext DbContext;
     protected readonly IServiceProvider ServiceProvider;
+    private static readonly Random _random = new Random();
     protected HOAManagementCompany.Services.ViolationService ViolationService => ServiceProvider.GetRequiredService<HOAManagementCompany.Services.ViolationService>();
 
     protected TestBase()
@@ -43,6 +46,20 @@ public abstract class TestBase : IDisposable
             options.EnableDetailedErrors();
         });
         services.AddScoped<HOAManagementCompany.Services.ViolationService>();
+        
+        // Add Identity services
+        services.AddIdentity<IdentityUser, IdentityRole>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.Password.RequiredLength = 8;
+        })
+        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddDefaultTokenProviders();
+        
+        services.AddScoped<UserRoleService>();
 
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -52,6 +69,18 @@ public abstract class TestBase : IDisposable
         
         // Clear any existing entity tracking to ensure clean state
         DbContext.ChangeTracker.Clear();
+    }
+
+    /// <summary>
+    /// Generates a unique test namespace with a random component to prevent conflicts between test runs
+    /// </summary>
+    /// <param name="testMethodName">The name of the test method</param>
+    /// <returns>A unique namespace string</returns>
+    protected string GenerateUniqueTestNamespace(string testMethodName)
+    {
+        var timestamp = DateTime.UtcNow.ToString("HHmmss");
+        var randomSuffix = _random.Next(1000, 9999);
+        return $"{testMethodName}_{timestamp}_{randomSuffix}";
     }
 
     protected async Task CleanupDatabaseAsync()
@@ -199,6 +228,28 @@ public abstract class TestBase : IDisposable
         
         // Clear entity tracking after cleanup
         DbContext.ChangeTracker.Clear();
+    }
+
+    protected async Task CleanupTestUsersAsync(string testNamespace)
+    {
+        try
+        {
+            var userManager = ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+            
+            // Find and remove test users by email pattern
+            var testUsers = await userManager.Users
+                .Where(u => u.Email != null && u.Email.Contains(testNamespace))
+                .ToListAsync();
+            
+            foreach (var user in testUsers)
+            {
+                await userManager.DeleteAsync(user);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error during test user cleanup: {ex.Message}");
+        }
     }
 
     protected async Task<int> GetSeededViolationTypeCountAsync()

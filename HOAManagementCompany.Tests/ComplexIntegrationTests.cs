@@ -10,7 +10,7 @@ public class ComplexIntegrationTests : TestBase
     [Fact]
     public async Task CompleteWorkflow_ShouldHandleComplexScenario()
     {
-        var ns = nameof(CompleteWorkflow_ShouldHandleComplexScenario);
+        var ns = GenerateUniqueTestNamespace(nameof(CompleteWorkflow_ShouldHandleComplexScenario));
         try
         {
             // Arrange
@@ -91,7 +91,7 @@ public class ComplexIntegrationTests : TestBase
     [Fact]
     public async Task BulkOperations_ShouldHandleMultipleRecords()
     {
-        var ns = nameof(BulkOperations_ShouldHandleMultipleRecords);
+        var ns = GenerateUniqueTestNamespace(nameof(BulkOperations_ShouldHandleMultipleRecords));
         try
         {
             // Arrange - Create multiple violation types
@@ -176,7 +176,7 @@ public class ComplexIntegrationTests : TestBase
     [Fact]
     public async Task QueryPerformance_ShouldHandleComplexQueries()
     {
-        var ns = nameof(QueryPerformance_ShouldHandleComplexQueries);
+        var ns = GenerateUniqueTestNamespace(nameof(QueryPerformance_ShouldHandleComplexQueries));
         try
         {
             // Arrange - Create test data
@@ -244,7 +244,7 @@ public class ComplexIntegrationTests : TestBase
     [Fact]
     public async Task TransactionRollback_ShouldHandleErrors()
     {
-        var ns = nameof(TransactionRollback_ShouldHandleErrors);
+        var ns = GenerateUniqueTestNamespace(nameof(TransactionRollback_ShouldHandleErrors));
         try
         {
             // Arrange
@@ -297,7 +297,7 @@ public class ComplexIntegrationTests : TestBase
     [Fact]
     public async Task ConcurrentAccess_ShouldHandleMultipleOperations()
     {
-        var ns = nameof(ConcurrentAccess_ShouldHandleMultipleOperations);
+        var ns = GenerateUniqueTestNamespace(nameof(ConcurrentAccess_ShouldHandleMultipleOperations));
         try
         {
             // Arrange

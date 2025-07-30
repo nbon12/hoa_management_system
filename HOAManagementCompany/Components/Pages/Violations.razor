@@ -1,6 +1,8 @@
 @page "/violations"
 @rendermode InteractiveServer
+@attribute [Authorize]
 @using HOAManagementCompany.Models
+@using Microsoft.AspNetCore.Authorization
 @inject HOAManagementCompany.Services.ViolationService ViolationService
 @inject NavigationManager Navigation 
 @inject IJSRuntime JsRuntime

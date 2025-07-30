@@ -1,0 +1,33 @@
+@page "/Identity/Account/Logout"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Logout - HOA Management</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h2>Logout</h2>
+            </div>
+            <div class="card-body">
+                <p>Are you sure you want to logout?</p>
+                <form method="post" action="/api/Identity/Account/Logout">
+                    <button type="submit" class="btn btn-primary">Yes, logout</button>
+                    <a href="/" class="btn btn-secondary ms-2">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // If accessed directly, perform logout
+        await SignInManager.SignOutAsync();
+        Navigation.NavigateTo("/", replace: true);
+    }
+} 

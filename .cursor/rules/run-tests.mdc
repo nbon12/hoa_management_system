@@ -1,5 +1,5 @@
 ---
-description: always run the integration tests after code changes. Always run Blazor Playwright tests in headless mode after code changes.
+description: always run the tests with the environment variable PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal
 globs:
 alwaysApply: true
 ---
