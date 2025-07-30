@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HOAManagementCompany.Models;
 
-public class ViolationType
+public class ViolationType : BaseAuditableEntity
 {
     public Guid Id { get; set; }
     [Required(ErrorMessage = "Name is required.")]
