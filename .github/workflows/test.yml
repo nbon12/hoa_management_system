@@ -57,12 +57,6 @@ jobs:
     - name: Build & Install
       run: dotnet build HOAManagementCompany.Tests/HOAManagementCompany.Tests.csproj --configuration Debug
 
-    - name: Run Integration Tests
-      run: dotnet test --configuration Debug --filter "FullyQualifiedName~IntegrationTests" --verbosity normal
-      env:
-        ASPNETCORE_ENVIRONMENT: Test
-        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
-
     - name: Ensure browsers are installed
       run: pwsh $(find HOAManagementCompany.Tests/bin/Debug -name playwright.ps1) install --with-deps
 
@@ -74,8 +68,8 @@ jobs:
         ASPNETCORE_ENVIRONMENT: Test
         ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
 
-    - name: Run Playwright tests
-      run: dotnet test --configuration Debug --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal
+    - name: Run All Tests
+      run: dotnet test --configuration Debug --verbosity normal
       env:
         PLAYWRIGHT_HEADLESS: "true"
         ASPNETCORE_ENVIRONMENT: Test
