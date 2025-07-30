@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using HOAManagementCompany.Models;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Identity;
+using HOAManagementCompany.Services;
 
 namespace HOAManagementCompany.Tests;
 
@@ -44,6 +46,20 @@ public abstract class TestBase : IDisposable
             options.EnableDetailedErrors();
         });
         services.AddScoped<HOAManagementCompany.Services.ViolationService>();
+        
+        // Add Identity services
+        services.AddIdentity<IdentityUser, IdentityRole>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = true;
+            options.Password.RequiredLength = 8;
+        })
+        .AddEntityFrameworkStores<ApplicationDbContext>()
+        .AddDefaultTokenProviders();
+        
+        services.AddScoped<UserRoleService>();
 
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -212,6 +228,28 @@ public abstract class TestBase : IDisposable
         
         // Clear entity tracking after cleanup
         DbContext.ChangeTracker.Clear();
+    }
+
+    protected async Task CleanupTestUsersAsync(string testNamespace)
+    {
+        try
+        {
+            var userManager = ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+            
+            // Find and remove test users by email pattern
+            var testUsers = await userManager.Users
+                .Where(u => u.Email != null && u.Email.Contains(testNamespace))
+                .ToListAsync();
+            
+            foreach (var user in testUsers)
+            {
+                await userManager.DeleteAsync(user);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error during test user cleanup: {ex.Message}");
+        }
     }
 
     protected async Task<int> GetSeededViolationTypeCountAsync()

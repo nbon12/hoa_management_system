@@ -40,7 +40,7 @@ fi
 
 # Run the Playwright tests
 echo "🧪 Running Playwright tests..."
-dotnet test HOAManagementCompany.Tests.csproj --filter "FullyQualifiedName~ViolationTypesPlaywrightTests" --verbosity normal --logger "console;verbosity=detailed"
+dotnet test HOAManagementCompany.Tests.csproj --filter "FullyQualifiedName~PlaywrightTests" --verbosity normal --logger "console;verbosity=detailed"
 
 # Check test results
 if [ $? -eq 0 ]; then
