@@ -43,8 +43,11 @@ public class AuditEntityTests : TestBase
         // Assert - Verify all required properties exist and are accessible
         Assert.IsAssignableFrom<DateTime>(testEntity.CreatedAt);
         Assert.IsAssignableFrom<DateTime>(testEntity.UpdatedAt);
-        Assert.IsAssignableFrom<string>(testEntity.CreatedBy);
-        Assert.IsAssignableFrom<string>(testEntity.UpdatedBy);
+        // Test that the properties can be assigned string values (even though they're nullable)
+        testEntity.CreatedBy = "test-user";
+        testEntity.UpdatedBy = "test-user";
+        Assert.Equal("test-user", testEntity.CreatedBy);
+        Assert.Equal("test-user", testEntity.UpdatedBy);
         Assert.IsAssignableFrom<bool>(testEntity.IsDeleted);
     }
 
@@ -67,8 +70,8 @@ public class AuditEntityTests : TestBase
         // Assert
         Assert.Equal(DateTime.MinValue, baseEntity.CreatedAt);
         Assert.Equal(DateTime.MinValue, baseEntity.UpdatedAt);
-        Assert.Equal("", baseEntity.CreatedBy);
-        Assert.Equal("", baseEntity.UpdatedBy);
+        Assert.Null(baseEntity.CreatedBy);
+        Assert.Null(baseEntity.UpdatedBy);
         Assert.False(baseEntity.IsDeleted);
     }
 
@@ -113,7 +116,8 @@ public class AuditEntityTests : TestBase
         // Assert
         Assert.NotEqual(DateTime.MinValue, testEntity.CreatedAt);
         Assert.NotEqual(DateTime.MinValue, testEntity.UpdatedAt);
-        Assert.Equal(testEntity.CreatedAt, testEntity.UpdatedAt);
+        // Use tolerance for DateTime comparison due to microsecond precision differences
+        Assert.True(Math.Abs((testEntity.CreatedAt - testEntity.UpdatedAt).TotalMilliseconds) < 100);
         Assert.NotNull(testEntity.CreatedBy);
         Assert.NotNull(testEntity.UpdatedBy);
         Assert.Equal(testEntity.CreatedBy, testEntity.UpdatedBy);

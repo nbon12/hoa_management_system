@@ -20,6 +20,10 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<Violation> Violations { get; set; }
     public DbSet<ViolationType> ViolationTypes { get; set; }
     
+    // Test entities for audit functionality testing
+    public DbSet<TestAuditableEntity> TestAuditableEntities { get; set; }
+    public DbSet<TestNonAuditableEntity> TestNonAuditableEntities { get; set; }
+    
     public override int SaveChanges()
     {
         ApplyAuditInformation();
@@ -38,7 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .Where(e => e.Entity is IAuditableEntity &&
                         (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted));
 
-        var currentUserId = GetCurrentUserName();
+        var currentUserId = GetCurrentUserId();
 
         foreach (var entry in entries)
         {
@@ -88,20 +92,19 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
         }
     }
 
-    private string GetCurrentUserName()
+    private string? GetCurrentUserId()
     {
-        // In a web application, you'd get the current authenticated user's name/ID
+        // In a web application, you'd get the current authenticated user's ID
         // from HttpContext.User.Identity.Name or from claims.
         if (_serviceProvider != null)
         {
             var httpContextAccessor = _serviceProvider.GetService<IHttpContextAccessor>();
             if (httpContextAccessor?.HttpContext != null && httpContextAccessor.HttpContext.User.Identity?.IsAuthenticated == true)
             {
-                return httpContextAccessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
-                       httpContextAccessor.HttpContext.User.Identity.Name ?? "System";
+                return httpContextAccessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             }
         }
-        return "System"; // Default for background tasks or unauthenticated requests
+        return null; // Default for background tasks or unauthenticated requests
     }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -115,11 +118,55 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .HasForeignKey(v => v.ViolationTypeId)
             .OnDelete(DeleteBehavior.Restrict);
             
+        // Configure audit foreign key relationships for Violation
+        modelBuilder.Entity<Violation>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(v => v.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+        modelBuilder.Entity<Violation>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(v => v.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+        // Configure audit foreign key relationships for ViolationType
+        modelBuilder.Entity<ViolationType>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(vt => vt.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+            
+        modelBuilder.Entity<ViolationType>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(vt => vt.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+            
         modelBuilder.Entity<ViolationType>().HasData(
             new ViolationType { Id = new Guid("b5a56c9b-a14f-4f9b-afc1-82d00663aa01"), Name = "GRASS", CovenantText = "Owners must maintain lawn (placeholder)..."},
         new ViolationType { Id = new Guid("3f843e9d-3e26-4696-84d6-f20f2dc20b1f"), Name = "POWERWASH", CovenantText = "Owners must maintain exterior (placeholder)..."}
             );
             
+        // Configure test entities
+        modelBuilder.Entity<TestAuditableEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired();
+        });
+        
+        modelBuilder.Entity<TestNonAuditableEntity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired();
+        });
+        
+        // Global query filters for soft delete functionality
+        // These filters automatically exclude soft deleted records from all queries
+        modelBuilder.Entity<Violation>().HasQueryFilter(v => !v.IsDeleted);
+        modelBuilder.Entity<ViolationType>().HasQueryFilter(vt => !vt.IsDeleted);
+        modelBuilder.Entity<TestAuditableEntity>().HasQueryFilter(te => !te.IsDeleted);
 
     }
 

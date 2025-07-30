@@ -215,10 +215,11 @@ public abstract class TestBase : IDisposable
             await DbContext.SaveChangesAsync();
         }
         
-        // Remove violation types for this namespace (only those without related violations)
+        // Find and remove violation types that don't have related violations
         var violationTypes = await DbContext.ViolationTypes
+            .IgnoreQueryFilters()
             .Where(vt => vt.Name.StartsWith(testNamespace + "_") && 
-                        !DbContext.Violations.Any(v => v.ViolationTypeId == vt.Id))
+                        !DbContext.Violations.IgnoreQueryFilters().Any(v => v.ViolationTypeId == vt.Id))
             .ToListAsync();
         if (violationTypes.Any())
         {

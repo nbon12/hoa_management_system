@@ -39,13 +39,32 @@ public class AuditLogicTests : TestBase
     {
         // Arrange & Act - Create a test class that implements IAuditableEntity
         var testEntity = new TestAuditableEntity();
+        var entityType = typeof(TestAuditableEntity);
 
         // Assert - Verify all required properties exist and are accessible
         Assert.IsAssignableFrom<DateTime>(testEntity.CreatedAt);
         Assert.IsAssignableFrom<DateTime>(testEntity.UpdatedAt);
-        Assert.IsAssignableFrom<string>(testEntity.CreatedBy);
-        Assert.IsAssignableFrom<string>(testEntity.UpdatedBy);
         Assert.IsAssignableFrom<bool>(testEntity.IsDeleted);
+        
+        // Check property types using reflection
+        var createdByProperty = entityType.GetProperty("CreatedBy");
+        var updatedByProperty = entityType.GetProperty("UpdatedBy");
+        
+        Assert.NotNull(createdByProperty);
+        Assert.NotNull(updatedByProperty);
+        Assert.Equal(typeof(string), createdByProperty.PropertyType);
+        Assert.Equal(typeof(string), updatedByProperty.PropertyType);
+        
+        // Also verify the property types are correct for non-nullable properties
+        Assert.Equal(typeof(DateTime), testEntity.CreatedAt.GetType());
+        Assert.Equal(typeof(DateTime), testEntity.UpdatedAt.GetType());
+        Assert.Equal(typeof(bool), testEntity.IsDeleted.GetType());
+        
+        // For nullable string properties, we need to assign a value first to check the type
+        testEntity.CreatedBy = "test";
+        testEntity.UpdatedBy = "test";
+        Assert.Equal(typeof(string), testEntity.CreatedBy.GetType());
+        Assert.Equal(typeof(string), testEntity.UpdatedBy.GetType());
     }
 
     [Fact]
@@ -67,8 +86,8 @@ public class AuditLogicTests : TestBase
         // Assert
         Assert.Equal(DateTime.MinValue, baseEntity.CreatedAt);
         Assert.Equal(DateTime.MinValue, baseEntity.UpdatedAt);
-        Assert.Equal("", baseEntity.CreatedBy);
-        Assert.Equal("", baseEntity.UpdatedBy);
+        Assert.Null(baseEntity.CreatedBy);
+        Assert.Null(baseEntity.UpdatedBy);
         Assert.False(baseEntity.IsDeleted);
     }
 
@@ -78,20 +97,20 @@ public class AuditLogicTests : TestBase
         // Arrange
         var baseEntity = new TestAuditableEntity();
         var now = DateTime.UtcNow;
-        var testUser = "test-user@example.com";
+        var testUserId = "test-user-id";
 
         // Act
         baseEntity.CreatedAt = now;
         baseEntity.UpdatedAt = now;
-        baseEntity.CreatedBy = testUser;
-        baseEntity.UpdatedBy = testUser;
+        baseEntity.CreatedBy = testUserId;
+        baseEntity.UpdatedBy = testUserId;
         baseEntity.IsDeleted = true;
 
         // Assert
         Assert.Equal(now, baseEntity.CreatedAt);
         Assert.Equal(now, baseEntity.UpdatedAt);
-        Assert.Equal(testUser, baseEntity.CreatedBy);
-        Assert.Equal(testUser, baseEntity.UpdatedBy);
+        Assert.Equal(testUserId, baseEntity.CreatedBy);
+        Assert.Equal(testUserId, baseEntity.UpdatedBy);
         Assert.True(baseEntity.IsDeleted);
     }
 
@@ -123,20 +142,20 @@ public class AuditLogicTests : TestBase
         // Arrange
         var violation = new Violation();
         var now = DateTime.UtcNow;
-        var testUser = "test-user@example.com";
+        var testUserId = "test-user-id";
 
         // Act
         violation.CreatedAt = now;
         violation.UpdatedAt = now;
-        violation.CreatedBy = testUser;
-        violation.UpdatedBy = testUser;
+        violation.CreatedBy = testUserId;
+        violation.UpdatedBy = testUserId;
         violation.IsDeleted = true;
 
         // Assert
         Assert.Equal(now, violation.CreatedAt);
         Assert.Equal(now, violation.UpdatedAt);
-        Assert.Equal(testUser, violation.CreatedBy);
-        Assert.Equal(testUser, violation.UpdatedBy);
+        Assert.Equal(testUserId, violation.CreatedBy);
+        Assert.Equal(testUserId, violation.UpdatedBy);
         Assert.True(violation.IsDeleted);
     }
 
@@ -146,20 +165,20 @@ public class AuditLogicTests : TestBase
         // Arrange
         var violationType = new ViolationType();
         var now = DateTime.UtcNow;
-        var testUser = "test-user@example.com";
+        var testUserId = "test-user-id";
 
         // Act
         violationType.CreatedAt = now;
         violationType.UpdatedAt = now;
-        violationType.CreatedBy = testUser;
-        violationType.UpdatedBy = testUser;
+        violationType.CreatedBy = testUserId;
+        violationType.UpdatedBy = testUserId;
         violationType.IsDeleted = true;
 
         // Assert
         Assert.Equal(now, violationType.CreatedAt);
         Assert.Equal(now, violationType.UpdatedAt);
-        Assert.Equal(testUser, violationType.CreatedBy);
-        Assert.Equal(testUser, violationType.UpdatedBy);
+        Assert.Equal(testUserId, violationType.CreatedBy);
+        Assert.Equal(testUserId, violationType.UpdatedBy);
         Assert.True(violationType.IsDeleted);
     }
 

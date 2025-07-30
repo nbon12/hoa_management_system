@@ -888,11 +888,13 @@ public class ViolationTypesPlaywrightTests : TestBase, IAsyncLifetime
         var updatedViolationType = await ViolationService.GetViolationTypeByIdAsync(violationTypeWithViolations.Id);
         Assert.Equal(updatedName, updatedViolationType.Name);
         
-        // 4. Delete (should fail due to related violations)
-        await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(async () => 
-        {
-            await ViolationService.DeleteViolationTypeAsync(violationTypeWithViolations.Id);
-        });
+        // 4. Delete (should soft delete successfully even with related violations)
+        await ViolationService.DeleteViolationTypeAsync(violationTypeWithViolations.Id);
+        
+        // Verify the violation type was soft deleted
+        var deletedViolationType = await ViolationService.GetViolationTypeByIdIncludingDeletedAsync(violationTypeWithViolations.Id);
+        Assert.NotNull(deletedViolationType);
+        Assert.True(deletedViolationType.IsDeleted);
         
         // Clean up test data
         await CleanupTestNamespaceAsync(_testNamespace);

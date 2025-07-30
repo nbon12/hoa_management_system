@@ -15,8 +15,16 @@ namespace HOAManagementCompany.Services
         public async Task<ViolationType?> GetViolationTypeByIdAsync(Guid id)
         {
             using var context = _dbContextFactory.CreateDbContext();
-            return await context.ViolationTypes.FindAsync(id);
+            return await context.ViolationTypes.FirstOrDefaultAsync(vt => vt.Id == id);
         }
+        
+        // NEW METHOD: To get a single Violation Type by Id including soft deleted ones (for audit purposes)
+        public async Task<ViolationType?> GetViolationTypeByIdIncludingDeletedAsync(Guid id)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            return await context.ViolationTypes.IgnoreQueryFilters().FirstOrDefaultAsync(vt => vt.Id == id);
+        }
+        
         public async Task<List<ViolationType>> GetViolationTypesAsync()
         {
             using var context = _dbContextFactory.CreateDbContext();
