@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using HOAManagementCompany.Models
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Web
 @inject HOAManagementCompany.Services.ViolationService ViolationService
 @inject NavigationManager Navigation 
 @inject IJSRuntime JsRuntime
@@ -16,48 +17,178 @@
     <button class="btn btn-secondary" @onclick="LoadViolations">Refresh</button>
 </p>
 
-@if (violations == null)
+<!-- Search and Filter Controls -->
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Search violations..." 
+                   @bind="searchTerm" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+            <button class="btn btn-outline-secondary" type="button" @onclick="ApplySearch">Search</button>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" @bind="selectedStatus">
+            <option value="">All Statuses</option>
+            <option value="Open">Open</option>
+            <option value="Closed">Closed</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <select class="form-select" @bind="pageSize">
+            <option value="10">10 per page</option>
+            <option value="25">25 per page</option>
+            <option value="50">50 per page</option>
+        </select>
+    </div>
+</div>
+
+@if (pagedViolations == null)
 {
     <p><em>Loading violations...</em></p>
 }
-else if (!violations.Any())
+else if (!pagedViolations.Any())
 {
     <p>No violations found. Click "Add New Violation" to get started.</p>
 }
 else
 {
-    <table class="table table-striped table-hover">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Description</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Occurrence Date</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var violation in violations)
-            {
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
                 <tr>
-                    <td>@violation.Id</td>
-                    <td>@violation.Description</td>
-                    <td>@(violation.ViolationType?.Name ?? "Unknown")</td>
-                    <td>
-                        <span class="badge @(violation.Status == ViolationStatus.Open ? "bg-warning" : "bg-success")">
-                            @violation.Status
-                        </span>
-                    </td>
-                    <td>@violation.OccurrenceDate.ToLocalTime().ToString("MM/dd/yyyy")</td>
-                    <td>
-                        <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(violation.Id))">Edit</button>
-                        <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolation(violation.Id))">Delete</button>
-                    </td>
+                    <th>
+                        <button class="btn btn-link p-0" @onclick="SortByDescription">
+                            Description
+                            @if (currentSortField == "Description")
+                            {
+                                <i class="fas @(currentSortDesc ? "fa-sort-down" : "fa-sort-up")"></i>
+                            }
+                            else
+                            {
+                                <i class="fas fa-sort"></i>
+                            }
+                        </button>
+                    </th>
+                    <th>Type</th>
+                    <th>
+                        <button class="btn btn-link p-0" @onclick="SortByStatus">
+                            Status
+                            @if (currentSortField == "Status")
+                            {
+                                <i class="fas @(currentSortDesc ? "fa-sort-down" : "fa-sort-up")"></i>
+                            }
+                            else
+                            {
+                                <i class="fas fa-sort"></i>
+                            }
+                        </button>
+                    </th>
+                    <th>
+                        <button class="btn btn-link p-0" @onclick="SortByOccurrenceDate">
+                            Occurrence Date
+                            @if (currentSortField == "OccurrenceDate")
+                            {
+                                <i class="fas @(currentSortDesc ? "fa-sort-down" : "fa-sort-up")"></i>
+                            }
+                            else
+                            {
+                                <i class="fas fa-sort"></i>
+                            }
+                        </button>
+                    </th>
+                    <th>Actions</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var violation in pagedViolations)
+                {
+                    <tr>
+                        <td>@violation.Description</td>
+                        <td>@(violation.ViolationType?.Name ?? "Unknown")</td>
+                        <td>
+                            <span class="badge @(violation.Status == ViolationStatus.Open ? "bg-warning" : "bg-success")">
+                                @violation.Status
+                            </span>
+                        </td>
+                        <td>@violation.OccurrenceDate.ToLocalTime().ToString("MM/dd/yyyy")</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" @onclick="(() => NavigateToEdit(violation.Id))">Edit</button>
+                            <button class="btn btn-sm btn-danger" @onclick="(async () => await DeleteViolation(violation.Id))">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    @if (pagedViolations != null && pagedViolations.TotalPages > 1)
+    {
+        <nav aria-label="Violations pagination">
+            <ul class="pagination justify-content-center">
+                <!-- Previous Page -->
+                <li class="page-item @(pagedViolations.HasPrevious ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(pagedViolations.CurrentPage - 1)" disabled="@(!pagedViolations.HasPrevious)">
+                        Previous
+                    </button>
+                </li>
+
+                <!-- Page Numbers -->
+                @{
+                    var startPage = Math.Max(1, pagedViolations.CurrentPage - 2);
+                    var endPage = Math.Min(pagedViolations.TotalPages, pagedViolations.CurrentPage + 2);
+                }
+
+                @if (startPage > 1)
+                {
+                    <li class="page-item">
+                        <button class="page-link" @onclick="() => GoToPage(1)">1</button>
+                    </li>
+                    @if (startPage > 2)
+                    {
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    }
+                }
+
+                @for (int i = startPage; i <= endPage; i++)
+                {
+                    var pageNumber = i;
+                    <li class="page-item @(pageNumber == pagedViolations.CurrentPage ? "active" : "")">
+                        <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                    </li>
+                }
+
+                @if (endPage < pagedViolations.TotalPages)
+                {
+                    @if (endPage < pagedViolations.TotalPages - 1)
+                    {
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    }
+                    <li class="page-item">
+                        <button class="page-link" @onclick="() => GoToPage(pagedViolations.TotalPages)">@pagedViolations.TotalPages</button>
+                    </li>
+                }
+
+                <!-- Next Page -->
+                <li class="page-item @(pagedViolations.HasNext ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(pagedViolations.CurrentPage + 1)" disabled="@(!pagedViolations.HasNext)">
+                        Next
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Page Info -->
+        <div class="text-center text-muted">
+            Showing @((pagedViolations.CurrentPage - 1) * pagedViolations.PageSize + 1) to 
+            @Math.Min(pagedViolations.CurrentPage * pagedViolations.PageSize, pagedViolations.TotalCount) 
+            of @pagedViolations.TotalCount violations
+        </div>
+    }
 }
 
 @code {
@@ -65,7 +196,13 @@ else
     [SupplyParameterFromQuery]
     public string? t { get; set; }
 
-    private List<HOAManagementCompany.Models.Violation>? violations;
+    private PagedList<Violation>? pagedViolations;
+    private string searchTerm = "";
+    private string selectedStatus = "";
+    private int pageSize = 10;
+    private int currentPage = 1;
+    private string currentSortField = "OccurrenceDate";
+    private bool currentSortDesc = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,11 +222,79 @@ else
     {
         try
         {
-            violations = await ViolationService.GetViolationsAsync();
+            var paginationParams = new PaginationParameters
+            {
+                PageNumber = currentPage,
+                PageSize = pageSize,
+                SearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm,
+                OrderBy = currentSortField,
+                OrderDesc = currentSortDesc
+            };
+
+            ViolationStatus? statusFilter = null;
+            if (!string.IsNullOrEmpty(selectedStatus) && Enum.TryParse<ViolationStatus>(selectedStatus, out var status))
+            {
+                statusFilter = status;
+            }
+
+            pagedViolations = await ViolationService.GetViolationsPagedAsync(paginationParams, statusFilter);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading violations: {ex.Message}");
+        }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page >= 1 && page <= (pagedViolations?.TotalPages ?? 1))
+        {
+            currentPage = page;
+            await LoadViolations();
+        }
+    }
+
+    private async Task SortByDescription()
+    {
+        await SortBy("Description");
+    }
+
+    private async Task SortByStatus()
+    {
+        await SortBy("Status");
+    }
+
+    private async Task SortByOccurrenceDate()
+    {
+        await SortBy("OccurrenceDate");
+    }
+
+    private async Task SortBy(string field)
+    {
+        if (currentSortField == field)
+        {
+            currentSortDesc = !currentSortDesc;
+        }
+        else
+        {
+            currentSortField = field;
+            currentSortDesc = false;
+        }
+        currentPage = 1; // Reset to first page when sorting
+        await LoadViolations();
+    }
+
+    private async Task ApplySearch()
+    {
+        currentPage = 1; // Reset to first page when searching
+        await LoadViolations();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ApplySearch();
         }
     }
 

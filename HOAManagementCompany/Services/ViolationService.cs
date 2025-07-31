@@ -72,6 +72,69 @@ namespace HOAManagementCompany.Services
                 .ToListAsync();
         }
         
+        public async Task<PagedList<Violation>> GetViolationsPagedAsync(
+            PaginationParameters paginationParams,
+            ViolationStatus? status = null,
+            Guid? violationTypeId = null,
+            string? testNamespace = null)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            
+            IQueryable<Violation> query = context.Violations.Include(v => v.ViolationType);
+
+            // Apply filters
+            if (status.HasValue)
+            {
+                query = query.Where(v => v.Status == status.Value);
+            }
+
+            if (violationTypeId.HasValue)
+            {
+                query = query.Where(v => v.ViolationTypeId == violationTypeId.Value);
+            }
+
+            // Apply test namespace filter if provided (for testing isolation)
+            if (!string.IsNullOrWhiteSpace(testNamespace))
+            {
+                query = query.Where(v => v.Description.Contains(testNamespace));
+            }
+
+            // Apply search term if provided
+            if (!string.IsNullOrWhiteSpace(paginationParams.SearchTerm))
+            {
+                var searchTerm = paginationParams.SearchTerm.ToLower();
+                query = query.Where(v => v.Description.ToLower().Contains(searchTerm));
+            }
+
+            // Apply ordering
+            if (!string.IsNullOrWhiteSpace(paginationParams.OrderBy))
+            {
+                query = paginationParams.OrderBy.ToLower() switch
+                {
+                    "description" => paginationParams.OrderDesc 
+                        ? query.OrderByDescending(v => v.Description)
+                        : query.OrderBy(v => v.Description),
+                    "status" => paginationParams.OrderDesc 
+                        ? query.OrderByDescending(v => v.Status)
+                        : query.OrderBy(v => v.Status),
+                    "occurrencedate" => paginationParams.OrderDesc 
+                        ? query.OrderByDescending(v => v.OccurrenceDate)
+                        : query.OrderBy(v => v.OccurrenceDate),
+                    "violationtype" => paginationParams.OrderDesc 
+                        ? query.OrderByDescending(v => v.ViolationType.Name)
+                        : query.OrderBy(v => v.ViolationType.Name),
+                    _ => query.OrderByDescending(v => v.OccurrenceDate) // Default ordering
+                };
+            }
+            else
+            {
+                // Default ordering is crucial for consistent pagination
+                query = query.OrderByDescending(v => v.OccurrenceDate);
+            }
+
+            return await PagedList<Violation>.CreateAsync(query, paginationParams.PageNumber, paginationParams.PageSize);
+        }
+        
         public async Task AddViolationAsync(Violation violation)
         {
             using var context = _dbContextFactory.CreateDbContext();
