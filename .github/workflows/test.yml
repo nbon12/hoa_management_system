@@ -63,7 +63,18 @@ jobs:
     - name: Start Blazor App
       run: |
         dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj --configuration Debug --urls=http://localhost:5212 &
-        sleep 10
+        echo "Waiting for application to be ready..."
+        # Wait for the application to be fully ready using health check
+        for i in {1..30}; do
+          if curl -s -f http://localhost:5212/health > /dev/null 2>&1; then
+            echo "Application is ready!"
+            break
+          fi
+          echo "Waiting for application... (attempt $i/30)"
+          sleep 2
+        done
+        # Additional wait to ensure everything is fully initialized
+        sleep 5
       env:
         ASPNETCORE_ENVIRONMENT: Test
         ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"

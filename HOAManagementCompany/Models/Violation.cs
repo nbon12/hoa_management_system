@@ -9,7 +9,7 @@ public enum ViolationStatus
     Closed
 }
 
-public class Violation
+public class Violation : BaseAuditableEntity
 {
     public Guid Id { get; set; }
     

@@ -86,9 +86,9 @@ public class ViolationTypeIntegrationTests : TestBase
     }
 
     [Fact]
-    public async Task DeleteViolationType_ShouldRemoveFromDatabase()
+    public async Task DeleteViolationType_ShouldSoftDeleteFromDatabase()
     {
-        var ns = GenerateUniqueTestNamespace(nameof(DeleteViolationType_ShouldRemoveFromDatabase));
+        var ns = GenerateUniqueTestNamespace(nameof(DeleteViolationType_ShouldSoftDeleteFromDatabase));
         try
         {
             // Arrange
@@ -99,10 +99,12 @@ public class ViolationTypeIntegrationTests : TestBase
             DbContext.ViolationTypes.Remove(violationType);
             await DbContext.SaveChangesAsync();
 
-            // Assert
+            // Assert - Should be soft deleted (IsDeleted = true)
             var deletedViolationType = await DbContext.ViolationTypes
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(vt => vt.Id == violationTypeId);
-            Assert.Null(deletedViolationType);
+            Assert.NotNull(deletedViolationType);
+            Assert.True(deletedViolationType.IsDeleted);
         }
         finally
         {

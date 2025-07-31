@@ -235,9 +235,9 @@ public class ViolationIntegrationTests : TestBase
     }
 
     [Fact]
-    public async Task DeleteViolation_ShouldRemoveFromDatabase()
+    public async Task DeleteViolation_ShouldSoftDeleteFromDatabase()
     {
-        var ns = GenerateUniqueTestNamespace(nameof(DeleteViolation_ShouldRemoveFromDatabase));
+        var ns = GenerateUniqueTestNamespace(nameof(DeleteViolation_ShouldSoftDeleteFromDatabase));
         try
         {
             // Arrange
@@ -247,9 +247,10 @@ public class ViolationIntegrationTests : TestBase
             // Act
             DbContext.Violations.Remove(violation);
             await DbContext.SaveChangesAsync();
-            // Assert
-            var deletedViolation = await DbContext.Violations.FirstOrDefaultAsync(v => v.Id == violationId);
-            Assert.Null(deletedViolation);
+            // Assert - Should be soft deleted (IsDeleted = true)
+            var deletedViolation = await DbContext.Violations.IgnoreQueryFilters().FirstOrDefaultAsync(v => v.Id == violationId);
+            Assert.NotNull(deletedViolation);
+            Assert.True(deletedViolation.IsDeleted);
         }
         finally
         {
@@ -416,16 +417,16 @@ public class ViolationIntegrationTests : TestBase
     }
 
     [Fact]
-    public async Task DeleteViolationType_WithRelatedViolations_ShouldRespectForeignKeyConstraint()
+    public async Task DeleteViolationType_WithRelatedViolations_ShouldSoftDeleteSuccessfully()
     {
         var ns = "FK_Test";
         try
         {
             // Arrange
-            var violationType = await CreateTestViolationTypeAsync(ns, "TO_DELETE_WITH_VIOLATIONS", "Will fail to delete");
+            var violationType = await CreateTestViolationTypeAsync(ns, "TO_DELETE_WITH_VIOLATIONS", "Will be soft deleted");
             var violation = await CreateTestViolationAsync(ns, violationType.Id, "Related violation");
 
-            // Act & Assert - Use a new context to avoid entity tracking conflicts
+            // Act - Use a new context to avoid entity tracking conflicts
             using var newScope = ((IServiceScopeFactory)ServiceProvider.GetService(typeof(IServiceScopeFactory))!).CreateScope();
             var newDbContext = newScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             
@@ -433,7 +434,17 @@ public class ViolationIntegrationTests : TestBase
             Assert.NotNull(violationTypeToDelete);
             
             newDbContext.ViolationTypes.Remove(violationTypeToDelete);
-            await Assert.ThrowsAsync<DbUpdateException>(() => newDbContext.SaveChangesAsync());
+            await newDbContext.SaveChangesAsync(); // Should not throw exception due to soft delete
+            
+            // Assert - ViolationType should be soft deleted
+            var deletedViolationType = await newDbContext.ViolationTypes.IgnoreQueryFilters().FirstOrDefaultAsync(vt => vt.Id == violationType.Id);
+            Assert.NotNull(deletedViolationType);
+            Assert.True(deletedViolationType.IsDeleted);
+            
+            // Related violation should still exist
+            var relatedViolation = await newDbContext.Violations.FirstOrDefaultAsync(v => v.Id == violation.Id);
+            Assert.NotNull(relatedViolation);
+            Assert.False(relatedViolation.IsDeleted);
         }
         finally
         {

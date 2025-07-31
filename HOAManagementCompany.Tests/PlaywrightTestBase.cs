@@ -2,28 +2,30 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using HOAManagementCompany.Models;
-using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Identity;
 using HOAManagementCompany.Services;
+using Microsoft.Playwright;
+using Xunit;
 
 namespace HOAManagementCompany.Tests;
 
-public abstract class TestBase : IDisposable
+public class PlaywrightTestBase : IAsyncLifetime
 {
     protected readonly ApplicationDbContext DbContext;
     protected readonly IServiceProvider ServiceProvider;
+    protected readonly string BaseUrl;
     private static readonly Random _random = new Random();
-    protected HOAManagementCompany.Services.ViolationService ViolationService => ServiceProvider.GetRequiredService<HOAManagementCompany.Services.ViolationService>();
 
-    protected TestBase()
+    protected PlaywrightTestBase()
     {
+        // Create a simple service collection for testing
         var services = new ServiceCollection();
         
         // Configure database context for testing
-        // Use environment variable for connection string in CI/CD, fallback to local development
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") ??
                               "Host=localhost;Port=5432;Database=sequestria;Username=sequestria1;Password=HXCKFJ3498fajjAJR94";
-        
+
+        // Add the test database context
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseNpgsql(connectionString);
@@ -31,43 +33,29 @@ public abstract class TestBase : IDisposable
             options.EnableDetailedErrors();
         });
 
+        // Add Identity services
+        services.AddIdentity<IdentityUser, IdentityRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>();
+
         // Add logging
-        services.AddLogging(builder =>
+        services.AddLogging(loggingBuilder =>
         {
-            builder.AddConsole();
-            builder.SetMinimumLevel(LogLevel.Information);
+            loggingBuilder.AddConsole();
+            loggingBuilder.SetMinimumLevel(LogLevel.Information);
         });
 
         // Add services
-        services.AddDbContextFactory<ApplicationDbContext>(options =>
-        {
-            options.UseNpgsql(connectionString);
-            options.EnableSensitiveDataLogging();
-            options.EnableDetailedErrors();
-        });
-        services.AddScoped<HOAManagementCompany.Services.ViolationService>();
-        
-        // Add Identity services
-        services.AddIdentity<IdentityUser, IdentityRole>(options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireNonAlphanumeric = true;
-            options.Password.RequiredLength = 8;
-        })
-        .AddEntityFrameworkStores<ApplicationDbContext>()
-        .AddDefaultTokenProviders();
-        
         services.AddScoped<UserRoleService>();
+        services.AddScoped<ViolationService>();
 
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
+        // Use localhost:5212 as the base URL (the default development server port)
+        BaseUrl = "http://localhost:5212/";
+        
         // Ensure database is created and migrations are applied
         DbContext.Database.EnsureCreated();
-        
-        // Clear any existing entity tracking to ensure clean state
         DbContext.ChangeTracker.Clear();
     }
 
@@ -256,132 +244,19 @@ public abstract class TestBase : IDisposable
         }
     }
 
-    protected async Task<int> GetSeededViolationTypeCountAsync()
+    public virtual async Task InitializeAsync()
     {
-        // Count all violation types that are not test-related
-        return await DbContext.ViolationTypes
-            .Where(vt => !vt.Name.Contains("TEST_") && 
-                        !vt.Name.Contains("TYPE_") && 
-                        !vt.Name.Contains("PERF_TYPE_") && 
-                        !vt.Name.Contains("GRASS_VIOLATION") && 
-                        !vt.Name.Contains("POWERWASH_VIOLATION") && 
-                        !vt.Name.Contains("FENCE") && 
-                        !vt.Name.Contains("STATUS_TEST") && 
-                        !vt.Name.Contains("TRANSACTION_TEST") && 
-                        !vt.Name.Contains("CONCURRENT_TEST") && 
-                        !vt.Name.Contains("TO_DELETE") && 
-                        !vt.Name.Contains("EXISTING") && 
-                        !vt.Name.Contains("DUPLICATE") && 
-                        !vt.Name.Contains("ORIGINAL_NAME") && 
-                        !vt.Name.Contains("UPDATED_NAME") && 
-                        !vt.Name.Contains("TEST_READ_VIOLATION") && 
-                        !vt.Name.Contains("TEST_GRASS_VIOLATION") && 
-                        !vt.Name.Contains("TEST_VIOLATION") && 
-                        !vt.Name.Contains("TO_DELETE_VIOLATION") && 
-                        !vt.Name.Contains("TO_DELETE_WITH_VIOLATIONS"))
-            .CountAsync();
+        // Ensure database is ready
+        await DbContext.Database.EnsureCreatedAsync();
+        await CleanupDatabaseAsync();
     }
 
-    protected async Task EnsureCleanStateAsync()
+    public virtual async Task DisposeAsync()
     {
-        // Clear any existing entity tracking to avoid conflicts
-        DbContext.ChangeTracker.Clear();
+        // Clean up test data
+        await CleanupDatabaseAsync();
         
-        // Use raw SQL to bypass foreign key constraints for cleanup
-        try
-        {
-            // First, disable foreign key checks temporarily
-            await DbContext.Database.ExecuteSqlRawAsync("SET session_replication_role = replica;");
-            
-            // Delete all test violations first
-            await DbContext.Database.ExecuteSqlRawAsync(@"
-                DELETE FROM ""Violations"" 
-                WHERE ""Description"" LIKE '%TEST_%' 
-                   OR ""Description"" LIKE '%Bulk violation%'
-                   OR ""Description"" LIKE '%Performance violation%'
-                   OR ""Description"" LIKE '%Concurrent violation%'
-                   OR ""Description"" LIKE '%Violation 1%'
-                   OR ""Description"" LIKE '%Violation 2%'
-                   OR ""Description"" LIKE '%Violation 3%'
-                   OR ""Description"" LIKE '%Grass violation%'
-                   OR ""Description"" LIKE '%Powerwash violation%'
-                   OR ""Description"" LIKE '%Lawn is overgrown%'
-                   OR ""Description"" LIKE '%House needs power washing%'
-                   OR ""Description"" LIKE '%Fence needs repair%'
-                   OR ""Description"" LIKE '%Valid violation%'
-                   OR ""Description"" LIKE '%Open violation%'
-                   OR ""Description"" LIKE '%Closed violation%'
-                   OR ""Description"" LIKE '%Status test%'
-                   OR ""Description"" LIKE '%Transaction test%'
-                   OR ""Description"" LIKE '%Will be deleted%'
-                   OR ""Description"" LIKE '%Related violation%'
-                   OR ""Description"" LIKE '%CompleteWorkflow%'
-                   OR ""Description"" LIKE '%BulkOperationsTest%'");
-            
-            // Then delete all test violation types
-            await DbContext.Database.ExecuteSqlRawAsync(@"
-                DELETE FROM ""ViolationTypes"" 
-                WHERE ""Name"" LIKE '%TEST_%'
-                   OR ""Name"" LIKE '%TYPE_%'
-                   OR ""Name"" LIKE '%PERF_TYPE_%'
-                   OR ""Name"" LIKE '%GRASS_VIOLATION%'
-                   OR ""Name"" LIKE '%POWERWASH_VIOLATION%'
-                   OR ""Name"" LIKE '%FENCE%'
-                   OR ""Name"" LIKE '%STATUS_TEST%'
-                   OR ""Name"" LIKE '%TRANSACTION_TEST%'
-                   OR ""Name"" LIKE '%CONCURRENT_TEST%'
-                   OR ""Name"" LIKE '%TO_DELETE%'
-                   OR ""Name"" LIKE '%EXISTING%'
-                   OR ""Name"" LIKE '%DUPLICATE%'
-                   OR ""Name"" LIKE '%ORIGINAL_NAME%'
-                   OR ""Name"" LIKE '%UPDATED_NAME%'
-                   OR ""Name"" LIKE '%TEST_READ_VIOLATION%'
-                   OR ""Name"" LIKE '%TEST_GRASS_VIOLATION%'
-                   OR ""Name"" LIKE '%TEST_VIOLATION%'
-                   OR ""Name"" LIKE '%TO_DELETE_VIOLATION%'
-                   OR ""Name"" LIKE '%TO_DELETE_WITH_VIOLATIONS%'");
-            
-            // Re-enable foreign key checks
-            await DbContext.Database.ExecuteSqlRawAsync("SET session_replication_role = DEFAULT;");
-        }
-        catch (Exception ex)
-        {
-            // If cleanup fails, try a more aggressive approach
-            try
-            {
-                // Re-enable foreign key checks in case the previous attempt failed
-                await DbContext.Database.ExecuteSqlRawAsync("SET session_replication_role = DEFAULT;");
-                
-                // Try to delete by ID ranges or other criteria
-                await DbContext.Database.ExecuteSqlRawAsync(@"
-                    DELETE FROM ""Violations"" 
-                    WHERE ""Description"" IS NOT NULL 
-                      AND (""Description"" LIKE '%TEST%' OR ""Description"" LIKE '%Bulk%' OR ""Description"" LIKE '%Performance%' OR ""Description"" LIKE '%CompleteWorkflow%' OR ""Description"" LIKE '%BulkOperationsTest%')");
-                
-                await DbContext.Database.ExecuteSqlRawAsync(@"
-                    DELETE FROM ""ViolationTypes"" 
-                    WHERE ""Name"" IS NOT NULL 
-                      AND (""Name"" LIKE '%TEST%' OR ""Name"" LIKE '%TYPE%' OR ""Name"" LIKE '%PERF%')");
-            }
-            catch (Exception)
-            {
-                // If even the aggressive cleanup fails, we'll continue anyway
-                // The test might still work with existing data
-            }
-        }
-        finally
-        {
-            // Clear entity tracking after cleanup
-            DbContext.ChangeTracker.Clear();
-        }
-    }
-
-    public void Dispose()
-    {
+        // Dispose resources
         DbContext?.Dispose();
-        if (ServiceProvider is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
     }
 } 

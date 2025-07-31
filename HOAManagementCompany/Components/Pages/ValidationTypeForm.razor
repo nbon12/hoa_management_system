@@ -44,7 +44,11 @@ else
     [Parameter]
     public Guid Id { get; set; } 
 
-    private ViolationType violationType = new ViolationType();
+    private ViolationType violationType = new ViolationType
+    {
+        Name = string.Empty,
+        CovenantText = string.Empty
+    };
     private bool IsCreating => Id == Guid.Empty;
 
     protected override async Task OnInitializedAsync()

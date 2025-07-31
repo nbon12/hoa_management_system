@@ -37,7 +37,10 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<ViolationService>();
 builder.Services.AddScoped<UserRoleService>();
-builder.Services.AddHttpContextAccessor(); 
+builder.Services.AddHttpContextAccessor();
+
+// Add health checks
+builder.Services.AddHealthChecks(); 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -64,6 +67,9 @@ app.MapControllers();
 
 // Add Identity endpoints
 app.MapIdentityApi<IdentityUser>();
+
+// Add health check endpoint
+app.MapHealthChecks("/health");
 
 // Seed data
 await ApplicationDbContext.SeedDataAsync(app.Services);

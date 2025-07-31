@@ -1,0 +1,7 @@
+---
+description: when inventing new features. Code them according to guidelines found either in the official Microsoft Documentation, or use FullStackHero as an example of the patterns that I want to follow https://github.com/fullstackhero/dotnet-starter-kit
+
+Use CQRS design pattern. 
+globs:
+alwaysApply: true
+---

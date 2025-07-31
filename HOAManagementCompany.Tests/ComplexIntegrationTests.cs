@@ -49,7 +49,7 @@ public class ComplexIntegrationTests : TestBase
             var grassViolationsBeforeDelete = await DbContext.Violations.Where(v => v.ViolationTypeId == grassType.Id).ToListAsync();
             Assert.Equal(2, grassViolationsBeforeDelete.Count);
 
-            // Try to delete violation type with related violations (should fail due to foreign key constraint)
+            // Try to delete violation type with related violations (should soft delete successfully)
             // Use a fresh context to avoid entity tracking conflicts
             using var newScope = ((IServiceScopeFactory)ServiceProvider.GetService(typeof(IServiceScopeFactory))!).CreateScope();
             var newDbContext = newScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -58,7 +58,12 @@ public class ComplexIntegrationTests : TestBase
             Assert.NotNull(grassTypeToDelete);
             
             newDbContext.ViolationTypes.Remove(grassTypeToDelete);
-            await Assert.ThrowsAsync<DbUpdateException>(() => newDbContext.SaveChangesAsync());
+            await newDbContext.SaveChangesAsync(); // Should not throw exception due to soft delete
+            
+            // Verify the violation type was soft deleted
+            var softDeletedGrassType = await newDbContext.ViolationTypes.IgnoreQueryFilters().FirstOrDefaultAsync(vt => vt.Id == grassType.Id);
+            Assert.NotNull(softDeletedGrassType);
+            Assert.True(softDeletedGrassType.IsDeleted);
 
             // Act 4 - Delete violations first, then delete violation type
             // Use the original context but clear tracking first
@@ -76,11 +81,11 @@ public class ComplexIntegrationTests : TestBase
                 await DbContext.SaveChangesAsync();
             }
 
-            // Assert 4 - Verify deletion
-            var testRemainingViolations = await DbContext.Violations.Where(v => v.Description.StartsWith(ns + "_")).ToListAsync();
-            var testRemainingViolationTypes = await DbContext.ViolationTypes.Where(vt => vt.Name == $"{ns}_POWERWASH" || vt.Name == $"{ns}_FENCE").ToListAsync();
+            // Assert 4 - Verify deletion (soft delete)
+            var testRemainingViolations = await DbContext.Violations.Where(v => v.Description.StartsWith(ns + "_") && !v.IsDeleted).ToListAsync();
+            var testRemainingViolationTypes = await DbContext.ViolationTypes.Where(vt => (vt.Name == $"{ns}_POWERWASH" || vt.Name == $"{ns}_FENCE") && !vt.IsDeleted).ToListAsync();
             Assert.Equal(2, testRemainingViolations.Count);
-            Assert.Equal(2, testRemainingViolationTypes.Count); // 2 created - 1 deleted
+            Assert.Equal(2, testRemainingViolationTypes.Count); // 2 created - 1 soft deleted
         }
         finally
         {
@@ -161,11 +166,18 @@ public class ComplexIntegrationTests : TestBase
                 await DbContext.SaveChangesAsync();
             }
 
-            // Assert - Verify bulk delete
+            // Assert - Verify bulk delete (soft delete)
             var remainingBulkViolations = await DbContext.Violations
-                .Where(v => v.Description.StartsWith(ns + "_"))
+                .Where(v => v.Description.StartsWith(ns + "_") && !v.IsDeleted)
                 .ToListAsync();
             Assert.Equal(5, remainingBulkViolations.Count);
+            
+            // Verify that the "deleted" violations are soft deleted
+            var softDeletedViolations = await DbContext.Violations
+                .IgnoreQueryFilters()
+                .Where(v => v.Description.StartsWith(ns + "_") && v.IsDeleted)
+                .ToListAsync();
+            Assert.Equal(5, softDeletedViolations.Count);
         }
         finally
         {
