@@ -8,7 +8,7 @@ echo "=================================================="
 
 # Check if the application is running
 echo "🔍 Checking if the application is running..."
-if ! curl -s -f http://localhost:5212 > /dev/null 2>&1; then
+if ! curl -s -f http://localhost:5212/health > /dev/null 2>&1; then
     echo "❌ Application is not running on http://localhost:5212"
     echo "Please start the application first:"
     echo "dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj"

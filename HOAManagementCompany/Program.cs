@@ -19,13 +19,6 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
-{
-    options.UseNpgsql(connectionString);
-    // Note: We can't inject the service provider here as it would create a circular dependency
-    // The audit functionality will work with "System" as the default user for now
-});
-
 // Add Identity services
 builder.Services.AddDefaultIdentity<IdentityUser>(options => {
     options.SignIn.RequireConfirmedAccount = false;
@@ -44,7 +37,10 @@ builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<ViolationService>();
 builder.Services.AddScoped<UserRoleService>();
-builder.Services.AddHttpContextAccessor(); 
+builder.Services.AddHttpContextAccessor();
+
+// Add health checks
+builder.Services.AddHealthChecks(); 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -71,6 +67,9 @@ app.MapControllers();
 
 // Add Identity endpoints
 app.MapIdentityApi<IdentityUser>();
+
+// Add health check endpoint
+app.MapHealthChecks("/health");
 
 // Seed data
 await ApplicationDbContext.SeedDataAsync(app.Services);
