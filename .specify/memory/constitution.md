@@ -1,14 +1,10 @@
 <!--
 Sync Impact Report
 ==================
-Version change: (template/placeholder) → 1.0
-Modified principles: N/A (initial ratification; replaced template placeholders)
-Added sections: Project Purpose, Technology Stack, Backend Principles, Frontend Principles,
-  Security & Authentication, Quality & Code Standards, Governance & Amendments,
-  Spec Kit Testing Constitution (Purpose, Core Definitions, Guiding Principles,
-  Repository/Business-Process/End-to-End Test Constitutions, Cross-Cutting Rules,
-  Recommended Folder Layout, Strategic Outcome)
-Removed sections: Template placeholders [PROJECT_NAME], [PRINCIPLE_*], [SECTION_*], [GOVERNANCE_RULES], etc.
+Version change: 1.0 → 1.1
+Modified principles: Spec Kit Testing Constitution — Guiding Principles (added 2.4 Test-First), new Section 9 Completion Gate
+Added sections: 2.4 Test-First (Red-Green), 9. Completion Gate
+Removed sections: None
 Templates requiring updates:
   .specify/templates/plan-template.md ✅ (Constitution Check references constitution file generically)
   .specify/templates/spec-template.md ✅ (no constitution-specific placeholders)
@@ -18,7 +14,7 @@ Follow-up TODOs: None
 
 # HOA Portal Spec Kit Constitution
 
-**Version**: 1.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-03-14  
+**Version**: 1.1 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-03-14  
 **Authors**: Project Lead
 
 ## 1. Project Purpose
@@ -214,6 +210,14 @@ if (role == "Admin") ApplyAdminDiscount();
 
 **Rationale:** Mixing business logic into factories creates hidden side effects; tests may pass/fail due to setup code rather than the system under test; makes factories brittle and tightly coupled to business rules. Keeps factories reusable, predictable, and declarative.
 
+### 2.4 Test-First (Red-Green)
+
+Tests MUST be written BEFORE code implementation.
+
+- Tests MUST be checked against the specification to ensure they match requirements before implementation begins.
+- It is acceptable for code or tests not to compile initially. Any non-compiling tests MAY be commented out while implementation proceeds.
+- Implementation MUST iteratively uncomment and fix tests to achieve red-to-green style (test fails → implement → test passes).
+
 ## 3. Repository Test Constitution
 
 - Repository tests MUST be isolated in their own transaction.
@@ -301,3 +305,12 @@ spec_kit/
 - **Business-process tests:** validate domain behavior independently of other processes
 - **End-to-end tests:** validate orchestration and workflow correctness
 - **All tests:** fully isolated, deterministic, production-faithful, and safe for parallel execution
+
+## 9. Completion Gate
+
+Implementation for a feature or task MUST continue until:
+
+- **Integration tests** run locally and **all pass**.
+- **UI unit tests** (e.g., Angular component/service tests) run locally and **all pass**.
+
+Work is not considered complete until both of these conditions are satisfied.
