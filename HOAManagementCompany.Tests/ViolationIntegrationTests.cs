@@ -15,13 +15,15 @@ public class ViolationIntegrationTests : TestBase
         {
             // Arrange
             var violationType = await CreateTestViolationTypeAsync(ns, "GRASS_VIOLATION", "Lawn maintenance covenant");
+            var property = await CreateTestPropertyAsync(ns, "LawnProperty");
             var violation = new Violation
             {
                 Id = Guid.NewGuid(),
                 Description = $"{ns}_Lawn is overgrown and needs to be mowed",
                 Status = ViolationStatus.Open,
                 OccurrenceDate = DateTime.UtcNow,
-                ViolationTypeId = violationType.Id
+                ViolationTypeId = violationType.Id,
+                PropertyId = property.Id
             };
             // Act
             DbContext.Violations.Add(violation);
@@ -355,6 +357,74 @@ public class ViolationIntegrationTests : TestBase
     }
 
     [Fact]
+    public async Task GetOpenViolationCountForUserAsync_ReturnsCountForUserPropertiesOnly()
+    {
+        var ns = GenerateUniqueTestNamespace(nameof(GetOpenViolationCountForUserAsync_ReturnsCountForUserPropertiesOnly));
+        try
+        {
+            var violationType = await CreateTestViolationTypeAsync(ns, "GRASS", "Covenant");
+            var property = await CreateTestPropertyAsync(ns, "MyProp");
+            DbContext.ChangeTracker.Clear();
+            var v1 = new Violation
+            {
+                Id = Guid.NewGuid(),
+                Description = $"{ns}_V1",
+                Status = ViolationStatus.Open,
+                OccurrenceDate = DateTime.UtcNow,
+                ViolationTypeId = violationType.Id,
+                PropertyId = property.Id
+            };
+            DbContext.Violations.Add(v1);
+            await DbContext.SaveChangesAsync();
+            var count = await ViolationService.GetOpenViolationCountForUserAsync(property.OwnerUserId);
+            Assert.Equal(1, count);
+            var otherUserCount = await ViolationService.GetOpenViolationCountForUserAsync("other-user-id");
+            Assert.Equal(0, otherUserCount);
+        }
+        finally
+        {
+            await CleanupTestNamespaceAsync(ns);
+        }
+    }
+
+    [Fact]
+    public async Task GetOpenViolationsForUserAsync_ReturnsPaginatedItemsAndTotalCount()
+    {
+        var ns = GenerateUniqueTestNamespace(nameof(GetOpenViolationsForUserAsync_ReturnsPaginatedItemsAndTotalCount));
+        try
+        {
+            var violationType = await CreateTestViolationTypeAsync(ns, "GRASS", "Covenant");
+            var property = await CreateTestPropertyAsync(ns, "MyProp");
+            DbContext.ChangeTracker.Clear();
+            for (int i = 0; i < 5; i++)
+            {
+                var v = new Violation
+                {
+                    Id = Guid.NewGuid(),
+                    Description = $"{ns}_V{i}",
+                    Status = ViolationStatus.Open,
+                    OccurrenceDate = DateTime.UtcNow.AddDays(-i),
+                    ViolationTypeId = violationType.Id,
+                    PropertyId = property.Id
+                };
+                DbContext.Violations.Add(v);
+            }
+            await DbContext.SaveChangesAsync();
+            var (page1, total) = await ViolationService.GetOpenViolationsForUserAsync(property.OwnerUserId, 2, 0);
+            Assert.Equal(5, total);
+            Assert.Equal(2, page1.Count);
+            var (page2, _) = await ViolationService.GetOpenViolationsForUserAsync(property.OwnerUserId, 2, 2);
+            Assert.Equal(2, page2.Count);
+            var (page3, _) = await ViolationService.GetOpenViolationsForUserAsync(property.OwnerUserId, 2, 4);
+            Assert.Equal(1, page3.Count);
+        }
+        finally
+        {
+            await CleanupTestNamespaceAsync(ns);
+        }
+    }
+
+    [Fact]
     public async Task CreateViolation_WithInvalidViolationTypeId_ShouldThrowException()
     {
         var ns = GenerateUniqueTestNamespace(nameof(CreateViolation_WithInvalidViolationTypeId_ShouldThrowException));
@@ -362,13 +432,15 @@ public class ViolationIntegrationTests : TestBase
         {
             // Arrange
             var invalidViolationTypeId = Guid.NewGuid(); // Non-existent ID
+            var property = await CreateTestPropertyAsync(ns, "TestProperty");
             var violation = new Violation
             {
                 Id = Guid.NewGuid(),
                 Description = $"{ns}_Test violation",
                 Status = ViolationStatus.Open,
                 OccurrenceDate = DateTime.UtcNow,
-                ViolationTypeId = invalidViolationTypeId
+                ViolationTypeId = invalidViolationTypeId,
+                PropertyId = property.Id
             };
 
             // Act & Assert
@@ -390,13 +462,15 @@ public class ViolationIntegrationTests : TestBase
         {
             // Arrange
             var violationType = await CreateTestViolationTypeAsync(ns, "TEST", "Test covenant");
+            var property = await CreateTestPropertyAsync(ns, "TestProperty");
             var violation = new Violation
             {
                 Id = Guid.NewGuid(),
                 Description = $"{ns}_", // Invalid: empty description
                 Status = ViolationStatus.Open,
                 OccurrenceDate = DateTime.UtcNow,
-                ViolationTypeId = violationType.Id
+                ViolationTypeId = violationType.Id,
+                PropertyId = property.Id
             };
 
             // Act & Assert

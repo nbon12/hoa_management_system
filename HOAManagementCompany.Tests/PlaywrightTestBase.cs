@@ -172,18 +172,42 @@ public class PlaywrightTestBase : IAsyncLifetime
         return violationType;
     }
 
+    protected async Task<Property> CreateTestPropertyAsync(string testNamespace, string displayName)
+    {
+        DbContext.ChangeTracker.Clear();
+        var userManager = ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        var guid = Guid.NewGuid().ToString("N")[..8];
+        var user = new IdentityUser
+        {
+            UserName = $"{testNamespace}_{displayName}_{guid}@test.hoa.com",
+            Email = $"{testNamespace}_{displayName}_{guid}@test.hoa.com",
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(user, "TestPass1!");
+        var property = new Property
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = user.Id,
+            DisplayName = $"{testNamespace}_{displayName}"
+        };
+        DbContext.Properties.Add(property);
+        await DbContext.SaveChangesAsync();
+        return property;
+    }
+
     protected async Task<Violation> CreateTestViolationAsync(string testNamespace, Guid violationTypeId, string description, ViolationStatus status = ViolationStatus.Open)
     {
         // Clear entity tracking to avoid conflicts
         DbContext.ChangeTracker.Clear();
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "Property");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_{description}",
             Status = status,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationTypeId
+            ViolationTypeId = violationTypeId,
+            PropertyId = property.Id
         };
         DbContext.Violations.Add(violation);
         await DbContext.SaveChangesAsync();
@@ -203,6 +227,19 @@ public class PlaywrightTestBase : IAsyncLifetime
         if (violations.Any())
         {
             DbContext.Violations.RemoveRange(violations);
+            await DbContext.SaveChangesAsync();
+        }
+
+        DbContext.ChangeTracker.Clear();
+
+        // Remove properties for this namespace (FK from violations; before users)
+        var properties = await DbContext.Properties
+            .IgnoreQueryFilters()
+            .Where(p => p.DisplayName.StartsWith(testNamespace + "_"))
+            .ToListAsync();
+        if (properties.Any())
+        {
+            DbContext.Properties.RemoveRange(properties);
             await DbContext.SaveChangesAsync();
         }
         

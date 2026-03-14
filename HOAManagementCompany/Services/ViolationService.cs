@@ -60,6 +60,7 @@ namespace HOAManagementCompany.Services
             using var context = _dbContextFactory.CreateDbContext();
             return await context.Violations
                 .Include(v => v.ViolationType)
+                .Include(v => v.Property)
                 .FirstOrDefaultAsync(v => v.Id == id);
         }
         
@@ -68,8 +69,54 @@ namespace HOAManagementCompany.Services
             using var context = _dbContextFactory.CreateDbContext();
             return await context.Violations
                 .Include(v => v.ViolationType)
+                .Include(v => v.Property)
                 .OrderByDescending(v => v.OccurrenceDate)
                 .ToListAsync();
+        }
+
+        /// <summary>
+        /// Returns the count of open violations for all properties owned by the given user.
+        /// </summary>
+        public async Task<int> GetOpenViolationCountForUserAsync(string userId)
+        {
+            using var context = _dbContextFactory.CreateDbContext();
+            return await context.Violations
+                .Where(v => v.Property != null && v.Property.OwnerUserId == userId && v.Status == ViolationStatus.Open)
+                .CountAsync();
+        }
+
+        /// <summary>
+        /// Returns paginated open violations for all properties owned by the given user.
+        /// </summary>
+        public async Task<(List<MyViolationItemDto> Items, int TotalCount)> GetOpenViolationsForUserAsync(string userId, int limit = 10, int offset = 0)
+        {
+            const int maxLimit = 50;
+            if (limit <= 0) limit = 10;
+            if (limit > maxLimit) limit = maxLimit;
+            if (offset < 0) offset = 0;
+
+            using var context = _dbContextFactory.CreateDbContext();
+            var query = context.Violations
+                .Include(v => v.ViolationType)
+                .Include(v => v.Property)
+                .Where(v => v.Property != null && v.Property.OwnerUserId == userId && v.Status == ViolationStatus.Open)
+                .OrderByDescending(v => v.OccurrenceDate);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip(offset)
+                .Take(limit)
+                .Select(v => new MyViolationItemDto
+                {
+                    Id = v.Id,
+                    Description = v.Description,
+                    OccurrenceDate = v.OccurrenceDate,
+                    ViolationTypeName = v.ViolationType != null ? v.ViolationType.Name : "",
+                    PropertyDisplayName = v.Property != null ? v.Property.DisplayName : ""
+                })
+                .ToListAsync();
+
+            return (items, totalCount);
         }
         
         public async Task AddViolationAsync(Violation violation)
@@ -87,6 +134,7 @@ namespace HOAManagementCompany.Services
                 existingViolation.Status = violation.Status;
                 existingViolation.OccurrenceDate = violation.OccurrenceDate;
                 existingViolation.ViolationTypeId = violation.ViolationTypeId;
+                existingViolation.PropertyId = violation.PropertyId;
             });
         }
         

@@ -143,9 +143,27 @@ dotnet test HOAManagementCompany.Tests
 - `OccurrenceDate` (DateTime, Required)
 - `ViolationTypeId` (Guid, Foreign Key to ViolationTypes)
 
+## Frontend (Angular)
+
+The Angular application lives in **`frontend/`** at the repository root. It is the canonical frontend for the HOA portal (dashboard, my violations, etc.).
+
+- **Run the frontend** (from repo root):
+  ```bash
+  cd frontend && npm start
+  ```
+- **API base URL**: Development uses `http://localhost:5000/api` (configured in `frontend/src/environments/`). Ensure the .NET backend is running when using the Angular app.
+- **Build**: `cd frontend && npm run build`
+
 ## Project Structure
 
 ```
+frontend/                 # Angular app (repo root)
+├── src/app/
+│   ├── pages/           # Dashboard, My Violations
+│   ├── components/
+│   └── services/
+└── ...
+
 HOAManagementCompany/
 ├── Components/           # Blazor components
 ├── EntityFramework/      # Database context

@@ -30,16 +30,16 @@
 
 **Purpose**: Data model and APIs that all user stories depend on. No user story work can begin until this phase is complete.
 
-- [ ] T005 Create Property entity with Id, OwnerUserId (FK to Identity), DisplayName (and optional audit fields) in `HOAManagementCompany/Models/Property.cs`
-- [ ] T006 Add PropertyId (required FK to Property) to Violation model in `HOAManagementCompany/Models/Violation.cs`
-- [ ] T007 Register Property in `HOAManagementCompany/EntityFramework/ApplicationDbContext.cs` (DbSet, relationships, query filters if auditable)
-- [ ] T008 Add EF Core migration for Property table and Violation.PropertyId in `HOAManagementCompany/Migrations/`
-- [ ] T009 Implement DashboardService (or extend existing service) to return dashboard summary (openViolationCount for current user's properties, placeholders for other boxes) in `HOAManagementCompany/Services/DashboardService.cs`
-- [ ] T010 Implement GET dashboard summary endpoint (e.g. `GET /api/dashboard/summary`) scoped to current user in `HOAManagementCompany/Controllers/DashboardController.cs` (or equivalent)
-- [ ] T011 Add method in ViolationService (or dedicated service) to get open violations count for current user's properties in `HOAManagementCompany/Services/ViolationService.cs`
-- [ ] T012 Add method to get paginated open violations for current user's properties (limit/offset) in `HOAManagementCompany/Services/ViolationService.cs`
-- [ ] T013 Implement GET My Violations endpoint (e.g. `GET /api/violations/mine?limit=&offset=`) with totalCount and items, scoped to current user in `HOAManagementCompany/Controllers/` (e.g. ViolationsController or new controller)
-- [ ] T014 Ensure all dashboard and violations endpoints require authentication and use current user id only (no user id in path/query); document or add integration test for FR-010 data isolation
+- [x] T005 Create Property entity with Id, OwnerUserId (FK to Identity), DisplayName (and optional audit fields) in `HOAManagementCompany/Models/Property.cs`
+- [x] T006 Add PropertyId (required FK to Property) to Violation model in `HOAManagementCompany/Models/Violation.cs`
+- [x] T007 Register Property in `HOAManagementCompany/EntityFramework/ApplicationDbContext.cs` (DbSet, relationships, query filters if auditable)
+- [x] T008 Add EF Core migration for Property table and Violation.PropertyId in `HOAManagementCompany/Migrations/`
+- [x] T009 Implement DashboardService (or extend existing service) to return dashboard summary (openViolationCount for current user's properties, placeholders for other boxes) in `HOAManagementCompany/Services/DashboardService.cs`
+- [x] T010 Implement GET dashboard summary endpoint (e.g. `GET /api/dashboard/summary`) scoped to current user in `HOAManagementCompany/Controllers/DashboardController.cs` (or equivalent)
+- [x] T011 Add method in ViolationService (or dedicated service) to get open violations count for current user's properties in `HOAManagementCompany/Services/ViolationService.cs`
+- [x] T012 Add method to get paginated open violations for current user's properties (limit/offset) in `HOAManagementCompany/Services/ViolationService.cs`
+- [x] T013 Implement GET My Violations endpoint (e.g. `GET /api/violations/mine?limit=&offset=`) with totalCount and items, scoped to current user in `HOAManagementCompany/Controllers/` (e.g. ViolationsController or new controller)
+- [x] T014 Ensure all dashboard and violations endpoints require authentication and use current user id only (no user id in path/query); document or add integration test for FR-010 data isolation
 
 **Checkpoint**: Foundation ready — dashboard summary and my-violations APIs exist and are scoped by current user; Property and Violation.PropertyId in place.
 
@@ -51,10 +51,10 @@
 
 **Independent Test**: Log in and confirm the dashboard is displayed with four visible summary boxes and is the default destination after login.
 
-- [ ] T015 [US1] Add dashboard route and component in `frontend/src/app/` (e.g. `frontend/src/app/pages/dashboard/` or equivalent) that renders a 2×2 grid with four boxes labeled Current Balance, Violations, Work Orders, Architecture Requests
-- [ ] T016 [US1] Configure post-login redirect to Dashboard (default landing page) in `frontend/` (e.g. auth callback or app routing in `frontend/src/app/`)
-- [ ] T017 [US1] Call GET dashboard summary from Angular dashboard component and display four boxes (Violations box may show 0 or placeholder until US2); ensure layout matches FR-002 (top row: Current Balance, Violations; bottom row: Work Orders, Architecture Requests)
-- [ ] T018 [US1] Ensure dashboard route is protected (auth required) and only accessible after login in `frontend/src/app/`
+- [x] T015 [US1] Add dashboard route and component in `frontend/src/app/` (e.g. `frontend/src/app/pages/dashboard/` or equivalent) that renders a 2×2 grid with four boxes labeled Current Balance, Violations, Work Orders, Architecture Requests
+- [x] T016 [US1] Configure post-login redirect to Dashboard (default landing page) in `frontend/` (e.g. auth callback or app routing in `frontend/src/app/`)
+- [x] T017 [US1] Call GET dashboard summary from Angular dashboard component and display four boxes (Violations box may show 0 or placeholder until US2); ensure layout matches FR-002 (top row: Current Balance, Violations; bottom row: Work Orders, Architecture Requests)
+- [x] T018 [US1] Ensure dashboard route is protected (auth required) and only accessible after login in `frontend/src/app/`
 
 **Checkpoint**: User Story 1 complete — login leads to Dashboard with four boxes; independently testable.
 
@@ -66,13 +66,13 @@
 
 **Independent Test**: Log in, see violation count in box, click count, confirm My Violations page opens with correct list (or empty); confirm loading indicator shows until count is available.
 
-- [ ] T019 [US2] In dashboard component in `frontend/`, show loading indicator (spinner or skeleton) in Violations box until dashboard summary response is received; keep box non-clickable until count is loaded (FR-007)
-- [ ] T020 [US2] Display openViolationCount from dashboard summary in Violations box; when count is zero show 0 or "no violations" (FR-003, FR-006)
-- [ ] T021 [US2] Make violation count in Violations box clickable and navigate to My Violations page/route in `frontend/src/app/` (FR-004)
-- [ ] T022 [US2] Add My Violations route and page component in `frontend/src/app/` (e.g. `frontend/src/app/pages/my-violations/`) that calls GET `/api/violations/mine` with limit/offset
-- [ ] T023 [US2] Render paginated list of open violations on My Violations page (items, totalCount); support limit/offset per contract in `frontend/src/app/`
-- [ ] T024 [US2] On dashboard summary API failure, show message "Failed to load violation count" in Violations box and leave rest of dashboard usable (FR-008) in `frontend/`
-- [ ] T025 [US2] Ensure My Violations page is auth-protected and shows only current user's open violations (no cross-user data)
+- [x] T019 [US2] In dashboard component in `frontend/`, show loading indicator (spinner or skeleton) in Violations box until dashboard summary response is received; keep box non-clickable until count is loaded (FR-007)
+- [x] T020 [US2] Display openViolationCount from dashboard summary in Violations box; when count is zero show 0 or "no violations" (FR-003, FR-006)
+- [x] T021 [US2] Make violation count in Violations box clickable and navigate to My Violations page/route in `frontend/src/app/` (FR-004)
+- [x] T022 [US2] Add My Violations route and page component in `frontend/src/app/` (e.g. `frontend/src/app/pages/my-violations/`) that calls GET `/api/violations/mine` with limit/offset
+- [x] T023 [US2] Render paginated list of open violations on My Violations page (items, totalCount); support limit/offset per contract in `frontend/src/app/`
+- [x] T024 [US2] On dashboard summary API failure, show message "Failed to load violation count" in Violations box and leave rest of dashboard usable (FR-008) in `frontend/`
+- [x] T025 [US2] Ensure My Violations page is auth-protected and shows only current user's open violations (no cross-user data)
 
 **Checkpoint**: User Story 2 complete — violation count, loading state, click-through, and My Violations list work; independently testable.
 
@@ -84,9 +84,9 @@
 
 **Independent Test**: Confirm all four boxes are present in 2×2 grid, Violations box is the only one with a link; other three show placeholder text only and are not clickable.
 
-- [ ] T026 [US3] Set Current Balance, Work Orders, and Architecture Requests boxes to display placeholder text only (no live data) in `frontend/src/app/` dashboard component (FR-009)
-- [ ] T027 [US3] Ensure Current Balance, Work Orders, and Architecture Requests boxes have no links or click handlers in `frontend/` (FR-009)
-- [ ] T028 [US3] Verify 2×2 grid order: top row Current Balance, Violations; bottom row Work Orders, Architecture Requests in `frontend/` (FR-002)
+- [x] T026 [US3] Set Current Balance, Work Orders, and Architecture Requests boxes to display placeholder text only (no live data) in `frontend/src/app/` dashboard component (FR-009)
+- [x] T027 [US3] Ensure Current Balance, Work Orders, and Architecture Requests boxes have no links or click handlers in `frontend/` (FR-009)
+- [x] T028 [US3] Verify 2×2 grid order: top row Current Balance, Violations; bottom row Work Orders, Architecture Requests in `frontend/` (FR-002)
 
 **Checkpoint**: User Story 3 complete — placeholder boxes and layout verified.
 
@@ -96,12 +96,12 @@
 
 **Purpose**: Error handling, responsiveness, and validation across the feature.
 
-- [ ] T029 Add or verify global exception handling returns user-friendly message "Failed to load violation count" for dashboard/summary and violations/mine failures in `HOAManagementCompany/` (FR-008)
-- [ ] T030 [P] Verify Dashboard and My Violations UI are responsive (iPhone, tablet, desktop) per constitution in `frontend/`
-- [ ] T031 [P] Run full test suite: `PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal` from repo root; fix any regressions
-- [ ] T032 Validate quickstart: build, run backend, run frontend, login → dashboard → My Violations per `specs/001-dashboard-violations-summary/quickstart.md`
-- [ ] T033 Add unit tests for DashboardService and ViolationService methods (open count, paginated list) and new controller actions in `HOAManagementCompany.Tests/` (per constitution: all functions must have unit tests)
-- [ ] T034 [P] Add Angular component unit tests for dashboard and my-violations components in `frontend/` (per constitution: component unit tests required)
+- [x] T029 Add or verify global exception handling returns user-friendly message "Failed to load violation count" for dashboard/summary and violations/mine failures in `HOAManagementCompany/` (FR-008)
+- [x] T030 [P] Verify Dashboard and My Violations UI are responsive (iPhone, tablet, desktop) per constitution in `frontend/`
+- [x] T031 [P] Run full test suite: `PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal` from repo root; fix any regressions
+- [x] T032 Validate quickstart: build, run backend, run frontend, login → dashboard → My Violations per `specs/001-dashboard-violations-summary/quickstart.md`
+- [x] T033 Add unit tests for DashboardService and ViolationService methods (open count, paginated list) and new controller actions in `HOAManagementCompany.Tests/` (per constitution: all functions must have unit tests)
+- [x] T034 [P] Add Angular component unit tests for dashboard and my-violations components in `frontend/` (per constitution: component unit tests required)
 
 ---
 

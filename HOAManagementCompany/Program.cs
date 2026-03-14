@@ -36,11 +36,25 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<ViolationService>();
+builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<UserRoleService>();
 builder.Services.AddHttpContextAccessor();
 
 // Add health checks
-builder.Services.AddHealthChecks(); 
+builder.Services.AddHealthChecks();
+
+// CORS for Angular frontend (e.g. dev server on port 4200)
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -52,6 +66,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
 
 // Add authentication and authorization middleware
 app.UseAuthentication();

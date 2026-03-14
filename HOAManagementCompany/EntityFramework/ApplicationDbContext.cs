@@ -19,6 +19,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     
     public DbSet<Violation> Violations { get; set; }
     public DbSet<ViolationType> ViolationTypes { get; set; }
+    public DbSet<Property> Properties { get; set; }
     
     // Test entities for audit functionality testing
     public DbSet<TestAuditableEntity> TestAuditableEntities { get; set; }
@@ -111,6 +112,32 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     {
         base.OnModelCreating(modelBuilder);
         
+        // Configure Property to IdentityUser (Owner)
+        modelBuilder.Entity<Property>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(p => p.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Configure Property audit foreign keys
+        modelBuilder.Entity<Property>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(p => p.CreatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Property>()
+            .HasOne<IdentityUser>()
+            .WithMany()
+            .HasForeignKey(p => p.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Configure Violation to Property
+        modelBuilder.Entity<Violation>()
+            .HasOne(v => v.Property)
+            .WithMany()
+            .HasForeignKey(v => v.PropertyId)
+            .OnDelete(DeleteBehavior.Restrict);
+        
         // Configure Violation to ViolationType relationship
         modelBuilder.Entity<Violation>()
             .HasOne(v => v.ViolationType)
@@ -166,6 +193,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
         // These filters automatically exclude soft deleted records from all queries
         modelBuilder.Entity<Violation>().HasQueryFilter(v => !v.IsDeleted);
         modelBuilder.Entity<ViolationType>().HasQueryFilter(vt => !vt.IsDeleted);
+        modelBuilder.Entity<Property>().HasQueryFilter(p => !p.IsDeleted);
         modelBuilder.Entity<TestAuditableEntity>().HasQueryFilter(te => !te.IsDeleted);
 
     }
