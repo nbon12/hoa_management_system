@@ -17,17 +17,20 @@ fi
 
 echo "✅ Application is running"
 
-# Check if PostgreSQL container is running
-if ! docker ps | grep -q "my_app_postgres_db"; then
+COMPOSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$COMPOSE_ROOT" || exit 1
+
+# Check if PostgreSQL service is running
+if ! docker compose ps --status running --services 2>/dev/null | grep -qx db; then
     echo "❌ PostgreSQL container is not running. Starting it now..."
-    cd ..
-    docker-compose up -d postgres-db
-    
+    docker compose up -d db
+
     # Wait for PostgreSQL to be ready
     echo "⏳ Waiting for PostgreSQL to be ready..."
     sleep 10
-    cd HOAManagementCompany.Tests
 fi
+
+cd "$COMPOSE_ROOT/HOAManagementCompany.Tests" || exit 1
 
 # Build the test project
 echo "🔨 Building test project..."

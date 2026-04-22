@@ -12,11 +12,14 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Check if PostgreSQL container is running
-if ! docker ps | grep -q "my_app_postgres_db"; then
+COMPOSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$COMPOSE_ROOT" || exit 1
+
+# Check if PostgreSQL service is running
+if ! docker compose ps --status running --services 2>/dev/null | grep -qx db; then
     echo "❌ PostgreSQL container is not running. Starting it now..."
-    docker-compose up -d postgres-db
-    
+    docker compose up -d db
+
     # Wait for PostgreSQL to be ready
     echo "⏳ Waiting for PostgreSQL to be ready..."
     sleep 10

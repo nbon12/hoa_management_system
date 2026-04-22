@@ -1,7 +1,6 @@
 services:
-  postgres-db:
+  db:
     image: postgres:16-alpine 
-    container_name: my_app_postgres_db #
     restart: unless-stopped 
 
     environment:
@@ -27,21 +26,32 @@ services:
     networks:
       - app_network
 
-  hoa-app:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hoa_management_web
     restart: unless-stopped
     ports:
       - "5212:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: "Host=postgres-db;Port=5432;Database=sequestria;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=sequestria;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
     depends_on:
-      postgres-db:
+      db:
         condition: service_healthy
+    networks:
+      - app_network
+
+  ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
     networks:
       - app_network
 

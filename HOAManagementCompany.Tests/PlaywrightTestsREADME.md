@@ -73,7 +73,7 @@ playwright install
 ```bash
 # Start PostgreSQL database
 cd ..
-docker-compose up -d postgres-db
+docker compose up -d db
 
 # Start the Blazor application
 cd HOAManagementCompany
@@ -206,7 +206,7 @@ The tests can be integrated into the existing GitHub Actions workflow.
    ```
    ❌ PostgreSQL container is not running
    ```
-   **Solution**: Start PostgreSQL with `docker-compose up -d postgres-db`
+   **Solution**: Start PostgreSQL with `docker compose up -d db`
 
 3. **Browser Not Found**
    ```
