@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HOAManagementCompany.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260422002404_SyncPendingModelChanges")]
+    partial class SyncPendingModelChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -59,7 +62,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasIndex("UpdatedBy");
 
-                    b.ToTable("Properties", (string)null);
+                    b.ToTable("Properties");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.TestAuditableEntity", b =>
@@ -89,7 +92,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TestAuditableEntities", (string)null);
+                    b.ToTable("TestAuditableEntities");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.TestNonAuditableEntity", b =>
@@ -104,7 +107,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TestNonAuditableEntities", (string)null);
+                    b.ToTable("TestNonAuditableEntities");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.Violation", b =>
@@ -155,7 +158,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasIndex("ViolationTypeId");
 
-                    b.ToTable("Violations", (string)null);
+                    b.ToTable("Violations");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.ViolationType", b =>
@@ -195,7 +198,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasIndex("UpdatedBy");
 
-                    b.ToTable("ViolationTypes", (string)null);
+                    b.ToTable("ViolationTypes");
 
                     b.HasData(
                         new

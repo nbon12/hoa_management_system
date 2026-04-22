@@ -1,6 +1,7 @@
 using HOAManagementCompany.Components;
 using HOAManagementCompany.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -17,7 +18,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
                        throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    options.UseNpgsql(connectionString);
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 
 // Add Identity services
 builder.Services.AddDefaultIdentity<IdentityUser>(options => {
@@ -85,6 +89,11 @@ app.MapIdentityApi<IdentityUser>();
 
 // Add health check endpoint
 app.MapHealthChecks("/health");
+
+await using (var db = await app.Services.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContextAsync())
+{
+    await db.Database.MigrateAsync();
+}
 
 // Seed data
 await ApplicationDbContext.SeedDataAsync(app.Services);
