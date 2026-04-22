@@ -57,7 +57,7 @@ public class AuthenticationIntegrationTests : TestBase
         
         // Ensure database is created and migrations are applied
         var dbContext = serviceProvider.GetRequiredService<ApplicationDbContext>();
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
         
         _userManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
         _roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();

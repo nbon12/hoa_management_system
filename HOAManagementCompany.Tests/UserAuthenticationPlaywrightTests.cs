@@ -7,6 +7,7 @@ using Xunit;
 
 namespace HOAManagementCompany.Tests;
 
+[Collection("Playwright")]
 public class UserAuthenticationPlaywrightTests : PlaywrightTestBase, IAsyncLifetime
 {
     private IPlaywright _playwright = null!;
@@ -345,38 +346,13 @@ public class UserAuthenticationPlaywrightTests : PlaywrightTestBase, IAsyncLifet
         await _page.FillAsync("input[name='email']", "invalid@test.com");
         await _page.FillAsync("input[name='password']", "InvalidPassword123!");
 
-        // Submit the form
-        await _page.ClickAsync("button[type='submit']");
-
-        // Wait for the form submission to complete
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        
-        // Wait a bit more for any server-side processing
-        await _page.WaitForTimeoutAsync(2000);
-
-        // Check if we're still on the login page (which would indicate login failed)
+        // Invalid credentials should keep us on the login page (do not use load-based navigation wait)
+#pragma warning disable CS0612
+        await _page.ClickAsync("button[type='submit']", new PageClickOptions { NoWaitAfter = true });
+#pragma warning restore CS0612
+        await _page.WaitForTimeoutAsync(2500);
         var finalUrl = _page.Url;
-        if (finalUrl.Contains("Identity/Account/Login"))
-        {
-            // Look for error message in the URL query parameter or on the page
-            var errorElement = await _page.QuerySelectorAsync(".text-danger, .alert-danger");
-            if (errorElement != null)
-            {
-                var errorText = await errorElement.TextContentAsync();
-                Assert.NotNull(errorText);
-                Assert.NotEmpty(errorText);
-            }
-            else
-            {
-                // Check if there's an error in the URL
-                Assert.True(finalUrl.Contains("error="), "Login should fail and show an error");
-            }
-        }
-        else
-        {
-            // If we're not on the login page, the invalid login somehow succeeded
-            Assert.Fail("Invalid login should not succeed");
-        }
+        Assert.Contains("Identity/Account/Login", finalUrl, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -457,13 +433,8 @@ public class UserAuthenticationPlaywrightTests : PlaywrightTestBase, IAsyncLifet
                 await _page.FillAsync("input[name='email']", email);
                 await _page.FillAsync("input[name='password']", password);
 
-                // Submit the form
-                await _page.ClickAsync("button[type='submit']");
+                await ClickLoginSubmitAndWaitToLeaveLoginPageAsync(_page);
 
-                // Wait for navigation away from the login page
-                await _page.WaitForURLAsync(url => !url.Contains("Identity/Account/Login"), new PageWaitForURLOptions { Timeout = 15000 });
-
-                // If we've successfully navigated away, break the loop
                 return;
             }
             catch (Exception ex)

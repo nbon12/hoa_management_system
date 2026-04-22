@@ -66,8 +66,8 @@ public abstract class TestBase : IDisposable
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        // Ensure database is created and migrations are applied
-        DbContext.Database.EnsureCreated();
+        // Ensure database migrations are applied (do not use EnsureCreated with migrations)
+        DbContext.Database.Migrate();
         
         // Clear any existing entity tracking to ensure clean state
         DbContext.ChangeTracker.Clear();
