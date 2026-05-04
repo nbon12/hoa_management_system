@@ -1,0 +1,37 @@
+---
+description: Project Development Guidelines
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# HOAManagementCompany Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2026-03-14
+
+## Active Technologies
+- PostgreSQL (existing; migrations for Property and Violation–Property association as needed) (001-dashboard-violations-summary)
+
+- .NET 9 (C#) + ASP.NET Core, Entity Framework Core 9, Npgsql (PostgreSQL), ASP.NET Core Identity (001-dashboard-violations-summary)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+# Add commands for .NET 9 (C#)
+
+## Code Style
+
+.NET 9 (C#): Follow standard conventions
+
+## Recent Changes
+- 001-dashboard-violations-summary: Added .NET 9 (C#) + ASP.NET Core, Entity Framework Core 9, Npgsql (PostgreSQL), ASP.NET Core Identity
+
+- 001-dashboard-violations-summary: Added .NET 9 (C#) + ASP.NET Core, Entity Framework Core 9, Npgsql (PostgreSQL), ASP.NET Core Identity
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

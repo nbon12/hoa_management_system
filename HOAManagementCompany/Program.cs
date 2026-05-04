@@ -1,6 +1,7 @@
 using HOAManagementCompany.Components;
 using HOAManagementCompany.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -17,7 +18,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
                        throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    options.UseNpgsql(connectionString);
+    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 
 // Add Identity services
 builder.Services.AddDefaultIdentity<IdentityUser>(options => {
@@ -36,11 +40,25 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddScoped<ViolationService>();
+builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<UserRoleService>();
 builder.Services.AddHttpContextAccessor();
 
 // Add health checks
-builder.Services.AddHealthChecks(); 
+builder.Services.AddHealthChecks();
+
+// CORS for Angular frontend (e.g. dev server on port 4200)
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -52,6 +70,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
 
 // Add authentication and authorization middleware
 app.UseAuthentication();
@@ -70,6 +89,11 @@ app.MapIdentityApi<IdentityUser>();
 
 // Add health check endpoint
 app.MapHealthChecks("/health");
+
+await using (var db = await app.Services.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContextAsync())
+{
+    await db.Database.MigrateAsync();
+}
 
 // Seed data
 await ApplicationDbContext.SeedDataAsync(app.Services);

@@ -27,4 +27,9 @@ public class Violation : BaseAuditableEntity
     public Guid ViolationTypeId { get; set; }
     
     public ViolationType? ViolationType { get; set; }
+
+    [Required(ErrorMessage = "Property is required.")]
+    public Guid PropertyId { get; set; }
+    
+    public Property? Property { get; set; }
 }

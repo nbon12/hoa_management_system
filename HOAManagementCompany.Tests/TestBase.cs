@@ -60,12 +60,14 @@ public abstract class TestBase : IDisposable
         .AddDefaultTokenProviders();
         
         services.AddScoped<UserRoleService>();
+        services.AddScoped<HOAManagementCompany.Services.DashboardService>();
+        services.AddHttpContextAccessor();
 
         ServiceProvider = services.BuildServiceProvider();
         DbContext = ServiceProvider.GetRequiredService<ApplicationDbContext>();
         
-        // Ensure database is created and migrations are applied
-        DbContext.Database.EnsureCreated();
+        // Ensure database migrations are applied (do not use EnsureCreated with migrations)
+        DbContext.Database.Migrate();
         
         // Clear any existing entity tracking to ensure clean state
         DbContext.ChangeTracker.Clear();
@@ -184,18 +186,45 @@ public abstract class TestBase : IDisposable
         return violationType;
     }
 
+    /// <summary>
+    /// Creates a test Property with a dedicated owner user (namespaced). Violations must be linked to a Property.
+    /// </summary>
+    protected async Task<Property> CreateTestPropertyAsync(string testNamespace, string displayName)
+    {
+        DbContext.ChangeTracker.Clear();
+        var userManager = ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        var guid = Guid.NewGuid().ToString("N")[..8];
+        var user = new IdentityUser
+        {
+            UserName = $"{testNamespace}_{displayName}_{guid}@test.hoa.com",
+            Email = $"{testNamespace}_{displayName}_{guid}@test.hoa.com",
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(user, "TestPass1!");
+        var property = new Property
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = user.Id,
+            DisplayName = $"{testNamespace}_{displayName}"
+        };
+        DbContext.Properties.Add(property);
+        await DbContext.SaveChangesAsync();
+        return property;
+    }
+
     protected async Task<Violation> CreateTestViolationAsync(string testNamespace, Guid violationTypeId, string description, ViolationStatus status = ViolationStatus.Open)
     {
         // Clear entity tracking to avoid conflicts
         DbContext.ChangeTracker.Clear();
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "Property");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_{description}",
             Status = status,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationTypeId
+            ViolationTypeId = violationTypeId,
+            PropertyId = property.Id
         };
         DbContext.Violations.Add(violation);
         await DbContext.SaveChangesAsync();
@@ -215,6 +244,19 @@ public abstract class TestBase : IDisposable
         if (violations.Any())
         {
             DbContext.Violations.RemoveRange(violations);
+            await DbContext.SaveChangesAsync();
+        }
+
+        DbContext.ChangeTracker.Clear();
+
+        // Remove properties for this namespace (FK from violations; must be before users)
+        var properties = await DbContext.Properties
+            .IgnoreQueryFilters()
+            .Where(p => p.DisplayName.StartsWith(testNamespace + "_"))
+            .ToListAsync();
+        if (properties.Any())
+        {
+            DbContext.Properties.RemoveRange(properties);
             await DbContext.SaveChangesAsync();
         }
         
@@ -317,6 +359,21 @@ public abstract class TestBase : IDisposable
                    OR ""Description"" LIKE '%Related violation%'
                    OR ""Description"" LIKE '%CompleteWorkflow%'
                    OR ""Description"" LIKE '%BulkOperationsTest%'");
+
+            // Delete test properties (FK from Violations; namespaced by DisplayName)
+            await DbContext.Database.ExecuteSqlRawAsync(@"
+                DELETE FROM ""Properties""
+                WHERE ""DisplayName"" LIKE '%_Property%'
+                   OR ""DisplayName"" LIKE '%_BulkProperty%'
+                   OR ""DisplayName"" LIKE '%_PerfProperty%'
+                   OR ""DisplayName"" LIKE '%_TxnProperty%'
+                   OR ""DisplayName"" LIKE '%_ConcurrentProperty%'
+                   OR ""DisplayName"" LIKE '%_LawnProperty%'
+                   OR ""DisplayName"" LIKE '%_TestProperty%'
+                   OR ""DisplayName"" LIKE '%_AuditProperty%'
+                   OR ""DisplayName"" LIKE '%_UpdateProperty%'
+                   OR ""DisplayName"" LIKE '%_SoftDeleteProperty%'
+                   OR ""DisplayName"" LIKE '%_MultiUpdateProperty%'");
             
             // Then delete all test violation types
             await DbContext.Database.ExecuteSqlRawAsync(@"

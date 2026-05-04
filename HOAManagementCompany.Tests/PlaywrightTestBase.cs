@@ -54,8 +54,8 @@ public class PlaywrightTestBase : IAsyncLifetime
         // Use localhost:5212 as the base URL (the default development server port)
         BaseUrl = "http://localhost:5212/";
         
-        // Ensure database is created and migrations are applied
-        DbContext.Database.EnsureCreated();
+        // Ensure database migrations are applied (do not use EnsureCreated with migrations)
+        DbContext.Database.Migrate();
         DbContext.ChangeTracker.Clear();
     }
 
@@ -172,18 +172,42 @@ public class PlaywrightTestBase : IAsyncLifetime
         return violationType;
     }
 
+    protected async Task<Property> CreateTestPropertyAsync(string testNamespace, string displayName)
+    {
+        DbContext.ChangeTracker.Clear();
+        var userManager = ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        var guid = Guid.NewGuid().ToString("N")[..8];
+        var user = new IdentityUser
+        {
+            UserName = $"{testNamespace}_{displayName}_{guid}@test.hoa.com",
+            Email = $"{testNamespace}_{displayName}_{guid}@test.hoa.com",
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(user, "TestPass1!");
+        var property = new Property
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = user.Id,
+            DisplayName = $"{testNamespace}_{displayName}"
+        };
+        DbContext.Properties.Add(property);
+        await DbContext.SaveChangesAsync();
+        return property;
+    }
+
     protected async Task<Violation> CreateTestViolationAsync(string testNamespace, Guid violationTypeId, string description, ViolationStatus status = ViolationStatus.Open)
     {
         // Clear entity tracking to avoid conflicts
         DbContext.ChangeTracker.Clear();
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "Property");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_{description}",
             Status = status,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationTypeId
+            ViolationTypeId = violationTypeId,
+            PropertyId = property.Id
         };
         DbContext.Violations.Add(violation);
         await DbContext.SaveChangesAsync();
@@ -203,6 +227,19 @@ public class PlaywrightTestBase : IAsyncLifetime
         if (violations.Any())
         {
             DbContext.Violations.RemoveRange(violations);
+            await DbContext.SaveChangesAsync();
+        }
+
+        DbContext.ChangeTracker.Clear();
+
+        // Remove properties for this namespace (FK from violations; before users)
+        var properties = await DbContext.Properties
+            .IgnoreQueryFilters()
+            .Where(p => p.DisplayName.StartsWith(testNamespace + "_"))
+            .ToListAsync();
+        if (properties.Any())
+        {
+            DbContext.Properties.RemoveRange(properties);
             await DbContext.SaveChangesAsync();
         }
         
@@ -244,10 +281,55 @@ public class PlaywrightTestBase : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Submits the Identity login form without waiting for the document "load" event (Blazor Server pages often never reach it).
+    /// Waits until we either leave the login URL or the authenticated UI appears.
+    /// </summary>
+    protected static async Task ClickLoginSubmitAndWaitToLeaveLoginPageAsync(IPage page, int timeoutMs = 60_000)
+    {
+        // Submitting via JS is more reliable than clicking (avoids clickability/overlay issues)
+        // and also avoids Playwright's historical "wait for navigation" coupling.
+        try
+        {
+            await page.Locator("form").EvaluateAsync("form => form.submit()");
+        }
+        catch
+        {
+#pragma warning disable CS0612 // NoWaitAfter: still required so Click does not wait for load on Blazor destinations
+            await page.ClickAsync("button[type='submit']", new PageClickOptions { NoWaitAfter = true });
+#pragma warning restore CS0612
+        }
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMs);
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            // Most reliable signal: URL changes away from /Identity/Account/Login
+            if (!page.Url.Contains("Identity/Account/Login", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            // Some flows (Blazor/Identity) can render authenticated UI without a hard navigation.
+            // MainLayout shows a Logout button only when authenticated.
+            try
+            {
+                var logout = page.Locator("button:has-text('Logout')");
+                if (await logout.CountAsync() > 0 && await logout.First.IsVisibleAsync())
+                    return;
+            }
+            catch
+            {
+                // Ignore transient evaluation errors while the page is updating.
+            }
+
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        throw new TimeoutException($"Timed out after {timeoutMs}ms waiting for login to complete. URL: {page.Url}");
+    }
+
     public virtual async Task InitializeAsync()
     {
         // Ensure database is ready
-        await DbContext.Database.EnsureCreatedAsync();
+        await DbContext.Database.MigrateAsync();
         await CleanupDatabaseAsync();
     }
 

@@ -21,6 +21,47 @@ namespace HOAManagementCompany.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HOAManagementCompany.Models.Property", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.ToTable("Properties", (string)null);
+                });
+
             modelBuilder.Entity("HOAManagementCompany.Models.TestAuditableEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -48,7 +89,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TestAuditableEntities");
+                    b.ToTable("TestAuditableEntities", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.TestNonAuditableEntity", b =>
@@ -63,7 +104,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TestNonAuditableEntities");
+                    b.ToTable("TestNonAuditableEntities", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.Violation", b =>
@@ -89,6 +130,9 @@ namespace HOAManagementCompany.Migrations
                     b.Property<DateTime>("OccurrenceDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("PropertyId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -105,11 +149,13 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasIndex("CreatedBy");
 
+                    b.HasIndex("PropertyId");
+
                     b.HasIndex("UpdatedBy");
 
                     b.HasIndex("ViolationTypeId");
 
-                    b.ToTable("Violations");
+                    b.ToTable("Violations", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Models.ViolationType", b =>
@@ -149,7 +195,7 @@ namespace HOAManagementCompany.Migrations
 
                     b.HasIndex("UpdatedBy");
 
-                    b.ToTable("ViolationTypes");
+                    b.ToTable("ViolationTypes", (string)null);
 
                     b.HasData(
                         new
@@ -368,12 +414,37 @@ namespace HOAManagementCompany.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("HOAManagementCompany.Models.Property", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("HOAManagementCompany.Models.Violation", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HOAManagementCompany.Models.Property", "Property")
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
                         .WithMany()
@@ -385,6 +456,8 @@ namespace HOAManagementCompany.Migrations
                         .HasForeignKey("ViolationTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Property");
 
                     b.Navigation("ViolationType");
                 });

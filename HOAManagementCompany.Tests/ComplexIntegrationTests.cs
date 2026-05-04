@@ -108,6 +108,7 @@ public class ComplexIntegrationTests : TestBase
             }
 
             // Act - Create multiple violations in bulk
+            var property = await CreateTestPropertyAsync(ns, "BulkProperty");
             var violations = new List<Violation>();
             for (int i = 1; i <= 10; i++)
             {
@@ -118,7 +119,8 @@ public class ComplexIntegrationTests : TestBase
                     Description = $"{ns}_Bulk violation {i}",
                     Status = i % 2 == 0 ? ViolationStatus.Open : ViolationStatus.Closed,
                     OccurrenceDate = DateTime.UtcNow.AddDays(-i),
-                    ViolationTypeId = violationType.Id
+                    ViolationTypeId = violationType.Id,
+                    PropertyId = property.Id
                 };
                 violations.Add(violation);
             }
@@ -199,6 +201,7 @@ public class ComplexIntegrationTests : TestBase
                 violationTypes.Add(violationType);
             }
 
+            var property = await CreateTestPropertyAsync(ns, "PerfProperty");
             var violations = new List<Violation>();
             for (int i = 1; i <= 20; i++)
             {
@@ -209,7 +212,8 @@ public class ComplexIntegrationTests : TestBase
                     Description = $"{ns}_Performance violation {i}",
                     Status = i % 3 == 0 ? ViolationStatus.Closed : ViolationStatus.Open,
                     OccurrenceDate = DateTime.UtcNow.AddDays(-i),
-                    ViolationTypeId = violationType.Id
+                    ViolationTypeId = violationType.Id,
+                    PropertyId = property.Id
                 };
                 violations.Add(violation);
             }
@@ -261,13 +265,15 @@ public class ComplexIntegrationTests : TestBase
         {
             // Arrange
             var violationType = await CreateTestViolationTypeAsync(ns, "TRANSACTION_TEST", "Transaction test covenant");
+            var property = await CreateTestPropertyAsync(ns, "TxnProperty");
             var validViolation = new Violation
             {
                 Id = Guid.NewGuid(),
                 Description = $"{ns}_Valid violation",
                 Status = ViolationStatus.Open,
                 OccurrenceDate = DateTime.UtcNow,
-                ViolationTypeId = violationType.Id
+                ViolationTypeId = violationType.Id,
+                PropertyId = property.Id
             };
 
             var invalidViolation = new Violation
@@ -276,7 +282,8 @@ public class ComplexIntegrationTests : TestBase
                 Description = $"{ns}_", // Invalid: empty description
                 Status = ViolationStatus.Open,
                 OccurrenceDate = DateTime.UtcNow,
-                ViolationTypeId = violationType.Id
+                ViolationTypeId = violationType.Id,
+                PropertyId = property.Id
             };
 
             // Act & Assert - Test transaction rollback
@@ -314,11 +321,13 @@ public class ComplexIntegrationTests : TestBase
         {
             // Arrange
             var violationType = await CreateTestViolationTypeAsync(ns, "CONCURRENT_TEST", "Concurrent test covenant");
+            var property = await CreateTestPropertyAsync(ns, "ConcurrentProperty");
             var tasks = new List<Task>();
 
             // Act - Simulate concurrent operations
             for (int i = 1; i <= 5; i++)
             {
+                var iCapture = i;
                 var task = Task.Run(async () =>
                 {
                     using var scope = ((IServiceScopeFactory)ServiceProvider.GetService(typeof(IServiceScopeFactory))!).CreateScope();
@@ -327,10 +336,11 @@ public class ComplexIntegrationTests : TestBase
                     var violation = new Violation
                     {
                         Id = Guid.NewGuid(),
-                        Description = $"{ns}_Concurrent violation {i}",
+                        Description = $"{ns}_Concurrent violation {iCapture}",
                         Status = ViolationStatus.Open,
                         OccurrenceDate = DateTime.UtcNow,
-                        ViolationTypeId = violationType.Id
+                        ViolationTypeId = violationType.Id,
+                        PropertyId = property.Id
                     };
 
                     dbContext.Violations.Add(violation);

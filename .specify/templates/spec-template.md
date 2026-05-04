@@ -100,6 +100,19 @@
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
 
+### Constitution Quality Gates *(mandatory)*
+
+- **Tenancy and authorization**: [Describe HOA/association scope, Auth0-authenticated
+  user roles, server-side authorization rules, and any intentional cross-HOA access]
+- **API contract**: [Describe response shape, error shape, pagination for collections,
+  cacheability, and contract/versioning impact]
+- **Security and privacy**: [Describe sensitive data, audit events, rate limiting needs,
+  and production-safe error behavior]
+- **Testing expectations**: [Map acceptance criteria to unit, integration,
+  business-process, frontend, Playwright, Cypress, or Storybook tests as applicable]
+- **Observability and documentation**: [Describe Sentry/logging needs and whether
+  Repowise-generated documentation must be refreshed]
+
 ## Success Criteria *(mandatory)*
 
 <!--

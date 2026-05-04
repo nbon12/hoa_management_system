@@ -7,6 +7,7 @@ using Xunit;
 
 namespace HOAManagementCompany.Tests;
 
+[Collection("Playwright")]
 public class ViolationTypesPlaywrightTests : PlaywrightTestBase, IAsyncLifetime
 {
     private IPlaywright _playwright = null!;
@@ -59,13 +60,8 @@ public class ViolationTypesPlaywrightTests : PlaywrightTestBase, IAsyncLifetime
                 await _page.FillAsync("input[name='email']", _testAdminEmail);
                 await _page.FillAsync("input[name='password']", _testPassword);
 
-                // Submit the form by clicking the submit button
-                await _page.ClickAsync("button[type='submit']");
-                
-                // Wait for navigation away from the login page
-                await _page.WaitForURLAsync(url => !url.Contains("Identity/Account/Login"), new PageWaitForURLOptions { Timeout = 15000 });
+                await ClickLoginSubmitAndWaitToLeaveLoginPageAsync(_page);
 
-                // If we've successfully navigated away, break the loop
                 return;
             }
             catch (Exception ex)

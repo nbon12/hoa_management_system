@@ -28,7 +28,7 @@ public class AccountController : ControllerBase
             return Redirect("/");
         }
         
-        return RedirectToAction("Login", "Account", new { error = "Invalid login attempt" });
+        return Redirect($"/Identity/Account/Login?Error={Uri.EscapeDataString("Invalid login attempt")}");
     }
 
     [HttpPost("Logout")]

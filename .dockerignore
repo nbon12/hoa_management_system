@@ -1,0 +1,9 @@
+**/.git
+**/.idea
+**/.vs
+**/bin
+**/obj
+**/*.user
+HOAManagementCompany.Tests
+frontend/node_modules
+**/*.log

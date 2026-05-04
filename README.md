@@ -1,6 +1,8 @@
 # HOA Management Company
 
-A .NET 9.0 Blazor application for managing HOA violations and violation types with PostgreSQL database integration.
+An HOA management portal with an Angular frontend and .NET 9 backend for managing HOA
+violations, violation types, properties, and association workflows with PostgreSQL database
+integration.
 
 ## Features
 
@@ -11,11 +13,13 @@ A .NET 9.0 Blazor application for managing HOA violations and violation types wi
 
 ## Technology Stack
 
-- **.NET 9.0** - Latest .NET framework
-- **Blazor Server** - Web UI framework
+- **Angular** - Canonical frontend hosted on Cloudflare Pages
+- **.NET 9.0 REST API** - Backend application endpoints implemented with FastEndpoints
 - **Entity Framework Core** - ORM for database operations
-- **PostgreSQL** - Primary database
-- **xUnit** - Testing framework
+- **PostgreSQL / Neon** - Primary database
+- **Auth0** - Authentication and authorization provider
+- **Sentry** - Error tracking and performance visibility
+- **xUnit and .NET Testcontainers** - Backend testing with PostgreSQL-backed integration tests
 - **GitHub Actions** - CI/CD pipeline
 
 ## Quick Start
@@ -78,7 +82,7 @@ The project includes comprehensive integration tests that:
 
 ```bash
 # Run all tests
-dotnet test HOAManagementCompany.Tests
+PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal
 
 # Run with detailed output
 dotnet test HOAManagementCompany.Tests --verbosity normal
@@ -143,9 +147,27 @@ dotnet test HOAManagementCompany.Tests
 - `OccurrenceDate` (DateTime, Required)
 - `ViolationTypeId` (Guid, Foreign Key to ViolationTypes)
 
+## Frontend (Angular)
+
+The Angular application lives in **`frontend/`** at the repository root. It is the canonical frontend for the HOA portal (dashboard, my violations, etc.).
+
+- **Run the frontend** (from repo root):
+  ```bash
+  cd frontend && npm start
+  ```
+- **API base URL**: Development uses `http://localhost:5000/api` (configured in `frontend/src/environments/`). Ensure the .NET backend is running when using the Angular app.
+- **Build**: `cd frontend && npm run build`
+
 ## Project Structure
 
 ```
+frontend/                 # Angular app (repo root)
+├── src/app/
+│   ├── pages/           # Dashboard, My Violations
+│   ├── components/
+│   └── services/
+└── ...
+
 HOAManagementCompany/
 ├── Components/           # Blazor components
 ├── EntityFramework/      # Database context

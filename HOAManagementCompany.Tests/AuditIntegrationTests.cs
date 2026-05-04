@@ -19,14 +19,15 @@ public class AuditIntegrationTests : TestBase
         // Arrange
         var testNamespace = GenerateUniqueTestNamespace("ViolationAudit");
         var violationType = await CreateTestViolationTypeAsync(testNamespace, "TestType", "Test covenant text");
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "AuditProperty");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_Violation",
             Status = ViolationStatus.Open,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationType.Id
+            ViolationTypeId = violationType.Id,
+            PropertyId = property.Id
         };
 
         // Act
@@ -79,14 +80,15 @@ public class AuditIntegrationTests : TestBase
         // Arrange
         var testNamespace = GenerateUniqueTestNamespace("ViolationUpdate");
         var violationType = await CreateTestViolationTypeAsync(testNamespace, "TestType", "Test covenant text");
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "UpdateProperty");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_Violation",
             Status = ViolationStatus.Open,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationType.Id
+            ViolationTypeId = violationType.Id,
+            PropertyId = property.Id
         };
 
         DbContext.Add(violation);
@@ -149,14 +151,15 @@ public class AuditIntegrationTests : TestBase
         // Arrange
         var testNamespace = GenerateUniqueTestNamespace("ViolationSoftDelete");
         var violationType = await CreateTestViolationTypeAsync(testNamespace, "TestType", "Test covenant text");
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "SoftDeleteProperty");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_Violation",
             Status = ViolationStatus.Open,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationType.Id
+            ViolationTypeId = violationType.Id,
+            PropertyId = property.Id
         };
 
         DbContext.Add(violation);
@@ -223,14 +226,15 @@ public class AuditIntegrationTests : TestBase
         // Arrange
         var testNamespace = GenerateUniqueTestNamespace("ViolationMultipleUpdates");
         var violationType = await CreateTestViolationTypeAsync(testNamespace, "TestType", "Test covenant text");
-        
+        var property = await CreateTestPropertyAsync(testNamespace, "MultiUpdateProperty");
         var violation = new Violation
         {
             Id = Guid.NewGuid(),
             Description = $"{testNamespace}_Violation",
             Status = ViolationStatus.Open,
             OccurrenceDate = DateTime.UtcNow,
-            ViolationTypeId = violationType.Id
+            ViolationTypeId = violationType.Id,
+            PropertyId = property.Id
         };
 
         DbContext.Add(violation);
