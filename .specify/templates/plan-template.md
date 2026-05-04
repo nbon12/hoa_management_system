@@ -31,7 +31,25 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Confirm the plan satisfies the active HOA Management Company Constitution:
+
+- **Technology fit**: Angular frontend, .NET FastEndpoints REST API, PostgreSQL/Neon,
+  Auth0, Cloudflare, Cloud Run, Docker/Docker Hub, Sentry, Swashbuckle in development
+  only, and GitHub Actions are used or explicitly marked not applicable.
+- **HOA tenancy**: HOA-scoped data includes an `hoa_id`, `association_id`, or equivalent
+  tenant boundary; cross-HOA access is denied by default; intentional cross-HOA queries
+  document authorization and result scope.
+- **API contracts**: Endpoints document authentication, authorization, pagination
+  (`limit`/`offset` for collections), error response shape, cacheability, and breaking
+  contract migration notes.
+- **Security and operations**: Secrets are externalized, Auth0 authorization is enforced
+  server-side, structured Serilog logs and Sentry tracing are planned, and production
+  errors do not leak system details.
+- **Testing discipline**: Tests are written first where applicable; backend persistence
+  tests use PostgreSQL/Testcontainers and transaction isolation; data-varied cases use
+  xUnit Theories; frontend tests use the constitution-approved tools.
+- **CI/CD and documentation**: Sonar, Codecov, coverage, deployment environment isolation,
+  and Repowise-generated documentation updates are accounted for.
 
 ## Project Structure
 

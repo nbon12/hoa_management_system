@@ -1,316 +1,452 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.0 → 1.1
-Modified principles: Spec Kit Testing Constitution — Guiding Principles (added 2.4 Test-First), new Section 9 Completion Gate
-Added sections: 2.4 Test-First (Red-Green), 9. Completion Gate
-Removed sections: None
+Version change: 1.1 -> 2.0.0
+Modified principles:
+  Project Purpose — expanded HOA scope, multi-association membership, and content ownership.
+  Technology Stack — replaced Okta with Auth0, added Angular hosting, FastEndpoints,
+    Neon, Cloud Run, Cloudflare, Docker Hub, Sentry, Swashbuckle, Repowise, R2/MinIO,
+    Sonar, and Codecov requirements.
+  Backend Principles — added FastEndpoints, Swagger/OpenAPI, production-safe errors,
+    and pagination standards.
+  Frontend Principles — expanded accessibility, API contract, and testing requirements.
+  Security & Authentication — replaced Okta-specific rules with Auth0 and HOA-scoped
+    server-side authorization.
+  Quality & Code Standards — expanded backend, frontend, CI/CD, coverage, and
+    documentation gates.
+  Spec Kit Testing Constitution — expanded PostgreSQL/Testcontainers, test-first,
+    theories, and completion gate guidance.
+Added sections:
+  Tenancy, Data, and Product Invariants; API Contract Standards; Operations, Secrets,
+  and Data Lifecycle; Infrastructure & Environments.
+Removed sections: None.
 Templates requiring updates:
-  .specify/templates/plan-template.md ✅ (Constitution Check references constitution file generically)
-  .specify/templates/spec-template.md ✅ (no constitution-specific placeholders)
-  .specify/templates/tasks-template.md ✅ (task types align with testing discipline and quality standards)
+  .specify/templates/plan-template.md updated (constitution gate details)
+  .specify/templates/spec-template.md updated (quality gates prompt)
+  .specify/templates/tasks-template.md updated (test-first and Repowise tasks)
 Follow-up TODOs: None
 -->
 
-# HOA Portal Spec Kit Constitution
+# HOA Management Company Constitution
 
-**Version**: 1.1 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-03-14  
-**Authors**: Project Lead
+**Version**: 2.0.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-05-03
+**Authors**: Project maintainers
 
 ## 1. Project Purpose
 
-This project provides a web portal for Homeowners, Board Members, and HOA Managers to interact with HOA data securely and efficiently. All features must align with the following principles:
+This project provides **HOA Management Company**, a web application that lets homeowners,
+board members, HOA managers, and platform operators manage HOA communities, properties,
+violations, assessments, documents, announcements, and related workflows. All features MUST
+align with:
 
-- Security, privacy, and proper authentication for all user types.
+- Security, privacy, and strong authentication for all user types.
 - Consistency and predictability of API behavior.
 - Maintainability and scalability of code.
 - Accessibility and responsiveness across devices.
+- **Multi-association membership**: a single user MAY belong to **multiple** HOAs or
+  associations; the data model and APIs MUST support this without ambiguity.
+- User-generated HOA content, documents, notes, evidence, and announcements MUST have clear
+  ownership, association scope, visibility, and moderation/audit rules where applicable.
 
 ## 2. Technology Stack
 
-All implementations MUST conform to the following technologies:
+All implementations MUST conform to the following:
 
-- **Backend**: .NET REST API (HTTP verbs: GET, POST, PUT, DELETE, etc.)
-- **Database**: PostgreSQL
-- **Frontend**: Angular
-- **Authentication/Authorization**: Okta (must handle all user types and roles)
-- **CI/CD**: GitHub Actions
-- **Testing**: Unit tests, integration tests, and UI responsiveness tests
+- **Frontend**: Angular, hosted on **Cloudflare Pages**.
+- **Backend**: **.NET** REST API using **FastEndpoints** for all application endpoints
+  (HTTP verbs: GET, POST, PUT, PATCH, DELETE as appropriate).
+- **Database**: **PostgreSQL**, single logical database with **shared tables** (no per-HOA
+  database silos unless explicitly amended).
+- **Database hosting**: **Neon** PostgreSQL with **scale-to-zero** in non-production and
+  production as configured; separate Neon databases per environment (see section 10).
+- **Authentication / authorization**: **Auth0** (all user types and roles; replaces any prior
+  Okta assumptions).
+- **Containers**: **All backend services MUST be Dockerized**. Images MUST be published to
+  **Docker Hub** (organization/repo naming per project standards).
+- **Backend runtime**: Containers deployed to **Google Cloud Run**, configured to **scale to
+  zero**; **cold start latency is acceptable**.
+- **Edge / perimeter**: **Cloudflare** MUST sit in front of public traffic for **DDoS
+  protection**, **rate limiting**, **bot filtering**, **traffic filtering**, and **edge caching**
+  where appropriate - including **in front of the backend** API surface exposed to clients.
+- **CI/CD**: **GitHub Actions**; deployments MUST run automatically on merges to **`main`**
+  (with environment promotion rules as defined in pipeline configuration).
+- **Testing**: Unit tests, integration tests, and UI tests per the Spec Kit Testing
+  Constitution below.
+- **Observability**: **Sentry** MUST be used for error tracking, performance visibility, and
+  trace context across frontend and backend services.
+- **API documentation**: **Swashbuckle** MUST generate OpenAPI and Swagger UI for .NET APIs
+  in development only.
+- **Repository intelligence docs**: **Repowise** indexes the codebase and emits documentation
+  in repository-defined marker regions (per project Repowise/MCP configuration). Pull requests
+  MUST include regenerated or updated Repowise outputs in those regions so indexed
+  documentation, ownership, architectural decisions, and related signals stay accurate.
+- **File storage**: If file/blob storage is added, hosted environments MUST use
+  **Cloudflare R2**. Local Docker Compose and local/CI tests MUST use **MinIO** to simulate
+  object storage behavior.
 
-## 3. Backend Principles
+## 3. Tenancy, Data, and Product Invariants
+
+- Every HOA-scoped row MUST include an `hoa_id`, `association_id`, or equivalent tenant
+  boundary.
+- Shared tables MUST avoid accidental global queries. Queries that intentionally cross HOAs
+  MUST document the reason, authorization model, and expected result scope.
+- Cross-HOA access MUST be denied by default.
+- A user MAY belong to multiple HOAs or associations.
+- An HOA MUST have at least one owner/admin or management administrator at all times.
+- User-generated HOA content MUST identify its owner, HOA scope, visibility, and
+  moderation/audit state where applicable.
+- Schema changes MUST be represented as migrations.
+- Migrations MUST be tested against PostgreSQL.
+- Database changes MUST use strict migrations; manual database edits are not allowed.
+- Cloud Run startup MUST apply migrations idempotently and safely.
+- Destructive migrations require an explicit rollback or mitigation plan.
+- Seed and reference data MUST be handled predictably per environment.
+- IDs SHOULD use a consistent format across APIs and storage; UUIDs are preferred unless
+  a feature plan documents a better fit.
+- Dates and times MUST be stored and exposed in UTC unless a field explicitly represents
+  a user-entered local date/time concept.
+
+## 4. Backend Principles
 
 ### Statelessness
 
-- The API MUST be as stateless as possible.
-- Any state changes MUST persist in the database.
-- Function calls MUST minimize side effects.
+- APIs MUST remain **stateless**; no reliance on in-process session state for correctness.
+- **All persistent state MUST be stored in PostgreSQL** (and external durable services
+  explicitly approved in plan/spec if added later).
+- Function and handler design MUST minimize unnecessary side effects; prefer pure functions
+  where practical.
 
-### Functional Paradigm
+### Endpoint implementation
 
-- Prefer functional programming patterns.
-- Use factories to create data and setup relationships.
-- Factories MUST NOT modify objects they didn't create.
-- Services are allowed to modify object state.
+- Application API endpoints MUST be implemented with **FastEndpoints**.
+- MVC controllers MUST NOT be introduced for application endpoints unless a feature plan
+  documents a specific compatibility reason and an amendment approves it.
 
-### Error Handling
+### Swagger and OpenAPI
 
-- A global exception handler MUST manage all errors consistently.
-- API responses MUST provide meaningful error messages with proper HTTP status codes.
+- **Swashbuckle** MUST generate OpenAPI documentation and Swagger UI for the .NET API in
+  development environments.
+- Swagger UI MUST be available at `/swagger` in development to support debugging, auth-flow
+  trials, bug reproduction, and shareable diagnostic links.
+- Swagger and its OpenAPI endpoint MUST be disabled entirely in production.
+- Swagger documentation MUST be generated from the implemented API endpoints and kept aligned
+  with API contracts.
+
+### Functional paradigm
+
+- Prefer **functional design** where appropriate (immutable DTOs, explicit inputs/outputs,
+  composition).
+- Use factories to create test data and setup relationships; factories MUST NOT modify objects
+  they did not create.
+- Application services MAY coordinate side effects and transactional boundaries.
+
+### Error handling
+
+- A **global exception handler** MUST catch unhandled errors and map them to HTTP responses.
+- APIs MUST return **consistent, meaningful error response shapes** (stable codes/types for
+  clients).
+- In **developer** environments, responses MAY include detailed error messages for debugging.
+- In **production**, responses MUST **NOT** leak stack traces, internal paths, or other
+  **system information**; use generic client-safe messages and log details server-side only.
 
 ### Pagination
 
-- All endpoints that return collections MUST support pagination via `limit` and `offset` query parameters.
+- Every endpoint that returns a **collection** MUST support pagination via **`limit`** and
+  **`offset`** query parameters (unless superseded by a documented cursor standard in a
+  future amendment; until then, limit/offset is mandatory).
+- Collection endpoints MUST document the default `limit` and maximum allowed `limit`.
 
-## 4. Frontend Principles
+## 5. API Contract Standards
+
+- API responses MUST use a consistent envelope or a documented response shape.
+- Error responses MUST use the same documented shape across endpoints.
+- Breaking API changes require contract updates and migration notes.
+- Contracts MUST document collection pagination, default `limit`, maximum `limit`,
+  authentication requirements, authorization rules, and cacheability.
+
+## 6. Frontend Principles
 
 ### Responsiveness
 
-UI MUST function and render correctly on:
+The UI MUST function and render correctly at:
 
-- iPhone widths
+- Phone widths (e.g., iPhone-class)
 - Tablet widths
 - Desktop widths
 
 ### Consistency
 
 - UI components MUST follow a consistent design system and Angular conventions.
-- All user interactions MUST be tested and validated against the backend API contracts.
+- User flows MUST be validated against backend **API contracts**; breaking contract changes
+  require coordinated releases or versioning.
+- Static assets SHOULD be cacheable with hashed filenames.
+- UI SHOULD target WCAG 2.1 AA where practical.
+- Forms, navigation, dialogs, property/violation workflows, and HOA content creation flows
+  MUST be keyboard-accessible.
+- Meaningful labels and validation messages are required.
 
-## 5. Security & Authentication
+## 7. Security & Authentication
 
-- All endpoints and UI actions MUST enforce Okta authentication.
-- User roles (Homeowner, Board Member, HOA Manager) MUST be strictly separated.
-- Sensitive data MUST be encrypted at rest and in transit.
-- API MUST NOT return more data than necessary for the authenticated role.
+- Auth0 provides identity and token validation.
+- All protected endpoints and UI actions MUST enforce **Auth0** authentication.
+- Application authorization is enforced server-side based on the authenticated user,
+  HOA membership, and role in the target HOA.
+- Authorization MUST always check both the authenticated user and their membership/role
+  in the target HOA.
+- Authorization MUST distinguish roles appropriate to the product (e.g., HOA creator,
+  owner/admin, board member, property manager, homeowner/resident, committee member,
+  platform operator) and MUST enforce least privilege.
+- Frontend authorization checks are UX-only and MUST NOT be trusted for enforcement.
+- Backend authorization policies MUST be covered by integration tests.
+- Sensitive data MUST be encrypted **in transit** (TLS end-to-end) and **at rest** per
+  provider capabilities (Neon, Cloud Run, secrets management).
+- APIs MUST NOT return more data than necessary for the authenticated principal and context.
+- User-generated content MUST be treated as untrusted input.
+- Security-sensitive events MUST be logged, including login-linked identity changes,
+  membership changes, role changes, property ownership/residency changes, deletes, and
+  publish/unpublish actions.
+- Moderation, manager, and board/admin actions SHOULD be auditable.
+- Rate limiting MUST apply to auth-adjacent, content creation, invite, violation submission,
+  document upload, and public discovery endpoints.
 
-## 6. Quality & Code Standards
+## 8. Operations, Secrets, and Data Lifecycle
+
+- Secrets MUST NOT be committed.
+- Environment-specific configuration MUST come from environment variables or managed secret
+  stores.
+- Dev, Staging, and Prod secrets MUST be isolated.
+- Docker images MUST NOT bake in secrets.
+- Backend services MUST emit structured JSON logs.
+- Backend services MUST use **Serilog** for structured logging.
+- Request correlation IDs SHOULD be propagated through API logs.
+- Sentry MUST be configured in both the Angular frontend and .NET backend for error tracking
+  and performance visibility.
+- Sentry trace context MUST propagate across frontend requests and backend handling so a
+  user-facing issue can be followed through the full request path.
+- Sentry events MUST include environment and release identifiers and MUST NOT capture secrets
+  or sensitive HOA, homeowner, resident, property, violation, payment, or document content.
+- Health/readiness endpoints SHOULD exist for Cloud Run services.
+- Production errors MUST be logged with enough detail to debug without leaking details to
+  clients.
+- Because Neon is the hosted PostgreSQL provider, database access MUST use low maximum
+  connection counts, pooling enabled, and short-lived DbContext instances.
+- File/blob storage, if introduced, MUST store binary objects in Cloudflare R2 for hosted
+  environments and MUST use MinIO in local Docker Compose/test environments.
+- PostgreSQL MUST store file metadata, ownership, HOA scope, and references, not large
+  binary file payloads.
+- API responses MUST only be cached when explicitly safe.
+- Authenticated or user-specific responses MUST NOT be edge-cached unless carefully keyed
+  and justified in the feature plan.
+
+## 9. Quality & Code Standards
 
 ### Backend
 
-- Adhere to .NET naming conventions and code style.
-- All functions MUST have unit tests.
-- Use integration tests to validate database interactions.
+- Adhere to .NET naming conventions and team code style.
+- Use CQRS where it fits the application boundary and existing project patterns.
+- Backend services MUST use **Serilog** for structured logging.
+- New logic MUST have **unit tests**; persistence and integrations MUST have **integration
+  tests** (PostgreSQL, see testing constitution).
+- **Docker Compose** for local development MUST approximate production: **a running
+  PostgreSQL service MUST be part of Compose** so local and CI test runs use realistic DB
+  semantics.
 
 ### Frontend
 
-- Use Angular best practices and linting.
-- Component unit tests are required.
+- Follow Angular best practices and linting; component and service unit tests are required
+  for non-trivial behavior.
+- Angular unit tests MUST use **Jasmine** and **Karma**.
+- Angular component tests MUST use **Angular Testing Library**.
+- Frontend browser tests MUST use **Playwright** where browser automation is required outside
+  the end-to-end suite.
+- End-to-end tests MUST use **Cypress**.
+- **Storybook** MUST be used for component stories and visual regression testing.
 
 ### CI/CD
 
-- All tests MUST pass before code merges.
-- GitHub Actions workflows MUST enforce linting, testing, and deployment rules.
+- Automated checks MUST enforce linting and tests before merge where configured.
+- Pull requests MUST pass static code analysis via **Sonar** before merge.
+- A **GitHub Actions** workflow MUST kick off the Sonar scan for pull requests.
+- Pull requests MUST publish Codecov results through **GitHub Actions**.
+- Pull requests MUST include updates to **Repowise**-generated content (run the project's
+  Repowise workflow and commit refreshed outputs in Repowise-maintained regions; no-op if
+  nothing changed) so repository intelligence documentation does not drift from merged code.
+- Code coverage MUST be at least **95%** for all relevant files changed or added by a pull
+  request.
+- Pipelines MUST deploy **Dev / Staging / Prod** with **isolated** Neon databases and
+  **isolated** Cloud Run services (or equivalent environment separation).
 
-## 7. Governance & Amendments
+## 10. Infrastructure & Environments
 
-- Any change to this constitution MUST be approved via a formal review process.
-- Each amendment MUST document the rationale and author.
-- Constitution versioning MUST be maintained, and old versions archived for reference.
+- **Dev**, **Staging**, and **Prod** MUST use **separate** PostgreSQL databases and
+  **separate** Cloud Run services (and separate Auth0 configuration as applicable).
+- **Cloudflare** configuration MUST align per environment (Pages for frontend; edge rules for
+  API protection and caching in front of backend endpoints).
+- **Local development**: `docker-compose` (or successor) MUST bring up dependencies so that
+  developers and automated tests can run against a **real PostgreSQL** instance analogous to
+  production semantics.
+
+## 11. Governance & Amendments
+
+- Changes to this constitution MUST be reviewed and approved like any architectural decision
+  record affecting the whole project.
+- Pull requests SHOULD be focused on vertical slices that deliver independently testable
+  increments. Horizontal pull requests are allowed for cross-cutting infrastructure,
+  quality, security, or refactoring work. Broad mixed-scope pull requests MUST be split
+  or explicitly justified.
+- The project MUST be built incrementally and iteratively; implementation plans MUST NOT
+  attempt to deliver unrelated product surface area all at once.
+- Each amendment MUST document rationale, author, and version bump per semantic versioning:
+  - **MAJOR**: Breaking governance or removal/redefinition of non-negotiable rules.
+  - **MINOR**: New principle, section, or materially expanded guidance.
+  - **PATCH**: Clarifications, wording, typos, non-semantic refinements.
+- Prior versions SHOULD be retained in version control history for auditability.
 
 ---
 
 # Spec Kit Testing Constitution
 
-(.NET + PostgreSQL, Transaction-per-Test Isolation)
+(.NET + PostgreSQL, transaction-per-test isolation)
 
 ## Purpose
 
-This constitution defines the rules, principles, and best practices for writing automated tests that are:
+This constitution defines rules for automated tests that use **xUnit** and **.NET
+Testcontainers** for containerized dependencies. Tests are:
 
-- **Deterministic** – repeatable and order-independent
-- **Isolated** – test data does not interfere with other tests
-- **Realistic** – uses PostgreSQL with production semantics
-- **Scalable** – maintainable as the system and team grow
+- **Deterministic** - repeatable and order-independent
+- **Isolated** - test data does not leak across tests
+- **Realistic** - PostgreSQL with production-like semantics
+- **Scalable** - maintainable as the system and team grow
 
 It applies to unit, repository, business-process, and end-to-end tests.
 
 ## 1. Core Definitions
 
-### 1.1 Business Process
+### 1.1 Business process
 
-A business process is:
+A **business process** is a named operation that coordinates domain rules, state transitions,
+and side effects to achieve an outcome. It typically lives in an application service or use
+case, may span repositories, and may emit events or notifications.
 
-A named, intention-revealing operation that coordinates multiple domain rules, state transitions, and side effects to achieve a business outcome.
-
-**Characteristics:**
-
-- Lives in Application Service, Domain Service, or Use Case
-- May span multiple repositories
-- May emit events, enqueue jobs, or send notifications
-- Often has transactional boundaries
-
-**Examples:** OnboardHomeOwner, ApproveBoardMember, GenerateMonthlyAssessment
-
-**Not a business process:** repository CRUD, query handlers, mapping, or pure domain methods
+**Examples:** `CreateHoa`, `InviteMember`, `RecordViolation`, `PublishAnnouncement`
+**Not a business process:** repository CRUD, trivial mapping, or pure domain queries with no
+orchestration.
 
 ### 1.2 Repository
 
-A repository is a persistence abstraction responsible for:
+A **repository** abstracts persistence: CRUD, queries, projections, and transaction boundaries
+for stored data. Repositories are not business processes and are tested separately.
 
-- CRUD operations
-- Queries and projections
-- Transaction boundaries for persisted data
+## 2. Guiding principles
 
-Repositories are not business processes and are tested separately.
+### 2.1 Universal isolation
 
-## 2. Guiding Principles
+All tests that touch the database MUST run inside a PostgreSQL **transaction that rolls back**
+after the test (or use an equivalent pattern approved in writing). This ensures isolation,
+safe parallelism, and no cross-test contamination.
 
-### 2.1 Universal Isolation
+Tests MUST be written with the assumption that other tests are running in parallel and that
+previous test runs may have created data, containers, files, messages, or other artifacts.
+Tests MUST use unique data, scoped resources, transactions, cleanup, or idempotent setup so
+they do not depend on a clean global environment.
 
-All tests MUST execute inside a PostgreSQL transaction that is rolled back after the test.
-
-This ensures:
-
-- Full isolation per test
-- Parallel execution safety
-- No cross-test contamination
-
-**Example Pattern (C# + EF Core):**
+**Example (C# + EF Core):**
 
 ```csharp
 await using var transaction = await dbContext.Database.BeginTransactionAsync();
-// create test data
-// execute method under test
-// assertions
+// arrange + act + assert
 await transaction.RollbackAsync();
 ```
 
-### 2.2 PostgreSQL Usage
+### 2.2 PostgreSQL usage
 
-All tests that interact with persistence MUST use PostgreSQL.
+Persistence-related tests MUST use **PostgreSQL**. In-memory providers MUST NOT replace
+PostgreSQL for integration or repository tests.
 
-- Avoid in-memory substitutes (SQLite, EF Core in-memory, mocks).
-- Ensures tests reflect production constraints, types, and transaction semantics.
+Integration tests MUST use **.NET Testcontainers** to spin up Docker containers for
+PostgreSQL and other required local dependencies.
 
 ### 2.3 Factories
 
-**Purpose:** Factories exist to declare valid data state for tests. They MUST NOT execute business logic.
+Factories declare **valid data** for tests and MUST NOT embed business rules or conditional
+side effects.
 
-**Allowed:**
+**Allowed:** explicit field values, required FKs, defaults.
+**Prohibited:** branching domain logic inside factories that changes real system behavior.
 
-- Explicit field values
-- Required attributes for tables or entities
-- Default foreign key references
+### 2.4 Test-first (red-green)
 
-**Example:**
+Tests MUST be written **before** implementation where this constitution applies to a task.
 
-```csharp
-var adminUser = UserFactory.Create(role: "Admin", discountRate: 0);
-```
+- Tests MUST be traceable to specification acceptance criteria before implementation begins.
+- Non-compiling tests MAY be temporarily commented with a clear path to restore them.
+- Implementation MUST proceed in **red -> green** cycles until tests pass.
 
-**Prohibited:**
+### 2.5 Data-varied tests with Theories
 
-- Conditional business rules inside factories
-- Applying side effects based on domain logic
+Tests that validate the same behavior across multiple input values, roles, pagination
+boundaries, authorization states, validation cases, or error cases MUST use xUnit
+**Theories** with explicit test data (`InlineData`, `MemberData`, or `ClassData`).
 
-```csharp
-// ❌ Not allowed
-if (role == "Admin") ApplyAdminDiscount();
-```
+Repeated copy/paste Facts for data variations are prohibited unless a test documents why the
+cases have materially different setup, behavior, or assertions.
 
-**Rationale:** Mixing business logic into factories creates hidden side effects; tests may pass/fail due to setup code rather than the system under test; makes factories brittle and tightly coupled to business rules. Keeps factories reusable, predictable, and declarative.
+## 3. Repository test constitution
 
-### 2.4 Test-First (Red-Green)
+- Repository tests MUST use per-test transaction isolation.
+- Required rows MUST be created in-test or via factories.
+- Assertions focus on **structural** correctness: CRUD, constraints, query shapes - not full
+  business outcomes.
 
-Tests MUST be written BEFORE code implementation.
+## 4. Business-process test constitution
 
-- Tests MUST be checked against the specification to ensure they match requirements before implementation begins.
-- It is acceptable for code or tests not to compile initially. Any non-compiling tests MAY be commented out while implementation proceeds.
-- Implementation MUST iteratively uncomment and fix tests to achieve red-to-green style (test fails → implement → test passes).
+- Business-process tests MUST use per-test transaction isolation.
+- Each test builds minimal valid domain state (factories), without calling unrelated processes
+  unless the scenario is explicitly end-to-end.
+- Assertions target **business outcomes**, not repository internals.
 
-## 3. Repository Test Constitution
+## 5. End-to-end test constitution
 
-- Repository tests MUST be isolated in their own transaction.
-- All required data MUST be created directly in the test or via factories.
-- Repository tests verify structural correctness only: CRUD operations, queries returning expected rows, constraints enforcement.
-- MUST NOT invoke business processes or validate domain rules.
+- Few in number; may span multiple processes and real infrastructure boundaries where
+  justified.
+- Still require deterministic data setup/teardown policies.
+- Focus on **workflow** correctness, not low-level SQL.
 
-**Lifecycle Example:**
+## 6. Cross-cutting rules
 
-```text
-Environment Setup (once per test suite)
-  ├─ PostgreSQL test database created
-  ├─ EF Core migrations applied
-  └─ Reference data seeded (roles, enums)
+- **Order independence**, **repeatability**, **single-reason failures**, **data ownership** by
+  each test, **parallel safety**, **rerun safety**, and **production faithfulness** for
+  PostgreSQL semantics.
 
-Per Test
-  ├─ Begin transaction
-  ├─ Insert necessary rows
-  ├─ Execute repository method
-  ├─ Assert structural correctness
-  └─ Rollback transaction
-```
-
-## 4. Business-Process Test Constitution
-
-- Business-process tests MUST be isolated in their own transaction.
-- Each test creates minimal valid domain state, even if normally produced by another business process.
-- Tests MUST NOT invoke other business processes, except for explicit end-to-end tests.
-- Assertions MUST focus on business outcomes, not repository implementation.
-
-**Lifecycle Example:**
-
-```text
-Environment Setup (once per suite)
-  ├─ PostgreSQL test database created
-  ├─ EF Core migrations applied
-  ├─ Seed roles, enums, and static reference data
-
-Per Test
-  ├─ Begin transaction
-  ├─ Create valid domain state (factories)
-  ├─ Execute business process
-  ├─ Assert business outcomes
-  └─ Rollback transaction
-```
-
-## 5. End-to-End Test Constitution
-
-- May invoke multiple business processes.
-- Validate full workflows, reflecting production behavior.
-- Should be few in number.
-- Isolation still required via per-test transaction.
-- Assertions focus on orchestration correctness, not structural details.
-
-## 6. Cross-Cutting Rules
-
-- **Order Independence** – tests pass in any order
-- **Repeatability** – tests pass on repeated runs
-- **Failure Isolation** – tests fail for one reason only
-- **Data Ownership** – tests own all data they require
-- **Production Faithfulness** – PostgreSQL semantics match production
-
-## 7. Recommended Folder Layout
+## 7. Recommended folder layout
 
 ```text
 spec_kit/
   testing/
-    constitution.md             # This main document
-    repository.constitution.md  # Optional modular supplement
+    constitution.md             # Optional modular copy or supplement
+    repository.constitution.md
     business_process.constitution.md
     end_to_end.constitution.md
   factories/
     UserFactory.cs
-    AssessmentFactory.cs
+    HoaFactory.cs
   fixtures/
-    TestDatabaseFixture.cs      # handles per-test transaction rollback
+    TestDatabaseFixture.cs
   migrations/
-    001_init.sql
-    002_roles.sql
+    (EF Core / SQL migrations as owned by the backend)
 ```
 
-## 8. Strategic Outcome
+## 8. Strategic outcome
 
-- **Repository tests:** validate persistence independently of domain rules
-- **Business-process tests:** validate domain behavior independently of other processes
-- **End-to-end tests:** validate orchestration and workflow correctness
-- **All tests:** fully isolated, deterministic, production-faithful, and safe for parallel execution
+- **Repository tests:** persistence correctness without domain coupling
+- **Business-process tests:** domain behavior without unrelated orchestration
+- **End-to-end tests:** full workflows, sparingly
+- **All tests:** isolated, deterministic, PostgreSQL-faithful, safe for parallel execution
 
-## 9. Completion Gate
+## 9. Completion gate
 
-Implementation for a feature or task MUST continue until:
+Implementation for a feature or task MUST NOT be considered complete until:
 
-- **Integration tests** run locally and **all pass**.
-- **UI unit tests** (e.g., Angular component/service tests) run locally and **all pass**.
-
-Work is not considered complete until both of these conditions are satisfied.
+- **Backend integration tests** run locally (or in CI) and **all pass**, and
+- **Frontend unit, component, Playwright, Cypress, and Storybook visual regression tests**
+  run locally (or in CI) where applicable and **all pass**.
