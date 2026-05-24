@@ -6,10 +6,12 @@ alwaysApply: true
 
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-14
+Auto-generated from all feature plans. Last updated: 2026-05-24
 
 ## Active Technologies
 - PostgreSQL (existing; migrations for Property and Violation–Property association as needed) (001-dashboard-violations-summary)
+- C# 13 / .NET 9 (003-dotnet-api-backend)
+- PostgreSQL — Docker Compose locally (`postgres:17`), Neon in staging/production (003-dotnet-api-backend)
 
 - .NET 9 (C#) + ASP.NET Core, Entity Framework Core 9, Npgsql (PostgreSQL), ASP.NET Core Identity (001-dashboard-violations-summary)
 
@@ -29,9 +31,10 @@ tests/
 .NET 9 (C#): Follow standard conventions
 
 ## Recent Changes
+- 003-dotnet-api-backend: Added C# 13 / .NET 9
+- 003-dotnet-api-backend: Added C# 13 / .NET 9
 - 001-dashboard-violations-summary: Added .NET 9 (C#) + ASP.NET Core, Entity Framework Core 9, Npgsql (PostgreSQL), ASP.NET Core Identity
 
-- 001-dashboard-violations-summary: Added .NET 9 (C#) + ASP.NET Core, Entity Framework Core 9, Npgsql (PostgreSQL), ASP.NET Core Identity
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
