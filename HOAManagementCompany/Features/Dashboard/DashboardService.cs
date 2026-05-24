@@ -24,9 +24,9 @@ public class DashboardService(ApplicationDbContext db)
             .CountAsync(v => v.PropertyId == propertyId && v.Status == ViolationStatus.Open, ct);
 
         var documentCount = await db.HoaDocuments.CountAsync(d => d.CommunityId == communityId, ct);
-        var monthStart = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+        var monthStart = new DateTimeOffset(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
         var newDocuments = await db.HoaDocuments
-            .CountAsync(d => d.CommunityId == communityId && d.CreatedAt >= monthStart.ToDateTime(TimeOnly.MinValue), ct);
+            .CountAsync(d => d.CommunityId == communityId && d.CreatedAt >= monthStart, ct);
 
         var pinnedAnnouncement = await db.Announcements
             .Where(a => a.CommunityId == communityId && a.Pinned)
@@ -34,7 +34,8 @@ public class DashboardService(ApplicationDbContext db)
             .Select(a => new AnnouncementSummary(a.Id, a.Title, a.Body, a.Category.ToString(), a.PublishedAt, a.AuthorName))
             .FirstOrDefaultAsync(ct);
 
-        var weekStart = DateTimeOffset.UtcNow.Date;
+        var now = DateTimeOffset.UtcNow;
+        var weekStart = new DateTimeOffset(now.Year, now.Month, now.Day, 0, 0, 0, TimeSpan.Zero);
         var weekEnd = weekStart.AddDays(7);
         var thisWeekEvents = await db.CalendarEvents
             .Where(e => e.CommunityId == communityId && e.EventDate >= weekStart && e.EventDate < weekEnd)

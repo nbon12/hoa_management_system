@@ -10,8 +10,7 @@ public class LoginEndpoint(AuthService authService) : Endpoint<LoginRequest, Aut
     {
         Post("/auth/login");
         AllowAnonymous();
-        Description(x => x.WithName("Login").WithTags("Auth"));
-        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Client-Id");
+        Description(x => x.WithName("Login").WithTags("Auth").RequireRateLimiting("auth"));
     }
 
     public override async Task HandleAsync(LoginRequest req, CancellationToken ct)

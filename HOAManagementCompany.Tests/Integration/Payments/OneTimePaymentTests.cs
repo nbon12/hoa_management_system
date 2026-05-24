@@ -55,10 +55,10 @@ public class OneTimePaymentTests(TestDatabaseFixture fixture) : IntegrationTestB
     }
 
     [Theory]
-    [InlineData("ach", 250, null, null, null, "routingNumber")]
-    [InlineData("ach", 0, "021000021", "123456789", "checking", "amount")]
+    [InlineData("ach", 250, null, null, null)]
+    [InlineData("ach", 0, "021000021", "123456789", "checking")]
     public async Task OneTimePayment_ValidationErrors_Returns422(
-        string method, double amount, string? routing, string? account, string? accountType, string expectedField)
+        string method, double amount, string? routing, string? account, string? accountType)
     {
         decimal amountDecimal = (decimal)amount;
         await SetAuthHeaderAsync();

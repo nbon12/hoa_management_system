@@ -2,6 +2,7 @@ using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -18,19 +19,52 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
     protected IntegrationTestBase(TestDatabaseFixture fixture)
     {
         Fixture = fixture;
+
+        // Set env vars before WebApplicationFactory starts so Program.cs reads them via builder.Configuration
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Test");
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", fixture.ConnectionString);
+        Environment.SetEnvironmentVariable("Storage__ServiceUrl", fixture.MinioEndpoint);
+
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
+                builder.UseSetting("environment", "Test");
+
+                builder.ConfigureAppConfiguration((ctx, cfg) =>
+                {
+                    cfg.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:DefaultConnection"] = fixture.ConnectionString,
+                        ["Jwt:Secret"] = "test-secret-for-integration-tests-must-be-32-chars!!",
+                        ["Jwt:Issuer"] = "nekohoa-api",
+                        ["Jwt:Audience"] = "nekohoa-frontend",
+                        ["Jwt:AccessTokenExpiryMinutes"] = "15",
+                        ["Jwt:RefreshTokenExpiryDays"] = "30",
+                        ["Storage:ServiceUrl"] = fixture.MinioEndpoint,
+                        ["Storage:AccessKey"] = "minioadmin",
+                        ["Storage:SecretKey"] = "minioadmin",
+                        ["Storage:BucketName"] = "hoa-documents",
+                        ["Storage:ForcePathStyle"] = "true",
+                        ["Sentry:Dsn"] = ""
+                    });
+                });
+
                 builder.ConfigureServices(services =>
                 {
-                    var descriptor = services.SingleOrDefault(
-                        d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-                    if (descriptor is not null) services.Remove(descriptor);
+                    // Replace DbContext registrations with the Testcontainers connection
+                    var toRemove = services
+                        .Where(d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>)
+                                 || d.ServiceType == typeof(IDbContextFactory<ApplicationDbContext>))
+                        .ToList();
+                    foreach (var d in toRemove) services.Remove(d);
 
                     services.AddDbContext<ApplicationDbContext>(o =>
                         o.UseNpgsql(fixture.ConnectionString));
+                    services.AddDbContextFactory<ApplicationDbContext>(o =>
+                        o.UseNpgsql(fixture.ConnectionString));
                 });
             });
+
         Client = _factory.CreateClient();
     }
 

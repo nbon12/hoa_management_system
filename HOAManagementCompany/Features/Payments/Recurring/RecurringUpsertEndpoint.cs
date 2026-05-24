@@ -10,7 +10,6 @@ public class RecurringUpsertEndpoint(PaymentService paymentService) : Endpoint<R
     {
         Put("/payments/recurring");
         Description(x => x.WithName("UpsertRecurring").WithTags("Payments"));
-        Throttle(hitLimit: 20, durationSeconds: 60, headerName: "X-Client-Id");
     }
 
     public override async Task HandleAsync(RecurringPaymentRequest req, CancellationToken ct)

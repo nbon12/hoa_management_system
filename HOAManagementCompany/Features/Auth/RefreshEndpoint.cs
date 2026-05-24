@@ -10,8 +10,7 @@ public class RefreshEndpoint(AuthService authService) : Endpoint<RefreshRequest,
     {
         Post("/auth/refresh");
         AllowAnonymous();
-        Description(x => x.WithName("RefreshToken").WithTags("Auth"));
-        Throttle(hitLimit: 10, durationSeconds: 60, headerName: "X-Client-Id");
+        Description(x => x.WithName("RefreshToken").WithTags("Auth").RequireRateLimiting("auth"));
     }
 
     public override async Task HandleAsync(RefreshRequest req, CancellationToken ct)

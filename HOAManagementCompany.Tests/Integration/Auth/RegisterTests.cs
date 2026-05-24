@@ -13,7 +13,7 @@ public class RegisterTests(TestDatabaseFixture fixture) : IntegrationTestBase(fi
         password = "Password1!",
         firstName = "Jane",
         lastName = "Doe",
-        accountNumber = "SAKURA-001"
+        accountNumber = "SAKURA-003"   // unclaimed property seeded for this test
     };
 
     [Fact]

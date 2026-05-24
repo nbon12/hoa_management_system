@@ -9,8 +9,7 @@ public class OneTimePaymentEndpoint(PaymentService paymentService) : Endpoint<On
     public override void Configure()
     {
         Post("/payments/one-time");
-        Description(x => x.WithName("SubmitOneTimePayment").WithTags("Payments"));
-        Throttle(hitLimit: 20, durationSeconds: 60, headerName: "X-Client-Id");
+        Description(x => x.WithName("SubmitOneTimePayment").WithTags("Payments").RequireRateLimiting("payments"));
     }
 
     public override async Task HandleAsync(OneTimePaymentRequest req, CancellationToken ct)

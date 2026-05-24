@@ -141,6 +141,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
 // ── FastEndpoints + Swagger ────────────────────────────────────────────────
+builder.Services.AddMemoryCache();
 builder.Services.AddFastEndpoints();
 
 if (builder.Environment.IsDevelopment())
@@ -198,6 +199,7 @@ app.MapHealthChecks("/health");
 app.UseFastEndpoints(c =>
 {
     c.Endpoints.RoutePrefix = "api/v1";
+    c.Errors.StatusCode = 422;
     c.Errors.ResponseBuilder = (failures, ctx, status) =>
     {
         var errors = failures.Select(f => new { field = f.PropertyName, message = f.ErrorMessage });
