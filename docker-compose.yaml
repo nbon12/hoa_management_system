@@ -1,64 +1,74 @@
 services:
   db:
-    image: postgres:16-alpine 
-    restart: unless-stopped 
-
+    image: postgres:17
+    restart: unless-stopped
     environment:
-      
-      POSTGRES_DB: sequestria 
-      POSTGRES_USER: sequestria1 
-      POSTGRES_PASSWORD: HXCKFJ3498fajjAJR94 
-      # POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C" # Optional: Initialisation arguments
-
+      POSTGRES_DB: nekohoa
+      POSTGRES_USER: nekohoa
+      POSTGRES_PASSWORD: nekohoa
     ports:
       - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sequestria1 -d sequestria"]
+      test: ["CMD-SHELL", "pg_isready -U nekohoa -d nekohoa"]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - app_network
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - app_network
 
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: HOAManagementCompany/Dockerfile
     restart: unless-stopped
     ports:
       - "5212:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=sequestria;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=nekohoa;Username=nekohoa;Password=nekohoa"
+      Jwt__Secret: "dev-secret-change-in-production-must-be-at-least-32-chars"
+      Jwt__Issuer: "nekohoa-api"
+      Jwt__Audience: "nekohoa-frontend"
+      Storage__ServiceUrl: "http://minio:9000"
+      Storage__AccessKey: "minioadmin"
+      Storage__SecretKey: "minioadmin"
+      Storage__BucketName: "hoa-documents"
+      Storage__ForcePathStyle: "true"
     depends_on:
       db:
         condition: service_healthy
     networks:
       - app_network
 
-  ui:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "4200:80"
-    depends_on:
-      - api
-    networks:
-      - app_network
-
 volumes:
   postgres_data:
+  minio_data:
 
-# Define custom networks
 networks:
-  app_network: 
+  app_network:
     driver: bridge

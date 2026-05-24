@@ -147,7 +147,7 @@ components:
     # ── Auth ──────────────────────────────────────────────────────────────────
     CurrentUser:
       type: object
-      required: [id, firstName, lastName, email, initials]
+      required: [id, firstName, lastName, email, initials, properties]
       properties:
         id:
           type: string
@@ -168,19 +168,37 @@ components:
           minLength: 1
           maxLength: 3
           example: NB
+        properties:
+          type: array
+          description: All properties linked to this user.
+          items:
+            type: object
+            required: [id, address, accountNumber]
+            properties:
+              id:
+                type: string
+                format: uuid
+              accountNumber:
+                type: string
+              address:
+                type: string
 
     AuthResponse:
       type: object
-      required: [token, expiresAt, user]
+      required: [token, refreshToken, expiresAt, user]
       properties:
         token:
           type: string
-          description: "Signed JWT — include as `Authorization: Bearer <token>` on subsequent requests."
+          description: "Short-lived JWT access token (15-min expiry). Include as `Authorization: Bearer <token>`."
           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          description: "Opaque refresh token (30-day expiry). Store securely; use with POST /auth/refresh."
+          example: d3f8a1b2c4e5...
         expiresAt:
           type: string
           format: date-time
-          example: "2026-06-24T00:00:00Z"
+          example: "2026-06-24T00:15:00Z"
         user:
           $ref: '#/components/schemas/CurrentUser'
 
@@ -199,7 +217,7 @@ components:
 
     RegisterRequest:
       type: object
-      required: [email, password, firstName, lastName]
+      required: [email, password, firstName, lastName, accountNumber]
       properties:
         email:
           type: string
@@ -214,6 +232,10 @@ components:
         lastName:
           type: string
           example: Doe
+        accountNumber:
+          type: string
+          description: "HOA account number from the resident's welcome letter. Links the new user to their property."
+          example: R0670853L0541192
 
     # ── Property ──────────────────────────────────────────────────────────────
     Property:
@@ -999,6 +1021,72 @@ paths:
                 $ref: '#/components/schemas/CurrentUser'
         "401":
           $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      operationId: RefreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  example: d3f8a1b2c4e5...
+      responses:
+        "200":
+          description: New token pair issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          description: Refresh token invalid, expired, or revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/switch-property:
+    post:
+      tags: [Auth]
+      summary: Switch active property
+      operationId: SwitchProperty
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId]
+              properties:
+                propertyId:
+                  type: string
+                  format: uuid
+                  description: "UUID of the target property. Must be linked to the authenticated user."
+      responses:
+        "200":
+          description: New token pair issued with updated propertyId claim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: User is not linked to the requested property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   # ╔═══════════════════════════════════════════════════════════════════════════
   # ║  DASHBOARD

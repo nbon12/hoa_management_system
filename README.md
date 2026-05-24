@@ -1,8 +1,41 @@
 # HOA Management Company
 
-An HOA management portal with an Angular frontend and .NET 9 backend for managing HOA
-violations, violation types, properties, and association workflows with PostgreSQL database
-integration.
+<!-- REPOWISE:START section=overview -->
+An HOA management portal with an Angular frontend (NekoHOA) and a .NET 9 FastEndpoints REST API backend. Residents can manage their property, view the ledger, pay assessments, participate in polls, and access community documents.
+<!-- REPOWISE:END -->
+
+## Technology Stack
+
+<!-- REPOWISE:START section=tech-stack -->
+- **Angular 19** — frontend (NekoHOA), served from `neko-hoa/`
+- **.NET 9 / C# 13** — REST API with **FastEndpoints** (30 endpoints, `api/v1` prefix)
+- **PostgreSQL 17** — primary data store via EF Core 9 + Npgsql
+- **ASP.NET Core Identity** — password hashing + user store; custom JWT auth
+- **MinIO (local) / Cloudflare R2 (production)** — document storage via AWSSDK.S3
+- **Serilog** — structured logging; **Sentry** — error tracking and performance monitoring
+- **xUnit + Testcontainers** — integration test suite
+- **Repowise** — repository intelligence documentation
+<!-- REPOWISE:END -->
+
+## Quick Start
+
+<!-- REPOWISE:START section=quickstart -->
+See [`specs/003-dotnet-api-backend/quickstart.md`](specs/003-dotnet-api-backend/quickstart.md) for the full developer setup guide.
+
+```bash
+# 1. Start infrastructure
+docker compose up -d
+
+# 2. Seed the database
+dotnet run --project HOAManagementCompany -- --seed
+
+# 3. Run the API
+dotnet run --project HOAManagementCompany
+
+# 4. Swagger UI (dev only)
+open http://localhost:5212/swagger
+```
+<!-- REPOWISE:END -->
 
 ## Features
 

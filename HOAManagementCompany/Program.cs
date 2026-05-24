@@ -1,101 +1,214 @@
-using HOAManagementCompany.Components;
-using HOAManagementCompany.Services;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
+// <!-- REPOWISE:START domain=bootstrap -->
+// Middleware pipeline and DI registration — HOAManagementCompany API
+// <!-- REPOWISE:END -->
+
+using System.Security.Claims;
+using System.Text;
+using Amazon.Runtime;
+using Amazon.S3;
+using FastEndpoints;
+using FastEndpoints.Swagger;
+using HOAManagementCompany.Domain.Entities;
+using HOAManagementCompany.Features.Common;
+using HOAManagementCompany.Infrastructure.Persistence;
+using HOAManagementCompany.Infrastructure.Storage;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+// ── Serilog ────────────────────────────────────────────────────────────────
+builder.Host.UseSerilog((ctx, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName));
 
-builder.Services.AddControllers();
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
-                       throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-
-builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+// ── Sentry ─────────────────────────────────────────────────────────────────
+builder.WebHost.UseSentry(builder.Configuration["Sentry:Dsn"] ?? "");
+builder.Services.Configure<Sentry.AspNetCore.SentryAspNetCoreOptions>(o =>
 {
-    options.UseNpgsql(connectionString);
-    options.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
-});
-
-// Add Identity services
-builder.Services.AddDefaultIdentity<IdentityUser>(options => {
-    options.SignIn.RequireConfirmedAccount = false;
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = true;
-    options.Password.RequiredLength = 6;
-    options.User.RequireUniqueEmail = true;
-})
-.AddRoles<IdentityRole>()
-.AddEntityFrameworkStores<ApplicationDbContext>();
-
-// Add authentication state
-builder.Services.AddCascadingAuthenticationState();
-
-builder.Services.AddScoped<ViolationService>();
-builder.Services.AddScoped<DashboardService>();
-builder.Services.AddScoped<UserRoleService>();
-builder.Services.AddHttpContextAccessor();
-
-// Add health checks
-builder.Services.AddHealthChecks();
-
-// CORS for Angular frontend (e.g. dev server on port 4200)
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
+    o.Environment = builder.Environment.EnvironmentName;
+    o.TracesSampleRate = 0.2;
+    o.SetBeforeSend((sentryEvent, _) =>
     {
-        policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+        if (sentryEvent.Request?.Data is IDictionary<string, object?> data)
+        {
+            foreach (var key in new[] { "cardNumber", "cardCvv", "routingNumber", "accountNumber" })
+                data.Remove(key);
+        }
+        return sentryEvent;
     });
 });
 
+// ── Database ───────────────────────────────────────────────────────────────
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+
+builder.Services.AddDbContext<ApplicationDbContext>(o =>
+    o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
+
+builder.Services.AddDbContextFactory<ApplicationDbContext>(o =>
+    o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
+
+// ── ASP.NET Core Identity ──────────────────────────────────────────────────
+builder.Services.AddIdentityCore<ApplicationUser>(o =>
+{
+    o.Password.RequireDigit = true;
+    o.Password.RequireUppercase = true;
+    o.Password.RequireNonAlphanumeric = true;
+    o.Password.RequiredLength = 8;
+    o.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
+
+// ── JWT Bearer ─────────────────────────────────────────────────────────────
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("Jwt:Secret is required.");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            NameClaimType = ClaimTypes.NameIdentifier
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// ── S3 / MinIO ─────────────────────────────────────────────────────────────
+builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
+
+var storageOpts = builder.Configuration.GetSection("Storage").Get<StorageOptions>()!;
+builder.Services.AddSingleton<IAmazonS3>(_ =>
+{
+    var config = new AmazonS3Config
+    {
+        ServiceURL = storageOpts.ServiceUrl,
+        ForcePathStyle = storageOpts.ForcePathStyle
+    };
+    return new AmazonS3Client(
+        new BasicAWSCredentials(storageOpts.AccessKey, storageOpts.SecretKey),
+        config);
+});
+builder.Services.AddScoped<IDocumentStorage, S3DocumentStorage>();
+
+// ── Rate Limiting ──────────────────────────────────────────────────────────
+builder.Services.AddRateLimiter(o =>
+{
+    o.AddFixedWindowLimiter("auth", opts =>
+    {
+        opts.PermitLimit = 10;
+        opts.Window = TimeSpan.FromMinutes(1);
+        opts.QueueLimit = 0;
+    });
+    o.AddFixedWindowLimiter("payments", opts =>
+    {
+        opts.PermitLimit = 20;
+        opts.Window = TimeSpan.FromMinutes(1);
+        opts.QueueLimit = 0;
+    });
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
+// ── CORS ───────────────────────────────────────────────────────────────────
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.WithOrigins("http://localhost:4200", "https://localhost:4200")
+     .AllowAnyHeader()
+     .AllowAnyMethod()
+     .AllowCredentials()));
+
+// ── Exception Handler ──────────────────────────────────────────────────────
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+// ── Health Checks ──────────────────────────────────────────────────────────
+builder.Services.AddHealthChecks();
+
+// ── FastEndpoints + Swagger ────────────────────────────────────────────────
+builder.Services.AddFastEndpoints();
+
+if (builder.Environment.IsDevelopment())
+    builder.Services.SwaggerDocument(o => o.DocumentSettings = s =>
+    {
+        s.Title = "NekoHOA API";
+        s.Version = "v1";
+    });
+
+// ── Feature Services ───────────────────────────────────────────────────────
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.AuthService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.PaymentService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.PropertyService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Community.CommunityService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>();
+
+// ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
+builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();
+
+// ═══════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+// ── --seed CLI flag (T068 amendment) ──────────────────────────────────────
+if (args.Contains("--seed"))
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    if (!app.Environment.IsDevelopment())
+    {
+        await Console.Error.WriteLineAsync("ERROR: Seeder is restricted to the Development environment.");
+        return 1;
+    }
+    await using var scope = app.Services.CreateAsyncScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
+    await seeder.SeedAsync();
+    return 0;
 }
 
-app.UseHttpsRedirection();
+// ── Middleware Pipeline ────────────────────────────────────────────────────
+app.UseExceptionHandler();
+app.UseSerilogRequestLogging(o =>
+{
+    o.EnrichDiagnosticContext = (diag, ctx) =>
+    {
+        diag.Set("CorrelationId", ctx.TraceIdentifier);
+        diag.Set("UserId", ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous");
+    };
+});
 app.UseCors();
-
-// Add authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
-app.UseAntiforgery();
-
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
-app.MapControllers();
-
-// Add Identity endpoints
-app.MapIdentityApi<IdentityUser>();
-
-// Add health check endpoint
 app.MapHealthChecks("/health");
 
-await using (var db = await app.Services.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContextAsync())
+app.UseFastEndpoints(c =>
 {
-    await db.Database.MigrateAsync();
-}
+    c.Endpoints.RoutePrefix = "api/v1";
+    c.Errors.ResponseBuilder = (failures, ctx, status) =>
+    {
+        var errors = failures.Select(f => new { field = f.PropertyName, message = f.ErrorMessage });
+        return new { code = "VALIDATION_ERROR", message = "One or more validation errors occurred.", errors };
+    };
+});
 
-// Seed data
-await ApplicationDbContext.SeedDataAsync(app.Services);
+if (app.Environment.IsDevelopment())
+    app.UseSwaggerGen();
 
 app.Run();
+return 0;
+
+public partial class Program { }

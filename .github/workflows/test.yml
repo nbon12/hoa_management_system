@@ -1,95 +1,80 @@
-name: Integration Tests
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+
+env:
+  DOTNET_VERSION: '9.0.x'
 
 jobs:
   test:
+    name: Build & Test
     runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: HXCKFJ3498fajjAJR94
-          POSTGRES_USER: sequestria1
-          POSTGRES_DB: hoa_management_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '9.0.x'
-    
-    - name: Restore dependencies
-      run: dotnet restore
-    
-    - name: Wait for PostgreSQL
-      run: |
-        echo "Waiting for PostgreSQL to be ready..."
-        while ! pg_isready -h localhost -p 5432 -U sequestria1; do
-          sleep 1
-        done
-        echo "PostgreSQL is ready!"
-    
-    - name: Install Entity Framework tools
-      run: |
-        dotnet tool install --global dotnet-ef
-        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-    
-    - name: Run database migrations
-      run: dotnet ef database update --project HOAManagementCompany --connection "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
-      env:
-        ASPNETCORE_ENVIRONMENT: Test
-    
-    - name: Build & Install
-      run: dotnet build HOAManagementCompany.Tests/HOAManagementCompany.Tests.csproj --configuration Debug
+      - uses: actions/checkout@v4
 
-    - name: Ensure browsers are installed
-      run: pwsh $(find HOAManagementCompany.Tests/bin/Debug -name playwright.ps1) install --with-deps
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Start Blazor App
-      run: |
-        dotnet run --project HOAManagementCompany/HOAManagementCompany.csproj --configuration Debug --urls=http://localhost:5212 &
-        echo "Waiting for application to be ready..."
-        # Wait for the application to be fully ready using health check
-        for i in {1..30}; do
-          if curl -s -f http://localhost:5212/health > /dev/null 2>&1; then
-            echo "Application is ready!"
-            break
-          fi
-          echo "Waiting for application... (attempt $i/30)"
-          sleep 2
-        done
-        # Additional wait to ensure everything is fully initialized
-        sleep 5
-      env:
-        ASPNETCORE_ENVIRONMENT: Test
-        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
+      - name: Begin SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=nekohoa-api
+            -Dsonar.sources=HOAManagementCompany
+            -Dsonar.tests=HOAManagementCompany.Tests
+            -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
+        continue-on-error: true
 
-    - name: Run All Tests
-      run: dotnet test --configuration Debug --verbosity normal
-      env:
-        PLAYWRIGHT_HEADLESS: "true"
-        ASPNETCORE_ENVIRONMENT: Test
-        ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=hoa_management_test;Username=sequestria1;Password=HXCKFJ3498fajjAJR94"
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results
-        path: HOAManagementCompany.Tests/TestResults/
-        retention-days: 7 
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  docker-push:
+    name: Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: HOAManagementCompany/Dockerfile
+          push: true
+          tags: |
+            nekohoa/api:latest
+            nekohoa/api:${{ github.sha }}
