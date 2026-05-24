@@ -100,18 +100,38 @@
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
 
-### Constitution Quality Gates *(mandatory)*
+### Constitution Requirements *(mandatory when applicable)*
 
-- **Tenancy and authorization**: [Describe HOA/association scope, Auth0-authenticated
-  user roles, server-side authorization rules, and any intentional cross-HOA access]
-- **API contract**: [Describe response shape, error shape, pagination for collections,
-  cacheability, and contract/versioning impact]
-- **Security and privacy**: [Describe sensitive data, audit events, rate limiting needs,
-  and production-safe error behavior]
-- **Testing expectations**: [Map acceptance criteria to unit, integration,
-  business-process, frontend, Playwright, Cypress, or Storybook tests as applicable]
-- **Observability and documentation**: [Describe Sentry/logging needs and whether
-  Repowise-generated documentation must be refreshed]
+- **Tenant boundary**: [Which entities are HOA-scoped and how `hoa_id`,
+  `association_id`, or equivalent tenant boundary applies; cross-HOA access denied by
+  default; any intentional cross-HOA queries must document authorization and result scope]
+- **Authorization**: [Which HOA membership/role is required for each protected action;
+  server-side checks required; frontend checks are UX-only]
+- **Ownership and moderation**: [Who owns user-generated content and what moderation
+  state or audit trail applies]
+- **API contract**: [Response shape, error shape, pagination defaults/max limits for
+  collections (`limit`/`offset`), UTC timestamps, ID format, and breaking-change notes]
+- **API implementation and docs**: [FastEndpoints endpoint requirements;
+  Swagger/OpenAPI behavior via Swashbuckle; confirm `/swagger` only exists in
+  development and is disabled in production]
+- **Database/runtime**: [Strict migrations, idempotent startup migrations in Cloud Run,
+  Neon low max connections, pooling, and short-lived DbContext expectations]
+- **File storage**: [If files are involved, which objects go to Cloudflare R2, what
+  metadata remains in PostgreSQL, and how MinIO covers local Docker Compose/tests]
+- **Security and abuse controls**: [Rate limits, untrusted input handling, sensitive
+  event logs, and auditability requirements]
+- **Observability**: [Sentry error tracking, performance visibility, trace context
+  across frontend/backend, environment/release tags, and sensitive-data exclusions]
+- **Accessibility**: [Keyboard access, labels, validation messages, and WCAG 2.1 AA
+  targets for key flows]
+- **Quality gates**: [Relevant files requiring 95% coverage, Sonar static analysis
+  expectations, xUnit/.NET Testcontainers expectations, Theory data variations to cover,
+  how tests remain safe with parallel execution and prior test-run artifacts, Serilog
+  logging expectations, Repowise documentation refresh/regeneration for PR delivery, and
+  focused vertical-slice or justified cross-cutting PR scope]
+- **Frontend testing**: [Jasmine/Karma unit tests, Angular Testing Library component
+  tests, Playwright browser tests when applicable, Cypress E2E coverage, and Storybook
+  visual regression expectations]
 
 ## Success Criteria *(mandatory)*
 
@@ -126,3 +146,16 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+
+## Assumptions
+
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right assumptions based on reasonable defaults
+  chosen when the feature description did not specify certain details.
+-->
+
+- [Assumption about target users, e.g., "Users have stable internet connectivity"]
+- [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
+- [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
+- [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]

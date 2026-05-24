@@ -45,6 +45,12 @@ Confirm the plan satisfies the active HOA Management Company Constitution:
 - **Security and operations**: Secrets are externalized, Auth0 authorization is enforced
   server-side, structured Serilog logs and Sentry tracing are planned, and production
   errors do not leak system details.
+- **File storage**: If file/blob storage is introduced, hosted environments use Cloudflare
+  R2; local Docker Compose and local/CI tests use MinIO; PostgreSQL stores
+  metadata/references, not large binary payloads.
+- **Caching/edge**: API responses are cached only when explicitly safe; authenticated or
+  user-specific responses are not edge-cached unless keyed and justified; static assets
+  use hashed filenames where practical.
 - **Testing discipline**: Tests are written first where applicable; backend persistence
   tests use PostgreSQL/Testcontainers and transaction isolation; data-varied cases use
   xUnit Theories; frontend tests use the constitution-approved tools.
