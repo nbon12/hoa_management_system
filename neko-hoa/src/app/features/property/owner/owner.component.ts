@@ -1,8 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { PropertyService } from '../../../core/services/property.service';
-import { Owner } from '../../../core/models';
+import { Owner, AddressHistory, Property } from '../../../core/models';
 
 @Component({
   selector: 'app-owner',
@@ -76,7 +76,7 @@ import { Owner } from '../../../core/models';
                     (click)="form.mailingToProperty = !form.mailingToProperty"></span>
               <div>
                 <div style="font-weight:500;">Mail to property</div>
-                <div class="muted" style="font-size:11px;">{{ prop.address }}</div>
+                <div class="muted" style="font-size:11px;">{{ prop()?.address }}</div>
               </div>
             </label>
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
@@ -117,7 +117,7 @@ import { Owner } from '../../../core/models';
           <tr><th>Date</th><th>Event</th><th>Address</th></tr>
         </thead>
         <tbody>
-          @for (h of addressHistory; track h.date) {
+          @for (h of addressHistory(); track h.date) {
             <tr>
               <td>{{ h.date | date:'MMM d, yyyy' }}</td>
               <td><span class="pill" [class.pill--ok]="h.event === 'created'">{{ h.event }}</span></td>
@@ -129,17 +129,31 @@ import { Owner } from '../../../core/models';
     </div>
   `
 })
-export class OwnerComponent {
+export class OwnerComponent implements OnInit {
   private svc = inject(PropertyService);
-  prop           = this.svc.getProperty();
-  addressHistory = this.svc.getAddressHistory();
+  prop           = signal<Property | null>(null);
+  addressHistory = signal<AddressHistory[]>([]);
 
   editing = signal(false);
   saving  = signal(false);
   saved   = signal(false);
 
-  form: Owner = { ...this.svc.getOwner() };
+  form: Owner = { firstName:'', lastName:'', ownerName2:null, memberSince:null, accountNumber:'',
+    communityName:'', propertyAddress:'', votingRights:false, email:'', phone:null,
+    mailingToProperty:false, paperlessStatements:false, smsReminders:false };
   private _original: Owner = { ...this.form };
+
+  async ngOnInit() {
+    const [p, o, h] = await Promise.all([
+      this.svc.getProperty(),
+      this.svc.getOwner(),
+      this.svc.getAddressHistory(),
+    ]);
+    this.prop.set(p);
+    this.form = { ...o };
+    this._original = { ...o };
+    this.addressHistory.set(h);
+  }
 
   accountFields = [
     { key: 'firstName',       label: 'First name',       editable: true },
@@ -171,11 +185,17 @@ export class OwnerComponent {
 
   async save() {
     this.saving.set(true);
-    await this.svc.updateOwner(this.form);
-    this._original = { ...this.form };
-    this.saving.set(false);
-    this.editing.set(false);
-    this.saved.set(true);
-    setTimeout(() => this.saved.set(false), 3000);
+    try {
+      const updated = await this.svc.updateOwner(this.form);
+      this.form = { ...updated };
+      this._original = { ...this.form };
+      this.saved.set(true);
+      setTimeout(() => this.saved.set(false), 3000);
+    } catch (e: any) {
+      alert(e?.error?.message ?? 'Save failed.');
+    } finally {
+      this.saving.set(false);
+      this.editing.set(false);
+    }
   }
 }

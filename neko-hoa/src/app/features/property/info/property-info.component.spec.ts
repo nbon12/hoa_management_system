@@ -1,5 +1,24 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { PropertyInfoComponent } from './property-info.component';
+import { PropertyService } from '../../../core/services/property.service';
+import { Property } from '../../../core/models';
+
+const MOCK_PROPERTY: Property = {
+  accountNumber: 'SAKURA-001',
+  communityId: 'SAKURA', communityName: 'Sakura Heights HOA',
+  address: '1 Sakura Drive', city: 'San Jose', state: 'CA', zip: '95101',
+  lot: 'A1', phase: null, section: '1', block: null,
+  fiscalYear: 2026, yearBuilt: 2005, status: 'active',
+  monthlyAssessment: 250, annualAssessment: 3000,
+  assessmentDueDay: 1, lateFeeAmount: 50, lateFeeGraceDays: 15,
+  financeChargeRate: 0.015,
+};
+
+function makeMockPropertyService(): Partial<PropertyService> {
+  return {
+    getProperty: jasmine.createSpy().and.returnValue(Promise.resolve(MOCK_PROPERTY)),
+  } as any;
+}
 
 describe('PropertyInfoComponent', () => {
   let fixture: ComponentFixture<PropertyInfoComponent>;
@@ -7,17 +26,20 @@ describe('PropertyInfoComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PropertyInfoComponent],
+      imports:   [PropertyInfoComponent],
+      providers: [{ provide: PropertyService, useValue: makeMockPropertyService() }],
     }).compileComponents();
     fixture = TestBed.createComponent(PropertyInfoComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     el = fixture.nativeElement;
   });
 
   it('should create', () => expect(fixture.componentInstance).toBeTruthy());
 
-  it('shows account number', () => {
-    expect(el.textContent).toContain('R0670853L0541192');
+  it('shows account number from API data', () => {
+    expect(el.textContent).toContain('SAKURA-001');
   });
 
   it('shows assessment rules section', () => {
@@ -30,12 +52,11 @@ describe('PropertyInfoComponent', () => {
   });
 
   it('shows late fee amount', () => {
-    expect(el.textContent).toContain('20.00');
+    expect(el.textContent).toContain('50.00');
   });
 
   it('shows finance charge rate', () => {
-    // Angular drops trailing zeros when interpolating a number; match on 18% prefix
-    expect(el.textContent).toMatch(/18(\.00)?%/);
+    expect(el.textContent).toMatch(/0\.015%/);
   });
 
   it('shows property details grid', () => {

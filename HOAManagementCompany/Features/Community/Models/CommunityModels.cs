@@ -33,3 +33,7 @@ public record DocumentListResponse(IEnumerable<DocumentDto> Items, int TotalCoun
 public record DocumentDto(Guid Id, string Name, string Category, DateOnly EffectiveDate, string FileSizeLabel, bool Pinned);
 
 public record DocumentDownloadResponse(string Url, DateTimeOffset ExpiresAt);
+
+public record NeighborDto(string Address, string? Name, string? Email, string? Phone);
+
+public record CommunityDirectoryResponse(IEnumerable<NeighborDto> Neighbors, int TotalSharing, int TotalHouseholds);

@@ -1,6 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { PropertyService } from '../../../core/services/property.service';
+import { CommunityService } from '../../../core/services/community.service';
 import { DirectoryField } from '../../../core/models';
+
+interface Neighbor { address: string; name: string | null; email: string | null; phone: string | null; }
+interface DirectoryResponse { neighbors: Neighbor[]; totalSharing: number; totalHouseholds: number; }
 
 @Component({
   selector: 'app-directory',
@@ -8,7 +12,7 @@ import { DirectoryField } from '../../../core/models';
   template: `
     <div class="page-header">
       <h1 class="page-title">Directory</h1>
-      <span class="muted" style="margin-left:10px;">Sakura Heights · 248 households</span>
+      <span class="muted" style="margin-left:10px;">Sakura Heights · {{ dirResponse()?.totalHouseholds ?? 248 }} households</span>
     </div>
 
     <!-- Info banner -->
@@ -48,7 +52,7 @@ import { DirectoryField } from '../../../core/models';
         <!-- Directory preview -->
         <div class="card card--lav">
           <div class="field-label">Directory preview</div>
-          <div style="font-size:18px;font-weight:600;margin-top:6px;">714 Keystone Park Dr</div>
+          <div style="font-size:18px;font-weight:600;margin-top:6px;">Your listing</div>
           @if (sharedFields().length === 0) {
             <p class="muted" style="font-size:11px;margin-top:6px;">
               The owner &amp; contact info has not been shared with the directory.
@@ -73,15 +77,72 @@ import { DirectoryField } from '../../../core/models';
         </div>
       </div>
     </div>
+
+    <!-- Community directory -->
+    <div class="card" style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div class="section-title" style="margin:0;">Neighbor Directory</div>
+        @if (dirResponse()) {
+          <span class="badge badge--green">{{ dirResponse()!.totalSharing }} sharing</span>
+        }
+      </div>
+
+      @if (!dirResponse()) {
+        <p class="muted" style="font-size:12px;">Loading…</p>
+      } @else if (dirResponse()!.neighbors.length === 0) {
+        <p class="muted" style="font-size:12px;">No neighbors have opted into the directory yet.</p>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (n of dirResponse()!.neighbors; track n.address) {
+              <tr>
+                <td>{{ n.address }}</td>
+                <td>{{ n.name ?? '—' }}</td>
+                <td>{{ n.email ?? '—' }}</td>
+                <td>{{ n.phone ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
   `
 })
-export class DirectoryComponent {
-  private svc = inject(PropertyService);
-  fields = signal<DirectoryField[]>(this.svc.getDirectoryFields());
+export class DirectoryComponent implements OnInit {
+  private svc     = inject(PropertyService);
+  private commSvc = inject(CommunityService);
+
+  fields      = signal<DirectoryField[]>([]);
+  dirResponse = signal<DirectoryResponse | null>(null);
 
   sharedFields() { return this.fields().filter(f => f.shared); }
 
-  toggle(key: string) {
-    this.fields.set(this.svc.toggleDirectoryField(key, this.fields()));
+  async ngOnInit() {
+    const [fields, dir] = await Promise.all([
+      this.svc.getDirectoryFields(),
+      this.commSvc.getCommunityDirectory(),
+    ]);
+    this.fields.set(fields);
+    this.dirResponse.set(dir);
+  }
+
+  async toggle(key: string) {
+    const current = this.fields().find(f => f.key === key);
+    if (!current) return;
+    const newShared = !current.shared;
+    this.fields.set(this.fields().map(f => f.key === key ? { ...f, shared: newShared } : f));
+    try {
+      await this.svc.toggleDirectoryField(key, newShared);
+    } catch {
+      this.fields.set(this.fields().map(f => f.key === key ? { ...f, shared: !newShared } : f));
+    }
   }
 }

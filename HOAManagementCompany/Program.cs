@@ -55,7 +55,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(o =>
     o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(o =>
-    o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
+    o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)), ServiceLifetime.Scoped);
 
 // ── ASP.NET Core Identity ──────────────────────────────────────────────────
 builder.Services.AddIdentityCore<ApplicationUser>(o =>

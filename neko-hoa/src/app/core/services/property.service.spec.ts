@@ -1,93 +1,86 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { PropertyService } from './property.service';
-import { MockDataService } from './mock-data.service';
+import { environment } from '../../../environments/environment';
+
+const BASE = environment.apiBaseUrl;
 
 describe('PropertyService', () => {
   let svc: PropertyService;
-  let mock: MockDataService;
+  let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({ imports: [HttpClientTestingModule] });
     svc  = TestBed.inject(PropertyService);
-    mock = TestBed.inject(MockDataService);
+    http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => http.verify());
 
   it('should be created', () => expect(svc).toBeTruthy());
 
   describe('getProperty()', () => {
-    it('returns the mock property', () => {
-      expect(svc.getProperty()).toBe(mock.property);
-    });
-    it('property status is active', () => {
-      expect(svc.getProperty().status).toBe('active');
+    it('calls /property and returns a property', async () => {
+      const promise = svc.getProperty();
+      http.expectOne(`${BASE}/property`).flush({
+        id: 'p1', accountNumber: 'SAKURA-001', communityId: 'SAKURA',
+        communityName: 'Sakura Heights HOA', address: '1 Sakura Drive',
+        city: 'San Jose', state: 'CA', zip: '95101',
+        lot: 'A1', section: '1', fiscalYear: 2026, yearBuilt: 2005,
+        status: 'active', monthlyAssessment: 250, annualAssessment: 3000,
+        assessmentDueDay: 1, lateFeeAmount: 50, lateFeGraceDays: 15, financeChargeRate: 0.015,
+      });
+      const prop = await promise;
+      expect(prop.status).toBe('active');
+      expect(prop.accountNumber).toBe('SAKURA-001');
     });
   });
 
   describe('getOwner()', () => {
-    it('returns the mock owner', () => {
-      expect(svc.getOwner()).toBe(mock.owner);
-    });
-    it('owner has a firstName', () => {
-      expect(svc.getOwner().firstName.length).toBeGreaterThan(0);
+    it('calls /property/owner and returns owner with property context', async () => {
+      const promise = svc.getOwner();
+      http.expectOne(`${BASE}/property/owner`).flush({
+        id: 'o1', firstName: 'Jane', lastName: 'Resident',
+        email: 'resident@nekohoa.dev', phone: '408-555-0101',
+        accountNumber: 'SAKURA-001', communityName: 'Sakura Heights HOA',
+        propertyAddress: '1 Sakura Drive, San Jose, CA 95101',
+        memberSince: '2005-06-01',
+        votingRights: true, mailingToProperty: true,
+        paperlessStatements: true, smsReminders: false,
+      });
+      const owner = await promise;
+      expect(owner.firstName).toBe('Jane');
+      expect(owner.accountNumber).toBe('SAKURA-001');
+      expect(owner.communityName).toBe('Sakura Heights HOA');
     });
   });
 
   describe('getAddressHistory()', () => {
-    it('returns address history entries', () => {
-      expect(svc.getAddressHistory().length).toBeGreaterThan(0);
-    });
-    it('first entry is most recent (descending order)', () => {
-      const history = svc.getAddressHistory();
-      if (history.length > 1) {
-        expect(history[0].date >= history[1].date).toBeTrue();
-      }
+    it('calls /property/address-history and returns entries', async () => {
+      const promise = svc.getAddressHistory();
+      http.expectOne(`${BASE}/property/address-history`).flush([
+        { id: 'h1', eventType: 'created', address: '1 Sakura Drive', effectiveDate: '2005-06-01' },
+        { id: 'h2', eventType: 'change',  address: '1 Sakura Drive Apt 2', effectiveDate: '2022-03-15' },
+      ]);
+      const history = await promise;
+      expect(history.length).toBe(2);
+      expect(history[0].date).toBe('2005-06-01');
     });
   });
 
   describe('getDirectoryFields()', () => {
-    it('returns an array of fields', () => {
-      expect(svc.getDirectoryFields().length).toBeGreaterThan(0);
-    });
-    it('returns a copy, not the original', () => {
-      const a = svc.getDirectoryFields();
-      const b = svc.getDirectoryFields();
-      expect(a).not.toBe(b);
-    });
-  });
-
-  describe('updateOwner()', () => {
-    it('resolves with merged owner data', async () => {
-      const result = await svc.updateOwner({ firstName: 'Maria' });
-      expect(result.firstName).toBe('Maria');
-    });
-    it('preserves unchanged fields', async () => {
-      const original = svc.getOwner();
-      const result = await svc.updateOwner({ firstName: 'Maria' });
-      expect(result.lastName).toBe(original.lastName);
-    });
-  });
-
-  describe('toggleDirectoryField()', () => {
-    it('flips the shared flag for the targeted key', () => {
-      const fields = svc.getDirectoryFields();
-      const key = fields[0].key;
-      const original = fields[0].shared;
-      const updated = svc.toggleDirectoryField(key, fields);
-      expect(updated.find(f => f.key === key)!.shared).toBe(!original);
-    });
-    it('does not mutate the original array', () => {
-      const fields = svc.getDirectoryFields();
-      const key = fields[0].key;
-      const originalShared = fields[0].shared;
-      svc.toggleDirectoryField(key, fields);
-      expect(fields[0].shared).toBe(originalShared);
-    });
-    it('leaves other fields unchanged', () => {
-      const fields = svc.getDirectoryFields();
-      const updated = svc.toggleDirectoryField(fields[0].key, fields);
-      for (let i = 1; i < fields.length; i++) {
-        expect(updated[i].shared).toBe(fields[i].shared);
-      }
+    it('calls /property/directory-fields and returns fields', async () => {
+      const promise = svc.getDirectoryFields();
+      http.expectOne(`${BASE}/property/directory-fields`).flush([
+        { id: 'f1', fieldKey: 'name',    label: 'Full Name', shared: true  },
+        { id: 'f2', fieldKey: 'email',   label: 'Email',     shared: false },
+        { id: 'f3', fieldKey: 'phone',   label: 'Phone',     shared: false },
+        { id: 'f4', fieldKey: 'address', label: 'Address',   shared: true  },
+      ]);
+      const fields = await promise;
+      expect(fields.length).toBe(4);
+      expect(fields.find(f => f.key === 'name')?.shared).toBeTrue();
+      expect(fields.find(f => f.key === 'email')?.shared).toBeFalse();
     });
   });
 });

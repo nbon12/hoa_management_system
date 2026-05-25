@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
-import { MockDataService } from '../core/services/mock-data.service';
+import { PropertyService } from '../core/services/property.service';
+import { Property } from '../core/models';
 
 interface NavGroup {
   group: string | null;
@@ -32,10 +33,10 @@ interface NavGroup {
       <!-- Property strip -->
       <div class="shell__strip">
         <span class="pin-icon"></span>
-        <b>{{ property.communityName }}</b>
-        <span>· {{ property.address }}</span>
+        <b>{{ property()?.communityName }}</b>
+        <span>· {{ property()?.address }}</span>
         <span class="mono" style="margin-left:auto;font-size:11px;color:var(--ink-mute);">
-          {{ property.accountNumber }}
+          {{ property()?.accountNumber }}
         </span>
       </div>
 
@@ -119,12 +120,18 @@ interface NavGroup {
     }
   `]
 })
-export class ShellComponent {
+export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
-  private mockData = inject(MockDataService);
+  private propertySvc = inject(PropertyService);
 
   user = this.auth.user;
-  property = this.mockData.property;
+  property = signal<Property | null>(null);
+
+  async ngOnInit() {
+    try {
+      this.property.set(await this.propertySvc.getProperty());
+    } catch { /* user may not have a property yet */ }
+  }
 
   navGroups: NavGroup[] = [
     { group: null, items: [

@@ -12,16 +12,17 @@ public class PaymentSeeder(ApplicationDbContext db, SeedResult result, ILogger l
         decimal balance = 0m;
         var entries = new List<LedgerEntry>();
 
-        for (int i = 12; i >= 1; i--)
+        // 18 months of history — 16 months fully paid, 2 months outstanding
+        for (int i = 18; i >= 3; i--)
         {
-            var date = DateOnly.FromDateTime(DateTime.Today.AddMonths(-i));
+            var chargeDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-i));
             balance += 250m;
             entries.Add(new LedgerEntry
             {
                 PropertyId = propertyId,
-                EntryDate = date,
-                Description = $"Regular Assessment – {date:MMMM yyyy}",
-                DocumentNumber = $"RA{date:yyyyMM}",
+                EntryDate = chargeDate,
+                Description = $"Regular Assessment – {chargeDate:MMMM yyyy}",
+                DocumentNumber = $"RA{chargeDate:yyyyMM}",
                 ChargeAmount = 250m,
                 RunningBalance = balance,
                 EntryType = LedgerEntryType.RegularAssessment
@@ -31,23 +32,58 @@ public class PaymentSeeder(ApplicationDbContext db, SeedResult result, ILogger l
             entries.Add(new LedgerEntry
             {
                 PropertyId = propertyId,
-                EntryDate = date.AddDays(5),
+                EntryDate = chargeDate.AddDays(4),
                 Description = "Online Payment – Thank You",
+                DocumentNumber = $"PMT{chargeDate:yyyyMM}",
                 PaymentAmount = 250m,
                 RunningBalance = balance,
                 EntryType = LedgerEntryType.Payment
             });
         }
 
+        // Late fee applied ~3 months ago (payment was missed that month)
+        var lateFeeMonth = DateOnly.FromDateTime(DateTime.Today.AddMonths(-4));
+        balance += 50m;
         entries.Add(new LedgerEntry
         {
             PropertyId = propertyId,
-            EntryDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-3)),
-            Description = "Late Fee",
+            EntryDate = lateFeeMonth.AddDays(16),
+            Description = "Late Fee – Assessment past grace period",
+            DocumentNumber = $"LF{lateFeeMonth:yyyyMM}",
             ChargeAmount = 50m,
-            RunningBalance = balance + 50m,
+            RunningBalance = balance,
             EntryType = LedgerEntryType.LateFee
         });
+
+        // Partial payment for that late-fee month
+        balance -= 50m;
+        entries.Add(new LedgerEntry
+        {
+            PropertyId = propertyId,
+            EntryDate = lateFeeMonth.AddDays(20),
+            Description = "Online Payment – Late Fee Cleared",
+            DocumentNumber = $"PMT{lateFeeMonth:yyyyMM}B",
+            PaymentAmount = 50m,
+            RunningBalance = balance,
+            EntryType = LedgerEntryType.Payment
+        });
+
+        // Current month + last month — NOT paid (outstanding balance)
+        for (int i = 2; i >= 1; i--)
+        {
+            var chargeDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-i));
+            balance += 250m;
+            entries.Add(new LedgerEntry
+            {
+                PropertyId = propertyId,
+                EntryDate = chargeDate,
+                Description = $"Regular Assessment – {chargeDate:MMMM yyyy}",
+                DocumentNumber = $"RA{chargeDate:yyyyMM}",
+                ChargeAmount = 250m,
+                RunningBalance = balance,
+                EntryType = LedgerEntryType.RegularAssessment
+            });
+        }
 
         db.LedgerEntries.AddRange(entries);
 
@@ -58,12 +94,15 @@ public class PaymentSeeder(ApplicationDbContext db, SeedResult result, ILogger l
             Method = PaymentMethod.Ach,
             DraftDay = 1,
             Status = "active",
-            RoutingNumberMasked = "****1234",
-            AccountNumberMasked = "****5678",
+            RoutingNumberMasked = "****3421",
+            AccountNumberMasked = "****8847",
             AccountType = "checking"
         });
 
         db.DraftEntries.AddRange(
+            new DraftEntry { PropertyId = propertyId, DraftDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-5)), SourceLabel = "Monthly Assessment – ACH", Amount = 250m, Status = DraftStatus.Paid },
+            new DraftEntry { PropertyId = propertyId, DraftDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-4)), SourceLabel = "Monthly Assessment – ACH", Amount = 250m, Status = DraftStatus.Failed },
+            new DraftEntry { PropertyId = propertyId, DraftDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-3)), SourceLabel = "Monthly Assessment – ACH", Amount = 250m, Status = DraftStatus.Paid },
             new DraftEntry { PropertyId = propertyId, DraftDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-2)), SourceLabel = "Monthly Assessment – ACH", Amount = 250m, Status = DraftStatus.Paid },
             new DraftEntry { PropertyId = propertyId, DraftDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1)), SourceLabel = "Monthly Assessment – ACH", Amount = 250m, Status = DraftStatus.Paid },
             new DraftEntry { PropertyId = propertyId, DraftDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)), SourceLabel = "Monthly Assessment – ACH", Amount = 250m, Status = DraftStatus.Scheduled });

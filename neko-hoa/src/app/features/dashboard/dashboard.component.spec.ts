@@ -4,11 +4,35 @@ import { DashboardComponent } from './dashboard.component';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { AuthService } from '../../core/services/auth.service';
 import { signal } from '@angular/core';
-import { CurrentUser } from '../../core/models';
+import { CurrentUser, DashboardSummary } from '../../core/models';
 
-function makeMockAuthService(firstName = 'Nicholas'): Partial<AuthService> {
-  const u: CurrentUser = { id: '1', firstName, lastName: 'Bonilla', email: 'n@b.com', initials: 'NB' };
-  return { user: signal(u) };
+const MOCK_USER: CurrentUser = { id: '1', firstName: 'Nicholas', lastName: 'Bonilla', email: 'n@b.com', initials: 'NB' };
+
+const MOCK_SUMMARY: DashboardSummary = {
+  currentBalance:        500,
+  balanceDueDate:        '2026-06-01',
+  openViolations:        2,
+  documentCount:         18,
+  newDocumentsThisMonth: 3,
+  pinnedAnnouncement: {
+    id: 'a1', title: 'Board Meeting', body: 'Meeting June 10', date: '2026-05-19',
+    category: 'Board', pinned: true, commentCount: 2, likeCount: 5,
+    imageUrl: null, authorInitials: 'DC', authorLabel: 'David Chen',
+  },
+  thisWeekEvents: [],
+  nextEvent: null,
+  recentActivity: [],
+  communityExpenses: [],
+};
+
+function makeMockAuthService(): Partial<AuthService> {
+  return { user: signal(MOCK_USER) };
+}
+
+function makeMockDashboardService(): Partial<DashboardService> {
+  return {
+    getSummary: jasmine.createSpy().and.returnValue(Promise.resolve(MOCK_SUMMARY)),
+  } as any;
 }
 
 describe('DashboardComponent', () => {
@@ -17,14 +41,17 @@ describe('DashboardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent],
+      imports:   [DashboardComponent],
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: makeMockAuthService() },
+        { provide: AuthService,       useValue: makeMockAuthService() },
+        { provide: DashboardService,  useValue: makeMockDashboardService() },
       ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DashboardComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     el = fixture.nativeElement;
   });
@@ -71,25 +98,18 @@ describe('DashboardComponent', () => {
   });
 
   it('shows payment due card when balance > 0', () => {
-    const svc = TestBed.inject(DashboardService);
-    const summary = svc.getSummary();
-    if (summary.currentBalance > 0) {
-      expect(el.textContent).toContain('Payment due');
-    }
+    expect(el.textContent).toContain('Payment due');
   });
 
   describe('categoryColor()', () => {
     it('returns lav-2 for Board', () => {
-      const comp = fixture.componentInstance;
-      expect(comp.categoryColor('Board')).toBe('var(--lav-2)');
+      expect(fixture.componentInstance.categoryColor('Board')).toBe('var(--lav-2)');
     });
     it('returns pink-2 for Amenity', () => {
-      const comp = fixture.componentInstance;
-      expect(comp.categoryColor('Amenity')).toBe('var(--pink-2)');
+      expect(fixture.componentInstance.categoryColor('Amenity')).toBe('var(--pink-2)');
     });
     it('returns default for unknown category', () => {
-      const comp = fixture.componentInstance;
-      expect(comp.categoryColor('Unknown')).toBe('var(--lav-2)');
+      expect(fixture.componentInstance.categoryColor('Unknown')).toBe('var(--lav-2)');
     });
   });
 });

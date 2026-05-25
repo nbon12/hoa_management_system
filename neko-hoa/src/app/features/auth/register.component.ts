@@ -186,13 +186,20 @@ export class RegisterComponent {
   }
 
   async createAccount() {
-    if (!this.email || !this.password || !this.firstName) {
-      this.error.set('Please fill in all required fields.');
+    if (!this.email || !this.password || !this.firstName || !this.accountNum) {
+      this.error.set('Please fill in all required fields including the account number.');
       return;
     }
     this.loading.set(true);
     this.error.set('');
-    await this.auth.register(this.email, this.password, this.firstName, this.lastName);
-    this.router.navigate(['/app/dashboard']);
+    try {
+      await this.auth.register(this.email, this.password, this.firstName, this.lastName, this.accountNum);
+      this.router.navigate(['/app/dashboard']);
+    } catch (e: any) {
+      const msg = e?.error?.message ?? 'Registration failed. Please check your details.';
+      this.error.set(msg);
+    } finally {
+      this.loading.set(false);
+    }
   }
 }

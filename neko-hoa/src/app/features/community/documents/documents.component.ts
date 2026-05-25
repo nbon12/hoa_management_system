@@ -1,8 +1,8 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { CommunityService } from '../../../core/services/community.service';
-import { DocumentCategory } from '../../../core/models';
+import { HOADocument, DocumentCategory } from '../../../core/models';
 
 const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
   'All', 'Pinned', 'Forms', 'Insurance', 'Budgets', 'Rules', 'Minutes', 'Governing', 'Financials'
@@ -98,31 +98,42 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
     }
   `
 })
-export class DocumentsComponent {
+export class DocumentsComponent implements OnInit {
   private svc = inject(CommunityService);
 
   categories = ALL_CATEGORIES;
   activeCategory = signal<string>('All');
+  private _allDocs = signal<HOADocument[]>([]);
   private _searchTerm = signal('');
   get searchTerm()          { return this._searchTerm(); }
   set searchTerm(v: string) { this._searchTerm.set(v); }
 
-  get totalCount() { return this.svc.getDocuments().length; }
-  countFor(cat: string) { return this.svc.getDocuments(cat).length; }
+  get totalCount() { return this._allDocs().length; }
+  countFor(cat: string): number {
+    if (cat === 'Pinned') return this._allDocs().filter(d => d.pinned).length;
+    return this._allDocs().filter(d => d.category === cat).length;
+  }
 
   visibleDocs = computed(() => {
     const cat  = this.activeCategory();
-    const term = this._searchTerm();
-    if (term) return this.svc.searchDocuments(term);
-    return this.svc.getDocuments(cat);
+    const term = this._searchTerm().toLowerCase();
+    let docs = this._allDocs();
+    if (term) return docs.filter(d => d.name.toLowerCase().includes(term));
+    if (cat === 'All') return docs;
+    if (cat === 'Pinned') return docs.filter(d => d.pinned);
+    return docs.filter(d => d.category === cat);
   });
+
+  async ngOnInit() {
+    this._allDocs.set(await this.svc.getDocuments());
+  }
 
   onSearch() {
     if (this._searchTerm()) this.activeCategory.set('All');
   }
 
   get pinnedGroups() {
-    const all = this.svc.getDocuments();
+    const all = this._allDocs();
     return [
       { title: '⭐ Pinned', items: all.filter(d => d.pinned).slice(0, 3) },
       { title: '📋 Forms',  items: all.filter(d => d.category === 'Forms').slice(0, 2) },

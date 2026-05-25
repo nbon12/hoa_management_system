@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { PropertyService } from '../../../core/services/property.service';
 import { CurrencyPipe } from '@angular/common';
+import { Property } from '../../../core/models';
 
 @Component({
   selector: 'app-property-info',
@@ -18,12 +19,12 @@ import { CurrencyPipe } from '@angular/common';
     <div class="grid-2">
       <div class="card">
         <div class="field-label">Account number</div>
-        <div class="mono" style="font-size:14px;font-weight:600;margin-top:4px;">{{ prop.accountNumber }}</div>
+        <div class="mono" style="font-size:14px;font-weight:600;margin-top:4px;">{{ prop()?.accountNumber }}</div>
       </div>
       <div class="card">
         <div class="field-label">Annual assessment</div>
-        <div class="mono" style="font-size:18px;margin-top:4px;">{{ prop.annualAssessment | currency }}</div>
-        <div class="muted">due {{ prop.assessmentDueDay }}st of each month</div>
+        <div class="mono" style="font-size:18px;margin-top:4px;">{{ prop()?.annualAssessment | currency }}</div>
+        <div class="muted">due {{ prop()?.assessmentDueDay }}st of each month</div>
       </div>
     </div>
 
@@ -42,7 +43,7 @@ import { CurrencyPipe } from '@angular/common';
 
     <!-- Assessment rules -->
     <div class="card">
-      <div class="section-title">📑 Assessment rules · {{ prop.fiscalYear }}</div>
+      <div class="section-title">📑 Assessment rules · {{ prop()?.fiscalYear }}</div>
       <table class="data-table" style="margin-top:10px;">
         <thead>
           <tr><th>Rule type</th><th>Rule</th></tr>
@@ -50,15 +51,15 @@ import { CurrencyPipe } from '@angular/common';
         <tbody>
           <tr>
             <td>Regular assessment</td>
-            <td><b>{{ prop.monthlyAssessment | currency }}</b> due the <b>{{ prop.assessmentDueDay }}st</b> of each <b>month</b>.</td>
+            <td><b>{{ prop()?.monthlyAssessment | currency }}</b> due the <b>{{ prop()?.assessmentDueDay }}st</b> of each <b>month</b>.</td>
           </tr>
           <tr>
             <td>Late fee</td>
-            <td><b>{{ prop.lateFeeAmount | currency }}</b> per missed period, applied {{ prop.lateFeeGraceDays }} days after the due date.</td>
+            <td><b>{{ prop()?.lateFeeAmount | currency }}</b> per missed period, applied {{ prop()?.lateFeeGraceDays }} days after the due date.</td>
           </tr>
           <tr>
             <td>Finance charge</td>
-            <td>{{ prop.financeChargeRate }}% per annum, simple compounding, 365-day year.</td>
+            <td>{{ prop()?.financeChargeRate }}% per annum, simple compounding, 365-day year.</td>
           </tr>
         </tbody>
       </table>
@@ -66,7 +67,7 @@ import { CurrencyPipe } from '@angular/common';
 
     <!-- Late fee timeline -->
     <div class="card card--dashed">
-      <div class="section-title">Late fee timeline · {{ prop.fiscalYear }}</div>
+      <div class="section-title">Late fee timeline · {{ prop()?.fiscalYear }}</div>
       <div style="position:relative;padding:24px 0 36px;">
         <div style="height:2px;background:var(--line);position:relative;">
           @for (m of months; track m; let i = $index) {
@@ -81,26 +82,33 @@ import { CurrencyPipe } from '@angular/common';
           }
         </div>
       </div>
-      <p class="muted" style="font-size:11px;">+{{ prop.lateFeeAmount | currency }} added each month past 30 days late.</p>
+      <p class="muted" style="font-size:11px;">+{{ prop()?.lateFeeAmount | currency }} added each month past 30 days late.</p>
     </div>
   `
 })
-export class PropertyInfoComponent {
-  prop = inject(PropertyService).getProperty();
+export class PropertyInfoComponent implements OnInit {
+  private svc = inject(PropertyService);
+  prop = signal<Property | null>(null);
 
   months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+  async ngOnInit() {
+    this.prop.set(await this.svc.getProperty());
+  }
+
   get detailFields() {
+    const p = this.prop();
+    if (!p) return [];
     return [
-      { label: 'Account #',      value: this.prop.accountNumber },
-      { label: 'Community ID',   value: this.prop.communityId },
+      { label: 'Account #',         value: p.accountNumber },
+      { label: 'Community ID',      value: p.communityId },
       { label: 'Check digit / PIN', value: '0' },
-      { label: 'Lot',            value: this.prop.lot },
-      { label: 'Phase',          value: this.prop.phase },
-      { label: 'Section',        value: this.prop.section },
-      { label: 'Block',          value: this.prop.block },
-      { label: 'Fiscal year',    value: String(this.prop.fiscalYear) },
-      { label: 'Year built',     value: String(this.prop.yearBuilt) },
+      { label: 'Lot',               value: p.lot },
+      { label: 'Phase',             value: p.phase },
+      { label: 'Section',           value: p.section },
+      { label: 'Block',             value: p.block },
+      { label: 'Fiscal year',       value: String(p.fiscalYear) },
+      { label: 'Year built',        value: String(p.yearBuilt) },
     ];
   }
 }

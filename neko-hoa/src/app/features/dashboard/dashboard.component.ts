@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe, DatePipe, LowerCasePipe } from '@angular/common';
 import { DashboardService } from '../../core/services/dashboard.service';
@@ -10,6 +10,14 @@ import { DashboardSummary } from '../../core/models';
   standalone: true,
   imports: [RouterLink, CurrencyPipe, DatePipe, LowerCasePipe],
   template: `
+    @if (loading()) {
+      <div style="padding:40px;text-align:center;color:var(--ink-mute);">
+        <span class="spinner" style="width:24px;height:24px;"></span>
+        <p>Loading dashboard…</p>
+      </div>
+    } @else if (error()) {
+      <div class="alert alert--error"><span>⚠</span> {{ error() }}</div>
+    } @else if (summary()) {
     <!-- Page header -->
     <div style="display:flex;align-items:baseline;gap:10px;">
       <h1 class="page-title">Hi <span class="hand">{{ user()?.firstName }}</span> 👋</h1>
@@ -19,12 +27,12 @@ import { DashboardSummary } from '../../core/models';
 
     <!-- 4 stat cards -->
     <div class="grid-4">
-      <div class="card" [class.card--rose]="summary.currentBalance > 0">
+      <div class="card" [class.card--rose]="(summary()?.currentBalance ?? 0) > 0">
         <div class="field-label">Balance</div>
-        <div class="mono" style="font-size:22px;">{{ summary.currentBalance | currency }}</div>
-        @if (summary.currentBalance > 0) {
+        <div class="mono" style="font-size:22px;">{{ summary()?.currentBalance | currency }}</div>
+        @if ((summary()?.currentBalance ?? 0) > 0) {
           <span class="pill pill--warn" style="margin-top:6px;">
-            due {{ summary.balanceDueDate | date:'M/d' }}
+            due {{ summary()?.balanceDueDate | date:'M/d' }}
           </span>
         } @else {
           <span class="pill pill--ok" style="margin-top:6px;">paid up</span>
@@ -32,18 +40,18 @@ import { DashboardSummary } from '../../core/models';
       </div>
       <div class="card">
         <div class="field-label">Violations</div>
-        <div class="mono" style="font-size:22px;">{{ summary.openViolations }}</div>
+        <div class="mono" style="font-size:22px;">{{ summary()?.openViolations }}</div>
         <span class="pill pill--ok" style="margin-top:6px;">compliant</span>
       </div>
       <div class="card">
         <div class="field-label">Next event</div>
-        <div style="font-weight:600;font-size:13px;">{{ summary.nextEvent?.title }}</div>
-        <div class="muted">{{ summary.nextEvent?.date | date:'MMM d · EEE' }}</div>
+        <div style="font-weight:600;font-size:13px;">{{ summary()?.nextEvent?.title }}</div>
+        <div class="muted">{{ summary()?.nextEvent?.date | date:'MMM d · EEE' }}</div>
       </div>
       <div class="card">
         <div class="field-label">Documents</div>
-        <div class="mono" style="font-size:22px;">{{ summary.documentCount }}</div>
-        <div class="muted">{{ summary.newDocumentsThisMonth }} new this month</div>
+        <div class="mono" style="font-size:22px;">{{ summary()?.documentCount }}</div>
+        <div class="muted">{{ summary()?.newDocumentsThisMonth }} new this month</div>
       </div>
     </div>
 
@@ -61,7 +69,7 @@ import { DashboardSummary } from '../../core/models';
             <tr><th>Date</th><th>Description</th><th class="num">Charge</th><th class="num">Payment</th></tr>
           </thead>
           <tbody>
-            @for (row of summary.recentActivity; track row.id) {
+            @for (row of summary()?.recentActivity; track row.id) {
               <tr>
                 <td>{{ row.date | date:'MM/dd/yy' }}</td>
                 <td>{{ row.description }}</td>
@@ -76,14 +84,14 @@ import { DashboardSummary } from '../../core/models';
       <!-- Right col -->
       <div class="flex-col">
         <!-- Pinned announcement -->
-        @if (summary.pinnedAnnouncement) {
+        @if (summary()?.pinnedAnnouncement) {
           <div class="card card--pink">
             <div style="display:flex;align-items:baseline;">
               <div class="section-title" style="margin:0;">Pinned announcement</div>
               <span class="pill" style="margin-left:auto;">NEW</span>
             </div>
-            <div style="font-weight:600;margin-top:6px;">{{ summary.pinnedAnnouncement.title }}</div>
-            <p class="muted" style="margin:4px 0 0;font-size:12px;">{{ summary.pinnedAnnouncement.body }}</p>
+            <div style="font-weight:600;margin-top:6px;">{{ summary()?.pinnedAnnouncement?.title }}</div>
+            <p class="muted" style="margin:4px 0 0;font-size:12px;">{{ summary()?.pinnedAnnouncement?.body }}</p>
           </div>
         }
 
@@ -91,7 +99,7 @@ import { DashboardSummary } from '../../core/models';
         <div class="card">
           <div class="section-title">This week</div>
           <ul style="margin:0;padding:0;list-style:none;font-size:12px;display:flex;flex-direction:column;gap:8px;">
-            @for (ev of summary.thisWeekEvents; track ev.id) {
+            @for (ev of summary()?.thisWeekEvents; track ev.id) {
               <li style="display:flex;gap:8px;align-items:center;">
                 <span class="pill"
                       [style.background]="categoryColor(ev.category)">
@@ -106,17 +114,17 @@ import { DashboardSummary } from '../../core/models';
     </div>
 
     <!-- Payment due card -->
-    @if (summary.currentBalance > 0) {
+    @if ((summary()?.currentBalance ?? 0) > 0) {
       <div class="card card--rose" style="max-width:480px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="color:var(--warn);">⚠</span>
           <span style="font-weight:600;">Payment due</span>
           <span class="pill pill--warn" style="margin-left:auto;">
-            due {{ summary.balanceDueDate | date:'M/d' }}
+            due {{ summary()?.balanceDueDate | date:'M/d' }}
           </span>
         </div>
         <div class="mono" style="font-size:34px;margin:10px 0 12px;">
-          {{ summary.currentBalance | currency }}
+          {{ summary()?.currentBalance | currency }}
         </div>
         <div style="display:flex;gap:8px;">
           <a routerLink="/app/payments/one-time" class="btn btn--primary">Pay now</a>
@@ -132,7 +140,7 @@ import { DashboardSummary } from '../../core/models';
       <div style="display:flex;gap:20px;align-items:center;">
         <div class="donut" style="flex-shrink:0;"></div>
         <div style="font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:3px 8px;flex:1;">
-          @for (exp of summary.communityExpenses; track exp.label) {
+          @for (exp of summary()?.communityExpenses; track exp.label) {
             <span style="width:8px;height:8px;border-radius:2px;align-self:center;"
                   [style.background]="exp.color">
             </span>
@@ -151,13 +159,26 @@ import { DashboardSummary } from '../../core/models';
         <a class="link" routerLink="/app/property/owner">Update mailing address</a>
       </div>
     </div>
+    } <!-- end @else if summary() -->
   `
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   private dashSvc = inject(DashboardService);
   user = inject(AuthService).user;
 
-  summary: DashboardSummary = this.dashSvc.getSummary();
+  summary  = signal<DashboardSummary | null>(null);
+  loading  = signal(true);
+  error    = signal('');
+
+  async ngOnInit() {
+    try {
+      this.summary.set(await this.dashSvc.getSummary());
+    } catch (e: any) {
+      this.error.set(e?.error?.message ?? 'Failed to load dashboard.');
+    } finally {
+      this.loading.set(false);
+    }
+  }
 
   categoryColor(cat: string): string {
     const map: Record<string, string> = {

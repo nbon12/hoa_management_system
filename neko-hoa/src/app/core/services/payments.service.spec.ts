@@ -1,121 +1,74 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { PaymentsService } from './payments.service';
-import { MockDataService } from './mock-data.service';
+import { environment } from '../../../environments/environment';
+
+const BASE = environment.apiBaseUrl;
 
 describe('PaymentsService', () => {
   let svc: PaymentsService;
-  let mockData: MockDataService;
+  let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    svc = TestBed.inject(PaymentsService);
-    mockData = TestBed.inject(MockDataService);
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+    });
+    svc  = TestBed.inject(PaymentsService);
+    http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => http.verify());
 
   it('should be created', () => expect(svc).toBeTruthy());
 
-  // ── getLedger ─────────────────────────────────────────────────────────────
   describe('getLedger()', () => {
-    it('returns all entries when no filter', () => {
-      expect(svc.getLedger().length).toBe(mockData.ledger.length);
-    });
-
-    it('filters by startDate', () => {
-      const entries = svc.getLedger('2026-01-01');
-      entries.forEach(e => expect(e.date >= '2026-01-01').toBeTrue());
-    });
-
-    it('filters by endDate', () => {
-      const entries = svc.getLedger(undefined, '2025-12-31');
-      entries.forEach(e => expect(e.date <= '2025-12-31').toBeTrue());
-    });
-
-    it('filters by date range', () => {
-      const entries = svc.getLedger('2025-06-01', '2025-09-30');
-      entries.forEach(e => {
-        expect(e.date >= '2025-06-01').toBeTrue();
-        expect(e.date <= '2025-09-30').toBeTrue();
+    it('calls /payments/ledger and maps items', async () => {
+      const promise = svc.getLedger();
+      const req = http.expectOne(r => r.url.includes('/payments/ledger'));
+      req.flush({
+        items: [
+          { id: '1', entryDate: '2026-01-01', description: 'Regular Assessment', entryType: 'RegularAssessment', chargeAmount: 250, paymentAmount: 0, runningBalance: 250, documentNumber: 'RA202601' },
+          { id: '2', entryDate: '2026-01-05', description: 'Payment',            entryType: 'Payment',          chargeAmount: 0,   paymentAmount: 250, runningBalance: 0,   documentNumber: '' },
+        ],
+        totalCount: 2, page: 1, pageSize: 100,
       });
+      const entries = await promise;
+      expect(entries.length).toBe(2);
+      expect(entries[0].type).toBe('Regular Assessment');
+      expect(entries[0].charge).toBe(250);
     });
 
-    it('returns empty array for future date range', () => {
-      expect(svc.getLedger('2099-01-01', '2099-12-31').length).toBe(0);
+    it('returns empty array on empty response', async () => {
+      const promise = svc.getLedger();
+      http.expectOne(r => r.url.includes('/payments/ledger'))
+          .flush({ items: [], totalCount: 0, page: 1, pageSize: 100 });
+      const entries = await promise;
+      expect(entries.length).toBe(0);
     });
   });
 
-  // ── balance / assessment ──────────────────────────────────────────────────
-  describe('currentBalance', () => {
-    it('returns a positive number', () => {
-      expect(svc.currentBalance).toBeGreaterThan(0);
-    });
-    it('matches mockData currentBalance', () => {
-      expect(svc.currentBalance).toBe(mockData.currentBalance);
-    });
-  });
-
-  describe('nextAssessment', () => {
-    it('returns monthly assessment amount', () => {
-      expect(svc.nextAssessment).toBe(mockData.property.monthlyAssessment);
-    });
-  });
-
-  describe('processingFee', () => {
-    it('returns a fee > 0', () => {
-      expect(svc.processingFee).toBeGreaterThan(0);
-    });
-  });
-
-  // ── getDrafts ─────────────────────────────────────────────────────────────
   describe('getDrafts()', () => {
-    it('returns draft history', () => {
-      expect(svc.getDrafts().length).toBeGreaterThan(0);
-    });
-    it('first draft has paid status', () => {
-      expect(svc.getDrafts()[0].status).toBe('paid');
-    });
-    it('remaining drafts are scheduled', () => {
-      svc.getDrafts().slice(1).forEach(d => expect(d.status).toBe('scheduled'));
+    it('calls /payments/drafts and maps items', async () => {
+      const promise = svc.getDrafts();
+      http.expectOne(r => r.url.includes('/payments/drafts'))
+          .flush([
+            { id: '1', draftDate: '2026-01-01', sourceLabel: 'ACH', amount: 250, status: 'paid' },
+            { id: '2', draftDate: '2026-02-01', sourceLabel: 'ACH', amount: 250, status: 'scheduled' },
+          ]);
+      const drafts = await promise;
+      expect(drafts.length).toBe(2);
+      expect(drafts[0].status).toBe('paid');
     });
   });
 
-  // ── submitPayment ─────────────────────────────────────────────────────────
   describe('submitPayment()', () => {
-    it('resolves with a confirmation number', async () => {
-      const result = await svc.submitPayment(35, 'ach');
-      expect(result.confirmationNumber).toBeTruthy();
-      expect(result.confirmationNumber.length).toBeGreaterThan(4);
-    });
-
-    it('resolves with correct amount', async () => {
-      const result = await svc.submitPayment(70, 'card');
-      expect(result.amount).toBe(70);
-    });
-
-    it('includes a date', async () => {
-      const result = await svc.submitPayment(35, 'ach');
-      expect(Date.parse(result.date)).not.toBeNaN();
-    });
-  });
-
-  // ── saveRecurring ─────────────────────────────────────────────────────────
-  describe('saveRecurring()', () => {
-    it('updates the recurring signal', async () => {
-      await svc.saveRecurring({ draftDay: 15 });
-      expect(svc.recurring().draftDay).toBe(15);
-    });
-
-    it('merges partial updates', async () => {
-      const originalMethod = svc.recurring().method;
-      await svc.saveRecurring({ draftDay: 5 });
-      expect(svc.recurring().method).toBe(originalMethod);
-    });
-  });
-
-  // ── cancelRecurring ───────────────────────────────────────────────────────
-  describe('cancelRecurring()', () => {
-    it('sets status to inactive', async () => {
-      await svc.cancelRecurring();
-      expect(svc.recurring().status).toBe('inactive');
+    it('posts to /payments/one-time and returns confirmation', async () => {
+      const promise = svc.submitPayment(250, 'ach');
+      http.expectOne(r => r.url.includes('/payments/one-time') && r.method === 'POST')
+          .flush({ confirmationNumber: 'CONF123', amount: 250, processedAt: '2026-01-01T00:00:00Z' });
+      const result = await promise;
+      expect(result.confirmationNumber).toBe('CONF123');
+      expect(result.amount).toBe(250);
     });
   });
 });

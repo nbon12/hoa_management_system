@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, WritableSignal } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -117,27 +117,27 @@ import { LedgerEntry } from '../../../core/models';
     </div>
   `
 })
-export class StatementComponent {
+export class StatementComponent implements OnInit {
   private svc = inject(PaymentsService);
 
   activeTab  = 'statement';
   startDate  = '2025-05-04';
   endDate    = '2026-06-01';
 
+  private _entries    = signal<LedgerEntry[]>([]);
+  private _balance    = signal(0);
   private _searchTerm = signal('');
   private _typeFilter = signal('');
 
-  get searchTerm()              { return this._searchTerm(); }
-  set searchTerm(v: string)     { this._searchTerm.set(v); }
-  get typeFilter()              { return this._typeFilter(); }
-  set typeFilter(v: string)     { this._typeFilter.set(v); }
-
-  private get allEntries(): LedgerEntry[] { return this.svc.getLedger(); }
+  get searchTerm()          { return this._searchTerm(); }
+  set searchTerm(v: string) { this._searchTerm.set(v); }
+  get typeFilter()          { return this._typeFilter(); }
+  set typeFilter(v: string) { this._typeFilter.set(v); }
 
   filteredEntries = computed(() => {
     const term = this._searchTerm();
     const type = this._typeFilter();
-    let entries = this.allEntries;
+    let entries = this._entries();
     if (term)
       entries = entries.filter(e =>
         e.description.toLowerCase().includes(term.toLowerCase()) ||
@@ -148,9 +148,19 @@ export class StatementComponent {
     return entries;
   });
 
-  get balance(): number { return this.svc.currentBalance; }
-  get totalCharges(): number  { return this.allEntries.reduce((s, e) => s + (e.charge ?? 0), 0); }
-  get totalPayments(): number { return this.allEntries.reduce((s, e) => s + (e.payment ?? 0), 0); }
+  get balance(): number      { return this._balance(); }
+  get totalCharges(): number { return this._entries().reduce((s, e) => s + (e.charge ?? 0), 0); }
+  get totalPayments(): number{ return this._entries().reduce((s, e) => s + (e.payment ?? 0), 0); }
 
-  refresh() { /* would re-fetch with date range; mock is synchronous */ }
+  async ngOnInit() {
+    const entries = await this.svc.getLedger();
+    this._entries.set(entries);
+    this._balance.set(entries.at(-1)?.balance ?? 0);
+  }
+
+  async refresh() {
+    const entries = await this.svc.getLedger();
+    this._entries.set(entries);
+    this._balance.set(entries.at(-1)?.balance ?? 0);
+  }
 }

@@ -1,6 +1,7 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { CommunityService } from '../../../core/services/community.service';
+import { Violation } from '../../../core/models';
 
 @Component({
   selector: 'app-violations',
@@ -122,13 +123,14 @@ import { CommunityService } from '../../../core/services/community.service';
     </div>
   `
 })
-export class ViolationsComponent {
+export class ViolationsComponent implements OnInit {
   private svc = inject(CommunityService);
 
   activeTab = signal<'open' | 'closed' | 'rules' | 'appeal'>('open');
 
-  openViolations   = computed(() => this.svc.getViolations('open'));
-  closedViolations = computed(() => this.svc.getViolations('closed'));
+  private _all    = signal<Violation[]>([]);
+  openViolations   = computed(() => this._all().filter(v => v.status === 'open'));
+  closedViolations = computed(() => this._all().filter(v => v.status === 'closed'));
 
   get openCount()   { return this.openViolations().length; }
   get closedCount() { return this.closedViolations().length; }
@@ -138,7 +140,7 @@ export class ViolationsComponent {
   }
 
   get mostCommon(): string {
-    const counts = this.svc.getViolations().reduce((acc, v) => {
+    const counts = this._all().reduce((acc, v) => {
       acc[v.category] = (acc[v.category] ?? 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -146,10 +148,14 @@ export class ViolationsComponent {
   }
 
   get mostCommonCount(): number {
-    const counts = this.svc.getViolations().reduce((acc, v) => {
+    const counts = this._all().reduce((acc, v) => {
       acc[v.category] = (acc[v.category] ?? 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[1] ?? 0;
+  }
+
+  async ngOnInit() {
+    this._all.set(await this.svc.getViolations());
   }
 }

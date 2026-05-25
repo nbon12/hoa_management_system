@@ -103,7 +103,7 @@ export class LoginComponent {
       await this.auth.login(this.email, this.password);
       this.router.navigate(['/app/dashboard']);
     } catch {
-      this.error.set('Invalid email or password. Try anything@example.com / password123');
+      this.error.set('Invalid email or password.');
     } finally {
       this.loading.set(false);
     }

@@ -6,5 +6,7 @@ public enum DocumentCategory
     Rules,
     Governing,
     Budgets,
-    Minutes
+    Minutes,
+    Financials,
+    Insurance
 }

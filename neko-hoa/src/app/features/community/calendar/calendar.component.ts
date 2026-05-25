@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { CommunityService } from '../../../core/services/community.service';
 import { CalendarEvent, EventCategory } from '../../../core/models';
@@ -161,7 +161,7 @@ const EVENT_COLORS: Record<EventCategory, string> = {
     </div>
   `
 })
-export class CalendarComponent {
+export class CalendarComponent implements OnInit {
   private svc = inject(CommunityService);
 
   EVENT_COLORS = EVENT_COLORS;
@@ -169,9 +169,14 @@ export class CalendarComponent {
   dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   view       = signal<'month' | 'timeline'>('month');
-  currentYear  = signal(2026);
-  currentMonth = signal(4); // 0-indexed, 4 = May
+  currentYear  = signal(new Date().getFullYear());
+  currentMonth = signal(new Date().getMonth());
   activeCategories = signal<Set<EventCategory>>(new Set(this.categories));
+  private _allEvents = signal<CalendarEvent[]>([]);
+
+  async ngOnInit() {
+    this._allEvents.set(await this.svc.getCalendarEvents());
+  }
 
   // Timeline months
   timelineMonths = computed(() => {
@@ -200,7 +205,7 @@ export class CalendarComponent {
   }
 
   private get visibleEvents(): CalendarEvent[] {
-    return this.svc.getCalendarEvents().filter(e => this.activeCategories().has(e.category));
+    return this._allEvents().filter(e => this.activeCategories().has(e.category));
   }
 
   calendarDays = computed(() => {
@@ -212,19 +217,16 @@ export class CalendarComponent {
 
     const days: { key: string; date: number; isToday: boolean; otherMonth: boolean; events: CalendarEvent[] }[] = [];
 
-    // Previous month padding
     for (let i = firstDay - 1; i >= 0; i--) {
       const d = daysInPrev - i;
       days.push({ key: `prev-${d}`, date: d, isToday: false, otherMonth: true, events: [] });
     }
-    // Current month
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
       const events = this.visibleEvents.filter(e => e.date === dateStr);
       days.push({ key: dateStr, date: d, isToday, otherMonth: false, events });
     }
-    // Next month padding (fill to 6 rows = 42 cells)
     const remaining = 42 - days.length;
     for (let d = 1; d <= remaining; d++) {
       days.push({ key: `next-${d}`, date: d, isToday: false, otherMonth: true, events: [] });

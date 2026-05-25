@@ -2,6 +2,21 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { OneTimeComponent } from './one-time.component';
 import { PaymentsService } from '../../../core/services/payments.service';
+import { LedgerEntry } from '../../../core/models';
+
+const MOCK_ENTRY: LedgerEntry = {
+  id: '1', date: '2026-05-01', description: 'Regular Assessment',
+  type: 'Regular Assessment', charge: 250, payment: 0, balance: 500, docNumber: 'RA202605',
+};
+
+function makeMockPaymentsService(): Partial<PaymentsService> {
+  return {
+    getLedger:     jasmine.createSpy().and.returnValue(Promise.resolve([MOCK_ENTRY])),
+    submitPayment: jasmine.createSpy().and.returnValue(Promise.resolve({
+      confirmationNumber: 'CONF123', amount: 500, date: '2026-05-01',
+    })),
+  } as any;
+}
 
 describe('OneTimeComponent', () => {
   let fixture: ComponentFixture<OneTimeComponent>;
@@ -10,12 +25,17 @@ describe('OneTimeComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [OneTimeComponent],
-      providers: [provideRouter([])],
+      imports:   [OneTimeComponent],
+      providers: [
+        provideRouter([]),
+        { provide: PaymentsService, useValue: makeMockPaymentsService() },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(OneTimeComponent);
-    comp = fixture.componentInstance;
+    comp    = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
     el = fixture.nativeElement;
   });
@@ -26,7 +46,7 @@ describe('OneTimeComponent', () => {
     expect(comp.currentStep()).toBe(1);
   });
 
-  it('shows stepper with 3 steps', () => {
+  it('shows stepper with steps', () => {
     expect(el.textContent).toContain('1');
     expect(el.textContent).toContain('2');
     expect(el.textContent).toContain('3');
@@ -38,21 +58,23 @@ describe('OneTimeComponent', () => {
     expect(el.textContent).toContain('Both');
   });
 
-  it('resolvedAmount uses current preset by default', () => {
-    const svc = TestBed.inject(PaymentsService);
-    expect(comp.resolvedAmount()).toBe(svc.currentBalance);
+  it('balance signal is set from loaded ledger', () => {
+    expect(comp.balance()).toBe(MOCK_ENTRY.balance);
   });
 
-  it('resolvedAmount changes when preset changes', () => {
-    const svc = TestBed.inject(PaymentsService);
+  it('resolvedAmount with current preset equals loaded balance', () => {
+    comp.selectedPreset.set('current');
+    expect(comp.resolvedAmount()).toBe(comp.balance());
+  });
+
+  it('resolvedAmount with next preset equals assessment', () => {
     comp.selectedPreset.set('next');
-    expect(comp.resolvedAmount()).toBe(svc.nextAssessment);
+    expect(comp.resolvedAmount()).toBe(comp.assessment());
   });
 
-  it('resolvedAmount for both preset is currentBalance + nextAssessment', () => {
-    const svc = TestBed.inject(PaymentsService);
+  it('resolvedAmount for both preset = balance + assessment', () => {
     comp.selectedPreset.set('both');
-    expect(comp.resolvedAmount()).toBe(svc.currentBalance + svc.nextAssessment);
+    expect(comp.resolvedAmount()).toBe(comp.balance() + comp.assessment());
   });
 
   it('totalAmount adds processing fee for card', () => {
@@ -92,15 +114,15 @@ describe('OneTimeComponent', () => {
   });
 
   it('submits payment and shows confirmation on step 3 submit', async () => {
-    await comp.next(); // to step 2
-    await comp.next(); // to step 3
-    await comp.next(); // submit
+    await comp.next();
+    await comp.next();
+    await comp.next();
     fixture.detectChanges();
     expect(comp.currentStep()).toBe(4);
     expect(comp.result()).not.toBeNull();
   });
 
-  it('shows confirmation number after payment', async () => {
+  it('shows confirmation after payment', async () => {
     await comp.next();
     await comp.next();
     await comp.next();

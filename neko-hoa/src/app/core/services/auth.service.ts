@@ -1,53 +1,91 @@
 import { Injectable, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { MockDataService } from './mock-data.service';
+import { firstValueFrom } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import { TokenService } from './token.service';
 import { CurrentUser } from '../models';
+
+interface AuthResponse {
+  token: string;
+  refreshToken: string;
+  expiresAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    initials: string;
+    properties: { id: string; accountNumber: string; address: string }[];
+  };
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly _user = signal<CurrentUser | null>(null);
   readonly user = this._user.asReadonly();
 
-  constructor(private mock: MockDataService, private router: Router) {
-    // Auto-login from session storage (mock persistence)
-    const stored = sessionStorage.getItem('neko_user');
-    if (stored) this._user.set(JSON.parse(stored));
+  private readonly base = environment.apiBaseUrl;
+
+  constructor(
+    private http: HttpClient,
+    private tokens: TokenService,
+    private router: Router,
+  ) {
+    // Restore session from localStorage on startup
+    const stored = localStorage.getItem('neko_user');
+    const token  = this.tokens.getAccessToken();
+    if (stored && token && !this.tokens.isTokenExpired(token)) {
+      this._user.set(JSON.parse(stored));
+    } else if (stored && this.tokens.getRefreshToken()) {
+      // Token expired but refresh exists — will be silently refreshed on next API call
+      this._user.set(JSON.parse(stored));
+    } else {
+      this.tokens.clearTokens();
+    }
   }
 
   isLoggedIn(): boolean {
     return this._user() !== null;
   }
 
-  login(email: string, password: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // Mock: accept any non-empty credentials
-        if (email && password) {
-          const user = this.mock.currentUser;
-          this._user.set(user);
-          sessionStorage.setItem('neko_user', JSON.stringify(user));
-          resolve();
-        } else {
-          reject(new Error('Invalid credentials'));
-        }
-      }, 600);
-    });
+  async login(email: string, password: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<AuthResponse>(`${this.base}/auth/login`, { email, password })
+    );
+    this._applyAuth(res);
   }
 
-  register(_email: string, _password: string, _firstName: string, _lastName: string): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = this.mock.currentUser;
-        this._user.set(user);
-        sessionStorage.setItem('neko_user', JSON.stringify(user));
-        resolve();
-      }, 800);
-    });
+  async register(email: string, password: string, firstName: string, lastName: string, accountNumber: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<AuthResponse>(`${this.base}/auth/register`, {
+        email, password, firstName, lastName, accountNumber
+      })
+    );
+    this._applyAuth(res);
   }
 
   logout(): void {
+    const token = this.tokens.getAccessToken();
+    if (token) {
+      // Best-effort — don't block UI on network
+      this.http.post(`${this.base}/auth/logout`, {}).subscribe({ error: () => {} });
+    }
     this._user.set(null);
-    sessionStorage.removeItem('neko_user');
+    this.tokens.clearTokens();
     this.router.navigate(['/login']);
+  }
+
+  private _applyAuth(res: AuthResponse): void {
+    const user: CurrentUser = {
+      id:        res.user.id,
+      firstName: res.user.firstName,
+      lastName:  res.user.lastName,
+      email:     res.user.email,
+      initials:  res.user.initials,
+    };
+    this._user.set(user);
+    this.tokens.setTokens(res.token, res.refreshToken);
+    localStorage.setItem('neko_user', JSON.stringify(user));
   }
 }

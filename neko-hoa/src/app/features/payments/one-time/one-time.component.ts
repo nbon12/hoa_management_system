@@ -1,9 +1,8 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe } from '@angular/common';
 import { PaymentsService, PaymentResult } from '../../../core/services/payments.service';
-import { MockDataService } from '../../../core/services/mock-data.service';
 
 type AmountPreset = 'current' | 'next' | 'both' | 'custom';
 type PayMethod = 'card' | 'ach';
@@ -208,9 +207,8 @@ type WizardStep = 1 | 2 | 3 | 4;
     </div>
   `
 })
-export class OneTimeComponent {
+export class OneTimeComponent implements OnInit {
   private paymentsSvc = inject(PaymentsService);
-  private mockData    = inject(MockDataService);
 
   steps = [
     { n: 1 as WizardStep, label: 'amount' },
@@ -225,18 +223,25 @@ export class OneTimeComponent {
   error   = signal('');
   result  = signal<PaymentResult | null>(null);
 
+  balance    = signal(0);
+  assessment = signal(250);
+
   customAmount = '';
   cardName  = ''; cardNumber = ''; cardExpiry = ''; cardCvc = ''; cardZip = '';
   bankName  = ''; routing = ''; accountNum = '';
 
-  get balance()     { return this.paymentsSvc.currentBalance; }
-  get assessment()  { return this.paymentsSvc.nextAssessment; }
+  get presets() {
+    return [
+      { id: 'current' as AmountPreset, label: 'Current',  amount: this.balance(),    sub: 'as of today' },
+      { id: 'next'    as AmountPreset, label: 'Next due',  amount: this.assessment(), sub: 'due next 1st' },
+      { id: 'both'    as AmountPreset, label: 'Both',      amount: this.balance() + this.assessment(), sub: 'paid through July' },
+    ];
+  }
 
-  presets = [
-    { id: 'current' as AmountPreset, label: 'Current',   amount: this.paymentsSvc.currentBalance, sub: 'as of today' },
-    { id: 'next'    as AmountPreset, label: 'Next due',   amount: this.paymentsSvc.nextAssessment,  sub: 'due 6/1' },
-    { id: 'both'    as AmountPreset, label: 'Both',       amount: this.paymentsSvc.currentBalance + this.paymentsSvc.nextAssessment, sub: 'paid through July' },
-  ];
+  async ngOnInit() {
+    const entries = await this.paymentsSvc.getLedger(1, 1);
+    this.balance.set(entries[0]?.balance ?? 0);
+  }
 
   resolvedAmount = computed(() => {
     const p = this.selectedPreset();
@@ -253,11 +258,22 @@ export class OneTimeComponent {
     if (this.currentStep() === 3) {
       this.loading.set(true);
       try {
-        const r = await this.paymentsSvc.submitPayment(this.totalAmount(), this.method());
+        const details: Record<string, string> = {};
+        if (this.method() === 'ach') {
+          details['routingNumber'] = this.routing;
+          details['accountNumber'] = this.accountNum;
+          details['accountType']   = 'checking';
+        } else {
+          details['cardholderName'] = this.cardName;
+          details['cardNumber']     = this.cardNumber;
+          details['cardExpiry']     = this.cardExpiry;
+          details['cardZip']        = this.cardZip;
+        }
+        const r = await this.paymentsSvc.submitPayment(this.totalAmount(), this.method(), details);
         this.result.set(r);
         this.currentStep.set(4);
-      } catch {
-        this.error.set('Payment failed. Please try again.');
+      } catch (e: any) {
+        this.error.set(e?.error?.message ?? 'Payment failed. Please try again.');
       } finally {
         this.loading.set(false);
       }

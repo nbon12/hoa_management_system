@@ -1,9 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { PaymentsService } from '../../../core/services/payments.service';
-import { RecurringPayment } from '../../../core/models';
+import { RecurringPayment, DraftEntry } from '../../../core/models';
 
 @Component({
   selector: 'app-recurring',
@@ -174,7 +174,7 @@ import { RecurringPayment } from '../../../core/models';
           <tr><th>Date</th><th>Source</th><th class="num">Amount</th><th>Status</th></tr>
         </thead>
         <tbody>
-          @for (d of drafts; track d.date) {
+          @for (d of drafts(); track d.date) {
             <tr>
               <td>{{ d.date | date:'MM/dd/yy' }}</td>
               <td>{{ d.source }}</td>
@@ -213,42 +213,59 @@ import { RecurringPayment } from '../../../core/models';
     }
   `
 })
-export class RecurringComponent {
+export class RecurringComponent implements OnInit {
   private svc = inject(PaymentsService);
 
-  rec = this.svc.recurring();
-  active      = signal(this.rec.status === 'active');
-  amountType  = signal(this.rec.amountType);
-  method      = signal<'ach' | 'card'>(this.rec.method);
-  fixedAmount = this.rec.fixedAmount?.toString() ?? '';
-  draftDay    = this.rec.draftDay;
-  accountType = this.rec.accountType ?? 'checking';
-  bankName    = this.rec.bankName    ?? '';
+  active      = signal(false);
+  amountType  = signal<'assessment' | 'balance' | 'fixed'>('assessment');
+  method      = signal<'ach' | 'card'>('ach');
+  fixedAmount = '';
+  draftDay    = 1;
+  accountType = 'checking';
+  bankName    = '';
   routing     = '';
   accountNum  = '';
-  cardName    = this.rec.cardholderName ?? '';
+  cardName    = '';
   cardNumber  = '';
-  cardExpiry  = this.rec.cardExpiry  ?? '';
+  cardExpiry  = '';
   cardCvc     = '';
-  cardZip     = this.rec.cardZip    ?? '';
+  cardZip     = '';
   agreed      = true;
   saving      = signal(false);
   saved       = signal(false);
+  drafts      = signal<DraftEntry[]>([]);
 
-  drafts = this.svc.getDrafts();
+  private _rec: RecurringPayment | null = null;
 
   amountOptions = [
-    { id: 'assessment' as const, label: 'Just the assessment',              sub: '$35/mo' },
-    { id: 'balance'    as const, label: 'Whatever I owe (open balance)',    sub: 'variable' },
-    { id: 'fixed'      as const, label: 'A fixed amount I pick',           sub: '$ ____' },
+    { id: 'assessment' as const, label: 'Just the assessment',           sub: '$250/mo' },
+    { id: 'balance'    as const, label: 'Whatever I owe (open balance)', sub: 'variable' },
+    { id: 'fixed'      as const, label: 'A fixed amount I pick',         sub: '$ ____' },
   ];
 
-  sourceLabel() {
-    if (this.method() === 'ach') return `${this.rec.bankName} ••${this.rec.accountLast4}`;
-    return this.rec.cardLast4 ? `Visa ••${this.rec.cardLast4}` : 'Not set';
+  async ngOnInit() {
+    await this.svc.loadRecurring();
+    this._rec = this.svc.recurring();
+    if (this._rec) {
+      this.active.set(this._rec.status === 'active');
+      this.amountType.set(this._rec.amountType as any);
+      this.method.set(this._rec.method as any);
+      this.draftDay    = this._rec.draftDay;
+      this.accountType = this._rec.accountType ?? 'checking';
+    }
+    try {
+      this.drafts.set(await this.svc.getDrafts());
+    } catch { /* ignore */ }
   }
 
-  nextAmount() { return this.rec.processingFee + 35; }
+  sourceLabel() {
+    const r = this._rec;
+    if (!r) return 'Not set';
+    if (r.method === 'ach') return `Bank ••${r.accountLast4 ?? '??'}`;
+    return r.cardLast4 ? `Card ••${r.cardLast4}` : 'Not set';
+  }
+
+  nextAmount() { return (this._rec?.processingFee ?? 0) + 250; }
 
   toggleActive() { this.active.set(!this.active()); }
 
@@ -261,14 +278,19 @@ export class RecurringComponent {
 
   async save() {
     this.saving.set(true);
-    await this.svc.saveRecurring({
-      status: this.active() ? 'active' : 'inactive',
-      amountType: this.amountType(),
-      method: this.method(),
-      draftDay: this.draftDay,
-    });
-    this.saving.set(false);
-    this.saved.set(true);
-    setTimeout(() => this.saved.set(false), 3000);
+    try {
+      await this.svc.saveRecurring({
+        status:     this.active() ? 'active' : 'inactive',
+        amountType: this.amountType(),
+        method:     this.method(),
+        draftDay:   this.draftDay,
+      });
+      this.saved.set(true);
+      setTimeout(() => this.saved.set(false), 3000);
+    } catch (e: any) {
+      alert(e?.error?.message ?? 'Save failed.');
+    } finally {
+      this.saving.set(false);
+    }
   }
 }

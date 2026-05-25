@@ -1,7 +1,7 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { CommunityService } from '../../../core/services/community.service';
-import { AnnouncementCategory } from '../../../core/models';
+import { AnnouncementCategory, Announcement, Poll } from '../../../core/models';
 
 const CATEGORIES: (AnnouncementCategory | 'All')[] = ['All', 'Board', 'Maintenance', 'Events', 'Emergencies'];
 
@@ -64,9 +64,9 @@ const CATEGORIES: (AnnouncementCategory | 'All')[] = ['All', 'Board', 'Maintenan
       <div class="flex-col">
         <div class="card card--lav">
           <div class="section-title">📊 Quick poll</div>
-          <p style="font-size:13px;font-weight:500;margin-top:4px;">{{ poll.question }}</p>
+          <p style="font-size:13px;font-weight:500;margin-top:4px;">{{ poll()?.question }}</p>
           <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:12px;">
-            @for (opt of poll.options; track opt.label) {
+            @for (opt of (poll()?.options ?? []); track opt.label) {
               <div style="position:relative;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;overflow:hidden;">
                 <div style="position:absolute;inset:0;background:var(--pink);"
                      [style.width]="opt.percent + '%'"></div>
@@ -77,22 +77,33 @@ const CATEGORIES: (AnnouncementCategory | 'All')[] = ['All', 'Board', 'Maintenan
               </div>
             }
           </div>
-          <div class="muted" style="font-size:11px;margin-top:6px;">{{ poll.totalVotes }} votes · {{ poll.closesLabel }}</div>
+          <div class="muted" style="font-size:11px;margin-top:6px;">{{ poll()?.totalVotes }} votes · {{ poll()?.closesLabel }}</div>
         </div>
       </div>
     </div>
   `
 })
-export class AnnouncementsComponent {
+export class AnnouncementsComponent implements OnInit {
   private svc = inject(CommunityService);
 
   categories = CATEGORIES;
   activeCategory = signal<AnnouncementCategory | 'All'>('All');
-  poll = this.svc.getPoll();
+  poll = signal<Poll | null>(null);
+  private _allAnnouncements = signal<Announcement[]>([]);
+
+  async ngOnInit() {
+    const [ann, poll] = await Promise.all([
+      this.svc.getAnnouncements(),
+      this.svc.getPoll(),
+    ]);
+    this._allAnnouncements.set(ann);
+    this.poll.set(poll);
+  }
 
   filtered = computed(() => {
     const cat = this.activeCategory();
-    return cat === 'All' ? this.svc.getAnnouncements() : this.svc.getAnnouncements(cat);
+    const all = this._allAnnouncements();
+    return cat === 'All' ? all : all.filter(a => a.category === cat);
   });
 
   categoryColor(cat: string): string {

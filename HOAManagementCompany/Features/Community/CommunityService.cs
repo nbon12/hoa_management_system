@@ -127,6 +127,40 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         return new DocumentListResponse(items, total, req.Page, req.PageSize);
     }
 
+    public async Task<CommunityDirectoryResponse> GetCommunityDirectoryAsync(string communityId, Guid currentPropertyId, CancellationToken ct = default)
+    {
+        var totalHouseholds = await db.Properties.CountAsync(p => p.CommunityId == communityId, ct);
+
+        // Find all properties in the community (excluding the current user's property)
+        // and whose owners have at least one field marked as Shared
+        var propertiesWithShared = await db.Properties
+            .Where(p => p.CommunityId == communityId && p.Id != currentPropertyId)
+            .Join(db.Owners, p => p.Id, o => o.PropertyId, (p, o) => new { Property = p, Owner = o })
+            .ToListAsync(ct);
+
+        var neighbors = new List<NeighborDto>();
+
+        foreach (var row in propertiesWithShared)
+        {
+            var sharedFields = await db.DirectoryFields
+                .Where(f => f.PropertyId == row.Property.Id && f.Shared)
+                .ToListAsync(ct);
+
+            if (sharedFields.Count == 0) continue;
+
+            var sharedKeys = sharedFields.Select(f => f.FieldKey).ToHashSet();
+
+            neighbors.Add(new NeighborDto(
+                $"{row.Property.Address}, {row.Property.City}",
+                sharedKeys.Contains("name") ? $"{row.Owner.FirstName} {row.Owner.LastName}" : null,
+                sharedKeys.Contains("email") ? row.Owner.Email : null,
+                sharedKeys.Contains("phone") ? row.Owner.Phone : null
+            ));
+        }
+
+        return new CommunityDirectoryResponse(neighbors, neighbors.Count, totalHouseholds);
+    }
+
     public async Task<DocumentDownloadResponse> GetDocumentDownloadUrlAsync(string communityId, Guid id, CancellationToken ct = default)
     {
         var doc = await db.HoaDocuments.FirstOrDefaultAsync(d => d.CommunityId == communityId && d.Id == id, ct)

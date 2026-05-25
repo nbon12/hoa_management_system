@@ -1,118 +1,129 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { CommunityService } from './community.service';
-import { MockDataService } from './mock-data.service';
+import { environment } from '../../../environments/environment';
+
+const BASE = environment.apiBaseUrl;
+
+const ANNOUNCEMENTS_RESPONSE = {
+  items: [
+    { id: 'a1', title: 'Board Meeting',   body: 'Meeting on June 10', category: 'Board',  publishedAt: '2026-05-01T00:00:00Z', pinned: true,  likeCount: 5, commentCount: 2, authorName: 'Board President' },
+    { id: 'a2', title: 'Pool Closing',    body: 'Pool closed June 1', category: 'Maintenance', publishedAt: '2026-04-20T00:00:00Z', pinned: false, likeCount: 0, commentCount: 0, authorName: 'Facilities' },
+  ],
+  totalCount: 2, page: 1, pageSize: 50,
+};
 
 describe('CommunityService', () => {
   let svc: CommunityService;
-  let mock: MockDataService;
+  let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({ imports: [HttpClientTestingModule] });
     svc  = TestBed.inject(CommunityService);
-    mock = TestBed.inject(MockDataService);
+    http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => http.verify());
 
   it('should be created', () => expect(svc).toBeTruthy());
 
-  // ── announcements ─────────────────────────────────────────────────────────
   describe('getAnnouncements()', () => {
-    it('returns all when no category filter', () => {
-      expect(svc.getAnnouncements().length).toBe(mock.announcements.length);
+    it('calls /community/announcements and returns mapped items', async () => {
+      const promise = svc.getAnnouncements();
+      http.expectOne(r => r.url.includes('/community/announcements'))
+          .flush(ANNOUNCEMENTS_RESPONSE);
+      const items = await promise;
+      expect(items.length).toBe(2);
+      expect(items[0].title).toBe('Board Meeting');
+      expect(items[0].category).toBe('Board');
+      expect(items[0].pinned).toBeTrue();
     });
-    it('filters by category', () => {
-      const board = svc.getAnnouncements('Board');
-      board.forEach(a => expect(a.category).toBe('Board'));
-    });
-    it('returns empty array for category with no announcements', () => {
-      expect(svc.getAnnouncements('Emergencies').length).toBe(0);
-    });
-    it('returns a copy', () => {
-      expect(svc.getAnnouncements()).not.toBe(svc.getAnnouncements());
+
+    it('passes category as query param', async () => {
+      const promise = svc.getAnnouncements('Board' as any);
+      const req = http.expectOne(r => r.url.includes('/community/announcements'));
+      expect(req.request.params.get('category')).toBe('Board');
+      req.flush({ ...ANNOUNCEMENTS_RESPONSE, items: [ANNOUNCEMENTS_RESPONSE.items[0]] });
+      await promise;
     });
   });
 
   describe('getPoll()', () => {
-    it('returns a poll object', () => {
-      expect(svc.getPoll()).toBeTruthy();
+    it('calls /community/poll and maps to poll model', async () => {
+      const promise = svc.getPoll();
+      http.expectOne(`${BASE}/community/poll`).flush({
+        id: 'p1', question: 'Which improvement?', closingLabel: 'Closes June 30',
+        totalVotes: 42,
+        options: [
+          { optionIndex: 0, optionText: 'Playground', voteCount: 18, percentage: 42.86 },
+          { optionIndex: 1, optionText: 'Tennis',     voteCount: 24, percentage: 57.14 },
+        ],
+      });
+      const poll = await promise;
+      expect(poll).toBeTruthy();
+      expect(poll!.question).toBe('Which improvement?');
+      expect(poll!.options.length).toBe(2);
+      expect(poll!.totalVotes).toBe(42);
     });
-    it('poll options sum to ~100%', () => {
-      const sum = svc.getPoll().options.reduce((s, o) => s + o.percent, 0);
-      expect(sum).toBe(100);
-    });
-    it('has a question', () => {
-      expect(svc.getPoll().question.length).toBeGreaterThan(0);
+
+    it('returns null on error', async () => {
+      const promise = svc.getPoll();
+      http.expectOne(`${BASE}/community/poll`).flush('Not Found', { status: 404, statusText: 'Not Found' });
+      const poll = await promise;
+      expect(poll).toBeNull();
     });
   });
 
-  // ── violations ────────────────────────────────────────────────────────────
   describe('getViolations()', () => {
-    it('returns all when no status filter', () => {
-      expect(svc.getViolations().length).toBe(mock.violations.length);
+    it('calls /community/violations and returns items', async () => {
+      const promise = svc.getViolations();
+      http.expectOne(r => r.url.includes('/community/violations')).flush({
+        items: [
+          { id: 'v1', title: 'Overgrown hedges', description: null, category: 'Landscape', status: 'Open',   issuedDate: '2026-05-01', resolvedDate: null, dueDate: '2026-06-01', fineAmount: null },
+          { id: 'v2', title: 'Parking violation', description: null, category: 'Parking',  status: 'Closed', issuedDate: '2026-02-01', resolvedDate: '2026-02-10', dueDate: null, fineAmount: null },
+        ],
+        totalCount: 2, page: 1, pageSize: 100,
+      });
+      const items = await promise;
+      expect(items.length).toBe(2);
+      expect(items[0].issue).toBe('Overgrown hedges');
+      expect(items[0].status).toBe('open');
+      expect(items[1].status).toBe('closed');
     });
-    it('returns only open violations', () => {
-      svc.getViolations('open').forEach(v => expect(v.status).toBe('open'));
-    });
-    it('returns only closed violations', () => {
-      svc.getViolations('closed').forEach(v => expect(v.status).toBe('closed'));
-    });
-    it('open + closed = total', () => {
-      const total  = svc.getViolations().length;
-      const open   = svc.getViolations('open').length;
-      const closed = svc.getViolations('closed').length;
-      expect(open + closed).toBe(total);
+
+    it('passes status as query param', async () => {
+      const promise = svc.getViolations('open');
+      const req = http.expectOne(r => r.url.includes('/community/violations'));
+      expect(req.request.params.get('status')).toBe('open');
+      req.flush({ items: [], totalCount: 0, page: 1, pageSize: 100 });
+      await promise;
     });
   });
 
-  // ── calendar events ───────────────────────────────────────────────────────
-  describe('getCalendarEvents()', () => {
-    it('returns all events when no filter', () => {
-      expect(svc.getCalendarEvents().length).toBe(mock.calendarEvents.length);
-    });
-    it('filters by category Board', () => {
-      svc.getCalendarEvents('Board').forEach(e => expect(e.category).toBe('Board'));
-    });
-    it('filters by category Amenity', () => {
-      svc.getCalendarEvents('Amenity').forEach(e => expect(e.category).toBe('Amenity'));
-    });
-    it('returns empty array for Maintenance (none in mock)', () => {
-      const maintenance = svc.getCalendarEvents('Maintenance');
-      expect(maintenance.length).toBe(0);
-    });
-  });
-
-  // ── documents ─────────────────────────────────────────────────────────────
   describe('getDocuments()', () => {
-    it('returns all when category is All', () => {
-      expect(svc.getDocuments('All').length).toBe(mock.documents.length);
-    });
-    it('returns all when no category', () => {
-      expect(svc.getDocuments().length).toBe(mock.documents.length);
-    });
-    it('filters by category', () => {
-      svc.getDocuments('Forms').forEach(d => expect(d.category).toBe('Forms'));
-    });
-    it('returns Pinned docs for Pinned category', () => {
-      svc.getDocuments('Pinned').forEach(d => expect(d.pinned).toBeTrue());
+    it('calls /community/documents and returns items', async () => {
+      const promise = svc.getDocuments();
+      http.expectOne(r => r.url.includes('/community/documents')).flush({
+        items: [
+          { id: 'd1', name: '2026 Budget', category: 'Budgets', effectiveDate: '2026-01-01', fileSizeLabel: '1.2 MB', pinned: true },
+          { id: 'd2', name: 'CC&R', category: 'Governing', effectiveDate: '2005-06-01', fileSizeLabel: '5.0 MB', pinned: false },
+        ],
+        totalCount: 2, page: 1, pageSize: 200,
+      });
+      const docs = await promise;
+      expect(docs.length).toBe(2);
+      expect(docs[0].name).toBe('2026 Budget');
+      expect(docs[0].pinned).toBeTrue();
     });
   });
 
   describe('searchDocuments()', () => {
-    it('returns matching documents', () => {
-      const results = svc.searchDocuments('budget');
-      expect(results.length).toBeGreaterThan(0);
-      results.forEach(d => expect(d.name.toLowerCase()).toContain('budget'));
-    });
-    it('is case-insensitive', () => {
-      const lower = svc.searchDocuments('acc');
-      const upper = svc.searchDocuments('ACC');
-      expect(lower.length).toBe(upper.length);
-    });
-    it('returns empty array for no match', () => {
-      expect(svc.searchDocuments('xyzzy_nonexistent').length).toBe(0);
-    });
-    it('partial match works', () => {
-      const results = svc.searchDocuments('ins');
-      expect(results.length).toBeGreaterThan(0);
+    it('passes search as query param', async () => {
+      const promise = svc.searchDocuments('budget');
+      const req = http.expectOne(r => r.url.includes('/community/documents'));
+      expect(req.request.params.get('search')).toBe('budget');
+      req.flush({ items: [], totalCount: 0, page: 1, pageSize: 200 });
+      await promise;
     });
   });
 });

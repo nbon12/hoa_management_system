@@ -19,13 +19,17 @@ public class PropertyService(ApplicationDbContext db)
     {
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct)
             ?? throw new DomainException("NOT_FOUND", "Owner not found.", 404);
-        return MapOwner(owner);
+        var property = await db.Properties.FindAsync([propertyId], ct)
+            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
+        return MapOwner(owner, property);
     }
 
     public async Task<OwnerDto> PatchOwnerAsync(Guid propertyId, OwnerPatchRequest req, CancellationToken ct = default)
     {
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct)
             ?? throw new DomainException("NOT_FOUND", "Owner not found.", 404);
+        var property = await db.Properties.FindAsync([propertyId], ct)
+            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
 
         var mailingChanged = req.MailingAddress is not null && req.MailingAddress != owner.MailingAddress;
 
@@ -50,7 +54,7 @@ public class PropertyService(ApplicationDbContext db)
             });
 
         await db.SaveChangesAsync(ct);
-        return MapOwner(owner);
+        return MapOwner(owner, property);
     }
 
     public async Task<IEnumerable<AddressHistoryDto>> GetAddressHistoryAsync(Guid propertyId, CancellationToken ct = default)
@@ -82,5 +86,9 @@ public class PropertyService(ApplicationDbContext db)
 
     private static PropertyDto MapProperty(Domain.Entities.Property p) => new(p.Id, p.AccountNumber, p.CommunityId, p.CommunityName, p.Address, p.City, p.State, p.Zip, p.Lot, p.Phase, p.Section, p.Block, p.FiscalYear, p.YearBuilt, p.Status, p.MonthlyAssessment, p.AnnualAssessment, p.AssessmentDueDay, p.LateFeeAmount, p.LateFeeGraceDays, p.FinanceChargeRate);
 
-    private static OwnerDto MapOwner(Owner o) => new(o.Id, o.FirstName, o.LastName, o.OwnerName2, o.Email, o.Phone, o.MailingToProperty, o.MailingAddress, o.PaperlessStatements, o.SmsReminders, o.VotingRights);
+    private static OwnerDto MapOwner(Owner o, Domain.Entities.Property p) => new(
+        o.Id, o.FirstName, o.LastName, o.OwnerName2, o.Email, o.Phone,
+        o.MailingToProperty, o.MailingAddress, o.PaperlessStatements, o.SmsReminders, o.VotingRights,
+        p.AccountNumber, p.CommunityName, $"{p.Address}, {p.City}, {p.State} {p.Zip}",
+        p.CreatedAt.ToString("yyyy-MM-dd"));
 }

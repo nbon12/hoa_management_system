@@ -1,24 +1,43 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from './auth.service';
-import { MockDataService } from './mock-data.service';
 import { LoginComponent } from '../../features/auth/login.component';
+import { environment } from '../../../environments/environment';
+
+const BASE = environment.apiBaseUrl;
+
+const MOCK_AUTH_RESPONSE = {
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.fake',
+  refreshToken: 'refresh-token-abc',
+  expiresAt: '2099-01-01T00:00:00Z',
+  user: {
+    id: 'u1', firstName: 'Jane', lastName: 'Resident',
+    email: 'resident@nekohoa.dev', initials: 'JR',
+    properties: [{ id: 'p1', accountNumber: 'SAKURA-001', address: '1 Sakura Drive' }],
+  },
+};
 
 describe('AuthService', () => {
   let svc: AuthService;
+  let http: HttpTestingController;
 
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
+      imports:   [HttpClientTestingModule],
       providers: [
-        // Provide a /login route so logout() navigation doesn't throw
         provideRouter([{ path: 'login', component: LoginComponent }]),
       ],
     });
-    svc = TestBed.inject(AuthService);
+    svc  = TestBed.inject(AuthService);
+    http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => sessionStorage.clear());
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+  });
 
   it('should be created', () => expect(svc).toBeTruthy());
 
@@ -31,54 +50,55 @@ describe('AuthService', () => {
   });
 
   describe('login()', () => {
-    it('resolves and sets user on valid credentials', async () => {
-      await svc.login('test@example.com', 'password123');
+    it('sets user on successful login', async () => {
+      const promise = svc.login('resident@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush(MOCK_AUTH_RESPONSE);
+      await promise;
       expect(svc.isLoggedIn()).toBeTrue();
-      expect(svc.user()).not.toBeNull();
+      expect(svc.user()?.firstName).toBe('Jane');
     });
 
     it('sets user initials after login', async () => {
-      await svc.login('any@test.com', 'any');
-      expect(svc.user()?.initials).toBeTruthy();
+      const promise = svc.login('resident@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush(MOCK_AUTH_RESPONSE);
+      await promise;
+      expect(svc.user()?.initials).toBe('JR');
     });
 
-    it('rejects with empty email', async () => {
-      await expectAsync(svc.login('', 'password')).toBeRejected();
+    it('rejects on HTTP 401', async () => {
+      const promise = svc.login('bad@example.com', 'wrong');
+      http.expectOne(`${BASE}/auth/login`)
+          .flush({ code: 'INVALID_CREDENTIALS' }, { status: 401, statusText: 'Unauthorized' });
+      await expectAsync(promise).toBeRejected();
+      expect(svc.isLoggedIn()).toBeFalse();
     });
 
-    it('rejects with empty password', async () => {
-      await expectAsync(svc.login('test@example.com', '')).toBeRejected();
-    });
-
-    it('persists user in sessionStorage', async () => {
-      await svc.login('test@example.com', 'pw');
-      expect(sessionStorage.getItem('neko_user')).not.toBeNull();
+    it('persists user in localStorage', async () => {
+      const promise = svc.login('resident@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush(MOCK_AUTH_RESPONSE);
+      await promise;
+      expect(localStorage.getItem('neko_user')).not.toBeNull();
     });
   });
 
   describe('register()', () => {
-    it('sets user after registration', async () => {
-      await svc.register('new@example.com', 'pass', 'Jane', 'Doe');
+    it('sets user after successful registration', async () => {
+      const promise = svc.register('new@example.com', 'pass', 'Jane', 'Doe', 'SAKURA-001');
+      http.expectOne(`${BASE}/auth/register`).flush(MOCK_AUTH_RESPONSE);
+      await promise;
       expect(svc.isLoggedIn()).toBeTrue();
     });
   });
 
   describe('logout()', () => {
-    it('clears user and sessionStorage', async () => {
-      await svc.login('a@b.com', 'pw');
+    it('clears user and localStorage', async () => {
+      const promise = svc.login('resident@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush(MOCK_AUTH_RESPONSE);
+      await promise;
       svc.logout();
+      http.expectOne(`${BASE}/auth/logout`).flush({});
       expect(svc.isLoggedIn()).toBeFalse();
-      expect(sessionStorage.getItem('neko_user')).toBeNull();
-    });
-  });
-
-  describe('session persistence', () => {
-    it('restores user from sessionStorage on construction', () => {
-      const mockUser = TestBed.inject(MockDataService).currentUser;
-      sessionStorage.setItem('neko_user', JSON.stringify(mockUser));
-      // A new service instance (same TestBed) should pick up the stored value
-      // We verify the storage mechanism is in place
-      expect(JSON.parse(sessionStorage.getItem('neko_user')!)).toEqual(mockUser);
+      expect(localStorage.getItem('neko_user')).toBeNull();
     });
   });
 });
