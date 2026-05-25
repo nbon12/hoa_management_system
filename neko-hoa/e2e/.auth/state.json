@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:4200",
+      "localStorage": [
+        {
+          "name": "neko_token",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYTlmMWI1NC1kZTEwLTRhNjYtYmU4Mi1jM2Y1OTI0ZjQxYmMiLCJlbWFpbCI6InJlc2lkZW50QG5la29ob2EuZGV2IiwicHJvcGVydHlJZCI6Ijg5ZGE2YTlhLWY4OTAtNDEwNi1hMzI1LTYwNzhhOWIyNmE3MyIsImNvbW11bml0eUlkIjoiU0FLVVJBIiwianRpIjoiNzA5OGU3Y2UtMzViMi00NzZlLTk4NTAtNjE2ZTk3ZjVkMjNmIiwiZXhwIjoxNzc5Njc4NzExLCJpc3MiOiJuZWtvaG9hLWFwaSIsImF1ZCI6Im5la29ob2EtZnJvbnRlbmQifQ.EFFmW2PHhuEMG0Zirp6hKdN7sJbnDViewfbLBq5x6NM"
+        },
+        {
+          "name": "neko_refresh",
+          "value": "W5KlgFxVxcJj4DUHCWN4BSayITwNhdflzuqQ8Uz+6dE8sNGUtOGO6EQibWiyZ5iweUCAbAbk33skNs1PmlubeA=="
+        },
+        {
+          "name": "neko_user",
+          "value": "{\"id\":\"ca9f1b54-de10-4a66-be82-c3f5924f41bc\",\"firstName\":\"Jane\",\"lastName\":\"Resident\",\"email\":\"resident@nekohoa.dev\",\"initials\":\"JR\"}"
+        }
+      ]
+    }
+  ]
+}

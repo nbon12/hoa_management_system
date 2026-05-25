@@ -161,9 +161,9 @@ export class PaymentsService {
   private _mapRecurring(r: ApiRecurring): RecurringPayment {
     return {
       status:          r.status as any,
-      amountType:      r.amountType as any,
+      amountType:      r.amountType.toLowerCase() as any,
       fixedAmount:     r.fixedAmount,
-      method:          r.method as any,
+      method:          r.method.toLowerCase() as any,
       draftDay:        r.draftDay,
       bankName:        null,
       routingLast4:    r.routingNumberMasked?.slice(-4) ?? null,
