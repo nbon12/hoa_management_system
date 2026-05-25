@@ -13,6 +13,10 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
   standalone: true,
   imports: [FormsModule, DatePipe],
   template: `
+    @if (error()) {
+      <div class="alert alert--error"><span>⚠</span> {{ error() }}</div>
+    }
+
     <div class="page-header">
       <h1 class="page-title">Documents <span class="hand">library</span></h1>
       <div class="page-header__actions">
@@ -56,7 +60,11 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
               <td>{{ doc.effectiveDate | date:'MM/dd/yy' }}</td>
               <td class="num">{{ doc.fileSizeLabel }}</td>
               <td>
-                <button class="btn btn--ghost" style="padding:4px 10px;font-size:11px;">⬇</button>
+                <button class="btn btn--ghost" style="padding:4px 10px;font-size:11px;"
+                        [disabled]="downloadingId() === doc.id"
+                        (click)="download(doc)">
+                  @if (downloadingId() === doc.id) { … } @else { ⬇ }
+                </button>
               </td>
             </tr>
           }
@@ -88,7 +96,9 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
                     <div style="font-size:12px;font-weight:500;">{{ item.name }}</div>
                     <div class="muted" style="font-size:11px;">{{ item.effectiveDate | date:'MMM d' }}</div>
                   </div>
-                  <button class="link" style="font-size:11px;background:none;border:none;cursor:pointer;">⬇</button>
+                  <button class="link" style="font-size:11px;background:none;border:none;cursor:pointer;"
+                          [disabled]="downloadingId() === item.id"
+                          (click)="download(item)">⬇</button>
                 </div>
               }
             </div>
@@ -105,6 +115,8 @@ export class DocumentsComponent implements OnInit {
   activeCategory = signal<string>('All');
   private _allDocs = signal<HOADocument[]>([]);
   private _searchTerm = signal('');
+  downloadingId = signal<string | null>(null);
+  error = signal('');
   get searchTerm()          { return this._searchTerm(); }
   set searchTerm(v: string) { this._searchTerm.set(v); }
 
@@ -130,6 +142,19 @@ export class DocumentsComponent implements OnInit {
 
   onSearch() {
     if (this._searchTerm()) this.activeCategory.set('All');
+  }
+
+  async download(doc: HOADocument) {
+    this.error.set('');
+    this.downloadingId.set(doc.id);
+    try {
+      const { url } = await this.svc.getDocumentDownloadUrl(doc.id);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      this.error.set(e?.error?.message ?? 'Download failed. Please try again.');
+    } finally {
+      this.downloadingId.set(null);
+    }
   }
 
   get pinnedGroups() {

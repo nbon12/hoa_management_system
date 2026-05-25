@@ -51,6 +51,7 @@ public class TestDatabaseFixture : IAsyncLifetime
             await s3.PutBucketAsync(new PutBucketRequest { BucketName = "hoa-documents", UseClientRegion = true });
         }
         catch { /* bucket may already exist */ }
+
     }
 
     public async Task DisposeAsync()

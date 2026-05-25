@@ -132,6 +132,14 @@ export class CommunityService {
     return res.items.map(d => this._mapDocument(d));
   }
 
+  async getDocumentDownloadUrl(documentId: string): Promise<{ url: string; expiresAt: string }> {
+    return firstValueFrom(
+      this.http.get<{ url: string; expiresAt: string }>(
+        `${this.base}/community/documents/${documentId}/download`,
+      ),
+    );
+  }
+
   async getCommunityDirectory(): Promise<{ neighbors: any[]; totalSharing: number; totalHouseholds: number }> {
     return firstValueFrom(
       this.http.get<{ neighbors: any[]; totalSharing: number; totalHouseholds: number }>(

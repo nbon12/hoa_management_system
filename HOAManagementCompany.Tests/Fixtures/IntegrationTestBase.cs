@@ -1,5 +1,10 @@
+using System.Text;
+using Amazon.Runtime;
+using Amazon.S3;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Minio;
+using Minio.DataModel.Args;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
@@ -13,8 +18,10 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
 {
     protected readonly TestDatabaseFixture Fixture;
     protected readonly HttpClient Client;
+    protected IServiceProvider Services => _factory.Services;
     private IDbContextTransaction? _transaction;
     private readonly WebApplicationFactory<Program> _factory;
+    private static bool _testDocumentsUploaded;
 
     protected IntegrationTestBase(TestDatabaseFixture fixture)
     {
@@ -62,6 +69,19 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         o.UseNpgsql(fixture.ConnectionString));
                     services.AddDbContextFactory<ApplicationDbContext>(o =>
                         o.UseNpgsql(fixture.ConnectionString));
+
+                    // Replace S3 client with one configured for Testcontainers MinIO
+                    var s3Descriptors = services.Where(d => d.ServiceType == typeof(IAmazonS3)).ToList();
+                    foreach (var d in s3Descriptors) services.Remove(d);
+                    services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
+                        new BasicAWSCredentials("minioadmin", "minioadmin"),
+                        new AmazonS3Config
+                        {
+                            ServiceURL = fixture.MinioEndpoint,
+                            ForcePathStyle = true,
+                            AuthenticationRegion = "us-east-1",
+                            UseHttp = fixture.MinioEndpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
+                        }));
                 });
             });
 
@@ -81,6 +101,39 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
             await _transaction.RollbackAsync();
             _transaction = null;
         }
+    }
+
+    /// <summary>Uploads placeholder PDFs to Testcontainers MinIO for document download tests.</summary>
+    protected async Task EnsureTestDocumentsInStorageAsync()
+    {
+        if (_testDocumentsUploaded) return;
+
+        var endpointUri = new Uri(Fixture.MinioEndpoint);
+        var minio = new MinioClient()
+            .WithEndpoint($"{endpointUri.Host}:{endpointUri.Port}")
+            .WithCredentials("minioadmin", "minioadmin")
+            .WithSSL(endpointUri.Scheme == "https")
+            .Build();
+
+        var pdfBytes = Encoding.UTF8.GetBytes("%PDF-1.4\n%Placeholder for integration tests\n%%EOF");
+
+        foreach (var key in new[]
+        {
+            "documents/2026/budget.pdf",
+            "documents/rules/rules.pdf",
+            "documents/governing/ccr-declaration.pdf",
+        })
+        {
+            await using var stream = new MemoryStream(pdfBytes);
+            await minio.PutObjectAsync(new PutObjectArgs()
+                .WithBucket("hoa-documents")
+                .WithObject(key)
+                .WithStreamData(stream)
+                .WithObjectSize(pdfBytes.Length)
+                .WithContentType("application/pdf"));
+        }
+
+        _testDocumentsUploaded = true;
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

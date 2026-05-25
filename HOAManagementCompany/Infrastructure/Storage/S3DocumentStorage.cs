@@ -1,3 +1,4 @@
+using System.Text;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
@@ -22,12 +23,15 @@ public class S3DocumentStorage(IAmazonS3 s3Client, IOptions<StorageOptions> opts
 
     public async Task UploadAsync(string storageKey, string content, string contentType = "application/pdf", CancellationToken ct = default)
     {
+        var bytes = Encoding.UTF8.GetBytes(content);
+        await using var stream = new MemoryStream(bytes);
         await s3Client.PutObjectAsync(new PutObjectRequest
         {
             BucketName = _opts.BucketName,
             Key = storageKey,
-            ContentBody = content,
-            ContentType = contentType
+            InputStream = stream,
+            ContentType = contentType,
+            Headers = { ContentLength = bytes.Length },
         }, ct);
     }
 }

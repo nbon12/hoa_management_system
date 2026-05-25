@@ -234,8 +234,9 @@ public class TestDataSeeder(ApplicationDbContext db)
             new CommunityExpense { Id = Guid.NewGuid(), CommunityId = CommunityId, Label = "Pool", Color = "#2196F3", Amount = 14200m, FiscalYear = 2026 });
 
         db.HoaDocuments.AddRange(
-            new HoaDocument { Id = Guid.NewGuid(), CommunityId = CommunityId, Name = "2026 Budget", Category = DocumentCategory.Budgets, EffectiveDate = new DateOnly(2026, 1, 1), FileSizeLabel = "1.2 MB", Pinned = true, StorageKey = "documents/2026/budget.pdf" },
-            new HoaDocument { Id = Guid.NewGuid(), CommunityId = CommunityId, Name = "Community Rules", Category = DocumentCategory.Rules, EffectiveDate = new DateOnly(2024, 1, 1), FileSizeLabel = "2.1 MB", Pinned = false, StorageKey = "documents/rules/rules.pdf" });
+            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001"), CommunityId = CommunityId, Name = "2026 Budget", Category = DocumentCategory.Budgets, EffectiveDate = new DateOnly(2026, 1, 1), FileSizeLabel = "1.2 MB", Pinned = true, StorageKey = "documents/2026/budget.pdf" },
+            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002"), CommunityId = CommunityId, Name = "Community Rules", Category = DocumentCategory.Rules, EffectiveDate = new DateOnly(2024, 1, 1), FileSizeLabel = "2.1 MB", Pinned = false, StorageKey = "documents/rules/rules.pdf" },
+            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000003"), CommunityId = CommunityId, Name = "CC&R Declaration", Category = DocumentCategory.Governing, EffectiveDate = new DateOnly(2005, 6, 1), FileSizeLabel = "5.0 MB", Pinned = true, StorageKey = "documents/governing/ccr-declaration.pdf" });
 
         await db.SaveChangesAsync(ct);
     }

@@ -282,26 +282,37 @@ test.describe('Documents', () => {
     expect(allCount).toBeGreaterThanOrEqual(filteredCount);
   });
 
-  test('READ + download: clicking download button triggers download URL request', async ({ page }) => {
-    // Intercept the API download call
-    const downloadPromise = page.waitForResponse(
-      (resp) => resp.url().includes('/community/documents') && resp.url().includes('/download'),
-      { timeout: 10_000 },
-    ).catch(() => null);
+  test('READ + download: CC&R Declaration presigned URL returns PDF from MinIO', async ({ page, request }) => {
+    await expect(page.locator('.data-table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
-    // Click the first ⬇ download button
-    const downloadBtn = page.locator('.btn--ghost').filter({ hasText: /⬇/i }).first();
-    const altBtn = page.getByRole('button', { name: /download/i }).first();
-    const btn = await downloadBtn.isVisible({ timeout: 5_000 }).catch(() => false)
-      ? downloadBtn
-      : altBtn;
+    const ccrRow = page.locator('.data-table tbody tr').filter({ hasText: /CC&R Declaration/i });
+    await expect(ccrRow).toBeVisible({ timeout: 10_000 });
 
-    await expect(btn).toBeVisible({ timeout: 10_000 });
-    await btn.click();
+    const downloadRespPromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/community/documents') &&
+        resp.url().includes('/download') &&
+        resp.request().method() === 'GET',
+      { timeout: 15_000 },
+    );
 
-    const resp = await downloadPromise;
-    if (resp) {
-      expect(resp.status()).toBe(200);
-    }
+    await ccrRow.locator('button').filter({ hasText: /⬇/ }).click();
+
+    const downloadResp = await downloadRespPromise;
+    expect(downloadResp.status()).toBe(200);
+
+    const body = await downloadResp.json() as { url: string; expiresAt: string };
+    expect(body.url).toBeTruthy();
+    expect(body.expiresAt).toBeTruthy();
+
+    // Local MinIO uses HTTP; presigned URLs must not use https against port 9000
+    const fetchUrl = body.url.replace(/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, 'http://$1$2');
+
+    // Fetch the presigned MinIO URL the same way a browser would when opening the download
+    const fileResp = await request.get(fetchUrl);
+    expect(fileResp.status()).toBe(200);
+
+    const content = await fileResp.text();
+    expect(content).toContain('%PDF');
   });
 });

@@ -100,7 +100,8 @@ builder.Services.AddSingleton<IAmazonS3>(_ =>
     var config = new AmazonS3Config
     {
         ServiceURL = storageOpts.ServiceUrl,
-        ForcePathStyle = storageOpts.ForcePathStyle
+        ForcePathStyle = storageOpts.ForcePathStyle,
+        UseHttp = storageOpts.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
     };
     return new AmazonS3Client(
         new BasicAWSCredentials(storageOpts.AccessKey, storageOpts.SecretKey),

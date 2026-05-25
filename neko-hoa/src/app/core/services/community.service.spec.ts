@@ -126,4 +126,19 @@ describe('CommunityService', () => {
       await promise;
     });
   });
+
+  describe('getDocumentDownloadUrl()', () => {
+    it('calls /community/documents/{id}/download and returns presigned url', async () => {
+      const promise = svc.getDocumentDownloadUrl('doc-123');
+      const req = http.expectOne(`${BASE}/community/documents/doc-123/download`);
+      expect(req.request.method).toBe('GET');
+      req.flush({
+        url: 'http://localhost:9000/hoa-documents/documents/governing/ccr.pdf?X-Amz-Signature=abc',
+        expiresAt: '2026-05-25T12:00:00Z',
+      });
+      const result = await promise;
+      expect(result.url).toContain('ccr.pdf');
+      expect(result.expiresAt).toBeTruthy();
+    });
+  });
 });

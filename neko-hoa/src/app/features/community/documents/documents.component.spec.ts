@@ -17,6 +17,9 @@ function makeMockCommunityService(): Partial<CommunityService> {
     searchDocuments: jasmine.createSpy().and.callFake((q: string) =>
       Promise.resolve(MOCK_DOCS.filter(d => d.name.toLowerCase().includes(q.toLowerCase())))
     ),
+    getDocumentDownloadUrl: jasmine.createSpy().and.returnValue(
+      Promise.resolve({ url: 'http://minio.test/hoa-documents/test.pdf', expiresAt: '2026-05-25T12:00:00Z' }),
+    ),
   } as any;
 }
 
@@ -57,5 +60,19 @@ describe('DocumentsComponent', () => {
     expect(el.textContent).toContain('All');
     expect(el.textContent).toContain('Forms');
     expect(el.textContent).toContain('Governing');
+  });
+
+  it('download() requests presigned url and opens it', async () => {
+    const svc = TestBed.inject(CommunityService) as jasmine.SpyObj<CommunityService>;
+    const openSpy = spyOn(window, 'open');
+
+    await comp.download(MOCK_DOCS[0]);
+
+    expect(svc.getDocumentDownloadUrl).toHaveBeenCalledWith('d1');
+    expect(openSpy).toHaveBeenCalledWith(
+      'http://minio.test/hoa-documents/test.pdf',
+      '_blank',
+      'noopener,noreferrer',
+    );
   });
 });
