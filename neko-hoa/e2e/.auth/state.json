@@ -6,15 +6,15 @@
       "localStorage": [
         {
           "name": "neko_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwN2FlNmE1MC0wYTk1LTQ0ZmEtYTlhYy04MjgxYTZkZjczY2IiLCJlbWFpbCI6InJlc2lkZW50QG5la29ob2EuZGV2IiwicHJvcGVydHlJZCI6IjFkOTQ4MjFkLTRiZGYtNDIxZC1hYjU3LWMwZTQzMjk2ZDRhNSIsImNvbW11bml0eUlkIjoiU0FLVVJBIiwianRpIjoiMmNjNjM0OTYtOTcwZC00NDlkLWExZTQtYzNlNDYzMjQ3NTJjIiwiZXhwIjoxNzgwMjcxMzQzLCJpc3MiOiJuZWtvaG9hLWFwaSIsImF1ZCI6Im5la29ob2EtZnJvbnRlbmQifQ.5ZH-cyAxXmoR0mMLcvY8Z2g7HHNn05Cv7AFfAcs5-6M"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1OTA0OTZkNC0zYzMzLTQwZjgtYTc2MC04MTg1NTg4MGM0ZmYiLCJlbWFpbCI6InJlc2lkZW50QG5la29ob2EuZGV2IiwicHJvcGVydHlJZCI6IjQxNDE5NzYzLWM1YzYtNDZhNy05NDE1LWZkNjE4OGI0OTAxMSIsImNvbW11bml0eUlkIjoiU0FLVVJBIiwianRpIjoiNjNhNDEyMTAtYjJhYS00NDBlLWI2ZWQtYzU2ZjA4Y2ZlMTkwIiwiZXhwIjoxNzgwNTM4MTczLCJpc3MiOiJuZWtvaG9hLWFwaSIsImF1ZCI6Im5la29ob2EtZnJvbnRlbmQifQ.-3linmAOZtPEs_qU4I0eMyKxBn-K4UyV1Ej7HnU895E"
         },
         {
           "name": "neko_refresh",
-          "value": "6LcXS5WOMi2f0YTfAq6QZS+XOM5c2W+5bMt7TeTmqtBx+SgczLSYsn+y1oWlaj9bYCNztY+TsoHYPQ1KJM+2nA=="
+          "value": "3rszx3hHnILUn2bfMD09PYy2l/KycjPhvpTzBqK461+XgujKFSV9+vI/9VUa4phzC537eYPckMU3bgoYrIUsLA=="
         },
         {
           "name": "neko_user",
-          "value": "{\"id\":\"07ae6a50-0a95-44fa-a9ac-8281a6df73cb\",\"firstName\":\"Jane\",\"lastName\":\"Resident\",\"email\":\"resident@nekohoa.dev\",\"initials\":\"JR\"}"
+          "value": "{\"id\":\"590496d4-3c33-40f8-a760-81855880c4ff\",\"firstName\":\"Jane\",\"lastName\":\"Resident\",\"email\":\"resident@nekohoa.dev\",\"initials\":\"JR\"}"
         }
       ]
     }

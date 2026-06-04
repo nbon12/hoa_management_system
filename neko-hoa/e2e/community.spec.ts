@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page, type APIRequestContext } from '@playwright/test';
 
 // ─── Announcements + Poll vote ────────────────────────────────────────────────
 
@@ -214,6 +214,37 @@ test.describe('Calendar', () => {
 
 // ─── Documents + Download ─────────────────────────────────────────────────────
 
+async function expectPdfOpensInNewTabAfterClick(page: Page, request: APIRequestContext, clickTarget: Locator) {
+  const downloadRespPromise = page.waitForResponse(
+    (resp) =>
+      resp.url().includes('/community/documents') &&
+      resp.url().includes('/download') &&
+      resp.request().method() === 'GET',
+    { timeout: 15_000 },
+  );
+  const popupPromise = page.context().waitForEvent('page', { timeout: 15_000 });
+
+  await clickTarget.click();
+
+  const [downloadResp, popup] = await Promise.all([downloadRespPromise, popupPromise]);
+  expect(downloadResp.status()).toBe(200);
+
+  const body = await downloadResp.json() as { url: string; expiresAt: string };
+  expect(body.url).toBeTruthy();
+  expect(body.expiresAt).toBeTruthy();
+  expect(body.url.toLowerCase()).not.toContain('response-content-disposition=attachment');
+
+  await popup.waitForLoadState('domcontentloaded', { timeout: 15_000 });
+  expect(popup.url()).toMatch(/ccr-declaration\.pdf/i);
+
+  const fetchUrl = body.url.replace(/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, 'http://$1$2');
+  const fileResp = await request.get(fetchUrl);
+  expect(fileResp.status()).toBe(200);
+  expect(await fileResp.text()).toContain('%PDF');
+
+  await popup.close();
+}
+
 test.describe('Documents', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/app/community/documents');
@@ -282,37 +313,29 @@ test.describe('Documents', () => {
     expect(allCount).toBeGreaterThanOrEqual(filteredCount);
   });
 
-  test('READ + download: CC&R Declaration presigned URL returns PDF from MinIO', async ({ page, request }) => {
+  test('READ + download: CC&R Declaration download button opens PDF in new tab', async ({ page, request }) => {
     await expect(page.locator('.data-table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
     const ccrRow = page.locator('.data-table tbody tr').filter({ hasText: /CC&R Declaration/i });
     await expect(ccrRow).toBeVisible({ timeout: 10_000 });
 
-    const downloadRespPromise = page.waitForResponse(
-      (resp) =>
-        resp.url().includes('/community/documents') &&
-        resp.url().includes('/download') &&
-        resp.request().method() === 'GET',
-      { timeout: 15_000 },
+    await expectPdfOpensInNewTabAfterClick(
+      page,
+      request,
+      ccrRow.locator('button').filter({ hasText: /⬇/ }),
     );
+  });
 
-    await ccrRow.locator('button').filter({ hasText: /⬇/ }).click();
+  test('READ + download: clicking document name opens PDF in new tab', async ({ page, request }) => {
+    await expect(page.locator('.data-table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
-    const downloadResp = await downloadRespPromise;
-    expect(downloadResp.status()).toBe(200);
+    const ccrRow = page.locator('.data-table tbody tr').filter({ hasText: /CC&R Declaration/i });
+    await expect(ccrRow).toBeVisible({ timeout: 10_000 });
 
-    const body = await downloadResp.json() as { url: string; expiresAt: string };
-    expect(body.url).toBeTruthy();
-    expect(body.expiresAt).toBeTruthy();
-
-    // Local MinIO uses HTTP; presigned URLs must not use https against port 9000
-    const fetchUrl = body.url.replace(/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, 'http://$1$2');
-
-    // Fetch the presigned MinIO URL the same way a browser would when opening the download
-    const fileResp = await request.get(fetchUrl);
-    expect(fileResp.status()).toBe(200);
-
-    const content = await fileResp.text();
-    expect(content).toContain('%PDF');
+    await expectPdfOpensInNewTabAfterClick(
+      page,
+      request,
+      ccrRow.locator('.doc-name-link'),
+    );
   });
 });

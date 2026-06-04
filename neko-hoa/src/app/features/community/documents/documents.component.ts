@@ -49,10 +49,17 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
         <tbody>
           @for (doc of visibleDocs(); track doc.id) {
             <tr>
-              <td style="display:flex;align-items:center;gap:10px;">
-                <div class="ph" style="width:24px;height:30px;border-radius:4px;font-size:8px;flex-shrink:0;">PDF</div>
-                <span class="link">{{ doc.name }}</span>
-                @if (doc.pinned) { <span class="pill" style="font-size:10px;">📌</span> }
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div class="ph" style="width:24px;height:30px;border-radius:4px;font-size:8px;flex-shrink:0;">PDF</div>
+                  <button type="button" class="link doc-name-link"
+                          style="background:none;border:none;padding:0;font:inherit;text-align:left;cursor:pointer;"
+                          [disabled]="downloadingId() === doc.id"
+                          (click)="openDocument(doc)">
+                    {{ doc.name }}
+                  </button>
+                  @if (doc.pinned) { <span class="pill" style="font-size:10px;">📌</span> }
+                </div>
               </td>
               <td>
                 <span class="pill" style="background:var(--lav-2);">{{ doc.category }}</span>
@@ -60,9 +67,9 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
               <td>{{ doc.effectiveDate | date:'MM/dd/yy' }}</td>
               <td class="num">{{ doc.fileSizeLabel }}</td>
               <td>
-                <button class="btn btn--ghost" style="padding:4px 10px;font-size:11px;"
+                <button type="button" class="btn btn--ghost doc-download-btn" style="padding:4px 10px;font-size:11px;"
                         [disabled]="downloadingId() === doc.id"
-                        (click)="download(doc)">
+                        (click)="openDocument(doc)">
                   @if (downloadingId() === doc.id) { … } @else { ⬇ }
                 </button>
               </td>
@@ -98,7 +105,7 @@ const ALL_CATEGORIES: (DocumentCategory | 'All' | 'Pinned')[] = [
                   </div>
                   <button class="link" style="font-size:11px;background:none;border:none;cursor:pointer;"
                           [disabled]="downloadingId() === item.id"
-                          (click)="download(item)">⬇</button>
+                          (click)="openDocument(item)">⬇</button>
                 </div>
               }
             </div>
@@ -144,7 +151,7 @@ export class DocumentsComponent implements OnInit {
     if (this._searchTerm()) this.activeCategory.set('All');
   }
 
-  async download(doc: HOADocument) {
+  async openDocument(doc: HOADocument) {
     this.error.set('');
     this.downloadingId.set(doc.id);
     try {

@@ -36,6 +36,7 @@ describe('DocumentsComponent', () => {
 
     fixture = TestBed.createComponent(DocumentsComponent);
     comp    = fixture.componentInstance;
+    spyOn(window, 'open').and.returnValue(null);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -62,11 +63,28 @@ describe('DocumentsComponent', () => {
     expect(el.textContent).toContain('Governing');
   });
 
-  it('download() requests presigned url and opens it', async () => {
+  it('openDocument() requests presigned url and opens it in a new tab', async () => {
     const svc = TestBed.inject(CommunityService) as jasmine.SpyObj<CommunityService>;
-    const openSpy = spyOn(window, 'open');
+    const openSpy = window.open as jasmine.Spy;
 
-    await comp.download(MOCK_DOCS[0]);
+    await comp.openDocument(MOCK_DOCS[0]);
+
+    expect(svc.getDocumentDownloadUrl).toHaveBeenCalledWith('d1');
+    expect(openSpy).toHaveBeenCalledWith(
+      'http://minio.test/hoa-documents/test.pdf',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('clicking document name opens PDF in a new tab', async () => {
+    const svc = TestBed.inject(CommunityService) as jasmine.SpyObj<CommunityService>;
+    const openSpy = window.open as jasmine.Spy;
+
+    const nameButton = el.querySelector('.data-table tbody tr .doc-name-link') as HTMLButtonElement;
+    expect(nameButton?.textContent?.trim()).toBe('2026 HOA Budget');
+    nameButton.click();
+    await fixture.whenStable();
 
     expect(svc.getDocumentDownloadUrl).toHaveBeenCalledWith('d1');
     expect(openSpy).toHaveBeenCalledWith(

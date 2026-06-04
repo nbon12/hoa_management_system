@@ -55,6 +55,7 @@ services:
       Jwt__Issuer: "nekohoa-api"
       Jwt__Audience: "nekohoa-frontend"
       Storage__ServiceUrl: "http://minio:9000"
+      Storage__PublicServiceUrl: "http://localhost:9000"
       Storage__AccessKey: "minioadmin"
       Storage__SecretKey: "minioadmin"
       Storage__BucketName: "hoa-documents"

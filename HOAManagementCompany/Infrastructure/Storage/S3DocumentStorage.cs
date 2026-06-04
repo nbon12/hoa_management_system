@@ -20,6 +20,14 @@ public class S3DocumentStorage(IAmazonS3 s3Client, IOptions<StorageOptions> opts
         var url = s3Client.GetPreSignedURL(request);
         if (_opts.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
             url = url.Replace("https://", "http://", StringComparison.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(_opts.PublicServiceUrl))
+        {
+            var internalAuthority = new Uri(_opts.ServiceUrl).Authority;
+            var publicAuthority = new Uri(_opts.PublicServiceUrl).Authority;
+            url = url.Replace(internalAuthority, publicAuthority, StringComparison.OrdinalIgnoreCase);
+        }
+
         return Task.FromResult(url);
     }
 

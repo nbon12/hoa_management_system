@@ -11,6 +11,7 @@ public class DatabaseSeeder(
     ApplicationDbContext db,
     IDbContextFactory<ApplicationDbContext> dbFactory,
     IServiceProvider services,
+    DocumentStorageInitializer documentStorageInitializer,
     ILogger<DatabaseSeeder> logger)
 {
     public async Task SeedAsync(CancellationToken ct = default)
@@ -31,6 +32,7 @@ public class DatabaseSeeder(
         await new PaymentSeeder(db, authResult, logger).SeedAsync(ct);
         await new CommunitySeeder(db, authResult, logger).SeedAsync(ct);
         await new StorageSeeder(db, services, authResult, logger).SeedAsync(ct);
+        await documentStorageInitializer.EnsureValidPdfsAsync(ct);
 
         logger.LogInformation("Seed complete.");
     }
