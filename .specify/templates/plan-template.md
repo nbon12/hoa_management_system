@@ -151,13 +151,7 @@ directories captured above]
 
 | Job | Secrets | Role |
 |-----|---------|------|
-| `repowise-gate` | None | `repowise init/update --index-only`, `status`, `health`, `risk`; fails on `health-gates.yaml` |
-| `repowise-docs` | Provider API key (optional) | Wiki update, marker validation, commit refreshed markers |
-
-PR checklist:
-
-- Repowise **health gate** passed (required)
-- Repowise **marker regions** regenerated or confirmed unchanged (docs job)
+| `repowise-gate` | None | `repowise init/update --index-only`, `status`, `health`, `risk`, marker validation |
 
 ## Complexity Tracking
 

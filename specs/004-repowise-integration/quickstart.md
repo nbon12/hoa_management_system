@@ -12,10 +12,12 @@ pip install "repowise>=0.16.0"
 ```bash
 cd /path/to/HOAManagementCompany
 repowise init --index-only -y \
-  -x frontend/ \
-  -x message-service-completed/ \
-  -x neko-hoa/.angular/**
+  -x 'frontend/' \
+  -x 'message-service-completed/' \
+  -x 'neko-hoa/.angular/'
 ```
+
+Excludes also live in [`.repowiseIgnore`](../../.repowiseIgnore) at repo root.
 
 ## Check before opening a PR
 
@@ -23,19 +25,20 @@ repowise init --index-only -y \
 repowise status
 repowise health
 repowise risk origin/main..HEAD
-python .github/scripts/check-repowise-health-gates.py /tmp/gate.txt /tmp/health.json /tmp/risk.json
-```
-
-Generate JSON for the gate script:
-
-```bash
 repowise health --format json > /tmp/health.json
 repowise risk origin/main..HEAD --format json > /tmp/risk.json
+python .github/scripts/check-repowise-health-gates.py /tmp/gate.txt /tmp/health.json /tmp/risk.json
+python .github/scripts/validate-repowise-markers.py
 ```
 
-## Full wiki + MCP (optional)
+## Full wiki + MCP (local only — not in CI)
 
-1. Add provider key to `.repowise/.env` (gitignored), e.g. `ANTHROPIC_API_KEY`.
+1. Copy [`repowise/.env.example`](../../repowise/.env.example) to `.repowise/.env` and paste your `ANTHROPIC_API_KEY`.
+   ```bash
+   mkdir -p .repowise
+   cp repowise/.env.example .repowise/.env
+   # edit .repowise/.env — paste key after ANTHROPIC_API_KEY=
+   ```
 2. Run `repowise init -y` (generates wiki pages and `.mcp.json`).
 3. Restart Cursor/Claude after MCP registration, or run `repowise mcp`.
 
@@ -43,14 +46,15 @@ repowise risk origin/main..HEAD --format json > /tmp/risk.json
 
 Edit only content between `REPOWISE:START` / `REPOWISE:END` pairs. Follow [`repowise/generation-prompt.md`](../../repowise/generation-prompt.md).
 
-Validate:
-
-```bash
-python .github/scripts/validate-repowise-markers.py
-```
-
 ## GitHub
 
-- **Required**: `repowise-gate` job — no secrets.
-- **Optional**: add `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY`) repo secret for `repowise-docs` LLM wiki updates.
-- **Branch protection**: require `Repowise health gate (no LLM)` check on `main`.
+- **Required:** `Repowise health gate (no LLM)` on PRs to `main` — no secrets.
+- **Branch protection:** require that check after merge.
+- **No CI wiki:** indexing for health/risk runs index-only in Actions; LLM wiki is local only.
+
+## What's left for you
+
+1. **Merge** the Repowise PR and enable branch protection on `repowise-gate`.
+2. **Locally:** `repowise init --index-only -y` (or full `init` + MCP if you want token savings in Cursor).
+3. **After big features:** update matching `REPOWISE:START` blocks per `generation-prompt.md`.
+4. **Tune thresholds:** if gate fails, download `repowise-gate-report` artifact or run the gate script locally; adjust [`health-gates.yaml`](../../repowise/health-gates.yaml) or set `mode: warn` temporarily.

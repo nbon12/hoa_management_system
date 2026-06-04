@@ -124,9 +124,20 @@ def score_for_file(health: dict, rel_path: str) -> float | None:
     return None
 
 
+def filtered_hotspot_avg(metrics: list[dict], percentile: float = 0.25) -> float | None:
+    """Hotspot subset: lowest-scoring fraction of filtered files (mirrors gate intent)."""
+    scores = sorted(m.get("score") for m in metrics if m.get("score") is not None)
+    if not scores:
+        return None
+    count = max(1, int(len(scores) * percentile))
+    lowest = scores[:count]
+    return sum(lowest) / len(lowest)
+
+
 def main() -> int:
     gates = load_gates()
     enforce = gates.get("mode", "enforce") != "warn"
+    skip_live = __import__("os").environ.get("REPOWISE_SKIP_LIVE_COMMANDS") == "1"
     violations: list[str] = []
     lines: list[str] = []
 
@@ -150,13 +161,12 @@ def main() -> int:
                 f"(filtered prefixes: {prefixes})"
             )
 
-    hotspot = kpis.get("hotspot_health")
+    hotspot = filtered_hotspot_avg(metrics) if prefixes else kpis.get("hotspot_health")
     if hotspot is not None and repo_cfg.get("min_hotspot_health") is not None:
         floor = float(repo_cfg["min_hotspot_health"])
         if float(hotspot) < floor:
-            violations.append(
-                f"hotspot_health {float(hotspot):.2f} < min_hotspot_health {floor}"
-            )
+            label = "filtered hotspot avg" if prefixes else "hotspot_health"
+            violations.append(f"{label} {float(hotspot):.2f} < min_hotspot_health {floor}")
 
     for entry in gates.get("files") or []:
         path = entry.get("path")
@@ -172,25 +182,43 @@ def main() -> int:
     base_ref = __import__("os").environ.get("REPOWISE_BASE_REF", "origin/main")
     risk = ensure_risk_json(base_ref)
     pr_cfg = gates.get("pr") or {}
+    risk_enforce = pr_cfg.get("risk_mode", "enforce") == "enforce"
     if risk and not risk.get("skipped") and pr_cfg.get("max_change_risk") is not None:
         risk_score = risk.get("score")
         if risk_score is not None and float(risk_score) > float(pr_cfg["max_change_risk"]):
-            violations.append(
+            msg = (
                 f"PR change risk {float(risk_score):.2f} > max_change_risk "
                 f"{pr_cfg['max_change_risk']} ({base_ref}..HEAD)"
             )
+            if risk_enforce:
+                violations.append(msg)
+            else:
+                lines.append(f"=== risk warning (risk_mode={pr_cfg.get('risk_mode', 'enforce')}) ===")
+                lines.append(f"  - {msg}")
 
     lines.append("=== repowise status ===")
-    _, status_out, status_err = run_repowise(["status"])
-    lines.append((status_out or status_err).strip() or "(no output)")
+    if skip_live:
+        status_path = Path("/tmp/repowise-status.txt")
+        lines.append(
+            status_path.read_text(encoding="utf-8").strip()
+            if status_path.is_file()
+            else "(skipped — see Repowise status step log)"
+        )
+    else:
+        _, status_out, status_err = run_repowise(["status"])
+        lines.append((status_out or status_err).strip() or "(no output)")
     lines.append("")
     lines.append("=== repowise health (kpis) ===")
     lines.append(json.dumps(kpis, indent=2))
     if prefixes:
         lines.append(f"Filtered avg ({len(metrics)} files): {avg}")
+        if hotspot is not None:
+            lines.append(f"Filtered hotspot avg (bottom 25%): {hotspot:.2f}")
     lines.append("")
     lines.append("=== repowise risk ===")
     lines.append(json.dumps(risk, indent=2) if risk else "(skipped or failed)")
+
+    # Risk warnings appended above may sit before this block; violations list is final authority.
     lines.append("")
     lines.append("=== gate violations ===")
     if violations:

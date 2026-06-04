@@ -4,45 +4,25 @@
 
 ## Summary
 
-Replace the invalid `repowise/action@v1` workflow with self-hosted Repowise 0.16+: a **secretless** `repowise-gate` job (index-only + health + risk) and an optional `repowise-docs` job (wiki + marker validation). Expand marker regions and commit `repowise/generation-prompt.md` + `repowise/health-gates.yaml`.
+Self-hosted Repowise 0.16+ with a single **secretless** `repowise-gate` job (index-only + health + risk + marker validation). No CI wiki / no Anthropic key in GitHub Actions. Local `repowise init` for MCP and optional LLM wiki.
 
 ## Repowise Documentation
 
-**Status**: Complete (initial implementation)
-
-### Configuration
-
-- [`repowise/generation-prompt.md`](../../repowise/generation-prompt.md)
-- [`repowise/health-gates.yaml`](../../repowise/health-gates.yaml)
-- [`.repowiseIgnore`](../../.repowiseIgnore)
-- [`.github/workflows/repowise.yml`](../../.github/workflows/repowise.yml)
-
-### Marker inventory
-
-| File | Region ID |
-|------|-----------|
-| `README.md` | `section=overview`, `tech-stack`, `quickstart`, `documentation` |
-| `neko-hoa/README.md` | `section=frontend-overview` |
-| `HOAManagementCompany/Program.cs` | `domain=bootstrap` |
-| `Features/Auth/AuthService.cs` | `domain=auth` |
-| `Infrastructure/Persistence/ApplicationDbContext.cs` | `domain=schema` |
-| `Domain/Entities/ApplicationUser.cs` | `domain=entities` |
-| `Features/Dashboard/DashboardService.cs` | `domain=dashboard` |
-| `Features/Payments/PaymentService.cs` | `domain=payments` |
-| `Features/Property/PropertyService.cs` | `domain=property` |
-| `Features/Community/CommunityService.cs` | `domain=community` |
-| `Features/DevTools/E2ECleanupEndpoint.cs` | `domain=devtools` |
+**Status**: Complete
 
 ### CI
 
-| Job | Secrets | Enforce merge |
-|-----|---------|---------------|
-| `repowise-gate` | None | Yes (after branch protection configured) |
-| `repowise-docs` | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` optional | No (`continue-on-error: true`) |
+| Job | Secrets | Role |
+|-----|---------|------|
+| `repowise-gate` | None | Index-only, health/risk gates, marker validation, artifact upload |
+
+### Local
+
+- Index-only: `repowise init --index-only -y`
+- Wiki + MCP: `repowise init -y` with `.repowise/.env` API key
 
 ### Human follow-up
 
-1. Merge to `main` and tune `repowise/health-gates.yaml` from first gate artifact.
-2. Add GitHub secret for docs job if LLM wiki is desired.
-3. Require `repowise-gate` in branch protection.
-4. Optionally install [Repowise PR Bot](https://github.com/apps/repowise-bot).
+1. Require `Repowise health gate (no LLM)` in branch protection.
+2. Local MCP setup per [quickstart.md](./quickstart.md).
+3. Tune `repowise/health-gates.yaml` from first green gate report if needed.

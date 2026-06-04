@@ -42,36 +42,58 @@ jobs:
 
       - name: Index codebase (graph + health only)
         run: |
-          EXCLUDES="-x frontend/ -x message-service-completed/ -x neko-hoa/.angular/** -x neko-hoa/node_modules/** -x neko-hoa/dist/** -x neko-hoa/playwright-report/** -x neko-hoa/test-results/** -x **/bin/** -x **/obj/**"
+          set -f
           if [ -f .repowise/wiki.db ]; then
-            repowise update --index-only -y $EXCLUDES
+            repowise update --index-only -y \
+              -x 'frontend/' \
+              -x 'message-service-completed/' \
+              -x 'neko-hoa/.angular/' \
+              -x 'neko-hoa/node_modules/' \
+              -x 'neko-hoa/dist/' \
+              -x 'neko-hoa/playwright-report/' \
+              -x 'neko-hoa/test-results/'
           else
-            repowise init --index-only -y $EXCLUDES
+            repowise init --index-only -y \
+              -x 'frontend/' \
+              -x 'message-service-completed/' \
+              -x 'neko-hoa/.angular/' \
+              -x 'neko-hoa/node_modules/' \
+              -x 'neko-hoa/dist/' \
+              -x 'neko-hoa/playwright-report/' \
+              -x 'neko-hoa/test-results/'
           fi
 
       - name: Repowise status
         run: repowise status | tee /tmp/repowise-status.txt
 
       - name: Repowise health (JSON)
-        run: repowise health --format json 2>/dev/null > /tmp/repowise-health.json
+        run: |
+          repowise health --format json > /tmp/repowise-health.json
+          test -s /tmp/repowise-health.json
 
       - name: Repowise PR risk
         run: |
-          repowise risk origin/main..HEAD --format json 2>/tmp/repowise-risk.stderr > /tmp/repowise-risk.json \
-            || repowise risk main..HEAD --format json 2>/tmp/repowise-risk.stderr > /tmp/repowise-risk.json \
-            || true
+          set +e
+          repowise risk origin/main..HEAD --format json 2>/tmp/repowise-risk.stderr > /tmp/repowise-risk.json
           if [ ! -s /tmp/repowise-risk.json ]; then
-            echo '{"skipped": true, "ref": "origin/main..HEAD"}' > /tmp/repowise-risk.json
+            repowise risk main..HEAD --format json 2>/tmp/repowise-risk.stderr > /tmp/repowise-risk.json
+          fi
+          if [ ! -s /tmp/repowise-risk.json ]; then
+            echo '{"skipped": true, "ref": "origin/main..HEAD", "score": 0}' > /tmp/repowise-risk.json
           fi
 
       - name: Check health gates
         env:
           REPOWISE_BASE_REF: origin/main
+          REPOWISE_SKIP_LIVE_COMMANDS: "1"
         run: |
           python .github/scripts/check-repowise-health-gates.py \
             /tmp/repowise-gate-report.txt \
             /tmp/repowise-health.json \
             /tmp/repowise-risk.json
+
+      - name: Validate marker regions
+        run: python .github/scripts/validate-repowise-markers.py
 
       - name: Upload gate report
         if: always()
@@ -80,72 +102,3 @@ jobs:
           name: repowise-gate-report
           path: /tmp/repowise-gate-report.txt
           if-no-files-found: warn
-
-  repowise-docs:
-    name: Repowise docs & markers
-    needs: repowise-gate
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: read
-    continue-on-error: true
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install repowise
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install "repowise${{ env.REPOWISE_VERSION }}" pyyaml
-
-      - name: Cache repowise index
-        uses: actions/cache@v4
-        with:
-          path: .repowise
-          key: repowise-index-${{ runner.os }}-${{ hashFiles('.repowiseIgnore', 'repowise/health-gates.yaml') }}
-          restore-keys: |
-            repowise-index-${{ runner.os }}-
-
-      - name: Update wiki index
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          EXCLUDES="-x frontend/ -x message-service-completed/ -x neko-hoa/.angular/** -x neko-hoa/node_modules/** -x neko-hoa/dist/** -x neko-hoa/playwright-report/** -x neko-hoa/test-results/** -x **/bin/** -x **/obj/**"
-          if [ -z "${ANTHROPIC_API_KEY}${OPENAI_API_KEY}" ]; then
-            echo "No LLM API key; running index-only update."
-            if [ -f .repowise/wiki.db ]; then
-              repowise update --index-only -y $EXCLUDES
-            else
-              repowise init --index-only -y $EXCLUDES
-            fi
-          else
-            if [ -f .repowise/wiki.db ]; then
-              repowise update -y $EXCLUDES
-            else
-              repowise init -y $EXCLUDES
-            fi
-          fi
-
-      - name: Sync and validate markers
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python .github/scripts/sync-repowise-markers.py
-
-      - name: Commit updated docs
-        run: |
-          git config user.name "repowise-bot"
-          git config user.email "repowise@users.noreply.github.com"
-          git diff --quiet && echo "No Repowise changes to commit." && exit 0
-          git add -A
-          git commit -m "chore: regenerate Repowise outputs"
-          git push

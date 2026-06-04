@@ -5,15 +5,15 @@
 
 ## Summary
 
-Complete self-hosted Repowise for the HOA Management Company monorepo: deterministic PR health gatekeeping (no LLM), optional docs/marker workflow, committed marker regions, and developer MCP setup.
+Self-hosted Repowise for the HOA Management Company monorepo: deterministic PR health gatekeeping (no LLM, no CI wiki), committed marker regions, and local developer MCP/wiki setup.
 
 ## Requirements
 
 1. PRs to `main` run `repowise-gate` without API secrets; job fails when `repowise/health-gates.yaml` thresholds are breached.
-2. PRs optionally run `repowise-docs` for wiki update and marker validation (`continue-on-error` until marker LLM sync is automated).
+2. Marker regions validated on each PR (`validate-repowise-markers.py`).
 3. Marker regions exist per `repowise/generation-prompt.md` catalog.
-4. `.repowise/` remains gitignored; excludes via `.repowiseIgnore` and CI `-x` flags.
-5. Developers can run `repowise init --index-only` locally before push; full `repowise init` + MCP when API keys are configured.
+4. `.repowise/` remains gitignored; excludes via `.repowiseIgnore` and CI init flags.
+5. Full wiki + MCP: **local only** (`repowise init` with key in `.repowise/.env`).
 
 ## Success criteria
 

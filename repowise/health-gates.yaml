@@ -12,10 +12,14 @@ include_path_prefixes:
 
 repo:
   min_avg_health: 6.0
+  # Use filtered hotspot avg (see check-repowise-health-gates.py), not global KPIs.
   min_hotspot_health: 4.0
 
 pr:
   max_change_risk: 7.0
+  # warn = log risk but do not fail CI (use for bootstrap/large infra PRs).
+  # enforce = fail when score exceeds max_change_risk (enable after repowise is on main).
+  risk_mode: warn
   max_avg_health_drop: 0.3
 
 files:

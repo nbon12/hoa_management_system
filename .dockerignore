@@ -7,3 +7,8 @@
 HOAManagementCompany.Tests
 frontend/node_modules
 **/*.log
+.repowise
+**/.repowise
+.env
+.env.local
+**/.env
