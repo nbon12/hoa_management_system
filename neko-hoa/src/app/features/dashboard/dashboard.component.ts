@@ -41,7 +41,11 @@ import { DashboardSummary } from '../../core/models';
       <div class="card">
         <div class="field-label">Violations</div>
         <div class="mono" style="font-size:22px;">{{ summary()?.openViolations }}</div>
-        <span class="pill pill--ok" style="margin-top:6px;">compliant</span>
+        @if ((summary()?.openViolations ?? 0) > 0) {
+          <span class="pill pill--warn" style="margin-top:6px;">needs attention</span>
+        } @else {
+          <span class="pill pill--ok" style="margin-top:6px;">compliant</span>
+        }
       </div>
       <div class="card">
         <div class="field-label">Next event</div>

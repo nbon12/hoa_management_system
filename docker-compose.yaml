@@ -65,6 +65,20 @@ services:
     networks:
       - app_network
 
+  # NekoHOA Angular app (neko-hoa/). Stop any local `ng serve` on 4200 before starting.
+  ui:
+    container_name: nekohoa-ui
+    build:
+      context: ./neko-hoa
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - api
+    networks:
+      - app_network
+
 volumes:
   postgres_data:
   minio_data:

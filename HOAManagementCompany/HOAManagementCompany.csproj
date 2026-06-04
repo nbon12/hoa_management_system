@@ -39,4 +39,8 @@
     <PackageReference Include="Sentry.AspNetCore" Version="4.*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="testdata\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

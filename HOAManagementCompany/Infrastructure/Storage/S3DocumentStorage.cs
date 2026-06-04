@@ -1,4 +1,3 @@
-using System.Text;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
@@ -16,22 +15,24 @@ public class S3DocumentStorage(IAmazonS3 s3Client, IOptions<StorageOptions> opts
             BucketName = _opts.BucketName,
             Key = storageKey,
             Expires = DateTime.UtcNow.AddMinutes(5),
-            Verb = HttpVerb.GET
+            Verb = HttpVerb.GET,
         };
-        return Task.FromResult(s3Client.GetPreSignedURL(request));
+        var url = s3Client.GetPreSignedURL(request);
+        if (_opts.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            url = url.Replace("https://", "http://", StringComparison.OrdinalIgnoreCase);
+        return Task.FromResult(url);
     }
 
-    public async Task UploadAsync(string storageKey, string content, string contentType = "application/pdf", CancellationToken ct = default)
+    public async Task UploadAsync(string storageKey, byte[] content, string contentType = "application/pdf", CancellationToken ct = default)
     {
-        var bytes = Encoding.UTF8.GetBytes(content);
-        await using var stream = new MemoryStream(bytes);
+        await using var stream = new MemoryStream(content);
         await s3Client.PutObjectAsync(new PutObjectRequest
         {
             BucketName = _opts.BucketName,
             Key = storageKey,
             InputStream = stream,
             ContentType = contentType,
-            Headers = { ContentLength = bytes.Length },
+            Headers = { ContentLength = content.Length },
         }, ct);
     }
 }

@@ -48,11 +48,10 @@ public class StorageSeeder(ApplicationDbContext db, IServiceProvider services, S
 
         foreach (var (name, category, pinned, key, effectiveDateStr, sizeBytes) in documents)
         {
-            // Build a minimal but realistic-looking PDF byte sequence
-            var placeholder = $"%PDF-1.4\n%Placeholder for: {name}\n%%EOF";
             try
             {
-                await storage.UploadAsync(key, placeholder, ct: ct);
+                var pdfBytes = await TestDataFiles.ReadSamplePdfAsync(ct);
+                await storage.UploadAsync(key, pdfBytes, ct: ct);
             }
             catch (Exception ex)
             {

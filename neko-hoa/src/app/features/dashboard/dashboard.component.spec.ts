@@ -29,10 +29,40 @@ function makeMockAuthService(): Partial<AuthService> {
   return { user: signal(MOCK_USER) };
 }
 
-function makeMockDashboardService(): Partial<DashboardService> {
+function makeMockDashboardService(summary: DashboardSummary = MOCK_SUMMARY): Partial<DashboardService> {
   return {
-    getSummary: jasmine.createSpy().and.returnValue(Promise.resolve(MOCK_SUMMARY)),
+    getSummary: jasmine.createSpy().and.returnValue(Promise.resolve(summary)),
   } as any;
+}
+
+function violationsCard(root: HTMLElement): HTMLElement | null {
+  const labels = root.querySelectorAll('.grid-4 .card .field-label');
+  for (const label of Array.from(labels)) {
+    if (label.textContent?.trim() === 'Violations') {
+      return label.closest('.card');
+    }
+  }
+  return null;
+}
+
+async function createDashboardFixture(summary: DashboardSummary = MOCK_SUMMARY): Promise<{
+  fixture: ComponentFixture<DashboardComponent>;
+  el: HTMLElement;
+}> {
+  await TestBed.configureTestingModule({
+    imports:   [DashboardComponent],
+    providers: [
+      provideRouter([]),
+      { provide: AuthService,       useValue: makeMockAuthService() },
+      { provide: DashboardService,  useValue: makeMockDashboardService(summary) },
+    ],
+  }).compileComponents();
+
+  const fixture = TestBed.createComponent(DashboardComponent);
+  fixture.detectChanges();
+  await fixture.whenStable();
+  fixture.detectChanges();
+  return { fixture, el: fixture.nativeElement };
 }
 
 describe('DashboardComponent', () => {
@@ -40,20 +70,7 @@ describe('DashboardComponent', () => {
   let el: HTMLElement;
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports:   [DashboardComponent],
-      providers: [
-        provideRouter([]),
-        { provide: AuthService,       useValue: makeMockAuthService() },
-        { provide: DashboardService,  useValue: makeMockDashboardService() },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(DashboardComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    el = fixture.nativeElement;
+    ({ fixture, el } = await createDashboardFixture());
   });
 
   it('should create', () => {
@@ -75,6 +92,22 @@ describe('DashboardComponent', () => {
 
   it('shows violations stat card', () => {
     expect(el.textContent).toContain('Violations');
+  });
+
+  it('shows "needs attention" pill when openViolations > 0', () => {
+    const card = violationsCard(el);
+    expect(card?.textContent).toContain('needs attention');
+    expect(card?.querySelector('.pill--warn')).toBeTruthy();
+    expect(card?.querySelector('.pill--ok')).toBeFalsy();
+  });
+
+  it('shows "compliant" pill when openViolations is 0', async () => {
+    TestBed.resetTestingModule();
+    const { el: zeroEl } = await createDashboardFixture({ ...MOCK_SUMMARY, openViolations: 0 });
+    const card = violationsCard(zeroEl);
+    expect(card?.textContent).toContain('compliant');
+    expect(card?.querySelector('.pill--ok')).toBeTruthy();
+    expect(card?.querySelector('.pill--warn')).toBeFalsy();
   });
 
   it('shows recent activity table', () => {

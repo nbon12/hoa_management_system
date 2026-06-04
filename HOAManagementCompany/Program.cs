@@ -162,6 +162,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>(
 
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();
+builder.Services.AddScoped<HOAManagementCompany.Seed.DocumentStorageInitializer>();
 
 // ═══════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
@@ -209,7 +210,15 @@ app.UseFastEndpoints(c =>
 });
 
 if (app.Environment.IsDevelopment())
+{
     app.UseSwaggerGen();
+
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        var storageInit = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DocumentStorageInitializer>();
+        await storageInit.EnsureValidPdfsAsync();
+    }
+}
 
 app.Run();
 return 0;
