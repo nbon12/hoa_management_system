@@ -5,6 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Dashboard;
 
+// <!-- REPOWISE:START domain=dashboard -->
+// GET /dashboard: balance, recent ledger slice, announcements for active property (propertyId claim).
+// <!-- REPOWISE:END -->
+
 public class DashboardService(ApplicationDbContext db)
 {
     public async Task<DashboardResponse> GetDashboardAsync(Guid propertyId, string communityId, CancellationToken ct = default)

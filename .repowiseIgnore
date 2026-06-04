@@ -1,0 +1,11 @@
+# Repowise-only exclusions (gitignore syntax). See repowise/docs installation/configuration.
+frontend/
+message-service-completed/
+neko-hoa/.angular/
+neko-hoa/node_modules/
+neko-hoa/dist/
+neko-hoa/playwright-report/
+neko-hoa/test-results/
+**/bin/
+**/obj/
+**/.venv-repowise/

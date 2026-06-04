@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Identity;
 
 namespace HOAManagementCompany.Domain.Entities;
 
+// <!-- REPOWISE:START domain=entities -->
+// Identity user: FirstName, LastName; UserProperties and RefreshTokens collections.
+// <!-- REPOWISE:END -->
+
 public class ApplicationUser : IdentityUser
 {
     public string FirstName { get; set; } = string.Empty;

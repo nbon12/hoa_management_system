@@ -7,6 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Community;
 
+// <!-- REPOWISE:START domain=community -->
+// Announcements, polls, events, documents (R2/MinIO), violations; CommunityId tenancy.
+// <!-- REPOWISE:END -->
+
 public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
 {
     public async Task<AnnouncementListResponse> GetAnnouncementsAsync(string communityId, AnnouncementListRequest req, CancellationToken ct = default)
