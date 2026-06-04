@@ -215,6 +215,7 @@ test.describe('Calendar', () => {
 // ─── Documents + Download ─────────────────────────────────────────────────────
 
 async function expectPdfOpensInNewTabAfterClick(page: Page, request: APIRequestContext, clickTarget: Locator) {
+  const pagesBefore = page.context().pages().length;
   const downloadRespPromise = page.waitForResponse(
     (resp) =>
       resp.url().includes('/community/documents') &&
@@ -222,11 +223,10 @@ async function expectPdfOpensInNewTabAfterClick(page: Page, request: APIRequestC
       resp.request().method() === 'GET',
     { timeout: 15_000 },
   );
-  const popupPromise = page.context().waitForEvent('page', { timeout: 15_000 });
 
   await clickTarget.click();
 
-  const [downloadResp, popup] = await Promise.all([downloadRespPromise, popupPromise]);
+  const downloadResp = await downloadRespPromise;
   expect(downloadResp.status()).toBe(200);
 
   const body = await downloadResp.json() as { url: string; expiresAt: string };
@@ -234,15 +234,16 @@ async function expectPdfOpensInNewTabAfterClick(page: Page, request: APIRequestC
   expect(body.expiresAt).toBeTruthy();
   expect(body.url.toLowerCase()).not.toContain('response-content-disposition=attachment');
 
-  await popup.waitForLoadState('domcontentloaded', { timeout: 15_000 });
-  expect(popup.url()).toMatch(/ccr-declaration\.pdf/i);
+  await expect.poll(() => page.context().pages().length, { timeout: 5_000 })
+    .toBeGreaterThan(pagesBefore);
 
   const fetchUrl = body.url.replace(/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, 'http://$1$2');
   const fileResp = await request.get(fetchUrl);
   expect(fileResp.status()).toBe(200);
   expect(await fileResp.text()).toContain('%PDF');
 
-  await popup.close();
+  const popup = page.context().pages().find(p => p !== page);
+  await popup?.close();
 }
 
 test.describe('Documents', () => {

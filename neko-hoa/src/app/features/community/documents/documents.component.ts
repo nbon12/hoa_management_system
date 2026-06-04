@@ -154,10 +154,17 @@ export class DocumentsComponent implements OnInit {
   async openDocument(doc: HOADocument) {
     this.error.set('');
     this.downloadingId.set(doc.id);
+    const tab = window.open('about:blank', '_blank');
     try {
       const { url } = await this.svc.getDocumentDownloadUrl(doc.id);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (tab) {
+        tab.location.href = url;
+        tab.opener = null;
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
     } catch (e: any) {
+      tab?.close();
       this.error.set(e?.error?.message ?? 'Download failed. Please try again.');
     } finally {
       this.downloadingId.set(null);

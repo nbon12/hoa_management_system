@@ -66,31 +66,29 @@ describe('DocumentsComponent', () => {
   it('openDocument() requests presigned url and opens it in a new tab', async () => {
     const svc = TestBed.inject(CommunityService) as jasmine.SpyObj<CommunityService>;
     const openSpy = window.open as jasmine.Spy;
+    const mockTab = { location: { href: '' }, close: jasmine.createSpy('close') };
+    openSpy.and.returnValue(mockTab as any);
 
     await comp.openDocument(MOCK_DOCS[0]);
 
+    expect(openSpy).toHaveBeenCalledWith('about:blank', '_blank');
     expect(svc.getDocumentDownloadUrl).toHaveBeenCalledWith('d1');
-    expect(openSpy).toHaveBeenCalledWith(
-      'http://minio.test/hoa-documents/test.pdf',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(mockTab.location.href).toBe('http://minio.test/hoa-documents/test.pdf');
   });
 
   it('clicking document name opens PDF in a new tab', async () => {
     const svc = TestBed.inject(CommunityService) as jasmine.SpyObj<CommunityService>;
     const openSpy = window.open as jasmine.Spy;
+    const mockTab = { location: { href: '' }, close: jasmine.createSpy('close') };
+    openSpy.and.returnValue(mockTab as any);
 
     const nameButton = el.querySelector('.data-table tbody tr .doc-name-link') as HTMLButtonElement;
     expect(nameButton?.textContent?.trim()).toBe('2026 HOA Budget');
     nameButton.click();
     await fixture.whenStable();
 
+    expect(openSpy).toHaveBeenCalledWith('about:blank', '_blank');
     expect(svc.getDocumentDownloadUrl).toHaveBeenCalledWith('d1');
-    expect(openSpy).toHaveBeenCalledWith(
-      'http://minio.test/hoa-documents/test.pdf',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(mockTab.location.href).toBe('http://minio.test/hoa-documents/test.pdf');
   });
 });

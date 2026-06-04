@@ -6,11 +6,11 @@
       "localStorage": [
         {
           "name": "neko_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1OTA0OTZkNC0zYzMzLTQwZjgtYTc2MC04MTg1NTg4MGM0ZmYiLCJlbWFpbCI6InJlc2lkZW50QG5la29ob2EuZGV2IiwicHJvcGVydHlJZCI6IjQxNDE5NzYzLWM1YzYtNDZhNy05NDE1LWZkNjE4OGI0OTAxMSIsImNvbW11bml0eUlkIjoiU0FLVVJBIiwianRpIjoiNjNhNDEyMTAtYjJhYS00NDBlLWI2ZWQtYzU2ZjA4Y2ZlMTkwIiwiZXhwIjoxNzgwNTM4MTczLCJpc3MiOiJuZWtvaG9hLWFwaSIsImF1ZCI6Im5la29ob2EtZnJvbnRlbmQifQ.-3linmAOZtPEs_qU4I0eMyKxBn-K4UyV1Ej7HnU895E"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1OTA0OTZkNC0zYzMzLTQwZjgtYTc2MC04MTg1NTg4MGM0ZmYiLCJlbWFpbCI6InJlc2lkZW50QG5la29ob2EuZGV2IiwicHJvcGVydHlJZCI6IjQxNDE5NzYzLWM1YzYtNDZhNy05NDE1LWZkNjE4OGI0OTAxMSIsImNvbW11bml0eUlkIjoiU0FLVVJBIiwianRpIjoiODI5Mjk2YzUtMzkzYi00MWZhLTk1YWMtNjUyMmIyMGJhMGE3IiwiZXhwIjoxNzgwNTM4NDM4LCJpc3MiOiJuZWtvaG9hLWFwaSIsImF1ZCI6Im5la29ob2EtZnJvbnRlbmQifQ.Zwu2M1hjx9lfkhC9A2ShqiJXB1Q7b194D9lZ5dRUmyg"
         },
         {
           "name": "neko_refresh",
-          "value": "3rszx3hHnILUn2bfMD09PYy2l/KycjPhvpTzBqK461+XgujKFSV9+vI/9VUa4phzC537eYPckMU3bgoYrIUsLA=="
+          "value": "14BBAwY56azZC8kUK6u1gxilXU7u2L0aXzQiTPt3ThUifaE1TT03VtSyWlvywU3OqmQSSMAI8zShOfxRou1F5A=="
         },
         {
           "name": "neko_user",
