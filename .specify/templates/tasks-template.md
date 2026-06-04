@@ -8,8 +8,9 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Test tasks are required where the constitution applies. Write tests before
-implementation and ensure they fail before the corresponding implementation task begins.
+**Tests**: The examples below include test tasks. Per the constitution, applicable backend
+integration tests and frontend unit tests are part of the completion gate; write tests first
+where the testing constitution applies.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -50,8 +51,13 @@ implementation and ensure they fail before the corresponding implementation task
 **Purpose**: Project initialization and basic structure
 
 - [ ] T001 Create project structure per implementation plan
-- [ ] T002 Initialize [language] project with [framework] dependencies
+- [ ] T002 Initialize .NET/FastEndpoints backend and Angular frontend dependencies
 - [ ] T003 [P] Configure linting and formatting tools
+- [ ] T004 [P] Configure Angular unit testing with Jasmine and Karma
+- [ ] T005 [P] Configure Angular Testing Library for component tests
+- [ ] T006 [P] Configure Playwright for frontend browser tests
+- [ ] T007 [P] Configure Cypress for end-to-end tests
+- [ ] T008 [P] Configure Storybook for component stories and visual regression testing
 
 ---
 
@@ -63,12 +69,25 @@ implementation and ensure they fail before the corresponding implementation task
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup FastEndpoints API routing, global exception handling, Swagger development-only configuration, and middleware structure
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure Serilog structured logging, Sentry tracing, and production-safe error handling
-- [ ] T009 Setup environment configuration management
+- [ ] T009 Setup strict database migrations framework (PostgreSQL; Neon per env; no manual DB edits)
+- [ ] T010 [P] Implement Auth0 authentication/authorization
+- [ ] T011 [P] Setup FastEndpoints routing, global exception handler, and consistent error responses
+- [ ] T012 Create base models/entities that all stories depend on (shared tables; multi-HOA membership)
+- [ ] T013 Configure Docker/Docker Compose for local parity (Postgres service for dev/tests; MinIO if file storage is used)
+- [ ] T014 Setup environment configuration (Dev/Staging/Prod + Cloud Run / Cloudflare settings; Swagger disabled in production)
+- [ ] T015 Define tenant-boundary conventions (`hoa_id` or `association_id`) for HOA-scoped tables
+- [ ] T016 [P] Configure Serilog structured JSON logging, correlation IDs, and health/readiness endpoints
+- [ ] T017 [P] Configure secret management and prevent secrets in images/config
+- [ ] T018 [P] Configure edge/rate-limit/cache policy defaults for Cloudflare-fronted API routes
+- [ ] T019 [P] Configure GitHub Actions Sonar scan required for pull requests
+- [ ] T020 [P] Configure GitHub Actions Codecov reporting and 95% relevant-file coverage gate
+- [ ] T021 [P] Configure Swashbuckle OpenAPI and Swagger UI at `/swagger` for development only
+- [ ] T022 [P] Configure idempotent Cloud Run startup migrations
+- [ ] T023 [P] Configure Neon connection limits, pooling, and short-lived DbContext lifetime
+- [ ] T024 [P] Configure xUnit and .NET Testcontainers for backend integration tests
+- [ ] T025 [P] Configure Sentry in Angular frontend with environment/release tags and sensitive-data filtering
+- [ ] T026 [P] Configure Sentry in .NET backend with performance tracing, environment/release tags, and sensitive-data filtering
+- [ ] T027 [P] Configure Sentry trace context propagation from frontend requests through backend handling
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -80,21 +99,27 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1
+### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T010 [P] [US1] Contract test for [endpoint] including Auth0 authorization, error shape, and pagination if applicable in [test path]
-- [ ] T011 [P] [US1] Integration/business-process test for [user journey] using PostgreSQL/Testcontainers and transaction isolation in [test path]
+- [ ] T028 [P] [US1] xUnit Theory contract test for [endpoint] data variations with unique/scoped test data in backend/tests/Contract/[Name]Tests.cs
+- [ ] T029 [P] [US1] xUnit Theory/Testcontainers integration test for [user journey], tenant isolation, and authorization data variations with parallel/rerun-safe setup in backend/tests/Integration/[Name]Tests.cs
+- [ ] T030 [P] [US1] Angular Testing Library component test for [component] in frontend/src/[path]/[component].spec.ts
+- [ ] T031 [P] [US1] Jasmine/Karma unit test for [service/utility] in frontend/src/[path]/[name].spec.ts
+- [ ] T032 [P] [US1] Cypress E2E test for [user journey] in frontend/cypress/e2e/[name].cy.ts
+- [ ] T033 [P] [US1] Storybook story and visual regression case for [component]
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
-- [ ] T015 [US1] Implement [FastEndpoints endpoint/feature] in src/[location]/[file]
-- [ ] T016 [US1] Add validation and error handling
-- [ ] T017 [US1] Add logging for user story 1 operations
+- [ ] T034 [P] [US1] Create [Entity1] model in backend/src/[path]/[Entity1].cs
+- [ ] T035 [P] [US1] Create [Entity2] model in backend/src/[path]/[Entity2].cs
+- [ ] T036 [US1] Implement [Service] in backend/src/[path]/[Service].cs (depends on T034, T035)
+- [ ] T037 [US1] Implement FastEndpoint for [endpoint/feature] in backend/src/[path]/[Endpoint].cs
+- [ ] T038 [US1] Add validation, error handling, and consistent response shape
+- [ ] T039 [US1] Add Serilog structured logging/audit events for sensitive operations
+- [ ] T040 [US1] Verify Swashbuckle documents the endpoint in development Swagger UI
+- [ ] T041 [US1] Verify Sentry captures errors/performance spans with trace context and without sensitive payloads
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -106,17 +131,19 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2
+### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
 
-- [ ] T018 [P] [US2] Contract test for [endpoint] including Auth0 authorization, error shape, and pagination if applicable in [test path]
-- [ ] T019 [P] [US2] Integration/business-process test for [user journey] using PostgreSQL/Testcontainers and transaction isolation in [test path]
+- [ ] T042 [P] [US2] xUnit Theory contract test for [endpoint] data variations with unique/scoped test data in backend/tests/Contract/[Name]Tests.cs
+- [ ] T043 [P] [US2] xUnit Theory/Testcontainers integration test for [user journey] data variations with parallel/rerun-safe setup in backend/tests/Integration/[Name]Tests.cs
+- [ ] T044 [P] [US2] Angular Testing Library component test for [component] in frontend/src/[path]/[component].spec.ts
+- [ ] T045 [P] [US2] Cypress E2E test for [user journey] in frontend/cypress/e2e/[name].cy.ts
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
-- [ ] T022 [US2] Implement [FastEndpoints endpoint/feature] in src/[location]/[file]
-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T046 [P] [US2] Create [Entity] model in backend/src/[path]/[Entity].cs
+- [ ] T047 [US2] Implement [Service] in backend/src/[path]/[Service].cs
+- [ ] T048 [US2] Implement FastEndpoint for [endpoint/feature] in backend/src/[path]/[Endpoint].cs
+- [ ] T049 [US2] Integrate with User Story 1 components (if needed)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -128,16 +155,18 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3
+### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
 
-- [ ] T024 [P] [US3] Contract test for [endpoint] including Auth0 authorization, error shape, and pagination if applicable in [test path]
-- [ ] T025 [P] [US3] Integration/business-process test for [user journey] using PostgreSQL/Testcontainers and transaction isolation in [test path]
+- [ ] T050 [P] [US3] xUnit Theory contract test for [endpoint] data variations with unique/scoped test data in backend/tests/Contract/[Name]Tests.cs
+- [ ] T051 [P] [US3] xUnit Theory/Testcontainers integration test for [user journey] data variations with parallel/rerun-safe setup in backend/tests/Integration/[Name]Tests.cs
+- [ ] T052 [P] [US3] Angular Testing Library component test for [component] in frontend/src/[path]/[component].spec.ts
+- [ ] T053 [P] [US3] Cypress E2E test for [user journey] in frontend/cypress/e2e/[name].cy.ts
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [FastEndpoints endpoint/feature] in src/[location]/[file]
+- [ ] T054 [P] [US3] Create [Entity] model in backend/src/[path]/[Entity].cs
+- [ ] T055 [US3] Implement [Service] in backend/src/[path]/[Service].cs
+- [ ] T056 [US3] Implement FastEndpoint for [endpoint/feature] in backend/src/[path]/[Endpoint].cs
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -155,9 +184,22 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
+- [ ] TXXX Review backend tests use xUnit Theories for repeated data variations
+- [ ] TXXX Review tests for parallel safety, rerun safety, unique data, scoped resources, cleanup, and idempotent setup
+- [ ] TXXX Security hardening, rate-limit review, and untrusted-content validation
+- [ ] TXXX Sentry review for frontend/backend error capture, performance spans, trace context, release/environment tags, and sensitive-data filtering
+- [ ] TXXX Accessibility pass for keyboard access, labels, and validation messages
+- [ ] TXXX Verify Jasmine/Karma unit tests, Angular Testing Library component tests, Playwright browser tests, Cypress E2E tests, and Storybook visual regression pass where applicable
+- [ ] TXXX API contract review for pagination defaults/max limits, UTC dates, IDs, and cacheability
+- [ ] TXXX Migration review for rollback/mitigation and environment seed/reference data
+- [ ] TXXX Swagger review: `/swagger` works in development and is disabled in production
+- [ ] TXXX Repowise review: PR includes regenerated or confirmed-unchanged Repowise outputs in marker regions; indexed docs match merged code
+- [ ] TXXX Neon review: low max connections, pooling enabled, short-lived DbContexts
+- [ ] TXXX File storage review: Cloudflare R2 for hosted environments, MinIO for local/tests, Postgres metadata only
+- [ ] TXXX Verify Sonar PR scan passes
+- [ ] TXXX Verify Codecov reports at least 95% coverage for relevant changed/added files
+- [ ] TXXX Confirm pull request scope is a focused vertical slice or justified cross-cutting change
 - [ ] TXXX Run quickstart.md validation
-- [ ] TXXX Run Repowise workflow and commit refreshed outputs in Repowise-maintained regions, or document no-op
 
 ---
 
@@ -201,12 +243,12 @@ Examples of foundational tasks (adjust based on your project):
 
 ```bash
 # Launch all tests for User Story 1 together (if tests requested):
-Task: "Contract test for [endpoint] in tests/contract/test_[name].py"
-Task: "Integration test for [user journey] in tests/integration/test_[name].py"
+Task: "Contract test for [endpoint] in backend/tests/Contract/[Name]Tests.cs"
+Task: "Integration test for [user journey] in backend/tests/Integration/[Name]Tests.cs"
 
 # Launch all models for User Story 1 together:
-Task: "Create [Entity1] model in src/models/[entity1].py"
-Task: "Create [Entity2] model in src/models/[entity2].py"
+Task: "Create [Entity1] model in backend/src/[path]/[Entity1].cs"
+Task: "Create [Entity2] model in backend/src/[path]/[Entity2].cs"
 ```
 
 ---

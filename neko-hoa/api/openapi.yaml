@@ -1,0 +1,1693 @@
+openapi: 3.0.3
+
+info:
+  title: NekoHOA API
+  version: 1.0.0
+  description: |
+    REST API for the NekoHOA Homeowners Association Management Platform.
+
+    ## Authentication
+    Every protected endpoint requires a Bearer JWT in the `Authorization` header.
+    Tokens are issued by `POST /auth/login` and `POST /auth/register`.
+
+    ## Base URL
+    | Environment | URL |
+    |---|---|
+    | Local (.NET dev) | `http://localhost:5000/api/v1` |
+    | Staging | `https://api-staging.nekohoa.com/v1` |
+    | Production | `https://api.nekohoa.com/v1` |
+  contact:
+    name: NekoHOA Engineering
+    email: dev@nekohoa.com
+  license:
+    name: Proprietary
+    url: https://nekohoa.com
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local .NET dev server
+  - url: https://api-staging.nekohoa.com/v1
+    description: Staging
+  - url: https://api.nekohoa.com/v1
+    description: Production
+
+tags:
+  - name: Auth
+    description: Login, register, and session management
+  - name: Dashboard
+    description: Summary data for the resident dashboard
+  - name: Payments
+    description: Ledger entries, one-time payments, and recurring drafts
+  - name: Property
+    description: Property details, owner info, and directory settings
+  - name: Community
+    description: Announcements, violations, calendar events, and documents
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY
+# ─────────────────────────────────────────────────────────────────────────────
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ─── Reusable parameters ──────────────────────────────────────────────────
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSizeParam:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+
+  # ─── Reusable responses ───────────────────────────────────────────────────
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated but not authorized for this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnprocessableEntity:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+
+  # ─── Schemas ──────────────────────────────────────────────────────────────
+  schemas:
+
+    # ── Primitives ────────────────────────────────────────────────────────────
+    ISODate:
+      type: string
+      format: date
+      example: "2026-06-01"
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: UNAUTHORIZED
+        message:
+          type: string
+          example: Authentication token missing or expired.
+
+    ValidationErrorResponse:
+      type: object
+      required: [code, message, errors]
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: One or more fields are invalid.
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+                example: email
+              message:
+                type: string
+                example: Must be a valid email address.
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    CurrentUser:
+      type: object
+      required: [id, firstName, lastName, email, initials, properties]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-0000-0000-0000-000000000001"
+        firstName:
+          type: string
+          example: Nicholas
+        lastName:
+          type: string
+          example: Bonilla
+        email:
+          type: string
+          format: email
+          example: nicholas@sakuraheights.com
+        initials:
+          type: string
+          minLength: 1
+          maxLength: 3
+          example: NB
+        properties:
+          type: array
+          description: All properties linked to this user.
+          items:
+            type: object
+            required: [id, address, accountNumber]
+            properties:
+              id:
+                type: string
+                format: uuid
+              accountNumber:
+                type: string
+              address:
+                type: string
+
+    AuthResponse:
+      type: object
+      required: [token, refreshToken, expiresAt, user]
+      properties:
+        token:
+          type: string
+          description: "Short-lived JWT access token (15-min expiry). Include as `Authorization: Bearer <token>`."
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          description: "Opaque refresh token (30-day expiry). Store securely; use with POST /auth/refresh."
+          example: d3f8a1b2c4e5...
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-06-24T00:15:00Z"
+        user:
+          $ref: '#/components/schemas/CurrentUser'
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: nicholas@sakuraheights.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+
+    RegisterRequest:
+      type: object
+      required: [email, password, firstName, lastName, accountNumber]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        firstName:
+          type: string
+          example: Jane
+        lastName:
+          type: string
+          example: Doe
+        accountNumber:
+          type: string
+          description: "HOA account number from the resident's welcome letter. Links the new user to their property."
+          example: R0670853L0541192
+
+    # ── Property ──────────────────────────────────────────────────────────────
+    Property:
+      type: object
+      required:
+        - accountNumber
+        - communityId
+        - communityName
+        - address
+        - city
+        - state
+        - zip
+        - lot
+        - section
+        - fiscalYear
+        - yearBuilt
+        - status
+        - monthlyAssessment
+        - annualAssessment
+        - assessmentDueDay
+        - lateFeeAmount
+        - lateFeeGraceDays
+        - financeChargeRate
+      properties:
+        accountNumber:
+          type: string
+          example: R0670853L0541192
+        communityId:
+          type: string
+          example: SAKURA
+        communityName:
+          type: string
+          example: Sakura Heights
+        address:
+          type: string
+          example: 714 Keystone Park Dr
+        city:
+          type: string
+          example: Austin
+        state:
+          type: string
+          example: TX
+        zip:
+          type: string
+          example: "78701"
+        lot:
+          type: string
+          example: "151"
+        phase:
+          type: string
+          nullable: true
+          example: null
+        section:
+          type: string
+          example: SF
+        block:
+          type: string
+          nullable: true
+          example: null
+        fiscalYear:
+          type: integer
+          example: 2026
+        yearBuilt:
+          type: integer
+          example: 2014
+        status:
+          type: string
+          enum: [active, inactive]
+          example: active
+        monthlyAssessment:
+          type: number
+          format: double
+          example: 35.00
+        annualAssessment:
+          type: number
+          format: double
+          example: 420.00
+        assessmentDueDay:
+          type: integer
+          minimum: 1
+          maximum: 31
+          example: 1
+        lateFeeAmount:
+          type: number
+          format: double
+          example: 20.00
+        lateFeeGraceDays:
+          type: integer
+          example: 30
+        financeChargeRate:
+          type: number
+          format: double
+          description: Annual rate as a percentage (e.g. 18 = 18%)
+          example: 18.00
+
+    Owner:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - accountNumber
+        - communityName
+        - propertyAddress
+        - votingRights
+        - email
+        - mailingToProperty
+        - paperlessStatements
+        - smsReminders
+      properties:
+        firstName:
+          type: string
+          example: Nicholas
+        lastName:
+          type: string
+          example: Bonilla
+        ownerName2:
+          type: string
+          nullable: true
+          example: null
+        memberSince:
+          type: string
+          nullable: true
+          example: "2020-03-15"
+        accountNumber:
+          type: string
+          example: R0670853L0541192
+        communityName:
+          type: string
+          example: Sakura Heights
+        propertyAddress:
+          type: string
+          example: 714 Keystone Park Dr
+        votingRights:
+          type: boolean
+          example: true
+        email:
+          type: string
+          format: email
+          example: nicholas@sakuraheights.com
+        phone:
+          type: string
+          nullable: true
+          example: "+15125550142"
+        mailingToProperty:
+          type: boolean
+          example: true
+        paperlessStatements:
+          type: boolean
+          example: true
+        smsReminders:
+          type: boolean
+          example: false
+
+    UpdateOwnerRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        ownerName2:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        mailingToProperty:
+          type: boolean
+        paperlessStatements:
+          type: boolean
+        smsReminders:
+          type: boolean
+
+    AddressHistory:
+      type: object
+      required: [event, address, date]
+      properties:
+        event:
+          type: string
+          enum: [created, change]
+          example: change
+        address:
+          type: string
+          example: 714 Keystone Park Dr, Austin TX 78701
+        date:
+          $ref: '#/components/schemas/ISODate'
+
+    DirectoryField:
+      type: object
+      required: [key, label, value, shared]
+      properties:
+        key:
+          type: string
+          example: phone
+        label:
+          type: string
+          example: Phone
+        value:
+          type: string
+          example: "+15125550142"
+        shared:
+          type: boolean
+          description: Whether this field is visible to other community members
+          example: true
+
+    # ── Payments ──────────────────────────────────────────────────────────────
+    LedgerEntryType:
+      type: string
+      enum:
+        - Regular Assessment
+        - Payment
+        - Late Fee
+        - Finance Charge
+
+    LedgerEntry:
+      type: object
+      required: [id, type, date, docNumber, description, balance]
+      properties:
+        id:
+          type: string
+          example: led-001
+        type:
+          $ref: '#/components/schemas/LedgerEntryType'
+        date:
+          $ref: '#/components/schemas/ISODate'
+        docNumber:
+          type: string
+          example: RAS-2025M6-7716699-56
+        description:
+          type: string
+          example: Assessment for June 2025
+        charge:
+          type: number
+          format: double
+          nullable: true
+          example: 35.00
+        payment:
+          type: number
+          format: double
+          nullable: true
+          example: null
+        balance:
+          type: number
+          format: double
+          example: 35.00
+
+    LedgerPage:
+      type: object
+      required: [data, total, page, pageSize, currentBalance]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerEntry'
+        total:
+          type: integer
+          example: 14
+        page:
+          type: integer
+          example: 1
+        pageSize:
+          type: integer
+          example: 50
+        currentBalance:
+          type: number
+          format: double
+          description: Running balance as of the last ledger entry
+          example: 70.00
+
+    OneTimePaymentRequest:
+      type: object
+      required: [amount, method]
+      properties:
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 35.00
+        method:
+          type: string
+          enum: [ach, card]
+          example: ach
+        # ACH fields — required when method = ach
+        routingNumber:
+          type: string
+          pattern: '^\d{9}$'
+          example: "021000021"
+        accountNumber:
+          type: string
+          example: "123456789"
+        accountType:
+          type: string
+          enum: [checking, savings]
+          example: checking
+        # Card fields — required when method = card
+        cardNumber:
+          type: string
+          example: "4111111111111111"
+        cardExpiry:
+          type: string
+          pattern: '^\d{2}/\d{2}$'
+          example: "12/28"
+        cardCvv:
+          type: string
+          example: "123"
+        cardholderName:
+          type: string
+          example: Nicholas Bonilla
+        billingZip:
+          type: string
+          example: "78701"
+
+    PaymentResult:
+      type: object
+      required: [confirmationNumber, amount, date]
+      properties:
+        confirmationNumber:
+          type: string
+          example: A7XQ2B9F
+        amount:
+          type: number
+          format: double
+          example: 35.00
+        date:
+          $ref: '#/components/schemas/ISODate'
+
+    RecurringPayment:
+      type: object
+      required: [status, amountType, method, draftDay, processingFee]
+      properties:
+        status:
+          type: string
+          enum: [active, inactive]
+          example: active
+        amountType:
+          type: string
+          enum: [assessment, balance, fixed]
+          description: |
+            - `assessment` — draft exactly the monthly assessment amount
+            - `balance`    — draft the full outstanding balance
+            - `fixed`      — draft a specific `fixedAmount`
+          example: assessment
+        fixedAmount:
+          type: number
+          format: double
+          nullable: true
+          example: null
+        method:
+          type: string
+          enum: [ach, card]
+          example: ach
+        draftDay:
+          type: integer
+          minimum: 1
+          maximum: 28
+          description: Day of month the draft is pulled
+          example: 1
+        bankName:
+          type: string
+          nullable: true
+          example: Chase
+        routingLast4:
+          type: string
+          nullable: true
+          example: "0021"
+        accountLast4:
+          type: string
+          nullable: true
+          example: "6789"
+        accountType:
+          type: string
+          enum: [checking, savings]
+          nullable: true
+          example: checking
+        cardholderName:
+          type: string
+          nullable: true
+          example: null
+        cardLast4:
+          type: string
+          nullable: true
+          example: null
+        cardExpiry:
+          type: string
+          nullable: true
+          example: null
+        cardZip:
+          type: string
+          nullable: true
+          example: null
+        processingFee:
+          type: number
+          format: double
+          description: Flat fee added for card payments (0.00 for ACH)
+          example: 0.00
+
+    UpsertRecurringRequest:
+      type: object
+      required: [amountType, method, draftDay]
+      properties:
+        amountType:
+          type: string
+          enum: [assessment, balance, fixed]
+        fixedAmount:
+          type: number
+          format: double
+          nullable: true
+        method:
+          type: string
+          enum: [ach, card]
+        draftDay:
+          type: integer
+          minimum: 1
+          maximum: 28
+        routingNumber:
+          type: string
+        accountNumber:
+          type: string
+        accountType:
+          type: string
+          enum: [checking, savings]
+        cardNumber:
+          type: string
+        cardExpiry:
+          type: string
+        cardCvv:
+          type: string
+        cardholderName:
+          type: string
+        billingZip:
+          type: string
+
+    DraftEntry:
+      type: object
+      required: [date, source, amount, status]
+      properties:
+        date:
+          $ref: '#/components/schemas/ISODate'
+        source:
+          type: string
+          example: ACH · Chase ···6789
+        amount:
+          type: number
+          format: double
+          example: 35.00
+        status:
+          type: string
+          enum: [paid, scheduled, failed]
+          example: paid
+
+    # ── Community ─────────────────────────────────────────────────────────────
+    AnnouncementCategory:
+      type: string
+      enum: [Board, Maintenance, Events, Emergencies]
+
+    Announcement:
+      type: object
+      required:
+        - id
+        - title
+        - body
+        - date
+        - category
+        - pinned
+        - commentCount
+        - likeCount
+        - authorInitials
+        - authorLabel
+      properties:
+        id:
+          type: string
+          example: ann-001
+        title:
+          type: string
+          example: Community pool opening!
+        body:
+          type: string
+          example: The pool reopens Saturday May 24th at 10am.
+        date:
+          $ref: '#/components/schemas/ISODate'
+        category:
+          $ref: '#/components/schemas/AnnouncementCategory'
+        pinned:
+          type: boolean
+          example: true
+        commentCount:
+          type: integer
+          example: 12
+        likeCount:
+          type: integer
+          example: 38
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: null
+        authorInitials:
+          type: string
+          example: BM
+        authorLabel:
+          type: string
+          example: Board · Mary R.
+
+    PollOption:
+      type: object
+      required: [label, percent]
+      properties:
+        label:
+          type: string
+          example: "Yes, all summer"
+        percent:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          example: 62.0
+
+    Poll:
+      type: object
+      required: [id, question, options, totalVotes, closesLabel]
+      properties:
+        id:
+          type: string
+          example: poll-001
+        question:
+          type: string
+          example: Should we extend pool hours to 9pm?
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollOption'
+        totalVotes:
+          type: integer
+          example: 132
+        closesLabel:
+          type: string
+          example: closes Friday
+
+    ViolationStatus:
+      type: string
+      enum: [open, closed]
+
+    ViolationCategory:
+      type: string
+      enum: [Maintenance, Landscape, Architectural, Parking, Noise, Other]
+
+    Violation:
+      type: object
+      required: [id, issue, date, category, status]
+      properties:
+        id:
+          type: string
+          example: vio-001
+        issue:
+          type: string
+          example: Unmaintained front lawn
+        date:
+          $ref: '#/components/schemas/ISODate'
+        category:
+          $ref: '#/components/schemas/ViolationCategory'
+        status:
+          $ref: '#/components/schemas/ViolationStatus'
+
+    EventCategory:
+      type: string
+      enum: [Board, Amenity, Social, Maintenance]
+
+    CalendarEvent:
+      type: object
+      required: [id, title, date, location, category, rsvpEnabled]
+      properties:
+        id:
+          type: string
+          example: evt-001
+        title:
+          type: string
+          example: Pool opens
+        date:
+          $ref: '#/components/schemas/ISODate'
+        location:
+          type: string
+          example: Sakura pool
+        category:
+          $ref: '#/components/schemas/EventCategory'
+        rsvpEnabled:
+          type: boolean
+          example: false
+
+    DocumentCategory:
+      type: string
+      enum: [Forms, Insurance, Budgets, Rules, Minutes, Governing, Financials]
+
+    HOADocument:
+      type: object
+      required: [id, name, category, effectiveDate, fileSizeLabel, pinned]
+      properties:
+        id:
+          type: string
+          example: doc-001
+        name:
+          type: string
+          example: CC&Rs — Sakura Heights 2023 Restatement
+        category:
+          $ref: '#/components/schemas/DocumentCategory'
+        effectiveDate:
+          $ref: '#/components/schemas/ISODate'
+        fileSizeLabel:
+          type: string
+          example: 2.4 MB
+        pinned:
+          type: boolean
+          example: true
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: Pre-signed download URL (short-lived). Use `GET /community/documents/{id}/download` to refresh.
+          example: null
+
+    # ── Dashboard ─────────────────────────────────────────────────────────────
+    CommunityExpense:
+      type: object
+      required: [label, color, amount]
+      properties:
+        label:
+          type: string
+          example: Landscaping
+        color:
+          type: string
+          example: "#c084fc"
+        amount:
+          type: number
+          format: double
+          example: 1200.00
+
+    DashboardSummary:
+      type: object
+      required:
+        - currentBalance
+        - balanceDueDate
+        - openViolations
+        - documentCount
+        - newDocumentsThisMonth
+        - thisWeekEvents
+        - recentActivity
+        - communityExpenses
+      properties:
+        currentBalance:
+          type: number
+          format: double
+          example: 70.00
+        balanceDueDate:
+          $ref: '#/components/schemas/ISODate'
+        openViolations:
+          type: integer
+          example: 0
+        nextEvent:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CalendarEvent'
+        documentCount:
+          type: integer
+          example: 12
+        newDocumentsThisMonth:
+          type: integer
+          example: 3
+        pinnedAnnouncement:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Announcement'
+        thisWeekEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarEvent'
+        recentActivity:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/LedgerEntry'
+        communityExpenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityExpense'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────────────────────
+paths:
+
+  # ╔═══════════════════════════════════════════════════════════════════════════
+  # ║  AUTH
+  # ╚═══════════════════════════════════════════════════════════════════════════
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in with email + password
+      security: []            # public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Successful login — returns JWT and user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INVALID_CREDENTIALS
+                message: Email or password is incorrect.
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Create a new resident account
+      security: []            # public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "201":
+          description: Account created — returns JWT and user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: EMAIL_TAKEN
+                message: An account with this email already exists.
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Invalidate the current session token
+      responses:
+        "204":
+          description: Session invalidated
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getMe
+      summary: Get the currently authenticated user
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      operationId: RefreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  example: d3f8a1b2c4e5...
+      responses:
+        "200":
+          description: New token pair issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          description: Refresh token invalid, expired, or revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/switch-property:
+    post:
+      tags: [Auth]
+      summary: Switch active property
+      operationId: SwitchProperty
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId]
+              properties:
+                propertyId:
+                  type: string
+                  format: uuid
+                  description: "UUID of the target property. Must be linked to the authenticated user."
+      responses:
+        "200":
+          description: New token pair issued with updated propertyId claim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          description: User is not linked to the requested property
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ╔═══════════════════════════════════════════════════════════════════════════
+  # ║  DASHBOARD
+  # ╚═══════════════════════════════════════════════════════════════════════════
+
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboard
+      summary: Resident dashboard summary
+      description: |
+        Returns a single aggregated payload for the dashboard screen:
+        balance, violations count, next event, pinned announcement, this-week
+        calendar, recent ledger activity, and community expense breakdown.
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ╔═══════════════════════════════════════════════════════════════════════════
+  # ║  PAYMENTS
+  # ╚═══════════════════════════════════════════════════════════════════════════
+
+  /payments/ledger:
+    get:
+      tags: [Payments]
+      operationId: getLedger
+      summary: Retrieve the account ledger
+      description: Returns all charge and payment entries, optionally filtered by date range. Results are sorted by date descending.
+      parameters:
+        - name: startDate
+          in: query
+          description: Include entries on or after this date (ISO 8601)
+          schema:
+            $ref: '#/components/schemas/ISODate'
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          description: Include entries on or before this date (ISO 8601)
+          schema:
+            $ref: '#/components/schemas/ISODate'
+          example: "2026-06-01"
+        - name: type
+          in: query
+          description: Filter by entry type
+          schema:
+            $ref: '#/components/schemas/LedgerEntryType'
+        - name: search
+          in: query
+          description: Full-text search across description and doc number
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        "200":
+          description: Paginated ledger entries with current balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerPage'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /payments/one-time:
+    post:
+      tags: [Payments]
+      operationId: submitOneTimePayment
+      summary: Submit a one-time payment
+      description: |
+        Submits a one-time ACH or card payment.
+        - For `method: ach` — provide `routingNumber`, `accountNumber`, `accountType`.
+        - For `method: card` — provide `cardNumber`, `cardExpiry`, `cardCvv`, `cardholderName`, `billingZip`.
+
+        A processing fee of **$1.95** is added server-side for card payments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OneTimePaymentRequest'
+            examples:
+              ach:
+                summary: ACH payment
+                value:
+                  amount: 35.00
+                  method: ach
+                  routingNumber: "021000021"
+                  accountNumber: "987654321"
+                  accountType: checking
+              card:
+                summary: Card payment
+                value:
+                  amount: 35.00
+                  method: card
+                  cardNumber: "4111111111111111"
+                  cardExpiry: "12/28"
+                  cardCvv: "123"
+                  cardholderName: Nicholas Bonilla
+                  billingZip: "78701"
+      responses:
+        "200":
+          description: Payment accepted — returns confirmation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResult'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /payments/recurring:
+    get:
+      tags: [Payments]
+      operationId: getRecurringPayment
+      summary: Get the current recurring payment setup
+      responses:
+        "200":
+          description: Current recurring payment configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPayment'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Payments]
+      operationId: upsertRecurringPayment
+      summary: Create or update recurring payment
+      description: |
+        Replaces the recurring payment configuration. If no recurring payment
+        exists this creates one; otherwise it fully replaces the existing one.
+        Pass `amountType: fixed` with a non-null `fixedAmount` to draft a
+        custom amount each month.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertRecurringRequest'
+      responses:
+        "200":
+          description: Updated recurring payment configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringPayment'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+    delete:
+      tags: [Payments]
+      operationId: cancelRecurringPayment
+      summary: Cancel recurring payment
+      description: Sets the recurring payment status to `inactive`. The record is retained for audit history.
+      responses:
+        "204":
+          description: Recurring payment cancelled
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /payments/drafts:
+    get:
+      tags: [Payments]
+      operationId: getDraftHistory
+      summary: List past and upcoming draft history
+      description: Returns up to 12 months of draft entries (paid, scheduled, and failed).
+      responses:
+        "200":
+          description: Draft history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DraftEntry'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  # ╔═══════════════════════════════════════════════════════════════════════════
+  # ║  PROPERTY
+  # ╚═══════════════════════════════════════════════════════════════════════════
+
+  /property:
+    get:
+      tags: [Property]
+      operationId: getProperty
+      summary: Get property details
+      description: Returns the property record associated with the authenticated resident's account.
+      responses:
+        "200":
+          description: Property record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Property'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /property/owner:
+    get:
+      tags: [Property]
+      operationId: getOwner
+      summary: Get owner / contact information
+      responses:
+        "200":
+          description: Owner record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Owner'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Property]
+      operationId: updateOwner
+      summary: Update owner contact information and notification preferences
+      description: |
+        Partial update — only include fields you want to change.
+        Mutable fields: `firstName`, `lastName`, `ownerName2`, `email`, `phone`,
+        `mailingToProperty`, `paperlessStatements`, `smsReminders`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOwnerRequest'
+      responses:
+        "200":
+          description: Updated owner record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Owner'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "422":
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /property/address-history:
+    get:
+      tags: [Property]
+      operationId: getAddressHistory
+      summary: Get mailing address change history
+      responses:
+        "200":
+          description: Address history in reverse chronological order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AddressHistory'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /property/directory-fields:
+    get:
+      tags: [Property]
+      operationId: getDirectoryFields
+      summary: Get community directory visibility settings
+      responses:
+        "200":
+          description: Directory field settings for this account
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DirectoryField'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /property/directory-fields/{key}:
+    patch:
+      tags: [Property]
+      operationId: updateDirectoryField
+      summary: Toggle directory field visibility
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: Field key (e.g. `phone`, `email`, `name`)
+          schema:
+            type: string
+          example: phone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shared]
+              properties:
+                shared:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated directory field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DirectoryField'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  # ╔═══════════════════════════════════════════════════════════════════════════
+  # ║  COMMUNITY
+  # ╚═══════════════════════════════════════════════════════════════════════════
+
+  /community/announcements:
+    get:
+      tags: [Community]
+      operationId: listAnnouncements
+      summary: List announcements
+      parameters:
+        - name: category
+          in: query
+          description: Filter by category. Omit for all.
+          schema:
+            $ref: '#/components/schemas/AnnouncementCategory'
+        - name: pinned
+          in: query
+          description: When `true`, returns only pinned announcements.
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        "200":
+          description: Announcements in reverse chronological order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Announcement'
+                  total:
+                    type: integer
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /community/announcements/{id}:
+    get:
+      tags: [Community]
+      operationId: getAnnouncement
+      summary: Get a single announcement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Announcement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /community/poll:
+    get:
+      tags: [Community]
+      operationId: getActivePoll
+      summary: Get the active community poll
+      responses:
+        "200":
+          description: Active poll (or 204 if none)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poll'
+        "204":
+          description: No active poll
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /community/poll/{id}/vote:
+    post:
+      tags: [Community]
+      operationId: castPollVote
+      summary: Cast a vote on a poll option
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [optionIndex]
+              properties:
+                optionIndex:
+                  type: integer
+                  minimum: 0
+                  description: Zero-based index of the chosen option
+      responses:
+        "200":
+          description: Updated poll with new percentages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poll'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "409":
+          description: Resident has already voted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /community/violations:
+    get:
+      tags: [Community]
+      operationId: listViolations
+      summary: List violations for this property
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ViolationStatus'
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ViolationCategory'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        "200":
+          description: Violation records, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Violation'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /community/events:
+    get:
+      tags: [Community]
+      operationId: listEvents
+      summary: List community calendar events
+      parameters:
+        - name: category
+          in: query
+          description: Filter by event category. Repeatable for multiple categories.
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/EventCategory'
+          style: form
+          explode: true
+        - name: startDate
+          in: query
+          schema:
+            $ref: '#/components/schemas/ISODate'
+          description: Include events on or after this date
+        - name: endDate
+          in: query
+          schema:
+            $ref: '#/components/schemas/ISODate'
+          description: Include events on or before this date
+      responses:
+        "200":
+          description: Calendar events sorted by date ascending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CalendarEvent'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /community/events/{id}/rsvp:
+    post:
+      tags: [Community]
+      operationId: rsvpEvent
+      summary: RSVP to an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attending]
+              properties:
+                attending:
+                  type: boolean
+      responses:
+        "204":
+          description: RSVP recorded
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /community/documents:
+    get:
+      tags: [Community]
+      operationId: listDocuments
+      summary: List HOA documents
+      parameters:
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentCategory'
+        - name: pinned
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          description: Full-text search across document name
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        "200":
+          description: Document list, pinned first then by effective date descending
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HOADocument'
+                  total:
+                    type: integer
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /community/documents/{id}/download:
+    get:
+      tags: [Community]
+      operationId: getDocumentDownloadUrl
+      summary: Get a short-lived download URL for a document
+      description: |
+        Returns a pre-signed URL (valid for 5 minutes) for the requested document.
+        The client should redirect the user to this URL to initiate the download.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pre-signed download URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expiresAt]
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                    example: "https://storage.nekohoa.com/docs/ccrs-2023.pdf?sig=abc123&exp=1719187200"
+                  expiresAt:
+                    type: string
+                    format: date-time
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'

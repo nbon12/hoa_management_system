@@ -1,0 +1,8 @@
+node_modules
+dist
+.git
+.angular
+playwright-report
+test-results
+e2e/.auth
+.claude
