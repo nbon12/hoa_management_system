@@ -42,25 +42,12 @@ jobs:
 
       - name: Index codebase (graph + health only)
         run: |
-          set -f
+          # Excludes come from .repowiseIgnore (read on init; persisted in config).
+          # update only accepts --index-only — not -y or -x (repowise 0.16+).
           if [ -f .repowise/wiki.db ]; then
-            repowise update --index-only -y \
-              -x 'frontend/' \
-              -x 'message-service-completed/' \
-              -x 'neko-hoa/.angular/' \
-              -x 'neko-hoa/node_modules/' \
-              -x 'neko-hoa/dist/' \
-              -x 'neko-hoa/playwright-report/' \
-              -x 'neko-hoa/test-results/'
+            repowise update --index-only
           else
-            repowise init --index-only -y \
-              -x 'frontend/' \
-              -x 'message-service-completed/' \
-              -x 'neko-hoa/.angular/' \
-              -x 'neko-hoa/node_modules/' \
-              -x 'neko-hoa/dist/' \
-              -x 'neko-hoa/playwright-report/' \
-              -x 'neko-hoa/test-results/'
+            repowise init --index-only
           fi
 
       - name: Repowise status
