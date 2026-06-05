@@ -3,7 +3,6 @@
 # Legacy / duplicate codebases
 frontend/
 message-service-completed/
-neko-hoa-mock/
 
 # Spec Kit — meta-tooling and planning docs (not running application code)
 .specify/
