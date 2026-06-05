@@ -44,3 +44,15 @@ packages/
 *.tlog
 _ReSharper.*/
 [Tt]humbs.db
+
+# Repowise local index and secrets (see repowise/.env.example)
+.repowise/
+.repowise/.env
+.venv-repowise/
+
+# Env files with secrets (tracked examples like repowise/.env.example are allowed)
+.env
+.env.local
+.env.*.local
+!.env.example
+!**/.env.example

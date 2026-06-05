@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Property;
 
+// <!-- REPOWISE:START domain=property -->
+// Property, owner, directory fields, address history; scoped by JWT propertyId.
+// <!-- REPOWISE:END -->
+
 public class PropertyService(ApplicationDbContext db)
 {
     public async Task<PropertyDto> GetPropertyAsync(Guid propertyId, CancellationToken ct = default)

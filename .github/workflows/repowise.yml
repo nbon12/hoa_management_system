@@ -1,30 +1,91 @@
-name: Repowise Documentation
+name: Repowise
 
 on:
   pull_request:
     branches: [main]
 
+env:
+  REPOWISE_VERSION: ">=0.16.0"
+
 jobs:
-  repowise:
+  repowise-gate:
+    name: Repowise health gate (no LLM)
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: read
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Run Repowise
-        uses: repowise/action@v1
+      - name: Fetch main for risk baseline
+        run: git fetch origin main:refs/remotes/origin/main || true
+
+      - uses: actions/setup-python@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+          python-version: "3.12"
 
-      - name: Commit updated docs
+      - name: Install repowise
         run: |
-          git config user.name "repowise-bot"
-          git config user.email "repowise@users.noreply.github.com"
-          git diff --quiet || (git add -A && git commit -m "chore: regenerate Repowise outputs" && git push)
+          python -m pip install --upgrade pip
+          python -m pip install "repowise${{ env.REPOWISE_VERSION }}" pyyaml
+
+      - name: Cache repowise index
+        uses: actions/cache@v4
+        with:
+          path: .repowise
+          key: repowise-index-${{ runner.os }}-${{ hashFiles('.repowiseIgnore', 'repowise/health-gates.yaml') }}
+          restore-keys: |
+            repowise-index-${{ runner.os }}-
+
+      - name: Index codebase (graph + health only)
+        run: |
+          # Excludes come from .repowiseIgnore (read on init; persisted in config).
+          # update only accepts --index-only — not -y or -x (repowise 0.16+).
+          if [ -f .repowise/wiki.db ]; then
+            repowise update --index-only
+          else
+            repowise init --index-only
+          fi
+
+      - name: Repowise status
+        run: repowise status | tee /tmp/repowise-status.txt
+
+      - name: Repowise health (JSON)
+        run: |
+          repowise health --format json > /tmp/repowise-health.json
+          test -s /tmp/repowise-health.json
+
+      - name: Repowise PR risk
+        run: |
+          set +e
+          repowise risk origin/main..HEAD --format json 2>/tmp/repowise-risk.stderr > /tmp/repowise-risk.json
+          if [ ! -s /tmp/repowise-risk.json ]; then
+            repowise risk main..HEAD --format json 2>/tmp/repowise-risk.stderr > /tmp/repowise-risk.json
+          fi
+          if [ ! -s /tmp/repowise-risk.json ]; then
+            echo '{"skipped": true, "ref": "origin/main..HEAD", "score": 0}' > /tmp/repowise-risk.json
+          fi
+
+      - name: Check health gates
+        env:
+          REPOWISE_BASE_REF: origin/main
+          REPOWISE_SKIP_LIVE_COMMANDS: "1"
+        run: |
+          python .github/scripts/check-repowise-health-gates.py \
+            /tmp/repowise-gate-report.txt \
+            /tmp/repowise-health.json \
+            /tmp/repowise-risk.json
+
+      - name: Validate marker regions
+        run: python .github/scripts/validate-repowise-markers.py
+
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repowise-gate-report
+          path: /tmp/repowise-gate-report.txt
+          if-no-files-found: warn

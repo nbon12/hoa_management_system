@@ -118,6 +118,41 @@ ios/ or android/
 **Structure Decision**: [Document the selected structure and reference the real
 directories captured above]
 
+## Repowise Documentation
+
+**Status**: [Bootstrapped | In progress | Complete]
+
+### Configuration
+
+- Marker instructions: [`repowise/generation-prompt.md`](../../repowise/generation-prompt.md)
+- PR health thresholds: [`repowise/health-gates.yaml`](../../repowise/health-gates.yaml)
+
+### Marker regions (this feature)
+
+| File | Region ID | Purpose |
+|------|-----------|---------|
+| [Add rows for each file touched] | `domain=*` or `section=*` | [What the region documents] |
+
+### Marker syntax
+
+```csharp
+// <!-- REPOWISE:START domain=example -->
+// ... generated content ...
+// <!-- REPOWISE:END -->
+```
+
+```markdown
+<!-- REPOWISE:START section=example -->
+... generated content ...
+<!-- REPOWISE:END -->
+```
+
+### CI (pull requests to `main`)
+
+| Job | Secrets | Role |
+|-----|---------|------|
+| `repowise-gate` | None | `repowise init/update --index-only`, `status`, `health`, `risk`, marker validation |
+
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**

@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.DevTools;
 
+// <!-- REPOWISE:START domain=devtools -->
+// DELETE /e2e/cleanup — removes e2e+*@test.dev users; 404 outside Development.
+// <!-- REPOWISE:END -->
+
 /// <summary>
 /// Dev-only endpoint: deletes E2E test users (email LIKE 'e2e+%@test.dev')
 /// so that the registration test can run against an unclaimed property each time.

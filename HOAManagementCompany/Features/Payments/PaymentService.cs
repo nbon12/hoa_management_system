@@ -7,6 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Payments;
 
+// <!-- REPOWISE:START domain=payments -->
+// Ledger, drafts, recurring payments, one-time payment (simulated ACH/card); property-scoped.
+// <!-- REPOWISE:END -->
+
 public class PaymentService(ApplicationDbContext db, ILogger<PaymentService> logger)
 {
     private const decimal CardFee = 1.95m;

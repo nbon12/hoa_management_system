@@ -1,0 +1,42 @@
+# Repowise-only exclusions (gitignore syntax). See repowise/docs installation/configuration.
+
+# Legacy / duplicate codebases
+frontend/
+message-service-completed/
+neko-hoa-mock/
+
+# Spec Kit — meta-tooling and planning docs (not running application code)
+.specify/
+specs/
+
+# Editor / AI config (not application source)
+.cursor/
+.claude/
+.idea/
+**/.vscode/
+
+# Repowise generated state (do not index the index)
+.repowise/
+**/.venv-repowise/
+
+# Build artifacts
+**/bin/
+**/obj/
+**/packages/
+**/.vs/
+neko-hoa/.angular/
+neko-hoa/node_modules/
+neko-hoa/dist/
+
+# EF Core generated migration companions
+**/Migrations/*Designer.cs
+**/Migrations/*ModelSnapshot.cs
+
+# Test runner output (not source)
+test-results/
+**/test-results/
+**/playwright-report/
+
+# Large static assets and logs
+wireframes/
+*.log

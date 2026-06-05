@@ -1,0 +1,29 @@
+# Deterministic PR gate thresholds (tune after first green repowise-gate on main).
+# mode: warn = log violations but exit 0; enforce = fail CI (default).
+
+mode: enforce
+
+# Paths used when computing repo KPIs (excludes caches and legacy trees).
+include_path_prefixes:
+  - HOAManagementCompany/
+  - HOAManagementCompany.Tests/
+  - neko-hoa/src/
+  - neko-hoa/e2e/
+
+repo:
+  min_avg_health: 6.0
+  # Use filtered hotspot avg (see check-repowise-health-gates.py), not global KPIs.
+  min_hotspot_health: 4.0
+
+pr:
+  max_change_risk: 7.0
+  # warn = log risk but do not fail CI (use for bootstrap/large infra PRs).
+  # enforce = fail when score exceeds max_change_risk (enable after repowise is on main).
+  risk_mode: warn
+  max_avg_health_drop: 0.3
+
+files:
+  - path: HOAManagementCompany/Program.cs
+    min_health: 5.0
+  - path: HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs
+    min_health: 5.0
