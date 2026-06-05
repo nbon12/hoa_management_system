@@ -40,7 +40,8 @@ python .github/scripts/validate-repowise-markers.py
    # edit .repowise/.env — paste key after ANTHROPIC_API_KEY=
    ```
 2. Run `repowise init -y` (generates wiki pages and `.mcp.json`).
-3. Restart Cursor/Claude after MCP registration, or run `repowise mcp`.
+3. **Cursor MCP:** [`.cursor/mcp.json`](../../.cursor/mcp.json) is committed for this repo — **quit and reopen Cursor** (MCP loads at startup). Check **Settings → Tools & MCP** for a green **repowise** server.
+4. Do **not** run `repowise mcp` manually in a terminal; Cursor spawns it automatically.
 
 ## Marker regions
 

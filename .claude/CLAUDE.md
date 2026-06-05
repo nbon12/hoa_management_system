@@ -11,13 +11,15 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-06-05 (commit e6513e6). Confidence: 100%.
+Last indexed: 2026-06-05 (commit 0fc9fab). Confidence: 100%.
 ### Architecture
----
+> High-level onboarding guide for new developers joining the project. ---
 
 
 
-repo is a **Homeowners Association (HOA) Management Platform** consisting of a .NET backend API and an Angular frontend application. The system enables HOA management companies to administer communities, track residents, manage violations, and handle authentication — providing a full-featured property management solution. The backend is a C# ASP.NET Core application following a **vertical slice / feature-based architecture**, while the frontend (neko-hoa) is an Angular TypeScript single-page application. The two communicate over a REST API.
+repo is a **Homeowners Association (HOA) Management System** built as a full-stack application. It provides tooling for managing communities, properties, residents, and payments within an HOA context. The system is composed of two primary components:
+
+1.
 ### Key Modules
 | Module | Purpose | Owner |
 |--------|---------|-------|
@@ -38,11 +40,11 @@ repo is a **Homeowners Association (HOA) Management Platform** consisting of a .
 **Infra:** Docker, Docker Compose### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `HOAManagementCompany/Program.cs` | 99.5th %ile | 2 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.Designer.cs` | 99.0th %ile | 1 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 98.5th %ile | 1 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.cs` | 97.9th %ile | 1 | Nicholas |
-| `neko-hoa/e2e/community.spec.ts` | 97.4th %ile | 1 | Nicholas |
+| `HOAManagementCompany/Program.cs` | 100.0th %ile | 2 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.Designer.cs` | 99.5th %ile | 1 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.0th %ile | 1 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.cs` | 98.5th %ile | 1 | Nicholas |
+| `neko-hoa/e2e/community.spec.ts` | 98.0th %ile | 1 | Nicholas |
 
 ### Repowise MCP Tools
 

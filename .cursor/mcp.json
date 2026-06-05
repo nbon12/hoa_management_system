@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "repowise": {
+      "command": "/Users/nicholasbonilla/.local/bin/repowise",
+      "args": [
+        "mcp",
+        "${workspaceFolder}",
+        "--transport",
+        "stdio"
+      ],
+      "description": "Repowise codebase intelligence — wiki, dependency graph, git hotspots, code health, architectural decisions"
+    }
+  }
+}
