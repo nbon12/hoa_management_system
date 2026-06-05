@@ -11,72 +11,67 @@
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-06-04 (commit 3d3eaeb)
+Last indexed: 2026-06-05 (commit e6513e6). Confidence: 100%.
+### Architecture
+---
+
+
+
+repo is a **Homeowners Association (HOA) Management Platform** consisting of a .NET backend API and an Angular frontend application. The system enables HOA management companies to administer communities, track residents, manage violations, and handle authentication — providing a full-featured property management solution. The backend is a C# ASP.NET Core application following a **vertical slice / feature-based architecture**, while the frontend (neko-hoa) is an Angular TypeScript single-page application. The two communicate over a REST API.
+### Key Modules
+| Module | Purpose | Owner |
+|--------|---------|-------|
+| `neko-hoa` | neko-hoa is a TypeScript/Angular single-page application that provides a self-se | — |
+| `neko-hoa-mock` | neko-hoa-mock is a TypeScript/Angular application that simulates a **Homeowners  | — |
+| `HOAManagementCompany.Tests` | HOAManagementCompany.Tests is the integration and performance test suite for the | — |
+| `.github` | > **Maintainer:** Nicholas Bonilla · **Language:** Python · **Symbols:** 15 publ | — |
+| `HOAManagementCompany` | HOAManagementCompany is the primary backend application for a Homeowners Associa | — |
 ### Entry Points
-- `neko-hoa/src/app/core/models/index.ts`
-- `neko-hoa-mock/models/index.ts`
 - `HOAManagementCompany/Program.cs`
-- `neko-hoa/scripts/generate-build-id.mjs`
+- `neko-hoa/src/app/core/models/index.ts`
 - `neko-hoa/src/main.ts`
+- `neko-hoa-mock/models/index.ts`
 ### Tech Stack
-**Languages:** C#
-**Frameworks:** .NET, ASP.NET Core
-**Databases:** Entity Framework Core
-**Infra:** Docker, Docker Compose### Architectural Layers
-| Layer | Files | Purpose |
-|-------|-------|---------|
-| neko-hoa | 47 |  |
-| hoamanagementcompany/features | 37 |  |
-| hoamanagementcompany | 35 |  |
-| external:microsoft.aspnetcore | 21 |  |
-| neko-hoa-mock | 6 |  |
-| external:node:fs | 4 |  |
-| 20260524200408_initialschema | 4 |  |
-| external:@playwright | 2 |  |
-| .mcp | 2 |  |
-| dockerfile | 1 |  |
-### Hotspots (High Churn)
+
+
+
+**Infra:** Docker, Docker Compose### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
 | `HOAManagementCompany/Program.cs` | 99.5th %ile | 2 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.cs` | 99.0th %ile | 1 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 98.4th %ile | 1 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.Designer.cs` | 97.9th %ile | 1 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.Designer.cs` | 99.0th %ile | 1 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 98.5th %ile | 1 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/20260524200408_InitialSchema.cs` | 97.9th %ile | 1 | Nicholas |
 | `neko-hoa/e2e/community.spec.ts` | 97.4th %ile | 1 | Nicholas |
-
-## Code health
-Hotspot health: 9.28/10 (stable) ·
-Average: 6.9/10 ·
-Worst: 5.65/10 (`neko-hoa/.angular/cache/17.3.17/vite/deps/@angular_forms.js`)
-
-### Critical biomarkers
-- `HOAManagementCompany.Tests/Fixtures/TestDataSeeder.cs` — untested hotspot — impact −2.0
-- `neko-hoa/src/app/core/models/index.ts` — untested hotspot — impact −2.0
-- `HOAManagementCompany.Tests/Fixtures/TestDataSeeder.cs` — large method (SeedAsync) — impact −1.5
 
 ### Repowise MCP Tools
 
-This repo has the Repowise MCP server configured. The tools below answer questions `grep`/`Read` cannot. Every response carries an `_meta` envelope with `index_age_days`, `indexed_commit`, and a `stale_warning` only when the index has actually diverged from HEAD — silence means the index is current.
+This project has a Repowise MCP server configured. These tools provide documentation, ownership, architectural decisions, and risk signals. Use them for orientation and discovery — then read actual source to verify before editing.
 
-**When to call which tool:**
+**Recommended workflow:**
 
-| Tool | What only this tool answers |
-|------|------------------------------|
-| `get_answer(question)` | Synthesised answer with verified citations and a calibrated `retrieval_quality`. First call for "how does X work" / "why is Y like this". On low confidence returns `best_guesses` with one-line justifications instead of an empty answer. |
-| `get_context(targets=[...])` | Triage card for files/modules/symbols — title, summary, signatures, `hotspot` bit, `decision_records` titles, and `symbol_id`s to pipe into `get_symbol`. Use `include=["callers","ownership",...]` to widen. NOT for source bytes. |
-| `get_symbol("path/to/file.py::Name")` | Raw source bytes for one indexed symbol with exact line bounds. Cheaper and safer than `Read` + offset math. Use the `symbol_id` returned by `get_context`. |
-| `search_codebase(query, kind?)` | Find pages by concept when you don't know the file. Each result carries `search_method` (`embedding` vs `bm25` fallback). For exact identifiers use Grep — the tool will hint when it sees one. |
-| `get_why(query, targets?)` | Architectural decision archaeology — *why* the code is shaped this way. Call before refactors or pattern divergences. Falls back to git archaeology when no ADRs exist for a file. |
-| `get_risk(targets, changed_files?)` | What history says about touching these files: churn, owners, blast radius. Pass `changed_files` for PR mode → returns a `directive` (`will_break`, `missing_cochanges`, `missing_tests`). |
-| `get_dead_code(...)` | Tiered unreachable / unused-export / zombie-package findings. Run before a cleanup sprint, not before a targeted fix. |
-| `get_overview(repo?)` | Architecture map for an unfamiliar repo. One-time orientation; skip on subsequent calls in the same session. |
+1. Start with `get_overview()` on a new task to orient yourself.
+2. Call `get_context(targets=["path/to/file.py"])` for enriched context on unfamiliar files — but always read the source before editing.
+3. Call `get_risk(targets=["path/to/file.py"])` before changing hotspot files.
+4. Don't know where something lives? Call `search_codebase(query="authentication flow")`.
+5. Need to understand why code is structured a certain way? Call `get_why(query="why JWT over sessions")` before architectural changes.
+6. After **architectural changes**, consider calling `update_decision_records(action="create", ...)` to record the rationale.
+7. Need to understand how two modules connect? Call `get_dependency_path(source="src/auth", target="src/db")`.
+8. Before cleanup tasks, call `get_dead_code()` to find confirmed unused code.
+9. For documentation or diagrams, call `get_architecture_diagram(scope="src/auth")`.
 
-**Composition tips:**
-- `get_answer` → if `confidence` is `medium`/`low`, follow the `best_guesses[0].file` or `fallback_targets[0]` into `get_context`, then `get_symbol` for bytes.
-- `get_context` returns `decision_records` titles → call `get_why(targets=[...])` for the rationale.
-- `get_context` returns `hotspot: true` → call `get_risk` before editing.
-- PR review → `get_risk(targets=[...], changed_files=[...])`; read the `directive` block first.
+**Note:** MCP tool responses reflect the last index run. If the index is stale, verify against source files.
 
-**Verify when:** `_meta.stale_warning` is present, or `retrieval_quality` is `partial`/`weak`, or `search_method` is `bm25`. Otherwise trust the response and act on it.
+| Tool | When to use |
+|------|-------------|
+| `get_overview()` | Orient yourself on a new task |
+| `get_context(targets=[...])` | Enriched context on unfamiliar files |
+| `get_risk(targets=[...])` | Before changing hotspot files |
+| `get_why(query="...")` | Before architectural changes |
+| `update_decision_records(action=...)` | After architectural changes — record decisions |
+| `search_codebase(query="...")` | When locating code |
+| `get_dependency_path(source=..., target=...)` | When tracing module connections |
+| `get_dead_code()` | Before any cleanup or removal |
+| `get_architecture_diagram(scope=...)` | For visual structure or documentation |
 
 <!-- REPOWISE:END -->

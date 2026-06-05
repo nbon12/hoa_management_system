@@ -9,3 +9,4 @@ neko-hoa/test-results/
 **/bin/
 **/obj/
 **/.venv-repowise/
+neko-hoa-mock/
