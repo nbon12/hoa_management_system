@@ -1,0 +1,35 @@
+---
+description: Prefer Repowise MCP for codebase discovery and orientation
+alwaysApply: true
+---
+
+# Codebase search — use Repowise first
+
+This repo is indexed by Repowise (MCP server: `repowise`). Before exploring with SemanticSearch, Grep, or Glob, call Repowise MCP tools via `CallMcpTool`.
+
+## Tool priority
+
+1. **New task / unfamiliar area:** `get_overview()`
+2. **"How does X work?" / "Why is Y like this?":** `get_answer(question="...")`
+3. **Find code by concept (unknown file):** `search_codebase(query="...")`
+4. **Context on a file/module/symbol:** `get_context(targets=["path/to/file"])`
+5. **Source for one symbol:** `get_symbol("path/to/file::Name")` — use `symbol_id` from `get_context`
+6. **Before refactors:** `get_why(query="...")` or `get_why(targets=["..."])`
+7. **Before editing hotspots:** `get_risk(targets=["..."])`
+8. **Cleanup sprints:** `get_dead_code()`
+
+## When native tools are OK
+
+- **Grep / Glob:** exact identifiers, filenames, or strings after Repowise narrows scope
+- **Read:** verify source before editing; Repowise context is not a substitute for the file bytes
+- **SemanticSearch:** only if Repowise MCP is unavailable — say so explicitly first
+
+## Composition
+
+- Low `get_answer` confidence → follow `best_guesses[0].file` into `get_context`, then `get_symbol`
+- `get_context` shows `hotspot: true` → call `get_risk` before editing
+- PR review → `get_risk(targets=[...], changed_files=[...])`; read `directive` first
+
+## Trust signals
+
+Repowise responses include `_meta` with `indexed_commit` and optional `stale_warning`. Re-verify against source when `stale_warning` is present, `retrieval_quality` is partial/weak, or `search_method` is `bm25`.
