@@ -32,4 +32,6 @@ This repo is indexed by Repowise (MCP server: `repowise`). Before exploring with
 
 ## Trust signals
 
-Repowise responses include `_meta` with `indexed_commit` and optional `stale_warning`. Re-verify against source when `stale_warning` is present, `retrieval_quality` is partial/weak, or `search_method` is `bm25`.
+Repowise responses include `_meta` with `indexed_commit` and optional `stale_warning`. Re-verify against source when `stale_warning` is present or `retrieval_quality` is partial/weak.
+
+**Strict embeddings:** If `search_method` is `bm25` or `_meta.embedder_degraded` is true, follow `repowise-strict-embeddings` — stop and alert the user; do not treat results as semantic search.
