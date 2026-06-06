@@ -11,7 +11,7 @@ namespace HOAManagementCompany.Features.Payments;
 // Ledger, drafts, recurring payments, one-time payment (simulated ACH/card); property-scoped.
 // <!-- REPOWISE:END -->
 
-public class PaymentService(ApplicationDbContext db, ILogger<PaymentService> logger)
+public class PaymentService(ApplicationDbContext db)
 {
     private const decimal CardFee = 1.95m;
 
@@ -41,35 +41,6 @@ public class PaymentService(ApplicationDbContext db, ILogger<PaymentService> log
 
         var totalPages = (int)Math.Ceiling(total / (double)req.PageSize);
         return new LedgerResponse(items, total, req.Page, req.PageSize, totalPages);
-    }
-
-    public async Task<OneTimePaymentResponse> SubmitOneTimePaymentAsync(Guid propertyId, OneTimePaymentRequest req, CancellationToken ct = default)
-    {
-        var isCard = req.Method.Equals("card", StringComparison.OrdinalIgnoreCase);
-        var fee = isCard ? CardFee : 0m;
-        var total = req.Amount + fee;
-        var confirmation = $"CONF-{Guid.NewGuid():N}"[..16].ToUpperInvariant();
-
-        var latestBalance = await db.LedgerEntries
-            .Where(e => e.PropertyId == propertyId)
-            .OrderByDescending(e => e.EntryDate)
-            .Select(e => e.RunningBalance)
-            .FirstOrDefaultAsync(ct);
-
-        db.LedgerEntries.Add(new LedgerEntry
-        {
-            PropertyId = propertyId,
-            EntryDate = DateOnly.FromDateTime(DateTime.Today),
-            Description = $"Online Payment – {(isCard ? "Card" : "ACH")} – {confirmation}",
-            DocumentNumber = confirmation,
-            PaymentAmount = req.Amount,
-            RunningBalance = latestBalance - req.Amount,
-            EntryType = LedgerEntryType.Payment
-        });
-        await db.SaveChangesAsync(ct);
-
-        logger.LogInformation("One-time payment processed: {Confirmation}, amount {Amount}", confirmation, req.Amount);
-        return new OneTimePaymentResponse(confirmation, req.Amount, isCard ? fee : null, req.Method, DateTimeOffset.UtcNow);
     }
 
     public async Task<RecurringPaymentDto?> GetRecurringAsync(Guid propertyId, CancellationToken ct = default)

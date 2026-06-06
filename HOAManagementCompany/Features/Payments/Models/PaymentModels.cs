@@ -6,10 +6,6 @@ public record LedgerResponse(IEnumerable<LedgerItemDto> Items, int TotalCount, i
 
 public record LedgerItemDto(Guid Id, DateOnly EntryDate, string? DocumentNumber, string Description, decimal ChargeAmount, decimal PaymentAmount, decimal RunningBalance, string EntryType);
 
-public record OneTimePaymentRequest(string Method, decimal Amount, string? RoutingNumber = null, string? AccountNumber = null, string? AccountType = null, string? CardNumber = null, string? CardExpiry = null, string? CardCvv = null, string? CardholderName = null, string? BillingZip = null);
-
-public record OneTimePaymentResponse(string ConfirmationNumber, decimal Amount, decimal? ProcessingFee, string Method, DateTimeOffset ProcessedAt);
-
 public record RecurringPaymentDto(Guid Id, string AmountType, decimal? FixedAmount, string Method, int DraftDay, string Status, decimal ProcessingFee, string? RoutingNumberMasked, string? AccountNumberMasked, string? AccountType, string? CardNumberMasked, string? CardExpiry, string? CardholderName, string? BillingZip);
 
 public record RecurringPaymentRequest(string AmountType, decimal? FixedAmount, string Method, int DraftDay, string? RoutingNumber = null, string? AccountNumber = null, string? AccountType = null, string? CardNumber = null, string? CardExpiry = null, string? CardCvv = null, string? CardholderName = null, string? BillingZip = null);
