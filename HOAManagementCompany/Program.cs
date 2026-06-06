@@ -296,6 +296,15 @@ if (app.Environment.IsDevelopment())
 
     await using (var scope = app.Services.CreateAsyncScope())
     {
+        // Apply migrations + seed dev data on every startup. SeedAsync runs
+        // MigrateAsync first and is idempotent (skips inserts when the seed user
+        // already exists), so a fresh `docker-compose up` yields a ready-to-use,
+        // login-able database without a manual --seed step.
+        var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
+        await seeder.SeedAsync();
+
+        // Refresh document PDFs in object storage on every startup — the minio
+        // volume can be reset independently of the database.
         var storageInit = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DocumentStorageInitializer>();
         await storageInit.EnsureValidPdfsAsync();
     }

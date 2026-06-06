@@ -1,16 +1,13 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
-using HOAManagementCompany.Infrastructure.Storage;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace HOAManagementCompany.Seed;
 
-public class StorageSeeder(ApplicationDbContext db, IServiceProvider services, SeedResult result, ILogger logger)
+public class StorageSeeder(ApplicationDbContext db, SeedResult result, ILogger logger)
 {
     public async Task SeedAsync(CancellationToken ct = default)
     {
-        var storage = services.GetRequiredService<IDocumentStorage>();
         var communityId = result.CommunityId;
 
         var documents = new[]
@@ -46,18 +43,12 @@ public class StorageSeeder(ApplicationDbContext db, IServiceProvider services, S
             ("Articles of Incorporation",              DocumentCategory.Governing, false, "documents/governing/articles-of-inc.pdf",      "2005-01-12", 819_200L),
         };
 
+        // Note: PDF bytes are NOT uploaded here. The bucket does not exist yet at this
+        // point in the seed sequence; DocumentStorageInitializer.EnsureValidPdfsAsync
+        // (called immediately after this seeder) creates the bucket and uploads a PDF
+        // for every StorageKey row inserted below.
         foreach (var (name, category, pinned, key, effectiveDateStr, sizeBytes) in documents)
         {
-            try
-            {
-                var pdfBytes = await TestDataFiles.ReadSamplePdfAsync(ct);
-                await storage.UploadAsync(key, pdfBytes, ct: ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to upload placeholder for {Name} — continuing", name);
-            }
-
             var effectiveDate = DateOnly.Parse(effectiveDateStr);
             var sizeLabel = sizeBytes >= 1_048_576
                 ? $"{sizeBytes / 1_048_576.0:F1} MB"
