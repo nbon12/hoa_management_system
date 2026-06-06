@@ -40,6 +40,21 @@ services:
     networks:
       - app_network
 
+  # .NET Aspire Dashboard — zero-config local telemetry viewer (FR-006/FR-014).
+  # Local-dev only; not deployed. Anonymous mode, no login token.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    restart: unless-stopped
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+      # Expose the OTLP/HTTP (protobuf) receiver on 18890 (FR-022).
+      DOTNET_DASHBOARD_OTLP_HTTP_ENDPOINT_URL: "http://0.0.0.0:18890"
+    ports:
+      - "18888:18888"   # Dashboard UI
+      - "18890:18890"   # OTLP/HTTP receiver
+    networks:
+      - app_network
+
   api:
     build:
       context: .
@@ -60,9 +75,15 @@ services:
       Storage__SecretKey: "minioadmin"
       Storage__BucketName: "hoa-documents"
       Storage__ForcePathStyle: "true"
+      # OpenTelemetry → Aspire Dashboard (FR-007/FR-014/FR-022).
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://aspire-dashboard:18890"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+      OTEL_SERVICE_NAME: "hoa-api"
     depends_on:
       db:
         condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
     networks:
       - app_network
 
