@@ -28,7 +28,8 @@ public class DashboardService(ApplicationDbContext db)
             .CountAsync(v => v.PropertyId == propertyId && v.Status == ViolationStatus.Open, ct);
 
         var documentCount = await db.HoaDocuments.CountAsync(d => d.CommunityId == communityId, ct);
-        var monthStart = new DateTimeOffset(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        var utcNow = DateTime.UtcNow;
+        var monthStart = new DateTimeOffset(utcNow.Year, utcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
         var newDocuments = await db.HoaDocuments
             .CountAsync(d => d.CommunityId == communityId && d.CreatedAt >= monthStart, ct);
 

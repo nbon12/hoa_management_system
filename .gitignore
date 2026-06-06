@@ -1,6 +1,11 @@
 bin/
 obj/
 /packages/
+
+# Test coverage artifacts
+/coverage/
+diff-coverage.md
+diff-coverage.html
 riderModule.iml
 /_ReSharper.Caches/
 
