@@ -31,7 +31,7 @@ public class DatabaseSeeder(
         await new PropertySeeder(db, authResult, logger).SeedAsync(ct);
         await new PaymentSeeder(db, authResult, logger).SeedAsync(ct);
         await new CommunitySeeder(db, authResult, logger).SeedAsync(ct);
-        await new StorageSeeder(db, services, authResult, logger).SeedAsync(ct);
+        await new StorageSeeder(db, authResult, logger).SeedAsync(ct);
         await documentStorageInitializer.EnsureValidPdfsAsync(ct);
 
         logger.LogInformation("Seed complete.");

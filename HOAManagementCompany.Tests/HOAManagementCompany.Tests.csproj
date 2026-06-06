@@ -29,6 +29,9 @@
 
     <!-- ASP.NET Core Testing -->
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.*" />
+
+    <!-- OpenTelemetry in-memory exporter for trace/metric assertions (test-only) -->
+    <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.*" />
   </ItemGroup>
 
   <ItemGroup>

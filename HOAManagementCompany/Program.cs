@@ -1,47 +1,93 @@
 // <!-- REPOWISE:START domain=bootstrap -->
-// Middleware pipeline and DI registration — HOAManagementCompany API
+// Middleware pipeline and DI registration — HOAManagementCompany API.
+// Observability wiring lives here: Serilog (Console + OTLP/JSON sink, trace/span +
+// user-GUID enrichment), Sentry-on-OTel (consumes the OpenTelemetry activity pipeline
+// with an independent trace sample rate), and builder.AddObservability() (OTel tracing/
+// metrics → OTLP, scrubbing, sampling). Telemetry-init is guarded as non-fatal (FR-008).
 // <!-- REPOWISE:END -->
 
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Amazon.Runtime;
 using Amazon.S3;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Features.Common;
+using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Infrastructure.Storage;
+using Sentry.OpenTelemetry;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Serilog;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Serilog ────────────────────────────────────────────────────────────────
-builder.Host.UseSerilog((ctx, cfg) => cfg
-    .ReadFrom.Configuration(ctx.Configuration)
-    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName));
+// 3-arg form so DI-registered ILogEventSink/ILogEventEnricher (e.g. the integration
+// test in-memory sink, the scrubbing + trace enrichers) are composed in via
+// ReadFrom.Services. The OTLP sink ships structured logs to the dashboard/vendor; the
+// human-readable Console sink is kept for local DX (FR-019/FR-020).
+builder.Host.UseSerilog((ctx, services, cfg) =>
+{
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+        .ReadFrom.Services(services)
+        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+        .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
+        .Enrich.FromLogContext()
+        .Enrich.With(new ActivityTraceEnricher()) // trace_id/span_id on every record (FR-003).
+        .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName);
 
-// ── Sentry ─────────────────────────────────────────────────────────────────
-builder.WebHost.UseSentry(builder.Configuration["Sentry:Dsn"] ?? "");
+    // Tests use the in-memory sink only — no external OTLP egress in the test path.
+    if (!ctx.HostingEnvironment.IsEnvironment("Test"))
+    {
+        var obs = ObservabilityOptions.FromConfiguration(ctx.Configuration, ctx.HostingEnvironment);
+        cfg.WriteTo.OpenTelemetry(o =>
+        {
+            o.Endpoint = $"{obs.OtlpEndpoint.TrimEnd('/')}/v1/logs";
+            o.Protocol = Serilog.Sinks.OpenTelemetry.OtlpProtocol.HttpProtobuf;
+            o.ResourceAttributes = new Dictionary<string, object> { ["service.name"] = obs.ServiceName };
+            if (!string.IsNullOrWhiteSpace(obs.OtlpHeaders))
+                foreach (var pair in obs.OtlpHeaders.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    var idx = pair.IndexOf('=');
+                    if (idx > 0) o.Headers[pair[..idx].Trim()] = pair[(idx + 1)..].Trim();
+                }
+        });
+    }
+});
+
+// ── Sentry (consumes the OpenTelemetry pipeline — Sentry-on-OTel, FR-023) ────
+var sentryTraceSampleRate = builder.Configuration.GetValue<double?>("Observability:SentryTraceSampleRatio") ?? 0.2;
+builder.WebHost.UseSentry();
 builder.Services.Configure<Sentry.AspNetCore.SentryAspNetCoreOptions>(o =>
 {
+    o.Dsn = builder.Configuration["Sentry:Dsn"] ?? "";
     o.Environment = builder.Environment.EnvironmentName;
-    o.TracesSampleRate = 0.2;
+    // Sentry keeps its OWN trace sample rate so its quota is decoupled from OTel's 100%
+    // default; error capture stays unconditional (FR-013/FR-023/FR-027).
+    o.TracesSampleRate = sentryTraceSampleRate;
+    o.UseOpenTelemetry();
+    // Broaden the before-send scrub to the FR-009 field set (adds emails, names, etc.).
+    var scrubKeys = new[]
+    {
+        "password", "token", "cardNumber", "cardCvv",
+        "routingNumber", "accountNumber", "email", "fullName"
+    };
     o.SetBeforeSend((sentryEvent, _) =>
     {
         if (sentryEvent.Request?.Data is IDictionary<string, object?> data)
         {
-            foreach (var key in new[] { "cardNumber", "cardCvv", "routingNumber", "accountNumber" })
-                data.Remove(key);
+            foreach (var key in data.Keys.ToList())
+                if (scrubKeys.Any(s => key.Contains(s, StringComparison.OrdinalIgnoreCase)))
+                    data.Remove(key);
         }
         return sentryEvent;
     });
@@ -51,11 +97,15 @@ builder.Services.Configure<Sentry.AspNetCore.SentryAspNetCoreOptions>(o =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
 
-builder.Services.AddDbContext<ApplicationDbContext>(o =>
-    o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
+// One traced data source shared by both registrations so DB spans carry SQL text (FR-004).
+// Registered via a factory so the DI container owns and disposes its connection pool.
+builder.Services.AddSingleton(_ => ObservabilityNpgsql.BuildTracedDataSource(connectionString));
 
-builder.Services.AddDbContextFactory<ApplicationDbContext>(o =>
-    o.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)), ServiceLifetime.Scoped);
+builder.Services.AddDbContext<ApplicationDbContext>((sp, o) =>
+    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3)));
+
+builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, o) =>
+    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3)), ServiceLifetime.Scoped);
 
 // ── ASP.NET Core Identity ──────────────────────────────────────────────────
 builder.Services.AddIdentityCore<ApplicationUser>(o =>
@@ -124,10 +174,25 @@ builder.Services.AddRateLimiter(o =>
         opts.Window = TimeSpan.FromMinutes(1);
         opts.QueueLimit = 0;
     });
+    // Browser telemetry proxy limiter — keyed by client IP so a single noisy client
+    // cannot exhaust the window for everyone (FR-031). Permit count is env-tunable.
+    var telemetryPermits = builder.Configuration.GetValue<int?>("Observability:TelemetryProxyRateLimitPerMinute") ?? 120;
+    o.AddPolicy("telemetry", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = telemetryPermits,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
 // ── CORS ───────────────────────────────────────────────────────────────────
+// AllowAnyHeader/AllowAnyMethod already permit the W3C `traceparent`/`tracestate`
+// request headers and the `application/x-protobuf` content type (a non-safelisted type
+// that triggers a CORS preflight) used by the browser telemetry proxy path (FR-028).
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.WithOrigins("http://localhost:4200", "https://localhost:4200")
      .AllowAnyHeader()
@@ -143,6 +208,7 @@ builder.Services.AddHealthChecks();
 
 // ── FastEndpoints + Swagger ────────────────────────────────────────────────
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient(); // used by the browser telemetry proxy forward (FR-029)
 builder.Services.AddFastEndpoints();
 
 if (builder.Environment.IsDevelopment())
@@ -164,6 +230,18 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>(
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();
 builder.Services.AddScoped<HOAManagementCompany.Seed.DocumentStorageInitializer>();
 
+// ── OpenTelemetry Observability ────────────────────────────────────────────
+// Telemetry-init failures MUST never block startup (FR-008/US1 AS3).
+try
+{
+    builder.AddObservability();
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine(
+        $"[Observability] OpenTelemetry initialization failed; continuing without telemetry: {ex.Message}");
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
@@ -183,6 +261,12 @@ if (args.Contains("--seed"))
 
 // ── Middleware Pipeline ────────────────────────────────────────────────────
 app.UseExceptionHandler();
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+// Push the authenticated user's subject GUID into the LogContext BEFORE request logging,
+// so the request-completion log (and any request-scoped entry) carries user_id (FR-011).
+app.UseMiddleware<TraceEnrichmentMiddleware>();
 app.UseSerilogRequestLogging(o =>
 {
     o.EnrichDiagnosticContext = (diag, ctx) =>
@@ -191,9 +275,6 @@ app.UseSerilogRequestLogging(o =>
         diag.Set("UserId", ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "anonymous");
     };
 });
-app.UseCors();
-app.UseAuthentication();
-app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapHealthChecks("/health");
@@ -215,6 +296,15 @@ if (app.Environment.IsDevelopment())
 
     await using (var scope = app.Services.CreateAsyncScope())
     {
+        // Apply migrations + seed dev data on every startup. SeedAsync runs
+        // MigrateAsync first and is idempotent (skips inserts when the seed user
+        // already exists), so a fresh `docker-compose up` yields a ready-to-use,
+        // login-able database without a manual --seed step.
+        var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
+        await seeder.SeedAsync();
+
+        // Refresh document PDFs in object storage on every startup — the minio
+        // volume can be reset independently of the database.
         var storageInit = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DocumentStorageInitializer>();
         await storageInit.EnsureValidPdfsAsync();
     }

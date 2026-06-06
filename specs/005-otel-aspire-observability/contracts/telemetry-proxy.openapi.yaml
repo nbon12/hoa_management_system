@@ -1,0 +1,66 @@
+openapi: 3.0.3
+info:
+  title: HOA Management Company — Telemetry Proxy
+  version: 1.0.0
+  description: >
+    Single additive endpoint introduced by feature 005-otel-aspire-observability.
+    Receives browser-originated OpenTelemetry trace telemetry (OTLP/HTTP protobuf) and
+    forwards it, as a passthrough, to the server-configured telemetry destination
+    (the .NET Aspire Dashboard in local development, or a cloud observability vendor in
+    production). Vendor credentials are attached server-side and never exposed to the
+    browser. The endpoint does not change any existing API contract.
+servers:
+  - url: /api/v1
+    description: Application API base path (same as existing endpoints)
+paths:
+  /telemetry:
+    post:
+      operationId: ingestBrowserTelemetry
+      summary: Accept browser OTLP trace telemetry and forward to the configured destination
+      description: >
+        Anonymous-permitted (so traces from pre-login pages are captured), rate-limited,
+        and body-size-capped. The request body is an OTLP ExportTraceServiceRequest encoded
+        as protobuf. The server forwards the payload unchanged (preserving browser trace/span
+        IDs), applies the sensitive-data scrubbing policy, and returns immediately
+        (fire-and-forget). Forwarding failures are swallowed and never surfaced to the client.
+        The destination is server-configured and can never be specified by the client.
+      security: []   # anonymous permitted by design (FR-031)
+      parameters:
+        - in: header
+          name: Content-Type
+          required: true
+          schema:
+            type: string
+            enum: [application/x-protobuf]
+          description: OTLP/HTTP protobuf encoding (FR-022). gRPC is not accepted.
+      requestBody:
+        required: true
+        content:
+          application/x-protobuf:
+            schema:
+              type: string
+              format: binary
+              description: >
+                OTLP ExportTraceServiceRequest (protobuf). Maximum size is configurable
+                (default 1 MiB); larger requests are rejected with 413.
+      responses:
+        '202':
+          description: >
+            Accepted for asynchronous forwarding. No response body. Trace identifiers are
+            never echoed in responses (internal observability signals only).
+        '413':
+          description: Payload exceeds the configured maximum body size.
+        '415':
+          description: Unsupported media type (only application/x-protobuf is accepted).
+        '429':
+          description: Rate limit exceeded for the client (fixed-window limiter).
+      x-constraints:
+        cacheable: false
+        edgeCacheable: false
+        pagination: not-applicable
+        authentication: anonymous-permitted
+        authorization: none (no HOA-scoped data; never carries HOA/association identifiers)
+        rateLimited: true
+        idempotent: false
+        responseEnvelope: none (status-only, no body)
+components: {}

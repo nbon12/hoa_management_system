@@ -1,15 +1,25 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
+using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Npgsql;
 using Minio;
 using Minio.DataModel.Args;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using Serilog.Core;
 using Xunit;
+using Metric = OpenTelemetry.Metrics.Metric;
 
 namespace HOAManagementCompany.Tests.Fixtures;
 
@@ -22,6 +32,43 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
     private IDbContextTransaction? _transaction;
     private readonly WebApplicationFactory<Program> _factory;
     private static bool _testDocumentsUploaded;
+
+    // One traced Npgsql data source per connection string, shared across all factories.
+    private static readonly ConcurrentDictionary<string, NpgsqlDataSource> SharedTracedDataSources = new();
+
+    // ── Telemetry capture (no external telemetry service — FR-024/FR-025) ──────
+    private readonly List<Activity> _exportedSpans = new();
+    private readonly List<Metric> _exportedMetrics = new();
+    private readonly InMemoryLogSink _logSink = new();
+
+    /// <summary>Server spans exported to the in-memory trace exporter (synchronous on end).</summary>
+    protected IReadOnlyList<Activity> ExportedSpans => _exportedSpans;
+
+    /// <summary>Metrics collected by the in-memory metric reader (call <see cref="FlushTelemetry"/> first).</summary>
+    protected IReadOnlyList<Metric> ExportedMetrics => _exportedMetrics;
+
+    /// <summary>Structured log records captured by the real in-memory Serilog sink.</summary>
+    protected InMemoryLogSink LogSink => _logSink;
+
+    /// <summary>Forces the metric reader (and tracer) to flush so assertions are deterministic.</summary>
+    protected void FlushTelemetry(int timeoutMilliseconds = 5000)
+    {
+        Services.GetService<TracerProvider>()?.ForceFlush(timeoutMilliseconds);
+        Services.GetService<MeterProvider>()?.ForceFlush(timeoutMilliseconds);
+    }
+
+    /// <summary>
+    /// Override to supply per-test configuration that wins over the harness defaults.
+    /// Implementations must be stateless (this runs from the base constructor).
+    /// </summary>
+    protected virtual IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
+        Array.Empty<KeyValuePair<string, string?>>();
+
+    /// <summary>
+    /// Override to register or replace services for a test (runs from the base
+    /// constructor, after the harness's own service overrides).
+    /// </summary>
+    protected virtual void ConfigureTestServices(IServiceCollection services) { }
 
     protected IntegrationTestBase(TestDatabaseFixture fixture)
     {
@@ -42,6 +89,11 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
                         ["ConnectionStrings:DefaultConnection"] = fixture.ConnectionString,
+                        // Allow Information-level logs so observability tests can read the
+                        // structured request log from the in-memory Serilog sink.
+                        ["Serilog:MinimumLevel:Default"] = "Information",
+                        // Small telemetry-proxy rate limit so the 429 test is fast/deterministic.
+                        ["Observability:TelemetryProxyRateLimitPerMinute"] = "5",
                         ["Jwt:Secret"] = "test-secret-for-integration-tests-must-be-32-chars!!",
                         ["Jwt:Issuer"] = "nekohoa-api",
                         ["Jwt:Audience"] = "nekohoa-frontend",
@@ -54,21 +106,40 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Storage:ForcePathStyle"] = "true",
                         ["Sentry:Dsn"] = ""
                     });
+
+                    // Per-test overrides (e.g. CaptureSqlText) win over the defaults above.
+                    var overrides = ExtraConfiguration().ToList();
+                    if (overrides.Count > 0)
+                        cfg.AddInMemoryCollection(overrides);
                 });
 
                 builder.ConfigureServices(services =>
                 {
-                    // Replace DbContext registrations with the Testcontainers connection
+                    // Replace DbContext registrations with the Testcontainers connection.
+                    // Use the traced data source so DB spans carry SQL text (FR-004).
                     var toRemove = services
                         .Where(d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>)
-                                 || d.ServiceType == typeof(IDbContextFactory<ApplicationDbContext>))
+                                 || d.ServiceType == typeof(IDbContextFactory<ApplicationDbContext>)
+                                 || d.ServiceType == typeof(NpgsqlDataSource))
                         .ToList();
                     foreach (var d in toRemove) services.Remove(d);
 
-                    services.AddDbContext<ApplicationDbContext>(o =>
-                        o.UseNpgsql(fixture.ConnectionString));
-                    services.AddDbContextFactory<ApplicationDbContext>(o =>
-                        o.UseNpgsql(fixture.ConnectionString));
+                    // Reuse ONE traced data source per connection string across all test
+                    // factories. A distinct instance per factory makes EF Core build a new
+                    // internal service provider each time (ManyServiceProvidersCreatedWarning);
+                    // a shared instance keeps EF's provider cache warm and avoids pool churn.
+                    var tracedDataSource = SharedTracedDataSources.GetOrAdd(
+                        fixture.ConnectionString, ObservabilityNpgsql.BuildTracedDataSource);
+                    services.AddSingleton(tracedDataSource);
+                    // Each test builds a fresh WebApplicationFactory (its own root provider), so
+                    // EF spins up a new internal provider per factory — benign in tests but it
+                    // trips ManyServiceProvidersCreatedWarning after 20. Suppress it here only.
+                    services.AddDbContext<ApplicationDbContext>(o => o
+                        .UseNpgsql(tracedDataSource)
+                        .ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
+                    services.AddDbContextFactory<ApplicationDbContext>(o => o
+                        .UseNpgsql(tracedDataSource)
+                        .ConfigureWarnings(w => w.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
 
                     // Replace S3 client with one configured for Testcontainers MinIO
                     var s3Descriptors = services.Where(d => d.ServiceType == typeof(IAmazonS3)).ToList();
@@ -82,6 +153,19 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                             AuthenticationRegion = "us-east-1",
                             UseHttp = fixture.MinioEndpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
                         }));
+
+                    // Append in-memory OTel exporters to the app's tracer/meter providers so
+                    // tests can read spans and metrics without any external collector.
+                    services.ConfigureOpenTelemetryTracerProvider(tracing =>
+                        tracing.AddInMemoryExporter(_exportedSpans));
+                    services.ConfigureOpenTelemetryMeterProvider(metrics =>
+                        metrics.AddInMemoryExporter(_exportedMetrics));
+
+                    // Compose a real Serilog sink via ReadFrom.Services for log assertions.
+                    services.AddSingleton<ILogEventSink>(_logSink);
+
+                    // Per-test service registrations/replacements.
+                    ConfigureTestServices(services);
                 });
             });
 
