@@ -16,6 +16,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # diff-cover needs the base branch history to compute changed lines
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -53,6 +56,44 @@ jobs:
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Setup Python
+        if: github.event_name == 'pull_request'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install diff-cover
+        if: github.event_name == 'pull_request'
+        run: pip install diff-cover
+
+      - name: Enforce 90% coverage on changed lines
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          # Don't abort on the pipeline; capture diff-cover's exit code via pipefail
+          # so the gate still fails the job, while streaming its report to the summary.
+          set +e
+          set -o pipefail
+          {
+            echo "## Diff coverage — changed lines (gate: 90%)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          diff-cover ./coverage/*/coverage.cobertura.xml \
+            --compare-branch origin/${{ github.event.pull_request.base.ref }} \
+            --fail-under 90 \
+            --format html:diff-coverage.html 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          status=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload diff coverage report
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diff-coverage-report
+          path: diff-coverage.html
+          if-no-files-found: ignore
 
   docker-push:
     name: Push Docker Image
