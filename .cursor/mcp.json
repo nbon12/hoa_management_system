@@ -9,6 +9,17 @@
         "stdio"
       ],
       "description": "Repowise codebase intelligence — wiki, dependency graph, git hotspots, code health, architectural decisions"
+    },
+    "headroom": {
+      "command": "/Users/nicholasbonilla/.local/bin/headroom",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "HEADROOM_PROXY_URL": "http://127.0.0.1:8787"
+      },
+      "description": "Headroom context compression — compress and retrieve tool outputs to reduce token usage"
     }
   }
 }
