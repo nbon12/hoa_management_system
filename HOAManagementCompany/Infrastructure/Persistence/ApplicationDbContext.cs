@@ -126,6 +126,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(x => x.ProcessingFee).HasColumnType("decimal(10,2)");
             e.Property(x => x.AmountType).HasConversion<string>();
             e.Property(x => x.Method).HasConversion<string>();
+            e.Property(x => x.MethodFunding).HasConversion<string>();
+            e.Property(x => x.VaultedPaymentMethodId).HasMaxLength(255);
+            e.Property(x => x.MethodBrand).HasMaxLength(50);
+            e.Property(x => x.MethodLast4).HasMaxLength(4);
             e.HasOne(x => x.Property).WithMany(p => p.RecurringPayments)
                 .HasForeignKey(x => x.PropertyId);
             e.ToTable("RecurringPayments");

@@ -219,8 +219,8 @@ public class TestDataSeeder(ApplicationDbContext db)
         {
             Id = Guid.NewGuid(), PropertyId = primaryProperty.Id,
             AmountType = RecurringAmountType.Assessment, Method = PaymentMethod.Ach,
-            DraftDay = 1, Status = "active", RoutingNumberMasked = "****1234",
-            AccountNumberMasked = "****5678", AccountType = "checking"
+            DraftDay = 1, Status = "active", VaultedPaymentMethodId = "pm_seed_ach",
+            MethodBrand = "Bank", MethodLast4 = "5678"
         });
 
         // Community data
