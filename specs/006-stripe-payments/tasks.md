@@ -164,8 +164,8 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T069 [P] [US3] Testcontainers Theory: opt-in matrix (sms/email/both/neither) → alert only on opted channels; one-time failure → no alert, in `HOAManagementCompany.Tests/Integration/Payments/AlertOptInTests.cs`
 - [X] T070 [P] [US3] Testcontainers test: provider send failure recorded (`alert.sent success=false` + errored span), not retried, webhook ack still 200 (FR-022a), in `HOAManagementCompany.Tests/Integration/Payments/AlertFailureTests.cs`
 - [X] T071 [P] [US3] Testcontainers test: `AlertConsent` captured on opt-in; opt-out/STOP disables channel (FR-031), in `HOAManagementCompany.Tests/Integration/Payments/AlertConsentTests.cs`
-- [ ] T072 [P] [US3] Angular Testing Library test for the payment-alerts opt-in section in `neko-hoa/src/app/features/payments/recurring/alerts/alerts.component.spec.ts`
-- [ ] T073 [P] [US3] Cypress E2E for alert opt-in/opt-out in `neko-hoa/cypress/e2e/alert-preferences.cy.ts`
+- [X] T072 [P] [US3] Angular Testing Library test for the payment-alerts opt-in section in `neko-hoa/src/app/features/payments/recurring/alerts/alerts.component.spec.ts`
+- [X] T073 [P] [US3] Cypress E2E for alert opt-in/opt-out in `neko-hoa/cypress/e2e/alert-preferences.cy.ts`
 
 ### Implementation for User Story 3
 
@@ -175,7 +175,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T077 [P] [US3] Implement `SendGridEmailProvider` in `HOAManagementCompany/Infrastructure/Payments/Alerts/SendGridEmailProvider.cs`
 - [X] T078 [US3] Implement `AlertService` (channel selection, masked content, outbox-driven dispatch) in `HOAManagementCompany/Features/Payments/Alerts/AlertService.cs`
 - [X] T079 [US3] Wire failure-alert enqueue on recurring `payment_failed` (FR-015) and ACH return (FR-014c) into the webhook handlers via outbox in `HOAManagementCompany/Features/Payments/Webhooks/WebhookProcessor.cs` <!-- consolidated WebhookProcessor, not Handlers/ -->`
-- [ ] T080 [P] [US3] Add the "Payment alerts" opt-in section + service methods in `neko-hoa/src/app/features/payments/recurring/alerts/alerts.component.ts` and `payments.service.ts`
+- [X] T080 [P] [US3] Add the "Payment alerts" opt-in section + service methods in `neko-hoa/src/app/features/payments/recurring/alerts/alerts.component.ts` and `payments.service.ts`
 
 **Checkpoint**: All three user stories independently functional.
 

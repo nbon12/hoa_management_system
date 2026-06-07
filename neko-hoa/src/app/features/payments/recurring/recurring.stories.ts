@@ -54,6 +54,12 @@ class EnrolledPaymentsService {
   cancelRecurring(): Promise<void> {
     return Promise.resolve();
   }
+  getAlertPreferences() {
+    return Promise.resolve({ smsOptIn: false, emailOptIn: false, alertPhone: null });
+  }
+  saveAlertPreferences(prefs: unknown) {
+    return Promise.resolve(prefs);
+  }
 }
 
 /** Stub for a resident with no enrollment yet — the page shows the "Set up auto-pay" CTA. */

@@ -98,6 +98,16 @@ export interface RecurringSaveRequest {
   mandateVersion?: string;
 }
 
+/**
+ * Payment-alert opt-in matrix for the signed-in owner (mirrors backend AlertPreferencesDto, FR-013/FR-031).
+ * Alerts default OFF (TCPA-safe). SMS requires a phone number on file in E.164 form.
+ */
+export interface AlertPreferences {
+  smsOptIn: boolean;
+  emailOptIn: boolean;
+  alertPhone: string | null;
+}
+
 /** One scheduled/historical auto-pay draft row (mirrors backend DraftEntryDto). */
 export interface DraftRow {
   id: string;
@@ -253,6 +263,22 @@ export class PaymentsService {
   /** Disables auto-pay and terminates the stored mandate. */
   async cancelRecurring(): Promise<void> {
     await firstValueFrom(this.http.delete(`${this.base}/payments/recurring`));
+  }
+
+  // ── Payment alerts (opt-in) ─────────────────────────────────────────────────
+
+  /** Current SMS/email opt-in flags + alert phone for the signed-in owner. */
+  async getAlertPreferences(): Promise<AlertPreferences> {
+    return firstValueFrom(
+      this.http.get<AlertPreferences>(`${this.base}/payments/alert-preferences`)
+    );
+  }
+
+  /** Updates the opt-in matrix; the backend appends an immutable TCPA consent row per changed channel. */
+  async saveAlertPreferences(prefs: AlertPreferences): Promise<AlertPreferences> {
+    return firstValueFrom(
+      this.http.put<AlertPreferences>(`${this.base}/payments/alert-preferences`, prefs)
+    );
   }
 
   // ── Mappers ───────────────────────────────────────────────────────────────

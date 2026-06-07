@@ -30,6 +30,11 @@ function mockPaymentsService(recurring: RecurringInfo | null = null): Partial<Pa
     createSetupIntent: jasmine.createSpy('createSetupIntent').and.resolveTo(SETUP),
     saveRecurring:     jasmine.createSpy('saveRecurring').and.resolveTo(ENROLLED),
     cancelRecurring:   jasmine.createSpy('cancelRecurring').and.resolveTo(undefined),
+    // The embedded payment-alerts section loads its own prefs on init.
+    getAlertPreferences: jasmine.createSpy('getAlertPreferences')
+      .and.resolveTo({ smsOptIn: false, emailOptIn: false, alertPhone: null }),
+    saveAlertPreferences: jasmine.createSpy('saveAlertPreferences')
+      .and.resolveTo({ smsOptIn: false, emailOptIn: false, alertPhone: null }),
   };
 }
 
