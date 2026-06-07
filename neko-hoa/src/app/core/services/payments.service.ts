@@ -1,8 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { LedgerEntry, RecurringPayment, DraftEntry } from '../models';
+import { LedgerEntry } from '../models';
 
 /** Fee policy + balances for the one-time payment screen (mirrors backend PaymentOptionsResponse, FR-007). */
 export interface PaymentOptions {
@@ -62,6 +62,52 @@ export interface Receipt {
   issuedAt: string;
 }
 
+/** SetupIntent for vaulting a payment method on file (US2, FR-009); mirrors backend SetupIntentResponse. */
+export interface SetupIntentResult {
+  setupIntentId: string;
+  clientSecret: string;
+  publishableKey: string;
+}
+
+/** Current auto-pay enrollment (mirrors backend RecurringPaymentDto). No raw instrument data — masked only. */
+export interface RecurringInfo {
+  id: string;
+  amountType: 'assessment' | 'balance' | 'fixed';
+  fixedAmount: number | null;
+  method: string;
+  draftDay: number;
+  status: string;
+  processingFee: number;
+  maskedMethod: string | null;
+  nextDraftDate: string | null;
+  nextDraftAmount: number | null;
+  mandateAcceptedAt: string | null;
+}
+
+/**
+ * Auto-pay upsert payload (mirrors backend RecurringPaymentRequest). The browser vaults the method via a
+ * SetupIntent and submits only its id + an explicit mandate acceptance — no raw card/bank data (SC-001).
+ */
+export interface RecurringSaveRequest {
+  amountType: 'assessment' | 'balance' | 'fixed';
+  fixedAmount: number | null;
+  draftDay: number;
+  setupIntentId: string;
+  mandateAccepted: boolean;
+  mandateText?: string;
+  mandateVersion?: string;
+}
+
+/** One scheduled/historical auto-pay draft row (mirrors backend DraftEntryDto). */
+export interface DraftRow {
+  id: string;
+  date: string;
+  source: string;
+  amount: number;
+  status: string;
+  transactionStatus: string | null;
+}
+
 interface ApiLedgerPage {
   items: ApiLedgerEntry[];
   total: number;
@@ -79,22 +125,13 @@ interface ApiLedgerEntry {
   entryType: string;
 }
 
-interface ApiRecurring {
-  status: string;
-  amountType: string;
-  fixedAmount: number | null;
-  method: string;
-  draftDay: number;
-  routingNumberMasked: string | null;
-  accountNumberMasked: string | null;
-  accountType: string | null;
-}
-
-interface ApiDraft {
+interface ApiDraftEntry {
+  id: string;
   draftDate: string;
+  sourceLabel: string;
   amount: number;
-  source: string;
   status: string;
+  transactionStatus: string | null;
 }
 
 interface ApiBalance {
@@ -106,8 +143,6 @@ interface ApiBalance {
 @Injectable({ providedIn: 'root' })
 export class PaymentsService {
   private readonly base = environment.apiBaseUrl;
-  private _recurring = signal<RecurringPayment | null>(null);
-  readonly recurring = this._recurring.asReadonly();
 
   constructor(private http: HttpClient) {}
 
@@ -137,15 +172,18 @@ export class PaymentsService {
 
   // ── Drafts ────────────────────────────────────────────────────────────────
 
-  async getDrafts(): Promise<DraftEntry[]> {
-    const items = await firstValueFrom(
-      this.http.get<ApiDraft[]>(`${this.base}/payments/drafts`)
+  async getDrafts(limit = 50, offset = 0): Promise<DraftRow[]> {
+    const params = new HttpParams().set('limit', limit).set('offset', offset);
+    const res = await firstValueFrom(
+      this.http.get<{ items: ApiDraftEntry[] }>(`${this.base}/payments/drafts`, { params })
     );
-    return items.map(d => ({
-      date:   d.draftDate.split('T')[0],
-      source: d.source,
-      amount: d.amount,
-      status: d.status as any,
+    return res.items.map(d => ({
+      id:                d.id,
+      date:              d.draftDate,
+      source:            d.sourceLabel,
+      amount:            d.amount,
+      status:            d.status,
+      transactionStatus: d.transactionStatus,
     }));
   }
 
@@ -185,32 +223,36 @@ export class PaymentsService {
     return firstValueFrom(this.http.get<Receipt>(`${this.base}/payments/receipts/${id}`));
   }
 
-  // ── Recurring payment ─────────────────────────────────────────────────────
+  // ── Recurring payment (auto-pay via vaulted method) ─────────────────────────
 
-  async loadRecurring(): Promise<void> {
-    try {
-      const r = await firstValueFrom(
-        this.http.get<ApiRecurring>(`${this.base}/payments/recurring`)
-      );
-      this._recurring.set(this._mapRecurring(r));
-    } catch {
-      this._recurring.set(null);
-    }
-  }
-
-  async saveRecurring(patch: Partial<RecurringPayment>): Promise<void> {
-    const body = this._toApiRecurring(patch);
-    const r = await firstValueFrom(
-      this.http.put<ApiRecurring>(`${this.base}/payments/recurring`, body)
+  /**
+   * Creates (or reuses) the Stripe customer and a SetupIntent so the Payment Element can vault a
+   * method on file. Returns the clientSecret the Element mounts against — no raw instrument data is sent.
+   */
+  async createSetupIntent(): Promise<SetupIntentResult> {
+    return firstValueFrom(
+      this.http.post<SetupIntentResult>(`${this.base}/payments/recurring/setup-intent`, {})
     );
-    this._recurring.set(this._mapRecurring(r));
   }
 
+  /** Current auto-pay enrollment, or null when the resident has none (backend returns 204). */
+  async getRecurring(): Promise<RecurringInfo | null> {
+    const r = await firstValueFrom(
+      this.http.get<RecurringInfo>(`${this.base}/payments/recurring`, { observe: 'response' })
+    );
+    return r.status === 204 ? null : r.body;
+  }
+
+  /** Enrolls/updates auto-pay against a vaulted method (setupIntentId) with an explicit mandate. */
+  async saveRecurring(req: RecurringSaveRequest): Promise<RecurringInfo> {
+    return firstValueFrom(
+      this.http.put<RecurringInfo>(`${this.base}/payments/recurring`, req)
+    );
+  }
+
+  /** Disables auto-pay and terminates the stored mandate. */
   async cancelRecurring(): Promise<void> {
     await firstValueFrom(this.http.delete(`${this.base}/payments/recurring`));
-    if (this._recurring()) {
-      this._recurring.set({ ...this._recurring()!, status: 'inactive' });
-    }
   }
 
   // ── Mappers ───────────────────────────────────────────────────────────────
@@ -234,34 +276,4 @@ export class PaymentsService {
     };
   }
 
-  private _mapRecurring(r: ApiRecurring): RecurringPayment {
-    return {
-      status:          r.status as any,
-      amountType:      r.amountType.toLowerCase() as any,
-      fixedAmount:     r.fixedAmount,
-      method:          r.method.toLowerCase() as any,
-      draftDay:        r.draftDay,
-      bankName:        null,
-      routingLast4:    r.routingNumberMasked?.slice(-4) ?? null,
-      accountLast4:    r.accountNumberMasked?.slice(-4) ?? null,
-      accountType:     r.accountType as any,
-      cardholderName:  null,
-      cardLast4:       null,
-      cardExpiry:      null,
-      cardZip:         null,
-      processingFee:   r.method === 'card' ? 1.95 : 0,
-    };
-  }
-
-  private _toApiRecurring(p: Partial<RecurringPayment>): Record<string, unknown> {
-    return {
-      amountType:     p.amountType,
-      fixedAmount:    p.fixedAmount,
-      method:         p.method,
-      draftDay:       p.draftDay,
-      routingNumber:  undefined,
-      accountNumber:  undefined,
-      accountType:    p.accountType,
-    };
-  }
 }

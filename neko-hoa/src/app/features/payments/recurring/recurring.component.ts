@@ -1,296 +1,324 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, ViewChild, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { PaymentsService } from '../../../core/services/payments.service';
-import { RecurringPayment, DraftEntry } from '../../../core/models';
+import { firstValueFrom } from 'rxjs';
+import { injectStripe, StripePaymentElementComponent } from 'ngx-stripe';
+import { environment } from '../../../../environments/environment';
+import {
+  PaymentsService, RecurringInfo, RecurringSaveRequest, DraftRow,
+} from '../../../core/services/payments.service';
+
+type AmountType = 'assessment' | 'balance' | 'fixed';
+
+// The mandate the resident must affirmatively accept before any method is vaulted / charged off-session.
+// Stored verbatim with the authorization (text + version + IP/UA captured server-side) for FR-009.
+const MANDATE_VERSION = '2026-06-v1';
+const MANDATE_TEXT =
+  'I authorize NekoHOA to electronically debit the payment method on file for my selected auto-pay ' +
+  'amount on the chosen draft day each month, plus any applicable processing fee, until I cancel. ' +
+  'I may cancel at any time from this page.';
 
 @Component({
   selector: 'app-recurring',
   standalone: true,
-  imports: [FormsModule, RouterLink, CurrencyPipe, DatePipe],
+  imports: [FormsModule, RouterLink, CurrencyPipe, DatePipe, StripePaymentElementComponent],
   template: `
-    <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">Auto-pay</h1>
-      <span class="muted" style="margin-left:4px;">set it & forget it</span>
-      <span class="pill pill--ok" style="margin-left:8px;">✓ Enrolled</span>
-      <div class="page-header__actions">
-        <button class="btn btn--ghost" (click)="confirmCancel()">🗑 Turn off</button>
-      </div>
-      <div class="toggle" [class.toggle--on]="active()" (click)="toggleActive()"></div>
-    </div>
-
-    <!-- Status bar -->
-    <div class="card card--lav" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
-      <div>
-        <div class="field-label">Status</div>
-        <div style="font-weight:600;">{{ active() ? 'Active' : 'Inactive' }}</div>
-      </div>
-      <div>
-        <div class="field-label">Next draft</div>
-        <div style="font-weight:600;">Jun 2 · {{ (nextAmount() | currency) }}</div>
-      </div>
-      <div>
-        <div class="field-label">Source</div>
-        <div style="font-weight:600;">{{ sourceLabel() }}</div>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <!-- What gets paid -->
-      <div class="card">
-        <div class="section-title">What gets paid</div>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:12px;">
-          @for (opt of amountOptions; track opt.id) {
-            <div style="padding:10px 12px;border-radius:10px;border:1.5px solid;cursor:pointer;"
-                 [style.border-color]="amountType() === opt.id ? 'var(--ink)' : 'var(--line)'"
-                 [style.background]="amountType() === opt.id ? 'var(--pink)' : 'var(--paper)'"
-                 (click)="amountType.set(opt.id)"
-                 style="display:flex;align-items:center;gap:10px;">
-              <span class="radio" [class.radio--on]="amountType() === opt.id"></span>
-              <div style="flex:1;">
-                <div [style.font-weight]="amountType() === opt.id ? 600 : 400">{{ opt.label }}</div>
-                <div class="muted" style="font-size:11px;">{{ opt.sub }}</div>
-              </div>
-            </div>
-          }
-          @if (amountType() === 'fixed') {
-            <div style="margin-top:4px;">
-              <div class="field-label">Fixed amount</div>
-              <input class="field mono" type="number" min="1" step="0.01"
-                     placeholder="0.00" [(ngModel)]="fixedAmount">
-            </div>
-          }
+      <span class="muted" style="margin-left:4px;">set it &amp; forget it</span>
+      @if (rec()?.status === 'active') {
+        <span class="pill pill--ok" style="margin-left:8px;" data-testid="enrolled-pill">✓ Enrolled</span>
+        <div class="page-header__actions">
+          <button class="btn btn--ghost" (click)="confirmCancel()" data-testid="turn-off">🗑 Turn off</button>
         </div>
-      </div>
-
-      <!-- When & where -->
-      <div class="card">
-        <div class="section-title">When &amp; where</div>
-
-        <!-- Method toggle -->
-        <div class="field-label" style="margin-top:10px;">How to pay</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:3px;background:var(--lav);border-radius:10px;border:1.5px solid var(--line);margin-bottom:14px;">
-          <button class="btn" style="border:none;border-radius:7px;justify-content:center;"
-                  [style.background]="method() === 'ach' ? 'var(--paper)' : 'transparent'"
-                  [style.font-weight]="method() === 'ach' ? 600 : 400"
-                  (click)="method.set('ach')">
-            🏦 Bank (ACH)
-          </button>
-          <button class="btn" style="border:none;border-radius:7px;justify-content:center;"
-                  [style.background]="method() === 'card' ? 'var(--paper)' : 'transparent'"
-                  [style.font-weight]="method() === 'card' ? 600 : 400"
-                  (click)="method.set('card')">
-            💳 Credit card
-          </button>
-        </div>
-
-        <div class="field-label">Draft date</div>
-        <select class="field field--dashed" [(ngModel)]="draftDay">
-          <option [value]="1">1st of each month</option>
-          <option [value]="2">2nd of each month</option>
-          <option [value]="5">5th of each month</option>
-          <option [value]="15">15th of each month</option>
-        </select>
-
-        <!-- ACH fields -->
-        @if (method() === 'ach') {
-          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
-            <div>
-              <div class="field-label">Bank name</div>
-              <input class="field" placeholder="Fidelity Investments" [(ngModel)]="bankName">
-            </div>
-            <div class="grid-2" style="gap:8px;">
-              <div>
-                <div class="field-label">Routing #</div>
-                <input class="field mono" placeholder="•••••681" [(ngModel)]="routing">
-              </div>
-              <div>
-                <div class="field-label">Account #</div>
-                <input class="field mono" placeholder="•••••747" [(ngModel)]="accountNum">
-              </div>
-            </div>
-            <div>
-              <div class="field-label">Account type</div>
-              <div style="display:flex;gap:14px;font-size:12px;margin-top:4px;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                  <span class="radio" [class.radio--on]="accountType === 'checking'" (click)="accountType='checking'"></span>
-                  Checking
-                </label>
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-                  <span class="radio" [class.radio--on]="accountType === 'savings'" (click)="accountType='savings'"></span>
-                  Savings
-                </label>
-              </div>
-            </div>
-            <div class="card card--pink" style="padding:8px 10px;font-size:11px;">
-              $1.95 processing fee per draft.
-            </div>
-          </div>
-        }
-
-        <!-- Card fields -->
-        @if (method() === 'card') {
-          <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
-            <div>
-              <div class="field-label">Cardholder name</div>
-              <input class="field" placeholder="Nicholas Bonilla" [(ngModel)]="cardName">
-            </div>
-            <div>
-              <div class="field-label">Card number</div>
-              <input class="field mono" placeholder="4242 4242 4242 ____" [(ngModel)]="cardNumber" maxlength="19">
-            </div>
-            <div class="grid-3" style="gap:8px;">
-              <div>
-                <div class="field-label">Expires</div>
-                <input class="field mono" placeholder="MM/YY" [(ngModel)]="cardExpiry" maxlength="5">
-              </div>
-              <div>
-                <div class="field-label">CVC</div>
-                <input class="field mono" placeholder="•••" type="password" [(ngModel)]="cardCvc" maxlength="4">
-              </div>
-              <div>
-                <div class="field-label">ZIP</div>
-                <input class="field mono" placeholder="27560" [(ngModel)]="cardZip" maxlength="5">
-              </div>
-            </div>
-            <div class="card card--pink" style="padding:8px 10px;font-size:11px;">
-              3% processing fee per draft · charged at time of payment.
-            </div>
-          </div>
-        }
-      </div>
+      }
     </div>
 
-    <!-- Draft history -->
-    <div class="card card--dashed">
-      <div style="display:flex;align-items:baseline;">
-        <div class="section-title" style="margin:0;">Drafts</div>
-        <span class="muted" style="margin-left:8px;font-size:11px;">past &amp; scheduled</span>
-      </div>
-      <table class="data-table" style="margin-top:10px;">
-        <thead>
-          <tr><th>Date</th><th>Source</th><th class="num">Amount</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          @for (d of drafts(); track d.date) {
-            <tr>
-              <td>{{ d.date | date:'MM/dd/yy' }}</td>
-              <td>{{ d.source }}</td>
-              <td class="num">{{ d.amount | currency }}</td>
-              <td>
-                <span class="pill" [class.pill--ok]="d.status === 'paid'">{{ d.status }}</span>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <!-- ACH authorization -->
-    <div class="card card--dashed">
-      <div class="section-title">Authorization</div>
-      <p class="muted" style="font-size:11px;line-height:1.6;">
-        By enrolling, you authorize NekoHOA to withdraw the amount above from the bank on file
-        each month, until cancelled. You may cancel at any time from this page.
-      </p>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;cursor:pointer;">
-        <span class="check" [class.check--on]="agreed" (click)="agreed = !agreed"></span>
-        I agree to the ACH agreement
-      </label>
-    </div>
-
-    <div style="display:flex;gap:8px;align-self:flex-end;">
-      <a routerLink="/app/payments/statement" class="btn btn--ghost">Cancel</a>
-      <button class="btn btn--primary" (click)="save()" [disabled]="saving()">
-        @if (saving()) { <span class="spinner"></span> } @else { Save changes }
-      </button>
-    </div>
-
-    @if (saved()) {
-      <div class="alert alert--success"><span>✓</span> Auto-pay settings saved.</div>
+    @if (error()) {
+      <div class="alert alert--error" data-testid="error"><span>⚠</span> {{ error() }}</div>
     }
-  `
+
+    @if (loading()) {
+      <div class="card"><span class="spinner"></span> Loading auto-pay…</div>
+    } @else {
+      <!-- Current enrollment status -->
+      @if (rec(); as r) {
+        <div class="card card--lav" data-testid="status-card"
+             style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+          <div>
+            <div class="field-label">Status</div>
+            <div style="font-weight:600;" data-testid="status-state">
+              {{ r.status === 'active' ? 'Active' : 'Inactive' }}
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Next draft</div>
+            <div style="font-weight:600;" data-testid="next-draft">
+              @if (r.nextDraftDate) {
+                {{ r.nextDraftDate | date:'MMM d' }} ·
+                <span data-testid="next-draft-amount">{{ r.nextDraftAmount | currency }}</span>
+              } @else { — }
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Source</div>
+            <div style="font-weight:600;" data-testid="masked-method">{{ r.maskedMethod ?? 'Not set' }}</div>
+          </div>
+        </div>
+      }
+
+      <!-- Set up / update -->
+      @if (!setupMode()) {
+        <div style="margin-top:14px;">
+          <button class="btn btn--primary" (click)="beginSetup()" data-testid="setup-toggle">
+            {{ rec()?.status === 'active' ? 'Update payment method & settings' : 'Set up auto-pay' }}
+          </button>
+        </div>
+      } @else {
+        <div class="grid-2" style="margin-top:14px;">
+          <!-- What gets paid -->
+          <div class="card">
+            <div class="section-title">What gets paid</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:12px;">
+              @for (opt of amountOptions; track opt.id) {
+                <div class="card" [attr.data-amount-type]="opt.id"
+                     style="padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;"
+                     [style.border-color]="amountType() === opt.id ? 'var(--ink)' : 'var(--line)'"
+                     [style.background]="amountType() === opt.id ? 'var(--pink)' : 'var(--paper)'"
+                     (click)="amountType.set(opt.id)">
+                  <span class="radio" [class.radio--on]="amountType() === opt.id"></span>
+                  <div style="flex:1;">
+                    <div [style.font-weight]="amountType() === opt.id ? 600 : 400">{{ opt.label }}</div>
+                    <div class="muted" style="font-size:11px;">{{ opt.sub }}</div>
+                  </div>
+                </div>
+              }
+              @if (amountType() === 'fixed') {
+                <div style="margin-top:4px;">
+                  <div class="field-label">Fixed amount</div>
+                  <input class="field mono" type="number" min="1" step="0.01"
+                         placeholder="0.00" [(ngModel)]="fixedAmount" data-testid="fixed-amount">
+                </div>
+              }
+            </div>
+
+            <div class="field-label" style="margin-top:14px;">Draft date</div>
+            <select class="field field--dashed" [(ngModel)]="draftDay" data-testid="draft-day">
+              @for (d of draftDayOptions; track d) {
+                <option [value]="d">{{ ordinal(d) }} of each month</option>
+              }
+            </select>
+          </div>
+
+          <!-- Payment method (vaulted via Stripe) -->
+          <div class="card">
+            <div class="section-title">Payment method</div>
+            <p class="muted" style="font-size:11px;line-height:1.6;margin-top:4px;">
+              Your card or bank details are entered securely with Stripe and stored on file as a token —
+              they never touch NekoHOA's servers.
+            </p>
+            @if (clientSecret()) {
+              <div style="margin-top:10px;">
+                <ngx-stripe-payment [stripe]="stripe" [clientSecret]="clientSecret()!" />
+              </div>
+            } @else {
+              <div class="muted" style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+                <span class="spinner"></span> Preparing secure form…
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Mandate authorization -->
+        <div class="card card--dashed">
+          <div class="section-title">Authorization</div>
+          <p class="muted" style="font-size:11px;line-height:1.6;">{{ mandateText }}</p>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:8px;cursor:pointer;">
+            <input type="checkbox" [(ngModel)]="mandateAccepted" data-testid="mandate-checkbox">
+            I authorize this recurring payment.
+          </label>
+        </div>
+
+        <div style="display:flex;gap:8px;align-self:flex-end;">
+          <button class="btn btn--ghost" (click)="cancelSetup()">Cancel</button>
+          <button class="btn btn--primary" (click)="save()"
+                  [disabled]="saving() || !clientSecret() || !mandateAccepted" data-testid="save">
+            @if (saving()) { <span class="spinner"></span> } @else { Save auto-pay }
+          </button>
+        </div>
+      }
+
+      @if (saved()) {
+        <div class="alert alert--success" data-testid="saved"><span>✓</span> Auto-pay settings saved.</div>
+      }
+
+      <!-- Draft history -->
+      <div class="card card--dashed">
+        <div style="display:flex;align-items:baseline;">
+          <div class="section-title" style="margin:0;">Drafts</div>
+          <span class="muted" style="margin-left:8px;font-size:11px;">past &amp; scheduled</span>
+        </div>
+        <table class="data-table" style="margin-top:10px;" data-testid="drafts-table">
+          <thead>
+            <tr><th>Date</th><th>Source</th><th class="num">Amount</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            @for (d of drafts(); track d.id) {
+              <tr>
+                <td>{{ d.date | date:'MM/dd/yy' }}</td>
+                <td>{{ d.source }}</td>
+                <td class="num">{{ d.amount | currency }}</td>
+                <td><span class="pill" [class.pill--ok]="(d.transactionStatus ?? d.status) === 'Succeeded'">
+                  {{ d.transactionStatus ?? d.status }}
+                </span></td>
+              </tr>
+            } @empty {
+              <tr><td colspan="4" class="muted">No drafts yet.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div style="align-self:flex-end;">
+        <a routerLink="/app/payments/statement" class="btn btn--ghost">Back to statement</a>
+      </div>
+    }
+  `,
 })
 export class RecurringComponent implements OnInit {
   private svc = inject(PaymentsService);
 
-  active      = signal(false);
-  amountType  = signal<'assessment' | 'balance' | 'fixed'>('assessment');
-  method      = signal<'ach' | 'card'>('ach');
+  // The publishable key is browser-safe; injectStripe resolves the same Stripe instance the Element mounts on.
+  readonly stripe = injectStripe(environment.stripePublishableKey);
+  @ViewChild(StripePaymentElementComponent) private paymentElement?: StripePaymentElementComponent;
+
+  readonly mandateText = MANDATE_TEXT;
+
+  loading        = signal(true);
+  rec            = signal<RecurringInfo | null>(null);
+  drafts         = signal<DraftRow[]>([]);
+  setupMode      = signal(false);
+  amountType     = signal<AmountType>('assessment');
+  clientSecret   = signal<string | null>(null);
+  saving         = signal(false);
+  saved          = signal(false);
+  error          = signal('');
+
   fixedAmount = '';
-  draftDay    = 1;
-  accountType = 'checking';
-  bankName    = '';
-  routing     = '';
-  accountNum  = '';
-  cardName    = '';
-  cardNumber  = '';
-  cardExpiry  = '';
-  cardCvc     = '';
-  cardZip     = '';
-  agreed      = true;
-  saving      = signal(false);
-  saved       = signal(false);
-  drafts      = signal<DraftEntry[]>([]);
+  draftDay = 1;
+  mandateAccepted = false;
+  private setupIntentId: string | null = null;
 
-  private _rec: RecurringPayment | null = null;
-
-  amountOptions = [
-    { id: 'assessment' as const, label: 'Just the assessment',           sub: '$250/mo' },
-    { id: 'balance'    as const, label: 'Whatever I owe (open balance)', sub: 'variable' },
-    { id: 'fixed'      as const, label: 'A fixed amount I pick',         sub: '$ ____' },
+  readonly amountOptions = [
+    { id: 'assessment' as const, label: 'Just the assessment',           sub: 'the monthly dues' },
+    { id: 'balance'    as const, label: 'Whatever I owe (open balance)', sub: 'variable each month' },
+    { id: 'fixed'      as const, label: 'A fixed amount I pick',         sub: 'same every month' },
   ];
+  readonly draftDayOptions = [1, 2, 5, 15, 28];
 
   async ngOnInit() {
-    await this.svc.loadRecurring();
-    this._rec = this.svc.recurring();
-    if (this._rec) {
-      this.active.set(this._rec.status === 'active');
-      this.amountType.set(this._rec.amountType as any);
-      this.method.set(this._rec.method as any);
-      this.draftDay    = this._rec.draftDay;
-      this.accountType = this._rec.accountType ?? 'checking';
+    try {
+      const rec = await this.svc.getRecurring();
+      this.rec.set(rec);
+      if (rec) {
+        this.amountType.set(rec.amountType);
+        this.fixedAmount = rec.fixedAmount != null ? String(rec.fixedAmount) : '';
+        this.draftDay = rec.draftDay;
+      }
+    } catch {
+      this.error.set('Could not load your auto-pay settings. Please try again.');
     }
     try {
       this.drafts.set(await this.svc.getDrafts());
-    } catch { /* ignore */ }
+    } catch { /* drafts are non-critical for the page to render */ }
+    this.loading.set(false);
   }
 
-  sourceLabel() {
-    const r = this._rec;
-    if (!r) return 'Not set';
-    if (r.method === 'ach') return `Bank ••${r.accountLast4 ?? '??'}`;
-    return r.cardLast4 ? `Card ••${r.cardLast4}` : 'Not set';
+  ordinal(d: number): string {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = d % 100;
+    return d + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
   }
 
-  nextAmount() { return (this._rec?.processingFee ?? 0) + 250; }
-
-  toggleActive() { this.active.set(!this.active()); }
-
-  confirmCancel() {
-    if (confirm('Turn off auto-pay? Your next assessment will not be auto-drafted.')) {
-      this.active.set(false);
-      this.svc.cancelRecurring();
+  /** Reveals the setup form and creates a SetupIntent so the Payment Element can mount. */
+  async beginSetup() {
+    this.error.set('');
+    this.setupMode.set(true);
+    this.clientSecret.set(null);
+    this.setupIntentId = null;
+    try {
+      const setup = await this.svc.createSetupIntent();
+      this.setupIntentId = setup.setupIntentId;
+      this.clientSecret.set(setup.clientSecret);
+    } catch (e: any) {
+      this.error.set(e?.error?.message ?? 'Could not start setup. Please try again.');
+      this.setupMode.set(false);
     }
   }
 
+  cancelSetup() {
+    this.setupMode.set(false);
+    this.clientSecret.set(null);
+    this.setupIntentId = null;
+    this.mandateAccepted = false;
+  }
+
+  /** Vaults the method via Stripe.js confirmSetup, then persists the enrollment + mandate on the backend. */
   async save() {
+    this.error.set('');
+    const secret = this.clientSecret();
+    const element = this.paymentElement?.elements;
+    if (!secret || !element || !this.setupIntentId) {
+      this.error.set('Payment form is not ready yet.'); return;
+    }
+    if (!this.mandateAccepted) {
+      this.error.set('Please accept the authorization to continue.'); return;
+    }
+    if (this.amountType() === 'fixed' && !(parseFloat(this.fixedAmount) > 0)) {
+      this.error.set('Enter a fixed amount greater than zero.'); return;
+    }
+
     this.saving.set(true);
     try {
-      await this.svc.saveRecurring({
-        status:     this.active() ? 'active' : 'inactive',
-        amountType: this.amountType(),
-        method:     this.method(),
-        draftDay:   this.draftDay,
-      });
+      const { error, setupIntent } = await firstValueFrom(
+        this.stripe.confirmSetup({ elements: element, clientSecret: secret, redirect: 'if_required' })
+      );
+      if (error) { this.error.set(error.message ?? 'Your method could not be saved.'); return; }
+      if (setupIntent?.status !== 'succeeded') {
+        this.error.set('Your method could not be saved. Please try again.'); return;
+      }
+
+      const req: RecurringSaveRequest = {
+        amountType:      this.amountType(),
+        fixedAmount:     this.amountType() === 'fixed' ? parseFloat(this.fixedAmount) : null,
+        draftDay:        Number(this.draftDay),
+        setupIntentId:   this.setupIntentId,
+        mandateAccepted: true,
+        mandateText:     MANDATE_TEXT,
+        mandateVersion:  MANDATE_VERSION,
+      };
+      this.rec.set(await this.svc.saveRecurring(req));
+      this.drafts.set(await this.svc.getDrafts());
+      this.setupMode.set(false);
+      this.clientSecret.set(null);
       this.saved.set(true);
       setTimeout(() => this.saved.set(false), 3000);
     } catch (e: any) {
-      alert(e?.error?.message ?? 'Save failed.');
+      this.error.set(e?.error?.message ?? 'Save failed. Please try again.');
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  async confirmCancel() {
+    if (!confirm('Turn off auto-pay? Your next assessment will not be auto-drafted.')) return;
+    this.error.set('');
+    try {
+      await this.svc.cancelRecurring();
+      this.rec.set(await this.svc.getRecurring());
+    } catch (e: any) {
+      this.error.set(e?.error?.message ?? 'Could not turn off auto-pay.');
     }
   }
 }

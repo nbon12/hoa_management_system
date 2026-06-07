@@ -16,7 +16,6 @@ function makeMockPaymentsService(): Partial<PaymentsService> {
     getLedger:       jasmine.createSpy().and.returnValue(Promise.resolve(MOCK_LEDGER)),
     getBalance:      jasmine.createSpy().and.returnValue(Promise.resolve({ currentBalance: 300, balanceDueDate: '2026-03-01', monthlyAssessment: 250 })),
     getDrafts:       jasmine.createSpy().and.returnValue(Promise.resolve([])),
-    loadRecurring:   jasmine.createSpy().and.returnValue(Promise.resolve()),
   } as any;
 }
 

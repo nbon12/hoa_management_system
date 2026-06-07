@@ -48,16 +48,86 @@ describe('PaymentsService', () => {
   });
 
   describe('getDrafts()', () => {
-    it('calls /payments/drafts and maps items', async () => {
+    it('GETs the paginated /payments/drafts envelope and maps items', async () => {
       const promise = svc.getDrafts();
-      http.expectOne(r => r.url.includes('/payments/drafts'))
-          .flush([
-            { id: '1', draftDate: '2026-01-01', sourceLabel: 'ACH', amount: 250, status: 'paid' },
-            { id: '2', draftDate: '2026-02-01', sourceLabel: 'ACH', amount: 250, status: 'scheduled' },
-          ]);
+      const req = http.expectOne(r => r.url.includes('/payments/drafts') && r.method === 'GET');
+      req.flush({
+        items: [
+          { id: '1', draftDate: '2026-01-01', sourceLabel: 'Bank •••• 6789', amount: 250, status: 'Paid',      transactionStatus: 'Succeeded' },
+          { id: '2', draftDate: '2026-02-01', sourceLabel: 'Bank •••• 6789', amount: 250, status: 'Scheduled', transactionStatus: null },
+        ],
+        totalCount: 2, limit: 50, offset: 0,
+      });
       const drafts = await promise;
       expect(drafts.length).toBe(2);
-      expect(drafts[0].status).toBe('paid');
+      expect(drafts[0].source).toBe('Bank •••• 6789');
+      expect(drafts[0].transactionStatus).toBe('Succeeded');
+      expect(drafts[1].transactionStatus).toBeNull();
+    });
+  });
+
+  describe('createSetupIntent()', () => {
+    it('POSTs to /payments/recurring/setup-intent and returns the client secret', async () => {
+      const promise = svc.createSetupIntent();
+      const req = http.expectOne(r => r.url.endsWith('/payments/recurring/setup-intent') && r.method === 'POST');
+      req.flush({ setupIntentId: 'seti_1', clientSecret: 'seti_1_secret', publishableKey: 'pk_test_x' });
+      const setup = await promise;
+      expect(setup.setupIntentId).toBe('seti_1');
+      expect(setup.clientSecret).toBe('seti_1_secret');
+    });
+  });
+
+  describe('getRecurring()', () => {
+    it('GETs /payments/recurring and returns the enrollment', async () => {
+      const promise = svc.getRecurring();
+      const req = http.expectOne(r => r.url.endsWith('/payments/recurring') && r.method === 'GET');
+      req.flush({
+        id: 'rec1', amountType: 'assessment', fixedAmount: null, method: 'card', draftDay: 1,
+        status: 'active', processingFee: 1.95, maskedMethod: 'Visa •••• 4242',
+        nextDraftDate: '2026-07-01', nextDraftAmount: 251.95, mandateAcceptedAt: '2026-06-07T00:00:00Z',
+      });
+      const rec = await promise;
+      expect(rec?.status).toBe('active');
+      expect(rec?.maskedMethod).toBe('Visa •••• 4242');
+    });
+
+    it('returns null when the resident has no enrollment (204 No Content)', async () => {
+      const promise = svc.getRecurring();
+      const req = http.expectOne(r => r.url.endsWith('/payments/recurring') && r.method === 'GET');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      expect(await promise).toBeNull();
+    });
+  });
+
+  describe('saveRecurring()', () => {
+    it('PUTs the enrollment + mandate to /payments/recurring', async () => {
+      const promise = svc.saveRecurring({
+        amountType: 'fixed', fixedAmount: 100, draftDay: 5, setupIntentId: 'seti_1',
+        mandateAccepted: true, mandateText: 'I authorize…', mandateVersion: '2026-06-v1',
+      });
+      const req = http.expectOne(r => r.url.endsWith('/payments/recurring') && r.method === 'PUT');
+      expect(req.request.body).toEqual({
+        amountType: 'fixed', fixedAmount: 100, draftDay: 5, setupIntentId: 'seti_1',
+        mandateAccepted: true, mandateText: 'I authorize…', mandateVersion: '2026-06-v1',
+      });
+      req.flush({
+        id: 'rec1', amountType: 'fixed', fixedAmount: 100, method: 'card', draftDay: 5,
+        status: 'active', processingFee: 1.95, maskedMethod: 'Visa •••• 4242',
+        nextDraftDate: '2026-07-05', nextDraftAmount: 101.95, mandateAcceptedAt: '2026-06-07T00:00:00Z',
+      });
+      const rec = await promise;
+      expect(rec.draftDay).toBe(5);
+      expect(rec.fixedAmount).toBe(100);
+    });
+  });
+
+  describe('cancelRecurring()', () => {
+    it('DELETEs /payments/recurring', async () => {
+      const promise = svc.cancelRecurring();
+      const req = http.expectOne(r => r.url.endsWith('/payments/recurring') && r.method === 'DELETE');
+      req.flush({});
+      await promise;
+      expect().nothing();
     });
   });
 
