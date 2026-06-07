@@ -94,9 +94,9 @@ public class PaymentSeeder(ApplicationDbContext db, SeedResult result, ILogger l
             Method = PaymentMethod.Ach,
             DraftDay = 1,
             Status = "active",
-            RoutingNumberMasked = "****3421",
-            AccountNumberMasked = "****8847",
-            AccountType = "checking"
+            VaultedPaymentMethodId = "pm_seed_ach",
+            MethodBrand = "Bank",
+            MethodLast4 = "8847"
         });
 
         db.DraftEntries.AddRange(

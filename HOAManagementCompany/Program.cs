@@ -242,6 +242,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.LedgerS
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.AllocationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Webhooks.WebhookProcessor>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Jobs.ReconciliationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Recurring.RecurringDraftService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.PropertyService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.CommunityService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>();

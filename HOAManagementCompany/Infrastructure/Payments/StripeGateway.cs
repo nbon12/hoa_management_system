@@ -74,6 +74,69 @@ public sealed class StripeGateway : IStripeGateway
         EventUtility.ConstructEvent(json, signatureHeader, _options.WebhookSigningSecret,
             tolerance: _options.WebhookToleranceSeconds);
 
+    public async Task<string> EnsureCustomerAsync(string? existingCustomerId, string email, string? name, CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(existingCustomerId)) return existingCustomerId;
+        var service = new CustomerService(Client);
+        var customer = await service.CreateAsync(new CustomerCreateOptions { Email = email, Name = name }, cancellationToken: ct);
+        return customer.Id;
+    }
+
+    public async Task<StripeSetupIntentResult> CreateSetupIntentAsync(string customerId, CancellationToken ct = default)
+    {
+        var service = new SetupIntentService(Client);
+        var si = await service.CreateAsync(new SetupIntentCreateOptions
+        {
+            Customer = customerId,
+            Usage = "off_session",
+            AutomaticPaymentMethods = new SetupIntentAutomaticPaymentMethodsOptions { Enabled = true },
+        }, cancellationToken: ct);
+        return new StripeSetupIntentResult(si.Id, si.ClientSecret, si.CustomerId, si.Status);
+    }
+
+    public async Task<StripeVaultedMethod> GetSetupIntentResultAsync(string setupIntentId, CancellationToken ct = default)
+    {
+        var service = new SetupIntentService(Client);
+        var si = await service.GetAsync(setupIntentId, new SetupIntentGetOptions { Expand = ["payment_method", "mandate"] }, cancellationToken: ct);
+        var pm = si.PaymentMethod;
+        var card = pm?.Card;
+        return new StripeVaultedMethod(
+            si.PaymentMethodId,
+            si.MandateId,
+            pm?.Type,
+            MapFunding(card?.Funding),
+            card?.Brand,
+            card?.Last4 ?? pm?.UsBankAccount?.Last4);
+    }
+
+    public async Task<StripePaymentIntentResult> ChargeOffSessionAsync(CreateOffSessionChargeRequest request, CancellationToken ct = default)
+    {
+        var service = new PaymentIntentService(Client);
+        var options = new PaymentIntentCreateOptions
+        {
+            Amount = request.AmountCents,
+            Currency = request.Currency,
+            Customer = request.CustomerId,
+            PaymentMethod = request.PaymentMethodId,
+            Confirm = true,
+            OffSession = true,
+            Metadata = request.Metadata?.ToDictionary(kv => kv.Key, kv => kv.Value),
+        };
+        var requestOptions = string.IsNullOrWhiteSpace(request.IdempotencyKey)
+            ? null
+            : new RequestOptions { IdempotencyKey = request.IdempotencyKey };
+        try
+        {
+            var pi = await service.CreateAsync(options, requestOptions, ct);
+            return Map(pi);
+        }
+        catch (StripeException ex) when (ex.StripeError?.PaymentIntent is not null)
+        {
+            // Off-session authentication/charge failure surfaces the PaymentIntent on the error.
+            return Map(ex.StripeError.PaymentIntent);
+        }
+    }
+
     private static StripePaymentIntentResult Map(PaymentIntent pi)
     {
         var charge = pi.LatestCharge;

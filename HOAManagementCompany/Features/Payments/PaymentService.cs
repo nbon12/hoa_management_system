@@ -1,20 +1,22 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
-using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Payments.Models;
+using HOAManagementCompany.Features.Payments.Recurring;
+using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Payments;
 
 // <!-- REPOWISE:START domain=payments -->
-// Ledger, drafts, recurring payments, one-time payment (simulated ACH/card); property-scoped.
+// Ledger, drafts, recurring auto-pay (Stripe-vaulted methods + immutable mandates); property-scoped.
 // <!-- REPOWISE:END -->
 
-public class PaymentService(ApplicationDbContext db)
+public class PaymentService(
+    ApplicationDbContext db,
+    IStripeGateway gateway,
+    RecurringDraftService draftService)
 {
-    private const decimal CardFee = 1.95m;
-
     public async Task<LedgerResponse> GetLedgerAsync(Guid propertyId, LedgerRequest req, CancellationToken ct = default)
     {
         var query = db.LedgerEntries.Where(e => e.PropertyId == propertyId).AsQueryable();
@@ -45,58 +47,95 @@ public class PaymentService(ApplicationDbContext db)
 
     public async Task<RecurringPaymentDto?> GetRecurringAsync(Guid propertyId, CancellationToken ct = default)
     {
-        var r = await db.RecurringPayments.FirstOrDefaultAsync(rp => rp.PropertyId == propertyId && rp.Status == "active", ct);
-        return r is null ? null : MapRecurring(r);
+        var r = await db.RecurringPayments
+            .Include(x => x.Authorizations)
+            .FirstOrDefaultAsync(rp => rp.PropertyId == propertyId && rp.Status == "active", ct);
+        return r is null ? null : await MapRecurringAsync(r, ct);
     }
 
-    public async Task<RecurringPaymentDto> UpsertRecurringAsync(Guid propertyId, RecurringPaymentRequest req, CancellationToken ct = default)
+    /// <summary>
+    /// Creates or updates the property's auto-pay mandate (US2, FR-009/FR-011b). The browser has
+    /// already vaulted the method via a SetupIntent; we resolve the <c>pm_…</c> reference from Stripe,
+    /// persist only the reference plus masked display detail (SC-001/SC-008), and append an immutable
+    /// mandate authorization. No raw card/bank number is ever accepted or stored.
+    /// </summary>
+    public async Task<RecurringPaymentDto> UpsertRecurringAsync(
+        Guid propertyId, RecurringPaymentRequest req, string? acceptedIp, string? userAgent, CancellationToken ct = default)
     {
-        var existing = await db.RecurringPayments.FirstOrDefaultAsync(rp => rp.PropertyId == propertyId, ct);
-        var isCard = req.Method.Equals("card", StringComparison.OrdinalIgnoreCase);
+        var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct)
+            ?? throw new InvalidOperationException($"No owner found for property {propertyId}.");
+
+        // Ensure a Stripe customer anchors the vaulted method, persisting the id for off-session draws.
+        var customerId = await gateway.EnsureCustomerAsync(
+            owner.StripeCustomerId, owner.Email, $"{owner.FirstName} {owner.LastName}".Trim(), ct);
+        owner.StripeCustomerId = customerId;
+
+        var vaulted = await gateway.GetSetupIntentResultAsync(req.SetupIntentId, ct);
+        var method = vaulted.PaymentMethodType == "card" ? PaymentMethod.Card : PaymentMethod.Ach;
+
+        var existing = await db.RecurringPayments
+            .Include(x => x.Authorizations)
+            .FirstOrDefaultAsync(rp => rp.PropertyId == propertyId, ct);
 
         if (existing is null)
         {
-            existing = new RecurringPayment { PropertyId = propertyId };
+            existing = new RecurringPayment { Id = Guid.NewGuid(), PropertyId = propertyId };
             db.RecurringPayments.Add(existing);
+        }
+        else
+        {
+            // Re-enrolling supersedes the prior mandate — terminate it (append-only, never deleted).
+            var current = existing.Authorizations.FirstOrDefault(a => a.Id == existing.CurrentAuthorizationId);
+            if (current is not null) current.TerminatedAt = DateTimeOffset.UtcNow;
         }
 
         existing.AmountType = Enum.Parse<RecurringAmountType>(req.AmountType, true);
         existing.FixedAmount = req.FixedAmount;
-        existing.Method = isCard ? PaymentMethod.Card : PaymentMethod.Ach;
+        existing.Method = method;
         existing.DraftDay = req.DraftDay;
         existing.Status = "active";
-        existing.ProcessingFee = isCard ? CardFee : 0m;
+        existing.VaultedPaymentMethodId = vaulted.PaymentMethodId;
+        existing.MethodBrand = vaulted.Brand;
+        existing.MethodLast4 = vaulted.Last4;
+        existing.MethodFunding = vaulted.CardFunding;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (!isCard)
+        var preview = await draftService.PreviewAsync(existing, DateOnly.FromDateTime(DateTime.UtcNow), ct);
+        existing.ProcessingFee = preview.Fee;
+
+        var auth = new PaymentAuthorization
         {
-            existing.RoutingNumberMasked = req.RoutingNumber is not null ? $"****{req.RoutingNumber[^4..]}" : null;
-            existing.AccountNumberMasked = req.AccountNumber is not null ? $"****{req.AccountNumber[^4..]}" : null;
-            existing.AccountType = req.AccountType;
-            existing.CardNumberMasked = null;
-            existing.CardExpiry = null;
-            existing.CardholderName = null;
-            existing.BillingZip = null;
-        }
-        else
-        {
-            existing.CardNumberMasked = req.CardNumber is not null ? $"****{req.CardNumber[^4..]}" : null;
-            existing.CardExpiry = req.CardExpiry;
-            existing.CardholderName = req.CardholderName;
-            existing.BillingZip = req.BillingZip;
-            existing.RoutingNumberMasked = null;
-            existing.AccountNumberMasked = null;
-            existing.AccountType = null;
-        }
+            Id = Guid.NewGuid(),
+            RecurringPaymentId = existing.Id,
+            MandateText = req.MandateText ?? DefaultMandateText(existing),
+            MandateVersion = req.MandateVersion ?? "1.0",
+            AmountTermsSnapshot = AmountTerms(existing),
+            AcceptedAt = DateTimeOffset.UtcNow,
+            AcceptedIp = acceptedIp,
+            AcceptedUserAgent = userAgent,
+            StripeMandateId = vaulted.MandateId,
+        };
+        db.PaymentAuthorizations.Add(auth);
+        existing.CurrentAuthorizationId = auth.Id;
+        existing.Authorizations.Add(auth);
 
         await db.SaveChangesAsync(ct);
-        return MapRecurring(existing);
+        return await MapRecurringAsync(existing, ct);
     }
 
     public async Task CancelRecurringAsync(Guid propertyId, CancellationToken ct = default)
     {
-        await db.RecurringPayments
-            .Where(rp => rp.PropertyId == propertyId)
-            .ExecuteUpdateAsync(s => s.SetProperty(rp => rp.Status, "inactive"), ct);
+        var now = DateTimeOffset.UtcNow;
+        var recurring = await db.RecurringPayments
+            .Include(r => r.Authorizations)
+            .FirstOrDefaultAsync(r => r.PropertyId == propertyId, ct);
+        if (recurring is null) return;
+
+        recurring.Status = "inactive";
+        recurring.UpdatedAt = now;
+        var current = recurring.Authorizations.FirstOrDefault(a => a.Id == recurring.CurrentAuthorizationId);
+        if (current is not null) current.TerminatedAt = now;
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<IEnumerable<DraftEntryDto>> GetDraftsAsync(Guid propertyId, CancellationToken ct = default)
@@ -109,8 +148,29 @@ public class PaymentService(ApplicationDbContext db)
             .ToListAsync(ct);
     }
 
-    private static RecurringPaymentDto MapRecurring(RecurringPayment r) => new(
-        r.Id, r.AmountType.ToString(), r.FixedAmount, r.Method.ToString(), r.DraftDay, r.Status, r.ProcessingFee,
-        r.RoutingNumberMasked, r.AccountNumberMasked, r.AccountType,
-        r.CardNumberMasked, r.CardExpiry, r.CardholderName, r.BillingZip);
+    private async Task<RecurringPaymentDto> MapRecurringAsync(RecurringPayment r, CancellationToken ct)
+    {
+        var preview = await draftService.PreviewAsync(r, DateOnly.FromDateTime(DateTime.UtcNow), ct);
+        var brand = string.IsNullOrEmpty(r.MethodBrand)
+            ? (r.Method == PaymentMethod.Card ? "Card" : "Bank")
+            : char.ToUpperInvariant(r.MethodBrand[0]) + r.MethodBrand[1..];
+        var masked = r.MethodLast4 is not null ? $"{brand} ····{r.MethodLast4}" : null;
+        var mandateAcceptedAt = r.Authorizations
+            .FirstOrDefault(a => a.Id == r.CurrentAuthorizationId)?.AcceptedAt;
+
+        return new RecurringPaymentDto(
+            r.Id, r.AmountType.ToString(), r.FixedAmount, r.Method.ToString(), r.DraftDay, r.Status,
+            r.ProcessingFee, masked, preview.NextDraftDate, preview.Total, mandateAcceptedAt);
+    }
+
+    private static string AmountTerms(RecurringPayment r) => r.AmountType switch
+    {
+        RecurringAmountType.Fixed => $"Fixed {r.FixedAmount:C} on day {r.DraftDay} of each month",
+        RecurringAmountType.Assessment => $"Monthly assessment on day {r.DraftDay} of each month",
+        RecurringAmountType.Balance => $"Statement balance on day {r.DraftDay} of each month",
+        _ => $"Recurring draft on day {r.DraftDay} of each month",
+    };
+
+    private static string DefaultMandateText(RecurringPayment r) =>
+        $"I authorize recurring payments of my {AmountTerms(r).ToLowerInvariant()} until I cancel.";
 }
