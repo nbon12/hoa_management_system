@@ -138,14 +138,32 @@ public class PaymentService(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IEnumerable<DraftEntryDto>> GetDraftsAsync(Guid propertyId, CancellationToken ct = default)
+    /// <summary>
+    /// Last-12-months drafts, newest first, with limit/offset pagination (T065). Each row carries
+    /// the linked <c>PaymentTransaction</c> status when a charge has been attempted — that is the
+    /// authoritative settlement state, independent of the draft's own scheduled/paid/failed flag.
+    /// </summary>
+    public async Task<DraftsResponse> GetDraftsAsync(Guid propertyId, DraftsRequest req, CancellationToken ct = default)
     {
+        var limit = Math.Clamp(req.Limit, 1, 200);
+        var offset = Math.Max(req.Offset, 0);
         var cutoff = DateOnly.FromDateTime(DateTime.Today.AddMonths(-12));
-        return await db.DraftEntries
-            .Where(d => d.PropertyId == propertyId && d.DraftDate >= cutoff)
+
+        var query = db.DraftEntries
+            .Where(d => d.PropertyId == propertyId && d.DraftDate >= cutoff);
+
+        var total = await query.CountAsync(ct);
+        var items = await query
             .OrderByDescending(d => d.DraftDate)
-            .Select(d => new DraftEntryDto(d.Id, d.DraftDate, d.SourceLabel, d.Amount, d.Status.ToString()))
+            .ThenByDescending(d => d.Id)
+            .Skip(offset)
+            .Take(limit)
+            .Select(d => new DraftEntryDto(
+                d.Id, d.DraftDate, d.SourceLabel, d.Amount, d.Status.ToString(),
+                d.Transaction != null ? d.Transaction.Status.ToString() : null))
             .ToListAsync(ct);
+
+        return new DraftsResponse(items, total, limit, offset);
     }
 
     private async Task<RecurringPaymentDto> MapRecurringAsync(RecurringPayment r, CancellationToken ct)

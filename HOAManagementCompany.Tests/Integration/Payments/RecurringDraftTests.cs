@@ -183,10 +183,11 @@ public class RecurringDraftTests(TestDatabaseFixture fixture) : PaymentTestBase(
         Assert.Equal(10300, charge.AmountCents);
         Assert.Equal("pm_seti_run", charge.PaymentMethodId);
 
-        // A draft entry was recorded as Paid.
+        // A draft entry was recorded as Paid, and surfaces its linked transaction's Succeeded status.
         var drafts = await JsonAsync(await Client.GetAsync("/api/v1/payments/drafts"));
-        Assert.Contains(drafts.EnumerateArray(), d =>
-            d.GetProperty("status").GetString() == "Paid" && d.GetProperty("amount").GetDecimal() == 103m);
+        Assert.Contains(drafts.GetProperty("items").EnumerateArray(), d =>
+            d.GetProperty("status").GetString() == "Paid" && d.GetProperty("amount").GetDecimal() == 103m
+            && d.GetProperty("transactionStatus").GetString() == "Succeeded");
     }
 
     [Fact]
@@ -230,7 +231,9 @@ public class RecurringDraftTests(TestDatabaseFixture fixture) : PaymentTestBase(
         Assert.Equal(1, run.GetProperty("failed").GetInt32());
 
         var drafts = await JsonAsync(await Client.GetAsync("/api/v1/payments/drafts"));
-        Assert.Contains(drafts.EnumerateArray(), d => d.GetProperty("status").GetString() == "Failed");
+        Assert.Contains(drafts.GetProperty("items").EnumerateArray(), d =>
+            d.GetProperty("status").GetString() == "Failed"
+            && d.GetProperty("transactionStatus").GetString() == "Failed");
     }
 
     [Fact]
@@ -239,5 +242,40 @@ public class RecurringDraftTests(TestDatabaseFixture fixture) : PaymentTestBase(
         await AuthenticateAsync();
         var res = await Client.GetAsync("/api/v1/payments/drafts");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Drafts_LimitOffset_PaginatesNewestFirst()
+    {
+        await AuthenticateAsync();
+
+        // Three drafts over distinct months so ordering is unambiguous.
+        await UpsertAsync("seti_pg", new
+        {
+            amountType = "fixed", fixedAmount = 10m, draftDay = 15,
+            setupIntentId = "seti_pg", mandateAccepted = true,
+        });
+        await Client.SendAsync(RunDrafts("2026-03-15"));
+        await Client.SendAsync(RunDrafts("2026-04-15"));
+        await Client.SendAsync(RunDrafts("2026-05-15"));
+
+        var page1 = await JsonAsync(await Client.GetAsync("/api/v1/payments/drafts?limit=2&offset=0"));
+        Assert.True(page1.GetProperty("totalCount").GetInt32() >= 3);
+        Assert.Equal(2, page1.GetProperty("limit").GetInt32());
+        Assert.Equal(0, page1.GetProperty("offset").GetInt32());
+        var firstPage = page1.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(2, firstPage.Count);
+
+        // Newest-first: the first item's draft date is not before the second's.
+        var d0 = firstPage[0].GetProperty("draftDate").GetString();
+        var d1 = firstPage[1].GetProperty("draftDate").GetString();
+        Assert.True(string.CompareOrdinal(d0, d1) >= 0);
+
+        // Offset advances the window — page 2 yields different rows.
+        var page2 = await JsonAsync(await Client.GetAsync("/api/v1/payments/drafts?limit=2&offset=2"));
+        var secondPage = page2.GetProperty("items").EnumerateArray().ToList();
+        Assert.NotEmpty(secondPage);
+        Assert.DoesNotContain(secondPage, d =>
+            d.GetProperty("id").GetString() == firstPage[0].GetProperty("id").GetString());
     }
 }
