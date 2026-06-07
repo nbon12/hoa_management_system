@@ -61,8 +61,8 @@ frontend tests for these flows; write tests first where the testing constitution
 
 - [X] T016 [P] xUnit Theory test for `FeeCalculator` — percentage⇒credit-only, flat⇒all-cards, percentage+debit/all-cards rejected, ACH free, gross/fee split, rounding — in `HOAManagementCompany.Tests/Integration/Payments/FeeCalculatorTests.cs`
 - [X] T017 [P] Testcontainers integration test for append-only ledger + allocation — deterministic `RunningBalance` recompute by `Sequence` under out-of-order/concurrent inserts (SC-009), statutory allocation order, overpayment→credit (negative balance), compensating reversals — in `HOAManagementCompany.Tests/Integration/Payments/LedgerAllocationTests.cs`
-- [ ] T018 Implement `FeeCalculator` (reads `HoaPaymentConfig`, uses Stripe `card.funding`) in `HOAManagementCompany/Features/Payments/Services/FeeCalculator.cs`
-- [ ] T019 Implement `LedgerService` (append-only `Sequence` under per-property lock, deterministic balance, compensating entries, overpayment credit) and `AllocationService` (category-priority, configurable order) in `HOAManagementCompany/Features/Payments/Ledger/`
+- [X] T018 Implement `FeeCalculator` (reads `HoaPaymentConfig`, uses Stripe `card.funding`) in `HOAManagementCompany/Features/Payments/Services/FeeCalculator.cs`
+- [X] T019 Implement `LedgerService` (append-only `Sequence` under per-property lock, deterministic balance, compensating entries, overpayment credit) and `AllocationService` (category-priority, configurable order) in `HOAManagementCompany/Features/Payments/Ledger/`
 
 ### Stripe gateway, idempotency, webhook intake, outbox, telemetry
 
