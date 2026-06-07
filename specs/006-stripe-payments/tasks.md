@@ -94,7 +94,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T031 [P] [US1] Testcontainers test: one-time ACH → Pending txn, ledger deferred until `payment_intent.succeeded` webhook writes it, in `HOAManagementCompany.Tests/Integration/Payments/OneTimeAchTests.cs`
 - [X] T032 [P] [US1] Testcontainers Theory: webhook lifecycle — succeeded (settlement refs + deferred ledger + receipt), payment_failed, partial+full refund (cumulative, compensating ledger, fee retained), dispute created/closed won/lost, ACH return → Returned (+reversal +NSF) — in `HOAManagementCompany.Tests/Integration/Payments/WebhookLifecycleTests.cs`
 - [X] T033 [P] [US1] Testcontainers test: idempotency key collapses double-submit to one charge/transaction, in `HOAManagementCompany.Tests/Integration/Payments/IdempotencyTests.cs`
-- [ ] T034 [P] [US1] SC-001 test: confirm no raw card/bank number is accepted or stored (request + storage inspection), in `HOAManagementCompany.Tests/Integration/Payments/PciScopeTests.cs`
+- [X] T034 [P] [US1] SC-001 test: confirm no raw card/bank number is accepted or stored (request + storage inspection), in `HOAManagementCompany.Tests/Integration/Payments/PciScopeTests.cs`
 - [ ] T035 [P] [US1] Angular Testing Library component test for one-time payment component in `neko-hoa/src/app/features/payments/one-time/one-time.component.spec.ts`
 - [ ] T036 [P] [US1] Jasmine unit test for `payments.service.ts` options/intent/confirm in `neko-hoa/src/app/core/services/payments.service.spec.ts`
 - [ ] T037 [P] [US1] Cypress E2E for one-time payment in `neko-hoa/cypress/e2e/one-time-payment.cy.ts`
@@ -132,7 +132,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T053 [P] [US2] Testcontainers test: setup-intent creates/reuses Stripe customer, vaults PM, stores only references, in `HOAManagementCompany.Tests/Integration/Payments/SetupIntentTests.cs`
 - [X] T054 [P] [US2] Testcontainers test: recurring upsert persists `PaymentAuthorization` (text/version/IP/UA/terms), drops masked fields, requires mandate, in `HOAManagementCompany.Tests/Integration/Payments/RecurringSetupTests.cs`
 - [X] T055 [P] [US2] Testcontainers Theory: run-drafts resolves amount (assessment/open-balance/fixed), applies fee, charges off-session, writes recurring txn + draft, idempotent per `{recurringId}:{period}`, in `HOAManagementCompany.Tests/Integration/Payments/RecurringDraftTests.cs`
-- [ ] T056 [P] [US2] Testcontainers test: variable-amount advance notice enqueued before draft (FR-011c); disable→no drafts; **failed draft is NOT auto-retried within the cycle and waits for the next draft day (FR-011a)**, in `HOAManagementCompany.Tests/Integration/Payments/RecurringNoticeTests.cs`
+- [X] T056 [P] [US2] Testcontainers test: variable-amount advance notice enqueued before draft (FR-011c); disable→no drafts; **failed draft is NOT auto-retried within the cycle and waits for the next draft day (FR-011a)**, in `HOAManagementCompany.Tests/Integration/Payments/RecurringNoticeTests.cs`
 - [ ] T057 [P] [US2] Angular Testing Library test for auto-pay component in `neko-hoa/src/app/features/payments/recurring/recurring.component.spec.ts`
 - [ ] T058 [P] [US2] Cypress E2E for auto-pay setup in `neko-hoa/cypress/e2e/recurring-setup.cy.ts`
 - [ ] T059 [P] [US2] Storybook story for the auto-pay status card + drafts table in `neko-hoa/src/app/features/payments/recurring/recurring.stories.ts`
@@ -144,7 +144,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T062 [P] [US2] Update `GET /payments/recurring` (masked method, next draft date·amount incl. fee, mandate ref) in `HOAManagementCompany/Features/Payments/Recurring/RecurringGetEndpoint.cs`
 - [X] T063 [P] [US2] Update `DELETE /payments/recurring` (disable + set `TerminatedAt` on authorization) in `HOAManagementCompany/Features/Payments/Recurring/RecurringDeleteEndpoint.cs`
 - [X] T064 [US2] Implement `POST /payments/jobs/run-drafts` (due drafts, amount resolution, off-session charge, fee, draft entry, per-period idempotency, variable notice) in `HOAManagementCompany/Features/Payments/Jobs/RunDraftsEndpoint.cs`
-- [ ] T065 [P] [US2] Update drafts query to surface status from linked `PaymentTransaction` and add `limit`/`offset` pagination (constitution §4) in `HOAManagementCompany/Features/Payments/DraftsEndpoint.cs`
+- [X] T065 [P] [US2] Update drafts query to surface status from linked `PaymentTransaction` and add `limit`/`offset` pagination (constitution §4) in `HOAManagementCompany/Features/Payments/DraftsEndpoint.cs`
 - [ ] T066 [P] [US2] Rebuild auto-pay page (SetupIntent element, amount type, draft day, mandate checkbox, status card, drafts table) in `neko-hoa/src/app/features/payments/recurring/recurring.component.ts`
 - [ ] T067 [P] [US2] Add setup-intent/recurring methods to `neko-hoa/src/app/core/services/payments.service.ts`
 - [ ] T068 [US2] Add validation/error shape/audit logging and verify Swagger + PII-free telemetry for recurring + job endpoints
@@ -185,9 +185,9 @@ frontend tests for these flows; write tests first where the testing constitution
 
 **Purpose**: Reporting, compliance, security, and gate verification across stories.
 
-- [ ] T081 [P] Implement `GET /payments/statements` + `GET /payments/unpaid-assessments` (FR-039, NC § 47F-3-118) in `HOAManagementCompany/Features/Payments/Statements/` with Testcontainers tests
+- [X] T081 [P] Implement `GET /payments/statements` + `GET /payments/unpaid-assessments` (FR-039, NC § 47F-3-118) in `HOAManagementCompany/Features/Payments/Statements/` with Testcontainers tests
 - [ ] T082 [P] Build the Angular statement/transactions view in `neko-hoa/src/app/features/payments/statement/statement.component.ts`
-- [ ] T083 [P] Reconciliation + dead-letter hardening test (missed-webhook backfill, outbox flush, inbox retry) in `HOAManagementCompany.Tests/Integration/Payments/ReconciliationTests.cs`
+- [X] T083 [P] Reconciliation + dead-letter hardening test (missed-webhook backfill, outbox flush, inbox retry) in `HOAManagementCompany.Tests/Integration/Payments/ReconciliationTests.cs`
 - [ ] T084 [P] PII encryption-at-rest review (FR-029) + audit logging of financial-record access and fee/alert/schedule config changes
 - [ ] T085 [P] Rate-limit review on intent/confirm/setup/jobs endpoints + processor fraud-tooling (Stripe Radar) note (FR-028)
 - [ ] T086 [P] Document NC late-fee/interest caps config seed + surcharge-jurisdiction gating; confirm `SurchargingEnabled` defaults safe

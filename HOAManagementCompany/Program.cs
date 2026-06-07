@@ -243,6 +243,8 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.Allocat
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Webhooks.WebhookProcessor>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Jobs.ReconciliationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Recurring.RecurringDraftService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Recurring.VariableNoticeService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Statements.StatementService>();
 // US3 failure alerts (006-stripe-payments): transactional outbox + opt-in alerting.
 builder.Services.AddMetrics(); // ensures IMeterFactory is available for PaymentMetrics.
 builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Observability.PaymentMetrics>();

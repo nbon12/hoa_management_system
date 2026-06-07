@@ -12,7 +12,8 @@ namespace HOAManagementCompany.Features.Payments.Jobs;
 /// the shared <c>X-Scheduler-Secret</c> header (not a user session). Idempotent per recurring/period,
 /// so a same-day re-run is safe.
 /// </summary>
-public class RunDraftsEndpoint(RecurringDraftService draftService, IOptions<JobsOptions> options)
+public class RunDraftsEndpoint(
+    RecurringDraftService draftService, VariableNoticeService noticeService, IOptions<JobsOptions> options)
     : EndpointWithoutRequest<RunDraftsResponse>
 {
     public override void Configure()
@@ -38,7 +39,9 @@ public class RunDraftsEndpoint(RecurringDraftService draftService, IOptions<Jobs
         if (!string.IsNullOrWhiteSpace(dateParam) && DateOnly.TryParse(dateParam, out var parsed))
             asOf = parsed;
 
+        // Advance notice for upcoming variable-amount drafts (FR-011c), then charge today's due drafts.
+        var noticesSent = await noticeService.SendDueNoticesAsync(asOf, ct);
         var result = await draftService.RunDueDraftsAsync(asOf, ct);
-        await SendOkAsync(result, ct);
+        await SendOkAsync(result with { NoticesSent = noticesSent }, ct);
     }
 }

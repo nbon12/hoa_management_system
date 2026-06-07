@@ -3,7 +3,7 @@ using HOAManagementCompany.Features.Payments.Models;
 
 namespace HOAManagementCompany.Features.Payments;
 
-public class DraftsEndpoint(PaymentService paymentService) : EndpointWithoutRequest<IEnumerable<DraftEntryDto>>
+public class DraftsEndpoint(PaymentService paymentService) : Endpoint<DraftsRequest, DraftsResponse>
 {
     public override void Configure()
     {
@@ -11,10 +11,10 @@ public class DraftsEndpoint(PaymentService paymentService) : EndpointWithoutRequ
         Description(x => x.WithName("GetDrafts").WithTags("Payments"));
     }
 
-    public override async Task HandleAsync(CancellationToken ct)
+    public override async Task HandleAsync(DraftsRequest req, CancellationToken ct)
     {
         var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
-        var result = await paymentService.GetDraftsAsync(propertyId, ct);
+        var result = await paymentService.GetDraftsAsync(propertyId, req, ct);
         await SendOkAsync(result, ct);
     }
 }

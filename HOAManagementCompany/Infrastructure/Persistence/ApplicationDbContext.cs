@@ -295,6 +295,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasIndex(x => x.Status);
             e.Property(x => x.Kind).HasMaxLength(30);
             e.Property(x => x.Status).HasConversion<string>();
+            e.Property(x => x.DedupKey).HasMaxLength(255);
+            // One row per dedup token; a re-run of a producing job is a no-op. Filtered (where not null).
+            e.HasIndex(x => x.DedupKey).IsUnique()
+                .HasFilter("\"DedupKey\" IS NOT NULL");
             e.HasOne<Owner>().WithMany(o => o.OutboxMessages)
                 .HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
             e.ToTable("OutboxMessages");

@@ -10,11 +10,21 @@ public class OutboxMessage
 {
     public Guid Id { get; set; }
 
-    /// <summary><c>sms_alert</c>, <c>email_alert</c>, or <c>receipt_email</c>.</summary>
+    /// <summary>
+    /// <c>sms_alert</c>, <c>email_alert</c>, <c>receipt_email</c>, or the variable-amount advance
+    /// notices <c>variable_notice_sms</c> / <c>variable_notice_email</c> (FR-011c).
+    /// </summary>
     public string Kind { get; set; } = string.Empty;
 
     public Guid OwnerId { get; set; }
     public Guid? TransactionId { get; set; }
+
+    /// <summary>
+    /// Deterministic per-message dedup token (filtered-unique) so a re-run of a producing job
+    /// cannot enqueue the same notice twice (FR-011c/FR-011d). Null for one-off rows that carry
+    /// no natural period key (failure alerts, receipts).
+    /// </summary>
+    public string? DedupKey { get; set; }
 
     /// <summary>Render inputs (no PII beyond the delivery target).</summary>
     public string PayloadJson { get; set; } = string.Empty;

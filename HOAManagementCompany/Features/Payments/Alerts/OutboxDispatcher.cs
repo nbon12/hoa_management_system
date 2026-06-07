@@ -94,11 +94,11 @@ public sealed class OutboxDispatcher(
 
     private static string Truncate(string s) => s.Length > 500 ? s[..500] : s;
 
-    // OutboxMessage.Kind is "<channel>_alert" / "receipt_email"; the channel half selects the provider.
+    // OutboxMessage.Kind names the channel; the sms_* kinds route to SMS, everything else to email.
     private static string ChannelForKind(string kind) => kind switch
     {
-        "sms_alert" => "sms",
-        "email_alert" or "receipt_email" => "email",
+        "sms_alert" or "variable_notice_sms" => "sms",
+        "email_alert" or "receipt_email" or "variable_notice_email" => "email",
         _ => "email",
     };
 }

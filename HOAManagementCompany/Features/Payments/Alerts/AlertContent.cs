@@ -30,6 +30,30 @@ public static class AlertContent
         return new FailureCopy(sms, subject, body);
     }
 
+    /// <summary>
+    /// NACHA variable-amount advance notice (FR-011c): tells the resident the exact amount and date
+    /// of an upcoming open-balance auto-pay draft, far enough ahead to dispute or cancel. PII-free —
+    /// amount and date only; the delivery target lives on the outbox row.
+    /// </summary>
+    public static FailureCopy VariableAmountNotice(decimal amount, DateOnly draftDate)
+    {
+        var money = amount.ToString("C", CultureInfo.GetCultureInfo("en-US"));
+        var when = draftDate.ToString("MMMM d, yyyy", CultureInfo.GetCultureInfo("en-US"));
+
+        var sms = $"NekoHOA: your auto-pay of {money} is scheduled for {when}. "
+                + "Sign in to review or cancel before then.";
+
+        var subject = "NekoHOA: upcoming automatic payment";
+        var body =
+            $"This is advance notice of an upcoming automatic payment.\n\n"
+            + $"Amount: {money}\nScheduled draft date: {when}\n\n"
+            + "Because your auto-pay is set to your current balance, the amount can change each cycle, "
+            + "so we notify you ahead of every draft. If you'd like to review or cancel this payment, "
+            + "please sign in to your NekoHOA account before the draft date.";
+
+        return new FailureCopy(sms, subject, body);
+    }
+
     /// <summary>Maps a raw Stripe failure/return code to friendly, non-sensitive copy.</summary>
     public static string FriendlyReason(string? code) => code switch
     {
