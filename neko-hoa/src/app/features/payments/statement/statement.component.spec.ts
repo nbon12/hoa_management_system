@@ -1,7 +1,7 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { StatementComponent } from './statement.component';
-import { PaymentsService } from '../../../core/services/payments.service';
+import { PaymentsService, TransactionSummary } from '../../../core/services/payments.service';
 import { LedgerEntry } from '../../../core/models';
 
 const MOCK_LEDGER: LedgerEntry[] = [
@@ -11,11 +11,18 @@ const MOCK_LEDGER: LedgerEntry[] = [
   { id: '4', date: '2026-03-01', description: 'Late Fee',                            type: 'Late Fee',          charge: 50,  payment: 0,   balance: 300, docNumber: 'LF202603' },
 ];
 
+// Masked methods only — TransactionDto never carries raw card/bank data (SC-001).
+const MOCK_TRANSACTIONS: TransactionSummary[] = [
+  { id: 't1', createdAt: '2026-01-05', grossAmount: 250, feeAmount: 5,    total: 255, cumulativeRefundedAmount: 0,  status: 'Succeeded', paymentMethod: 'card', maskedMethod: 'Visa •••• 4242', isRecurring: false },
+  { id: 't2', createdAt: '2026-02-01', grossAmount: 250, feeAmount: 1.95, total: 251.95, cumulativeRefundedAmount: 50, status: 'Refunded',  paymentMethod: 'card', maskedMethod: 'Visa •••• 4242', isRecurring: true },
+];
+
 function makeMockPaymentsService(): Partial<PaymentsService> {
   return {
     getLedger:       jasmine.createSpy().and.returnValue(Promise.resolve(MOCK_LEDGER)),
     getBalance:      jasmine.createSpy().and.returnValue(Promise.resolve({ currentBalance: 300, balanceDueDate: '2026-03-01', monthlyAssessment: 250 })),
     getDrafts:       jasmine.createSpy().and.returnValue(Promise.resolve([])),
+    getTransactions: jasmine.createSpy('getTransactions').and.returnValue(Promise.resolve(MOCK_TRANSACTIONS)),
   } as any;
 }
 
@@ -99,5 +106,63 @@ describe('StatementComponent', () => {
 
   it('shows Make payment button', () => {
     expect(el.textContent).toContain('Make payment');
+  });
+
+  describe('Payments tab (transaction history)', () => {
+    function svc() {
+      return TestBed.inject(PaymentsService) as unknown as { getTransactions: jasmine.Spy };
+    }
+
+    it('does not load transactions until the Payments tab is opened', () => {
+      expect(svc().getTransactions).not.toHaveBeenCalled();
+    });
+
+    it('lazy-loads transactions the first time the Payments tab is opened, and only once', async () => {
+      comp.switchTab('payments');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(svc().getTransactions).toHaveBeenCalledTimes(1);
+      expect(comp.transactions().length).toBe(MOCK_TRANSACTIONS.length);
+
+      // Switching away and back must not refetch.
+      comp.switchTab('statement');
+      comp.switchTab('payments');
+      await fixture.whenStable();
+      expect(svc().getTransactions).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders a row per transaction with masked method and refund column', async () => {
+      comp.switchTab('payments');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const rows = el.querySelectorAll('[data-testid="txn-row"]');
+      expect(rows.length).toBe(MOCK_TRANSACTIONS.length);
+      const table = el.querySelector('[data-testid="transactions-table"]') as HTMLElement;
+      expect(table.textContent).toContain('Visa •••• 4242');
+      expect(table.textContent).toContain('auto-pay');
+      expect(table.textContent).toContain('one-time');
+    });
+
+    it('shows an empty state when there are no transactions', async () => {
+      svc().getTransactions.and.returnValue(Promise.resolve([]));
+      comp.switchTab('payments');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(el.querySelector('[data-testid="txn-empty"]')).toBeTruthy();
+      expect(el.querySelectorAll('[data-testid="txn-row"]').length).toBe(0);
+    });
+
+    it('hides the ledger search/filter card on the Payments tab (SC-001: no raw inputs anywhere)', async () => {
+      comp.switchTab('payments');
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // The ledger card is gone, and there is certainly no card/account entry field.
+      expect((el.textContent ?? '').toLowerCase()).not.toContain('search ledger');
+      expect(el.querySelector('input[placeholder*="4242"]')).toBeNull();
+    });
   });
 });
