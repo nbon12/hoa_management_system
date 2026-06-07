@@ -1,132 +1,141 @@
-import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { render, screen } from '@testing-library/angular';
 import { provideRouter } from '@angular/router';
+import { provideNgxStripe } from 'ngx-stripe';
+import { of } from 'rxjs';
 import { OneTimeComponent } from './one-time.component';
-import { PaymentsService } from '../../../core/services/payments.service';
-import { LedgerEntry } from '../../../core/models';
+import {
+  PaymentsService, PaymentOptions, PaymentIntentResult, ConfirmResult,
+} from '../../../core/services/payments.service';
 
-const MOCK_ENTRY: LedgerEntry = {
-  id: '1', date: '2026-05-01', description: 'Regular Assessment',
-  type: 'Regular Assessment', charge: 250, payment: 0, balance: 500, docNumber: 'RA202605',
+const OPTIONS: PaymentOptions = {
+  currentBalance: 300, creditBalance: 0, nextAssessment: 250, nextAssessmentDueDate: '2026-07-01',
+  cardFeeType: 'Flat', cardFeeValue: 1.95, cardScope: 'All', surchargingEnabled: true, achFeeValue: 0,
 };
 
-function makeMockPaymentsService(): Partial<PaymentsService> {
+const INTENT: PaymentIntentResult = {
+  paymentIntentId: 'pi_test_123', clientSecret: 'pi_test_123_secret', amount: 300, fee: 1.95, total: 301.95,
+};
+
+const CONFIRMED: ConfirmResult = {
+  transactionId: 't1', status: 'Succeeded', grossAmount: 300, feeAmount: 1.95, total: 301.95,
+  maskedMethod: 'Visa •••• 4242', confirmationNumber: 'NEKO-ABC123', receiptId: 'r1',
+};
+
+function mockPaymentsService(): Partial<PaymentsService> {
   return {
-    getLedger:     jasmine.createSpy().and.returnValue(Promise.resolve([MOCK_ENTRY])),
-    submitPayment: jasmine.createSpy().and.returnValue(Promise.resolve({
-      confirmationNumber: 'CONF123', amount: 500, date: '2026-05-01',
-    })),
-  } as any;
+    getPaymentOptions: jasmine.createSpy().and.resolveTo(OPTIONS),
+    createIntent:      jasmine.createSpy().and.resolveTo(INTENT),
+    confirmPayment:    jasmine.createSpy().and.resolveTo(CONFIRMED),
+  };
+}
+
+async function renderComponent() {
+  const view = await render(OneTimeComponent, {
+    providers: [
+      provideRouter([]),
+      // The component injects with environment.stripePublishableKey (empty in the test/prod
+      // environment); a global test key lets injectStripe resolve to the (spied) StripeService.
+      provideNgxStripe('pk_test_karma'),
+      { provide: PaymentsService, useValue: mockPaymentsService() },
+    ],
+  });
+  await view.fixture.whenStable();
+  view.fixture.detectChanges();
+  return view;
 }
 
 describe('OneTimeComponent', () => {
-  let fixture: ComponentFixture<OneTimeComponent>;
-  let comp: OneTimeComponent;
-  let el: HTMLElement;
+  it('renders and starts on step 1', async () => {
+    const { fixture } = await renderComponent();
+    expect(fixture.componentInstance.currentStep()).toBe(1);
+    expect(screen.getByText('Step 1 — How much?')).toBeTruthy();
+  });
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports:   [OneTimeComponent],
-      providers: [
-        provideRouter([]),
-        { provide: PaymentsService, useValue: makeMockPaymentsService() },
-      ],
-    }).compileComponents();
+  it('builds amount presets from the backend options (FR-007)', async () => {
+    const { fixture } = await renderComponent();
+    const comp = fixture.componentInstance;
+    const presets = comp.presets();
+    expect(presets.find(p => p.id === 'current')!.amount).toBe(300);
+    expect(presets.find(p => p.id === 'next')!.amount).toBe(250);
+    expect(presets.find(p => p.id === 'both')!.amount).toBe(550);
+    expect(screen.getByText('Current')).toBeTruthy();
+    expect(screen.getByText('Next due')).toBeTruthy();
+  });
 
-    fixture = TestBed.createComponent(OneTimeComponent);
-    comp    = fixture.componentInstance;
+  it('has NO raw card or bank inputs (SC-001 regression guard)', async () => {
+    await renderComponent();
+    // The legacy mock collected PAN/CVC/routing/account in plain inputs — those must be gone.
+    expect(screen.queryByText('Card number')).toBeNull();
+    expect(screen.queryByText('CVC')).toBeNull();
+    expect(screen.queryByText('Routing number')).toBeNull();
+    expect(screen.queryByText('Account number')).toBeNull();
+    expect(screen.queryByPlaceholderText(/4242 4242/)).toBeNull();
+  });
+
+  it('shows the server-authoritative fee and total on review (not recomputed)', async () => {
+    const { fixture } = await renderComponent();
+    const comp = fixture.componentInstance;
+    // Jump to review with the intent the server returned.
+    comp.intent.set(INTENT);
+    comp.clientSecret.set(INTENT.clientSecret);
+    comp.currentStep.set(3);
     fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    el = fixture.nativeElement;
+
+    expect(screen.getByTestId('summary-fee').textContent).toContain('1.95');
+    expect(screen.getByTestId('summary-total').textContent).toContain('301.95');
   });
 
-  it('should create', () => expect(comp).toBeTruthy());
+  it('selecting a method creates a PaymentIntent for the chosen amount', async () => {
+    const { fixture } = await renderComponent();
+    const comp = fixture.componentInstance;
+    const svc = fixture.debugElement.injector.get(PaymentsService);
 
-  it('starts on step 1', () => {
-    expect(comp.currentStep()).toBe(1);
-  });
-
-  it('shows stepper with steps', () => {
-    expect(el.textContent).toContain('1');
-    expect(el.textContent).toContain('2');
-    expect(el.textContent).toContain('3');
-  });
-
-  it('shows amount presets in step 1', () => {
-    expect(el.textContent).toContain('Current');
-    expect(el.textContent).toContain('Next due');
-    expect(el.textContent).toContain('Both');
-  });
-
-  it('balance signal is set from loaded ledger', () => {
-    expect(comp.balance()).toBe(MOCK_ENTRY.balance);
-  });
-
-  it('resolvedAmount with current preset equals loaded balance', () => {
     comp.selectedPreset.set('current');
-    expect(comp.resolvedAmount()).toBe(comp.balance());
+    comp.selectMethod('ach');
+    await fixture.whenStable();
+
+    expect(svc.createIntent).toHaveBeenCalledWith(300, 'ach');
+    expect(comp.clientSecret()).toBe(INTENT.clientSecret);
   });
 
-  it('resolvedAmount with next preset equals assessment', () => {
-    comp.selectedPreset.set('next');
-    expect(comp.resolvedAmount()).toBe(comp.assessment());
-  });
+  it('confirms via Stripe.js then records on the backend and shows the receipt', async () => {
+    const { fixture } = await renderComponent();
+    const comp = fixture.componentInstance;
+    const svc = fixture.debugElement.injector.get(PaymentsService);
 
-  it('resolvedAmount for both preset = balance + assessment', () => {
-    comp.selectedPreset.set('both');
-    expect(comp.resolvedAmount()).toBe(comp.balance() + comp.assessment());
-  });
+    // Arrange a ready-to-confirm review state without mounting the real Stripe iframe.
+    comp.intent.set(INTENT);
+    comp.clientSecret.set(INTENT.clientSecret);
+    comp.currentStep.set(3);
+    (comp as any).paymentElement = { elements: {} };
+    spyOn(comp.stripe, 'confirmPayment').and.returnValue(
+      of({ paymentIntent: { status: 'succeeded' } }) as any);
 
-  it('totalAmount adds processing fee for card', () => {
-    comp.method.set('card');
-    expect(comp.totalAmount()).toBe(comp.resolvedAmount() + 1.95);
-  });
+    await comp.next(); // step 3 → submit
 
-  it('totalAmount has no fee for ach', () => {
-    comp.method.set('ach');
-    expect(comp.totalAmount()).toBe(comp.resolvedAmount());
-  });
-
-  it('next() advances to step 2', async () => {
-    await comp.next();
-    expect(comp.currentStep()).toBe(2);
-  });
-
-  it('back() goes back to step 1 from step 2', async () => {
-    await comp.next();
-    comp.back();
-    expect(comp.currentStep()).toBe(1);
-  });
-
-  it('shows payment method options on step 2', async () => {
-    await comp.next();
-    fixture.detectChanges();
-    expect(el.textContent).toContain('Credit card');
-    expect(el.textContent).toContain('eCheck');
-  });
-
-  it('shows review on step 3', async () => {
-    await comp.next();
-    await comp.next();
-    fixture.detectChanges();
-    expect(el.textContent).toContain('Review');
-    expect(el.textContent).toContain('Total');
-  });
-
-  it('submits payment and shows confirmation on step 3 submit', async () => {
-    await comp.next();
-    await comp.next();
-    await comp.next();
-    fixture.detectChanges();
+    expect(comp.stripe.confirmPayment).toHaveBeenCalled();
+    expect(svc.confirmPayment).toHaveBeenCalledWith('pi_test_123');
     expect(comp.currentStep()).toBe(4);
-    expect(comp.result()).not.toBeNull();
+    expect(comp.result()!.confirmationNumber).toBe('NEKO-ABC123');
+
+    fixture.detectChanges();
+    expect(screen.getByTestId('confirmation-number').textContent).toContain('NEKO-ABC123');
   });
 
-  it('shows confirmation after payment', async () => {
+  it('surfaces a Stripe confirmation error and stays on review', async () => {
+    const { fixture } = await renderComponent();
+    const comp = fixture.componentInstance;
+
+    comp.intent.set(INTENT);
+    comp.clientSecret.set(INTENT.clientSecret);
+    comp.currentStep.set(3);
+    (comp as any).paymentElement = { elements: {} };
+    spyOn(comp.stripe, 'confirmPayment').and.returnValue(
+      of({ error: { message: 'Your card was declined.' } }) as any);
+
     await comp.next();
-    await comp.next();
-    await comp.next();
-    fixture.detectChanges();
-    expect(el.textContent).toContain('Payment submitted');
+
+    expect(comp.currentStep()).toBe(3);
+    expect(comp.error()).toContain('declined');
   });
 });

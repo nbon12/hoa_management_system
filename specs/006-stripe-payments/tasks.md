@@ -75,7 +75,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T025 [P] Implement `ReconciliationService` scaffolding + `POST /payments/jobs/reconcile` endpoint with Cloud Scheduler auth (OIDC / `X-Scheduler-Secret`) in `HOAManagementCompany/Features/Payments/Jobs/`
 - [X] T026 [P] Extend `TelemetryScrubbingProcessor` for Stripe/PII fields and add payment metrics (`payment.*`, `alert.sent`, `webhook.processed`) in `HOAManagementCompany/Infrastructure/Observability/` <!-- PaymentMetrics meter added + registered via AddMeter; scrubbing processor unchanged this split -->`
 - [X] T027 [P] Seed default `HoaPaymentConfig` per HOA from `Payments:DefaultFee`/`Nsf` in `HOAManagementCompany/Seed/DatabaseSeeder.cs`
-- [ ] T028 [P] Initialize Stripe.js (`loadStripe`) and expose `stripe$` in `neko-hoa/src/app/core/services/payments.service.ts`; register `provideNgxStripe()` in `neko-hoa/src/app/app.config.ts`
+- [X] T028 [P] Initialize Stripe.js (`loadStripe`) and expose `stripe$` in `neko-hoa/src/app/core/services/payments.service.ts`; register `provideNgxStripe()` in `neko-hoa/src/app/app.config.ts`
 - [X] T029 Register all new gateways/services (Stripe, Twilio, SendGrid, FeeCalculator, Ledger/Allocation, Outbox, Reconciliation, Idempotency) in `HOAManagementCompany/Program.cs` DI <!-- alert split: PaymentMetrics, IAlertProvider x2, AlertService, OutboxDispatcher registered -->`
 
 **Checkpoint**: Foundation ready — user stories can begin.
@@ -95,10 +95,10 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T032 [P] [US1] Testcontainers Theory: webhook lifecycle — succeeded (settlement refs + deferred ledger + receipt), payment_failed, partial+full refund (cumulative, compensating ledger, fee retained), dispute created/closed won/lost, ACH return → Returned (+reversal +NSF) — in `HOAManagementCompany.Tests/Integration/Payments/WebhookLifecycleTests.cs`
 - [X] T033 [P] [US1] Testcontainers test: idempotency key collapses double-submit to one charge/transaction, in `HOAManagementCompany.Tests/Integration/Payments/IdempotencyTests.cs`
 - [X] T034 [P] [US1] SC-001 test: confirm no raw card/bank number is accepted or stored (request + storage inspection), in `HOAManagementCompany.Tests/Integration/Payments/PciScopeTests.cs`
-- [ ] T035 [P] [US1] Angular Testing Library component test for one-time payment component in `neko-hoa/src/app/features/payments/one-time/one-time.component.spec.ts`
-- [ ] T036 [P] [US1] Jasmine unit test for `payments.service.ts` options/intent/confirm in `neko-hoa/src/app/core/services/payments.service.spec.ts`
-- [ ] T037 [P] [US1] Cypress E2E for one-time payment in `neko-hoa/cypress/e2e/one-time-payment.cy.ts`
-- [ ] T038 [P] [US1] Storybook story + visual case for the one-time payment summary in `neko-hoa/src/app/features/payments/one-time/one-time.stories.ts`
+- [X] T035 [P] [US1] Angular Testing Library component test for one-time payment component in `neko-hoa/src/app/features/payments/one-time/one-time.component.spec.ts`
+- [X] T036 [P] [US1] Jasmine unit test for `payments.service.ts` options/intent/confirm in `neko-hoa/src/app/core/services/payments.service.spec.ts`
+- [X] T037 [P] [US1] Cypress E2E for one-time payment in `neko-hoa/cypress/e2e/one-time-payment.cy.ts`
+- [X] T038 [P] [US1] Storybook story + visual case for the one-time payment summary in `neko-hoa/src/app/features/payments/one-time/one-time.stories.ts`
 
 ### Implementation for User Story 1
 
@@ -113,8 +113,8 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T047 [US1] Implement `GET /payments/transactions` (pagination, status/isRecurring filters, masked method) replacing nothing — new in `HOAManagementCompany/Features/Payments/OneTime/TransactionsEndpoint.cs`
 - [X] T048 [US1] Implement `GET /payments/receipts/{transactionId}` in `HOAManagementCompany/Features/Payments/OneTime/ReceiptEndpoint.cs`
 - [X] T049 [US1] Remove the simulated one-time path (raw card/CVV handling) from `HOAManagementCompany/Features/Payments/PaymentService.cs` and `OneTimePaymentEndpoint.cs`/`PaymentModels.cs`
-- [ ] T050 [P] [US1] Rebuild one-time component with Stripe Payment Element, presets, masked summary (Amount/Fee/Total), confirm flow in `neko-hoa/src/app/features/payments/one-time/one-time.component.ts`
-- [ ] T051 [P] [US1] Add options/intent/confirm/transactions/receipt methods to `neko-hoa/src/app/core/services/payments.service.ts`
+- [X] T050 [P] [US1] Rebuild one-time component with Stripe Payment Element, presets, masked summary (Amount/Fee/Total), confirm flow in `neko-hoa/src/app/features/payments/one-time/one-time.component.ts`
+- [X] T051 [P] [US1] Add options/intent/confirm/transactions/receipt methods to `neko-hoa/src/app/core/services/payments.service.ts`
 - [ ] T052 [US1] Add validation, consistent error shape, Serilog audit logging, and verify dev Swagger + PII-free Sentry/OTel spans for the one-time endpoints
 
 **Checkpoint**: One-time payment is a complete, independently testable MVP slice.
