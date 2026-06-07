@@ -66,7 +66,7 @@ frontend tests for these flows; write tests first where the testing constitution
 
 ### Stripe gateway, idempotency, webhook intake, outbox, telemetry
 
-- [ ] T020 [P] Define `IStripeGateway` (PaymentIntent, SetupIntent, Customer, off-session charge, balance-transaction/payout fetch, event construct) + `StripeGateway` impl in `HOAManagementCompany/Infrastructure/Payments/` and an in-memory fake in `HOAManagementCompany.Tests/Fixtures/FakeStripeGateway.cs`
+- [X] T020 [P] Define `IStripeGateway` (PaymentIntent, SetupIntent, Customer, off-session charge, balance-transaction/payout fetch, event construct) + `StripeGateway` impl in `HOAManagementCompany/Infrastructure/Payments/` and an in-memory fake in `HOAManagementCompany.Tests/Fixtures/FakeStripeGateway.cs`
 - [ ] T021 [P] Implement idempotency-key infrastructure (header binding, durable persistence on `PaymentTransaction.IdempotencyKey`, replay-returns-original, forward to Stripe `RequestOptions`) in `HOAManagementCompany/Features/Payments/Services/IdempotencyService.cs`
 - [ ] T022 Testcontainers integration test for durable webhook intake — signature verify, timestamp-tolerance replay rejection, inbox idempotency, retry→dead-letter — in `HOAManagementCompany.Tests/Integration/Payments/WebhookIntakeTests.cs`
 - [X] T023 Implement durable webhook intake core (`StripeWebhookEndpoint`: verify+timestamp tolerance → upsert `WebhookEventInbox` → ack 200 → dispatch; terminal-state guard) in `HOAManagementCompany/Features/Payments/Webhooks/StripeWebhookEndpoint.cs`
@@ -128,9 +128,9 @@ frontend tests for these flows; write tests first where the testing constitution
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T053 [P] [US2] Testcontainers test: setup-intent creates/reuses Stripe customer, vaults PM, stores only references, in `HOAManagementCompany.Tests/Integration/Payments/SetupIntentTests.cs`
-- [ ] T054 [P] [US2] Testcontainers test: recurring upsert persists `PaymentAuthorization` (text/version/IP/UA/terms), drops masked fields, requires mandate, in `HOAManagementCompany.Tests/Integration/Payments/RecurringSetupTests.cs`
-- [ ] T055 [P] [US2] Testcontainers Theory: run-drafts resolves amount (assessment/open-balance/fixed), applies fee, charges off-session, writes recurring txn + draft, idempotent per `{recurringId}:{period}`, in `HOAManagementCompany.Tests/Integration/Payments/RecurringDraftTests.cs`
+- [X] T053 [P] [US2] Testcontainers test: setup-intent creates/reuses Stripe customer, vaults PM, stores only references, in `HOAManagementCompany.Tests/Integration/Payments/SetupIntentTests.cs`
+- [X] T054 [P] [US2] Testcontainers test: recurring upsert persists `PaymentAuthorization` (text/version/IP/UA/terms), drops masked fields, requires mandate, in `HOAManagementCompany.Tests/Integration/Payments/RecurringSetupTests.cs`
+- [X] T055 [P] [US2] Testcontainers Theory: run-drafts resolves amount (assessment/open-balance/fixed), applies fee, charges off-session, writes recurring txn + draft, idempotent per `{recurringId}:{period}`, in `HOAManagementCompany.Tests/Integration/Payments/RecurringDraftTests.cs`
 - [ ] T056 [P] [US2] Testcontainers test: variable-amount advance notice enqueued before draft (FR-011c); disable→no drafts; **failed draft is NOT auto-retried within the cycle and waits for the next draft day (FR-011a)**, in `HOAManagementCompany.Tests/Integration/Payments/RecurringNoticeTests.cs`
 - [ ] T057 [P] [US2] Angular Testing Library test for auto-pay component in `neko-hoa/src/app/features/payments/recurring/recurring.component.spec.ts`
 - [ ] T058 [P] [US2] Cypress E2E for auto-pay setup in `neko-hoa/cypress/e2e/recurring-setup.cy.ts`
@@ -138,11 +138,11 @@ frontend tests for these flows; write tests first where the testing constitution
 
 ### Implementation for User Story 2
 
-- [ ] T060 [US2] Implement `POST /payments/setup-intent` (create/reuse customer, SetupIntent) in `HOAManagementCompany/Features/Payments/Recurring/SetupIntentEndpoint.cs`
-- [ ] T061 [US2] Update `PUT /payments/recurring` (store vaulted PM, capture mandate→`PaymentAuthorization`, recurring fee) in `HOAManagementCompany/Features/Payments/Recurring/RecurringUpsertEndpoint.cs`
-- [ ] T062 [P] [US2] Update `GET /payments/recurring` (masked method, next draft date·amount incl. fee, mandate ref) in `HOAManagementCompany/Features/Payments/Recurring/RecurringGetEndpoint.cs`
-- [ ] T063 [P] [US2] Update `DELETE /payments/recurring` (disable + set `TerminatedAt` on authorization) in `HOAManagementCompany/Features/Payments/Recurring/RecurringDeleteEndpoint.cs`
-- [ ] T064 [US2] Implement `POST /payments/jobs/run-drafts` (due drafts, amount resolution, off-session charge, fee, draft entry, per-period idempotency, variable notice) in `HOAManagementCompany/Features/Payments/Jobs/RunDraftsEndpoint.cs`
+- [X] T060 [US2] Implement `POST /payments/setup-intent` (create/reuse customer, SetupIntent) in `HOAManagementCompany/Features/Payments/Recurring/SetupIntentEndpoint.cs`
+- [X] T061 [US2] Update `PUT /payments/recurring` (store vaulted PM, capture mandate→`PaymentAuthorization`, recurring fee) in `HOAManagementCompany/Features/Payments/Recurring/RecurringUpsertEndpoint.cs`
+- [X] T062 [P] [US2] Update `GET /payments/recurring` (masked method, next draft date·amount incl. fee, mandate ref) in `HOAManagementCompany/Features/Payments/Recurring/RecurringGetEndpoint.cs`
+- [X] T063 [P] [US2] Update `DELETE /payments/recurring` (disable + set `TerminatedAt` on authorization) in `HOAManagementCompany/Features/Payments/Recurring/RecurringDeleteEndpoint.cs`
+- [X] T064 [US2] Implement `POST /payments/jobs/run-drafts` (due drafts, amount resolution, off-session charge, fee, draft entry, per-period idempotency, variable notice) in `HOAManagementCompany/Features/Payments/Jobs/RunDraftsEndpoint.cs`
 - [ ] T065 [P] [US2] Update drafts query to surface status from linked `PaymentTransaction` and add `limit`/`offset` pagination (constitution §4) in `HOAManagementCompany/Features/Payments/DraftsEndpoint.cs`
 - [ ] T066 [P] [US2] Rebuild auto-pay page (SetupIntent element, amount type, draft day, mandate checkbox, status card, drafts table) in `neko-hoa/src/app/features/payments/recurring/recurring.component.ts`
 - [ ] T067 [P] [US2] Add setup-intent/recurring methods to `neko-hoa/src/app/core/services/payments.service.ts`
