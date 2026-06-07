@@ -1,0 +1,18 @@
+/* Storybook's Angular build uses this tsconfig so it compiles only the stories + .storybook
+   config (preview.ts/main.ts) — not the Jasmine specs or Playwright e2e specs, which would
+   otherwise fail type-checking under Storybook's webpack compilation. */
+{
+  "extends": "../tsconfig.app.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": [
+    "../src/**/*.stories.ts",
+    "../src/**/*.d.ts",
+    "./*.ts"
+  ],
+  "exclude": [
+    "../src/**/*.spec.ts",
+    "../src/test.ts"
+  ]
+}

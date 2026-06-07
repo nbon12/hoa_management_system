@@ -134,6 +134,7 @@
           "options": {
             "configDir": ".storybook",
             "browserTarget": "neko-hoa:build",
+            "tsConfig": ".storybook/tsconfig.json",
             "compodoc": false,
             "port": 6006
           }
@@ -143,6 +144,7 @@
           "options": {
             "configDir": ".storybook",
             "browserTarget": "neko-hoa:build",
+            "tsConfig": ".storybook/tsconfig.json",
             "compodoc": false,
             "outputDir": "storybook-static"
           }
