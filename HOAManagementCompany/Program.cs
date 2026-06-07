@@ -15,6 +15,7 @@ using FastEndpoints;
 using FastEndpoints.Swagger;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Features.Common;
+using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Infrastructure.Storage;
@@ -29,6 +30,8 @@ using Serilog;
 using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: true);
 
 // ── Serilog ────────────────────────────────────────────────────────────────
 // 3-arg form so DI-registered ILogEventSink/ILogEventEnricher (e.g. the integration
@@ -159,6 +162,13 @@ builder.Services.AddSingleton<IAmazonS3>(_ =>
 });
 builder.Services.AddScoped<IDocumentStorage, S3DocumentStorage>();
 
+// ── Payments (Stripe / alerts / jobs) ──────────────────────────────────────
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName));
+builder.Services.Configure<JobsOptions>(builder.Configuration.GetSection(JobsOptions.SectionName));
+builder.Services.Configure<TwilioOptions>(builder.Configuration.GetSection(TwilioOptions.SectionName));
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
+
 // ── Rate Limiting ──────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(o =>
 {
@@ -222,6 +232,16 @@ if (builder.Environment.IsDevelopment())
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.AuthService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.PaymentService>();
+// Stripe payments (006-stripe-payments). Gateway is the network adapter; the rest is testable logic.
+builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.IStripeGateway,
+    HOAManagementCompany.Infrastructure.Payments.StripeGateway>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.FeeCalculator>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.IdempotencyService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.PaymentConfigService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.LedgerService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.AllocationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Webhooks.WebhookProcessor>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Jobs.ReconciliationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.PropertyService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.CommunityService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>();

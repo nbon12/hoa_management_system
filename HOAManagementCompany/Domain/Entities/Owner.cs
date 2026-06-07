@@ -16,5 +16,16 @@ public class Owner
     public bool VotingRights { get; set; } = true;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    // Payments / alerts (006-stripe-payments).
+    public string? StripeCustomerId { get; set; }
+    public bool AlertSmsOptIn { get; set; }
+    public bool AlertEmailOptIn { get; set; }
+
+    /// <summary>E.164 phone for SMS alerts; required when <see cref="AlertSmsOptIn"/> (encrypted at rest, FR-029).</summary>
+    public string? AlertPhone { get; set; }
+
     public Property Property { get; set; } = null!;
+    public ICollection<AlertConsent> AlertConsents { get; set; } = [];
+    public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = [];
+    public ICollection<OutboxMessage> OutboxMessages { get; set; } = [];
 }

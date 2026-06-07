@@ -160,6 +160,20 @@ public class TestDataSeeder(ApplicationDbContext db)
             VotingRights = true
         });
 
+        // Per-HOA payment policy (006-stripe-payments): 3% credit-card surcharge, flat ACH, NSF fee.
+        db.HoaPaymentConfigs.Add(new HoaPaymentConfig
+        {
+            Id = Guid.NewGuid(),
+            CommunityId = CommunityId,
+            CardFeeType = FeeType.Percentage,
+            CardFeeValue = 0.03m,
+            CardScope = CardScope.CreditOnly,
+            SurchargingEnabled = true,
+            AchFeeValue = 0m,
+            NsfFeeEnabled = true,
+            NsfFeeAmount = 25m,
+        });
+
         // Directory fields for primary
         db.DirectoryFields.AddRange(
             new DirectoryField { Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, FieldKey = "name", Label = "Full Name", Shared = true },
@@ -177,22 +191,25 @@ public class TestDataSeeder(ApplicationDbContext db)
             EffectiveDate = new DateOnly(2005, 6, 1)
         });
 
-        // Ledger entries (12 months of assessments + payments + 1 late fee)
+        // Ledger entries (12 months of assessments + payments + 1 late fee).
+        // Sequence is the append-only per-property ordering enforced by IX_LedgerEntries_PropertyId_Sequence;
+        // the seeder assigns it explicitly since it bypasses LedgerService's advisory-lock allocation.
         decimal balance = 0m;
+        long sequence = 0;
         for (int i = 12; i >= 1; i--)
         {
             var date = DateOnly.FromDateTime(DateTime.Today.AddMonths(-i));
             balance += 250m;
             db.LedgerEntries.Add(new LedgerEntry
             {
-                Id = Guid.NewGuid(), PropertyId = primaryProperty.Id,
+                Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, Sequence = ++sequence,
                 EntryDate = date, Description = $"Regular Assessment – {date:MMMM yyyy}",
                 ChargeAmount = 250m, RunningBalance = balance, EntryType = LedgerEntryType.RegularAssessment
             });
             balance -= 250m;
             db.LedgerEntries.Add(new LedgerEntry
             {
-                Id = Guid.NewGuid(), PropertyId = primaryProperty.Id,
+                Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, Sequence = ++sequence,
                 EntryDate = date.AddDays(5), Description = "Online Payment",
                 PaymentAmount = 250m, RunningBalance = balance, EntryType = LedgerEntryType.Payment
             });
