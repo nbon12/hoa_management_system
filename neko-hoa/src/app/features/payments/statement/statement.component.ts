@@ -2,7 +2,7 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { PaymentsService } from '../../../core/services/payments.service';
+import { PaymentsService, TransactionSummary } from '../../../core/services/payments.service';
 import { LedgerEntry } from '../../../core/models';
 
 @Component({
@@ -26,8 +26,9 @@ import { LedgerEntry } from '../../../core/models';
     <!-- Filter bar -->
     <div class="card card--lav" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="display:flex;gap:6px;padding:3px;background:var(--paper);border-radius:999px;border:1.5px solid var(--ink);">
-        <button class="tab" [class.tab--active]="activeTab==='statement'" (click)="activeTab='statement'">Statement</button>
-        <button class="tab" [class.tab--active]="activeTab==='balance'" (click)="activeTab='balance'">Open balance</button>
+        <button class="tab" [class.tab--active]="activeTab==='statement'" (click)="switchTab('statement')" data-testid="tab-statement">Statement</button>
+        <button class="tab" [class.tab--active]="activeTab==='balance'" (click)="switchTab('balance')" data-testid="tab-balance">Open balance</button>
+        <button class="tab" [class.tab--active]="activeTab==='payments'" (click)="switchTab('payments')" data-testid="tab-payments">Payments</button>
       </div>
       <div class="field-label" style="margin:0;">From</div>
       <input class="field field--dashed" type="date" style="width:150px;" [(ngModel)]="startDate">
@@ -58,7 +59,8 @@ import { LedgerEntry } from '../../../core/models';
       </div>
     }
 
-    <!-- Search + filters -->
+    <!-- Search + filters (ledger views) -->
+    @if (activeTab !== 'payments') {
     <div class="card" style="padding:0;overflow:hidden;">
       <div style="padding:10px 14px;display:flex;gap:8px;align-items:center;border-bottom:1.5px dashed var(--line);">
         <input class="field field--dashed" placeholder="🔍 Search ledger…" style="max-width:220px;" [(ngModel)]="searchTerm">
@@ -115,6 +117,55 @@ import { LedgerEntry } from '../../../core/models';
         <b class="mono" style="color:var(--rose);">{{ balance | currency }}</b>
       </div>
     </div>
+    }
+
+    <!-- Payments tab: Stripe transaction history (read-only) -->
+    @if (activeTab === 'payments') {
+    <div class="card" style="padding:0;overflow:hidden;" data-testid="transactions-card">
+      @if (txnLoading()) {
+        <div class="muted" style="padding:32px;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span class="spinner"></span> Loading payment history…
+        </div>
+      } @else {
+        <div class="scroll-area" style="max-height:460px;">
+          <table class="data-table" data-testid="transactions-table">
+            <thead>
+              <tr>
+                <th>Date</th><th>Type</th><th>Method</th>
+                <th class="num">Amount</th><th class="num">Fee</th><th class="num">Total</th>
+                <th>Status</th><th class="num">Refunded</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of transactions(); track t.id) {
+                <tr data-testid="txn-row">
+                  <td>{{ t.createdAt | date:'MM/dd/yy' }}</td>
+                  <td>
+                    <span class="pill" [style.background]="t.isRecurring ? 'var(--lav-2)' : 'var(--pink-2)'">
+                      {{ t.isRecurring ? 'auto-pay' : 'one-time' }}
+                    </span>
+                  </td>
+                  <td class="mono" style="font-size:11px;">{{ t.maskedMethod }}</td>
+                  <td class="num">{{ t.grossAmount | currency }}</td>
+                  <td class="num">{{ t.feeAmount ? (t.feeAmount | currency) : '—' }}</td>
+                  <td class="num">{{ t.total | currency }}</td>
+                  <td><span class="pill">{{ t.status }}</span></td>
+                  <td class="num" [style.color]="t.cumulativeRefundedAmount > 0 ? 'var(--rose)' : ''">
+                    {{ t.cumulativeRefundedAmount > 0 ? (t.cumulativeRefundedAmount | currency) : '—' }}
+                  </td>
+                </tr>
+              }
+              @empty {
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--ink-mute);" data-testid="txn-empty">
+                  No payments yet. Your card and bank payments will appear here.
+                </td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+    }
   `
 })
 export class StatementComponent implements OnInit {
@@ -128,6 +179,11 @@ export class StatementComponent implements OnInit {
   private _balance    = signal(0);
   private _searchTerm = signal('');
   private _typeFilter = signal('');
+
+  // Payments tab: Stripe transaction history, lazy-loaded the first time the tab is opened.
+  transactions = signal<TransactionSummary[]>([]);
+  txnLoading   = signal(false);
+  private _txnLoaded = false;
 
   get searchTerm()          { return this._searchTerm(); }
   set searchTerm(v: string) { this._searchTerm.set(v); }
@@ -162,5 +218,23 @@ export class StatementComponent implements OnInit {
     const entries = await this.svc.getLedger();
     this._entries.set(entries);
     this._balance.set(entries.at(-1)?.balance ?? 0);
+  }
+
+  switchTab(tab: string) {
+    this.activeTab = tab;
+    // Defer the network call until the resident actually opens the Payments tab, and only once.
+    if (tab === 'payments' && !this._txnLoaded) {
+      this.loadTransactions();
+    }
+  }
+
+  async loadTransactions() {
+    this._txnLoaded = true;
+    this.txnLoading.set(true);
+    try {
+      this.transactions.set(await this.svc.getTransactions());
+    } finally {
+      this.txnLoading.set(false);
+    }
   }
 }

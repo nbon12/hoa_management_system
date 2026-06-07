@@ -186,7 +186,7 @@ frontend tests for these flows; write tests first where the testing constitution
 **Purpose**: Reporting, compliance, security, and gate verification across stories.
 
 - [X] T081 [P] Implement `GET /payments/statements` + `GET /payments/unpaid-assessments` (FR-039, NC § 47F-3-118) in `HOAManagementCompany/Features/Payments/Statements/` with Testcontainers tests
-- [ ] T082 [P] Build the Angular statement/transactions view in `neko-hoa/src/app/features/payments/statement/statement.component.ts`
+- [X] T082 [P] Build the Angular statement/transactions view in `neko-hoa/src/app/features/payments/statement/statement.component.ts`
 - [X] T083 [P] Reconciliation + dead-letter hardening test (missed-webhook backfill, outbox flush, inbox retry) in `HOAManagementCompany.Tests/Integration/Payments/ReconciliationTests.cs`
 - [ ] T084 [P] PII encryption-at-rest review (FR-029) + audit logging of financial-record access and fee/alert/schedule config changes
 - [ ] T085 [P] Rate-limit review on intent/confirm/setup/jobs endpoints + processor fraud-tooling (Stripe Radar) note (FR-028)
