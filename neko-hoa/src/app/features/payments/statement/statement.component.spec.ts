@@ -17,7 +17,6 @@ function makeMockPaymentsService(): Partial<PaymentsService> {
     getBalance:      jasmine.createSpy().and.returnValue(Promise.resolve({ currentBalance: 300, balanceDueDate: '2026-03-01', monthlyAssessment: 250 })),
     getDrafts:       jasmine.createSpy().and.returnValue(Promise.resolve([])),
     loadRecurring:   jasmine.createSpy().and.returnValue(Promise.resolve()),
-    submitPayment:   jasmine.createSpy().and.returnValue(Promise.resolve({ confirmationNumber: 'CONF001', amount: 250, date: '2026-03-01' })),
   } as any;
 }
 

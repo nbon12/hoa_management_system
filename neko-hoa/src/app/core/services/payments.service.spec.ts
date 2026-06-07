@@ -61,14 +61,45 @@ describe('PaymentsService', () => {
     });
   });
 
-  describe('submitPayment()', () => {
-    it('posts to /payments/one-time and returns confirmation', async () => {
-      const promise = svc.submitPayment(250, 'ach');
-      http.expectOne(r => r.url.includes('/payments/one-time') && r.method === 'POST')
-          .flush({ confirmationNumber: 'CONF123', amount: 250, processedAt: '2026-01-01T00:00:00Z' });
+  describe('getPaymentOptions()', () => {
+    it('GETs /payments/options and returns the fee policy + balances', async () => {
+      const promise = svc.getPaymentOptions();
+      const req = http.expectOne(r => r.url.endsWith('/payments/options') && r.method === 'GET');
+      req.flush({
+        currentBalance: 300, creditBalance: 0, nextAssessment: 250, nextAssessmentDueDate: '2026-07-01',
+        cardFeeType: 'Flat', cardFeeValue: 1.95, cardScope: 'All', surchargingEnabled: true, achFeeValue: 0,
+      });
+      const opts = await promise;
+      expect(opts.currentBalance).toBe(300);
+      expect(opts.cardFeeValue).toBe(1.95);
+    });
+  });
+
+  describe('createIntent()', () => {
+    it('POSTs amount + method to /payments/intent and returns the server-authoritative intent', async () => {
+      const promise = svc.createIntent(300, 'card');
+      const req = http.expectOne(r => r.url.endsWith('/payments/intent') && r.method === 'POST');
+      expect(req.request.body).toEqual({ amount: 300, method: 'card' });
+      req.flush({ paymentIntentId: 'pi_1', clientSecret: 'pi_1_secret', amount: 300, fee: 1.95, total: 301.95 });
+      const intent = await promise;
+      expect(intent.paymentIntentId).toBe('pi_1');
+      expect(intent.clientSecret).toBe('pi_1_secret');
+      expect(intent.total).toBe(301.95);
+    });
+  });
+
+  describe('confirmPayment()', () => {
+    it('POSTs the paymentIntentId to /payments/one-time/confirm and returns the receipt detail', async () => {
+      const promise = svc.confirmPayment('pi_1');
+      const req = http.expectOne(r => r.url.endsWith('/payments/one-time/confirm') && r.method === 'POST');
+      expect(req.request.body).toEqual({ paymentIntentId: 'pi_1' });
+      req.flush({
+        transactionId: 't1', status: 'Succeeded', grossAmount: 300, feeAmount: 1.95, total: 301.95,
+        maskedMethod: 'Visa •••• 4242', confirmationNumber: 'NEKO-ABC123', receiptId: 'r1',
+      });
       const result = await promise;
-      expect(result.confirmationNumber).toBe('CONF123');
-      expect(result.amount).toBe(250);
+      expect(result.confirmationNumber).toBe('NEKO-ABC123');
+      expect(result.maskedMethod).toBe('Visa •••• 4242');
     });
   });
 });

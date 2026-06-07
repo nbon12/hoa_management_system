@@ -95,6 +95,40 @@ jobs:
           path: diff-coverage.html
           if-no-files-found: ignore
 
+  frontend:
+    name: Frontend (neko-hoa)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neko-hoa
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: neko-hoa/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests (headless)
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: E2E (Cypress, headless)
+        # start-server-and-test boots `ng serve` on :4200, waits for it, then runs the Cypress
+        # happy-path. The Stripe instance is faked at the window.Stripe seam — no live Stripe calls.
+        run: npm run e2e:ci
+
   docker-push:
     name: Push Docker Image
     runs-on: ubuntu-latest

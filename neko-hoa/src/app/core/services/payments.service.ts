@@ -4,7 +4,63 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { LedgerEntry, RecurringPayment, DraftEntry } from '../models';
 
-export interface PaymentResult { confirmationNumber: string; amount: number; date: string; }
+/** Fee policy + balances for the one-time payment screen (mirrors backend PaymentOptionsResponse, FR-007). */
+export interface PaymentOptions {
+  currentBalance: number;
+  creditBalance: number;
+  nextAssessment: number;
+  nextAssessmentDueDate: string | null;
+  cardFeeType: string;
+  cardFeeValue: number;
+  cardScope: string;
+  surchargingEnabled: boolean;
+  achFeeValue: number;
+}
+
+/** Server-authoritative PaymentIntent: the fee/total are computed by the backend FeeCalculator, never client-side. */
+export interface PaymentIntentResult {
+  paymentIntentId: string;
+  clientSecret: string;
+  amount: number;
+  fee: number;
+  total: number;
+}
+
+/** Result of confirming a one-time payment against the backend (post Stripe.js confirmPayment). */
+export interface ConfirmResult {
+  transactionId: string;
+  status: string;
+  grossAmount: number;
+  feeAmount: number;
+  total: number;
+  maskedMethod: string;
+  confirmationNumber: string | null;
+  receiptId: string | null;
+}
+
+export interface TransactionSummary {
+  id: string;
+  createdAt: string;
+  grossAmount: number;
+  feeAmount: number;
+  total: number;
+  cumulativeRefundedAmount: number;
+  status: string;
+  paymentMethod: string;
+  maskedMethod: string;
+  isRecurring: boolean;
+}
+
+export interface Receipt {
+  id: string;
+  transactionId: string;
+  confirmationNumber: string;
+  maskedMethod: string;
+  grossAmount: number;
+  feeAmount: number;
+  total: number;
+  issuedAt: string;
+}
 
 interface ApiLedgerPage {
   items: ApiLedgerEntry[];
@@ -93,20 +149,40 @@ export class PaymentsService {
     }));
   }
 
-  // ── One-time payment ──────────────────────────────────────────────────────
+  // ── One-time payment (Stripe Payment Element) ───────────────────────────────
 
-  async submitPayment(amount: number, method: 'card' | 'ach', details?: Record<string, string>): Promise<PaymentResult> {
-    const body = { amount, method, ...details };
-    const res = await firstValueFrom(
-      this.http.post<{ confirmationNumber: string; amount: number; processedAt: string }>(
-        `${this.base}/payments/one-time`, body
-      )
+  /** Balance presets + fee policy for the one-time screen. */
+  async getPaymentOptions(): Promise<PaymentOptions> {
+    return firstValueFrom(this.http.get<PaymentOptions>(`${this.base}/payments/options`));
+  }
+
+  /**
+   * Creates a Stripe PaymentIntent server-side. The backend computes the fee/total authoritatively
+   * and returns the clientSecret the Payment Element mounts against. No raw instrument data is sent.
+   */
+  async createIntent(amount: number, method: 'card' | 'ach'): Promise<PaymentIntentResult> {
+    return firstValueFrom(
+      this.http.post<PaymentIntentResult>(`${this.base}/payments/intent`, { amount, method })
     );
-    return {
-      confirmationNumber: res.confirmationNumber,
-      amount:             res.amount,
-      date:               res.processedAt?.split('T')[0] ?? new Date().toISOString().split('T')[0],
-    };
+  }
+
+  /** Records the payment after Stripe.js has confirmed the intent in-browser; returns the receipt detail. */
+  async confirmPayment(paymentIntentId: string): Promise<ConfirmResult> {
+    return firstValueFrom(
+      this.http.post<ConfirmResult>(`${this.base}/payments/one-time/confirm`, { paymentIntentId })
+    );
+  }
+
+  async getTransactions(limit = 20, offset = 0): Promise<TransactionSummary[]> {
+    const params = new HttpParams().set('limit', limit).set('offset', offset);
+    const res = await firstValueFrom(
+      this.http.get<{ items: TransactionSummary[] }>(`${this.base}/payments/transactions`, { params })
+    );
+    return res.items;
+  }
+
+  async getReceipt(id: string): Promise<Receipt> {
+    return firstValueFrom(this.http.get<Receipt>(`${this.base}/payments/receipts/${id}`));
   }
 
   // ── Recurring payment ─────────────────────────────────────────────────────
