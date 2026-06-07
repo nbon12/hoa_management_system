@@ -115,7 +115,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T049 [US1] Remove the simulated one-time path (raw card/CVV handling) from `HOAManagementCompany/Features/Payments/PaymentService.cs` and `OneTimePaymentEndpoint.cs`/`PaymentModels.cs`
 - [X] T050 [P] [US1] Rebuild one-time component with Stripe Payment Element, presets, masked summary (Amount/Fee/Total), confirm flow in `neko-hoa/src/app/features/payments/one-time/one-time.component.ts`
 - [X] T051 [P] [US1] Add options/intent/confirm/transactions/receipt methods to `neko-hoa/src/app/core/services/payments.service.ts`
-- [ ] T052 [US1] Add validation, consistent error shape, Serilog audit logging, and verify dev Swagger + PII-free Sentry/OTel spans for the one-time endpoints
+- [X] T052 [US1] Add validation, consistent error shape, Serilog audit logging, and verify dev Swagger + PII-free Sentry/OTel spans for the one-time endpoints
 
 **Checkpoint**: One-time payment is a complete, independently testable MVP slice.
 
@@ -147,7 +147,7 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T065 [P] [US2] Update drafts query to surface status from linked `PaymentTransaction` and add `limit`/`offset` pagination (constitution §4) in `HOAManagementCompany/Features/Payments/DraftsEndpoint.cs`
 - [X] T066 [P] [US2] Rebuild auto-pay page (SetupIntent element, amount type, draft day, mandate checkbox, status card, drafts table) in `neko-hoa/src/app/features/payments/recurring/recurring.component.ts`
 - [X] T067 [P] [US2] Add setup-intent/recurring methods to `neko-hoa/src/app/core/services/payments.service.ts`
-- [ ] T068 [US2] Add validation/error shape/audit logging and verify Swagger + PII-free telemetry for recurring + job endpoints
+- [X] T068 [US2] Add validation/error shape/audit logging and verify Swagger + PII-free telemetry for recurring + job endpoints
 
 **Checkpoint**: One-time AND recurring both work independently.
 
@@ -188,16 +188,16 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T081 [P] Implement `GET /payments/statements` + `GET /payments/unpaid-assessments` (FR-039, NC § 47F-3-118) in `HOAManagementCompany/Features/Payments/Statements/` with Testcontainers tests
 - [X] T082 [P] Build the Angular statement/transactions view in `neko-hoa/src/app/features/payments/statement/statement.component.ts`
 - [X] T083 [P] Reconciliation + dead-letter hardening test (missed-webhook backfill, outbox flush, inbox retry) in `HOAManagementCompany.Tests/Integration/Payments/ReconciliationTests.cs`
-- [ ] T084 [P] PII encryption-at-rest review (FR-029) + audit logging of financial-record access and fee/alert/schedule config changes
-- [ ] T085 [P] Rate-limit review on intent/confirm/setup/jobs endpoints + processor fraud-tooling (Stripe Radar) note (FR-028)
-- [ ] T086 [P] Document NC late-fee/interest caps config seed + surcharge-jurisdiction gating; confirm `SurchargingEnabled` defaults safe
-- [ ] T087 [P] Document backups/PITR + RPO/RTO + Stripe-based reconstruction (FR-036) in `specs/006-stripe-payments/quickstart.md` ops section
-- [ ] T088 Accessibility pass (WCAG 2.1 AA) for payment, auto-pay, alerts, and statement surfaces
-- [ ] T089 Verify SC-008: confirm 0 deprecated masked card/bank columns remain post-migration; migration rollback/mitigation review
-- [ ] T090 [P] Update Repowise marker regions for `PaymentService.cs`, `Program.cs`, webhook + jobs files
-- [ ] T091 Verify Sonar PR scan, Codecov ≥95% changed-file coverage, and the 90% diff-coverage gate pass
-- [ ] T092 Run `quickstart.md` end-to-end validation (Stripe CLI webhooks, draft + reconcile job curls)
-- [ ] T093 [P] Add a Playwright browser test for the Stripe Payment Element interaction (iframe field entry outside the Cypress E2E suite, constitution §9) in `neko-hoa/tests/playwright/payment-element.spec.ts`
+- [X] T084 [P] PII encryption-at-rest review (FR-029) + audit logging of financial-record access and fee/alert/schedule config changes
+- [X] T085 [P] Rate-limit review on intent/confirm/setup/jobs endpoints + processor fraud-tooling (Stripe Radar) note (FR-028)
+- [X] T086 [P] Document NC late-fee/interest caps config seed + surcharge-jurisdiction gating; confirm `SurchargingEnabled` defaults safe
+- [X] T087 [P] Document backups/PITR + RPO/RTO + Stripe-based reconstruction (FR-036) in `specs/006-stripe-payments/quickstart.md` ops section
+- [X] T088 Accessibility pass (WCAG 2.1 AA) for payment, auto-pay, alerts, and statement surfaces
+- [X] T089 Verify SC-008: confirm 0 deprecated masked card/bank columns remain post-migration; migration rollback/mitigation review
+- [X] T090 [P] Update Repowise marker regions for `PaymentService.cs`, `Program.cs`, webhook + jobs files
+- [X] T091 Verify Sonar PR scan, Codecov ≥95% changed-file coverage, and the 90% diff-coverage gate pass
+- [X] T092 Run `quickstart.md` end-to-end validation (Stripe CLI webhooks, draft + reconcile job curls)
+- [X] T093 [P] Add a Playwright browser test for the Stripe Payment Element interaction (iframe field entry outside the Cypress E2E suite, constitution §9) in `neko-hoa/tests/playwright/payment-element.spec.ts`
 
 ---
 

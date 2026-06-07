@@ -29,19 +29,19 @@ const MANDATE_TEXT =
       <h1 class="page-title">Auto-pay</h1>
       <span class="muted" style="margin-left:4px;">set it &amp; forget it</span>
       @if (rec()?.status === 'active') {
-        <span class="pill pill--ok" style="margin-left:8px;" data-testid="enrolled-pill">✓ Enrolled</span>
+        <span class="pill pill--ok" style="margin-left:8px;" data-testid="enrolled-pill"><span aria-hidden="true">✓</span> Enrolled</span>
         <div class="page-header__actions">
-          <button class="btn btn--ghost" (click)="confirmCancel()" data-testid="turn-off">🗑 Turn off</button>
+          <button class="btn btn--ghost" (click)="confirmCancel()" data-testid="turn-off"><span aria-hidden="true">🗑</span> Turn off</button>
         </div>
       }
     </div>
 
     @if (error()) {
-      <div class="alert alert--error" data-testid="error"><span>⚠</span> {{ error() }}</div>
+      <div class="alert alert--error" role="alert" data-testid="error"><span aria-hidden="true">⚠</span> {{ error() }}</div>
     }
 
     @if (loading()) {
-      <div class="card"><span class="spinner"></span> Loading auto-pay…</div>
+      <div class="card" role="status"><span class="spinner" aria-hidden="true"></span> Loading auto-pay…</div>
     } @else {
       <!-- Current enrollment status -->
       @if (rec(); as r) {
@@ -124,8 +124,8 @@ const MANDATE_TEXT =
                 <ngx-stripe-payment [stripe]="stripe" [clientSecret]="clientSecret()!" />
               </div>
             } @else {
-              <div class="muted" style="margin-top:12px;display:flex;align-items:center;gap:8px;">
-                <span class="spinner"></span> Preparing secure form…
+              <div class="muted" role="status" style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+                <span class="spinner" aria-hidden="true"></span> Preparing secure form…
               </div>
             }
           </div>
@@ -145,13 +145,13 @@ const MANDATE_TEXT =
           <button class="btn btn--ghost" (click)="cancelSetup()">Cancel</button>
           <button class="btn btn--primary" (click)="save()"
                   [disabled]="saving() || !clientSecret() || !mandateAccepted" data-testid="save">
-            @if (saving()) { <span class="spinner"></span> } @else { Save auto-pay }
+            @if (saving()) { <span class="spinner" aria-hidden="true"></span> } @else { Save auto-pay }
           </button>
         </div>
       }
 
       @if (saved()) {
-        <div class="alert alert--success" data-testid="saved"><span>✓</span> Auto-pay settings saved.</div>
+        <div class="alert alert--success" role="status" data-testid="saved"><span aria-hidden="true">✓</span> Auto-pay settings saved.</div>
       }
 
       <!-- Payment alerts opt-in (US3) -->
@@ -164,8 +164,9 @@ const MANDATE_TEXT =
           <span class="muted" style="margin-left:8px;font-size:11px;">past &amp; scheduled</span>
         </div>
         <table class="data-table" style="margin-top:10px;" data-testid="drafts-table">
+          <caption class="sr-only">Auto-pay draft history: past and scheduled drafts with amount and status</caption>
           <thead>
-            <tr><th>Date</th><th>Source</th><th class="num">Amount</th><th>Status</th></tr>
+            <tr><th scope="col">Date</th><th scope="col">Source</th><th scope="col" class="num">Amount</th><th scope="col">Status</th></tr>
           </thead>
           <tbody>
             @for (d of drafts(); track d.id) {

@@ -27,12 +27,12 @@ const SMS_CONSENT =
       </p>
 
       @if (loading()) {
-        <div class="muted" style="margin-top:12px;display:flex;align-items:center;gap:8px;">
-          <span class="spinner"></span> Loading alert settings…
+        <div class="muted" role="status" style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+          <span class="spinner" aria-hidden="true"></span> Loading alert settings…
         </div>
       } @else {
         @if (error()) {
-          <div class="alert alert--error" data-testid="alerts-error"><span>⚠</span> {{ error() }}</div>
+          <div class="alert alert--error" role="alert" data-testid="alerts-error"><span aria-hidden="true">⚠</span> {{ error() }}</div>
         }
 
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
@@ -43,10 +43,11 @@ const SMS_CONSENT =
 
           @if (smsOptIn) {
             <div style="margin-left:24px;">
-              <div class="field-label">Mobile number</div>
-              <input class="field mono" type="tel" placeholder="+19195551234"
+              <label class="field-label" for="alert-phone-input">Mobile number</label>
+              <input id="alert-phone-input" class="field mono" type="tel" placeholder="+19195551234"
+                     aria-describedby="alert-sms-consent"
                      [(ngModel)]="alertPhone" data-testid="alert-phone">
-              <div class="muted" style="font-size:10px;line-height:1.5;margin-top:6px;">{{ smsConsent }}</div>
+              <div id="alert-sms-consent" class="muted" style="font-size:10px;line-height:1.5;margin-top:6px;">{{ smsConsent }}</div>
             </div>
           }
 
@@ -58,12 +59,12 @@ const SMS_CONSENT =
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
           <button class="btn btn--primary" (click)="save()" [disabled]="saving()" data-testid="alerts-save">
-            @if (saving()) { <span class="spinner"></span> } @else { Save alert settings }
+            @if (saving()) { <span class="spinner" aria-hidden="true"></span> } @else { Save alert settings }
           </button>
         </div>
 
         @if (saved()) {
-          <div class="alert alert--success" data-testid="alerts-saved"><span>✓</span> Alert settings saved.</div>
+          <div class="alert alert--success" role="status" data-testid="alerts-saved"><span aria-hidden="true">✓</span> Alert settings saved.</div>
         }
       }
     </div>

@@ -2,9 +2,14 @@ using FastEndpoints;
 using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Features.Payments.Models;
 using HOAManagementCompany.Features.Payments.Recurring;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Features.Payments.Jobs;
+
+// <!-- REPOWISE:START domain=payments-jobs -->
+// Scheduler-triggered recurring draft sweep endpoint: secret-authenticated, idempotent per period.
+// <!-- REPOWISE:END -->
 
 /// <summary>
 /// POST /payments/jobs/run-drafts — Cloud Scheduler-triggered recurring auto-pay sweep (FR-010).
@@ -42,6 +47,10 @@ public class RunDraftsEndpoint(
         // Advance notice for upcoming variable-amount drafts (FR-011c), then charge today's due drafts.
         var noticesSent = await noticeService.SendDueNoticesAsync(asOf, ct);
         var result = await draftService.RunDueDraftsAsync(asOf, ct);
+        // Audit trail (FR-029): job run recorded with aggregate counts only — no per-owner PII.
+        Logger.LogInformation(
+            "audit payments.jobs.run-drafts asOf {AsOf} due {Due} charged {Charged} failed {Failed} skipped {Skipped} notices {Notices}",
+            asOf, result.DueCount, result.Charged, result.Failed, result.Skipped, noticesSent);
         await SendOkAsync(result with { NoticesSent = noticesSent }, ct);
     }
 }

@@ -10,6 +10,11 @@ using Microsoft.Extensions.Logging;
 
 namespace HOAManagementCompany.Features.Payments.Recurring;
 
+// <!-- REPOWISE:START domain=payments-jobs -->
+// Recurring auto-pay draft engine: resolves due mandates, applies fees, charges vaulted methods
+// off-session, and writes recurring transactions idempotently per {recurringId}:{period}.
+// <!-- REPOWISE:END -->
+
 /// <summary>
 /// The amount owed for a draft plus the resident-facing fee, resolved at preview/charge time.
 /// </summary>

@@ -243,3 +243,68 @@ dotnet test --filter "Integration/Payments"
 - Only Stripe payment-method IDs (`pm_...`) and payment-intent IDs (`pi_...`) reach the backend.
 - Do **not** log or store any field that could contain a PAN, routing number, or account number.
 - Use the existing `TelemetryScrubbingProcessor` — it strips PII from OTel spans automatically.
+
+---
+
+## 12. Backups, PITR & Disaster Recovery (FR-036, T087)
+
+Because Stripe is the system of record for card/bank credentials and is itself the authoritative
+ledger of money movement, our DR posture only needs to protect the **HOA-owned relational state**
+(transactions, drafts, recurring config, mandates, webhook inbox/outbox) and lean on Stripe to
+reconstruct anything that crosses the money boundary.
+
+| Concern | Target | Mechanism |
+|---------|--------|-----------|
+| **Backups** | Continuous | Neon Postgres automated backups (managed). Local/CI uses ephemeral Testcontainers — no backup needed. |
+| **PITR** | 7-day window (Neon plan-dependent) | Neon branch-from-timestamp restore. Promote a recovery branch, repoint `ConnectionStrings:Default`, redeploy. |
+| **RPO** (max data loss) | ≤ 5 min | Bounded by Neon WAL shipping cadence. The webhook **inbox** (`ProcessedWebhookEvents`) is written *before* the 2xx ack, so any event accepted by Stripe is durably recorded or never acked → Stripe redelivers. |
+| **RTO** (max downtime) | ≤ 1 hr | Stateless Cloud Run service: redeploy + restore Neon branch. No local disk state to recover. |
+
+### Stripe-based reconstruction
+
+If the HOA database is lost between the last backup and the incident, replay closes the gap — no
+money state is invented locally:
+
+1. **Restore** the most recent Neon backup / PITR branch.
+2. **Backfill missed webhooks**: Stripe retries undelivered events for up to 3 days; for older gaps
+   list events via the API (`stripe events list --created>=<ts>`) and re-POST them to
+   `/payments/webhooks/stripe`. The inbox dedupe (`StripeEventId`) makes replay **idempotent** — already-applied events are acked without re-applying side effects.
+3. **Reconcile**: run the reconciliation sweep (Section 7) — it resolves `Pending` ACH past the
+   window, flushes the alert outbox, and retries any `Received` inbox rows. Recurring drafts are
+   idempotent per `{recurringId}:{period}`, so a re-run after restore cannot double-charge.
+4. **Vaulted methods & customers** live entirely in Stripe; we only store `cus_…`/`pm_…` references,
+   which the restore brings back. No re-collection of card/bank data is ever required.
+
+---
+
+## 13. End-to-End Validation Procedure (T092)
+
+This is the manual acceptance run that exercises the full money path against Stripe **test mode**.
+It complements the automated suites (backend Testcontainers + frontend Karma/Cypress) which run in
+CI on every PR. The Stripe-CLI/live-webhook legs below are **run locally** — they are intentionally
+*not* wired into CI because they require an interactive `stripe login` and a forwarding tunnel.
+
+**Pre-req:** backend + SPA running (Sections 5), `stripe listen` forwarding (Section 3).
+
+1. **One-time card** — `/app/payments/one-time`: pick a preset → method `card` → enter test card
+   `4242 4242 4242 4242` in the Payment Element → review shows server-authoritative Amount/Fee/Total
+   → Submit → receipt with a confirmation number. Verify in DevTools that **no** request body contains
+   a PAN/CVV/account (SC-001).
+2. **One-time ACH** — repeat with `eCheck (ACH)` and Stripe's test bank
+   (routing `110000000`, account `000123456789`). Posts as `Pending`.
+3. **Recurring setup** — `/app/payments/recurring`: choose amount type + draft day → enter a test
+   method → accept the mandate → Save → status card flips to **Active** with a masked method.
+4. **Draft sweep** — `curl -X POST .../payments/jobs/run-drafts -H "X-Scheduler-Secret: <dev secret>"`
+   → a recurring transaction + draft row appears; re-run the same day → **no** duplicate (idempotency).
+5. **Webhook handling** — trigger events via the CLI (Section 8): `payment_intent.succeeded`,
+   `charge.refunded`, and a recurring `payment_intent.payment_failed`. Confirm statuses update and,
+   for the failure with an opted-in resident, an alert is enqueued and dispatched (SC-006 ≤ 5 min).
+6. **Reconciliation** — `curl -X POST .../payments/jobs/reconcile -H "X-Scheduler-Secret: <dev secret>"`
+   → stuck `Pending` ACH past the window resolves; outbox/inbox drain.
+7. **Statement** — `/app/payments/statement`: the ledger, open balance, and **Payments** tab
+   (Stripe transaction history, masked methods only) all reflect the activity above.
+
+> **CI note:** Steps 4–6 depend on a live Stripe CLI session and shared-secret-authenticated job
+> endpoints, so they are validated locally rather than gated in CI. The deterministic equivalents —
+> off-session draft idempotency, webhook inbox dedupe, and reconciliation — are covered by the
+> `Integration/Payments` Testcontainers suite that **does** run on every PR.

@@ -108,6 +108,41 @@ describe('StatementComponent', () => {
     expect(el.textContent).toContain('Make payment');
   });
 
+  describe('accessibility (T088 / WCAG 2.1 AA)', () => {
+    it('exposes the view switcher as an ARIA tablist with aria-selected on the active tab', () => {
+      const tablist = el.querySelector('[role="tablist"]');
+      expect(tablist).toBeTruthy();
+      expect(tablist?.getAttribute('aria-label')).toBeTruthy();
+
+      const activeTab = el.querySelector('[data-testid="tab-statement"]');
+      expect(activeTab?.getAttribute('role')).toBe('tab');
+      expect(activeTab?.getAttribute('aria-selected')).toBe('true');
+      expect(el.querySelector('[data-testid="tab-payments"]')?.getAttribute('aria-selected')).toBe('false');
+    });
+
+    it('gives the ledger table a caption and column-scoped headers', () => {
+      const table = el.querySelector('.data-table');
+      expect(table?.querySelector('caption')?.textContent?.toLowerCase()).toContain('ledger');
+      const ths = Array.from(table?.querySelectorAll('thead th') ?? []);
+      expect(ths.length).toBeGreaterThan(0);
+      ths.forEach(th => expect(th.getAttribute('scope')).toBe('col'));
+    });
+
+    it('marks the transactions loading state as a live status region', async () => {
+      comp.switchTab('payments');
+      // Before whenStable the load is in flight, so the status spinner is showing.
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="transactions-card"] [role="status"]')).toBeTruthy();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const txnTable = el.querySelector('[data-testid="transactions-table"]');
+      expect(txnTable?.querySelector('caption')).toBeTruthy();
+      Array.from(txnTable?.querySelectorAll('thead th') ?? [])
+        .forEach(th => expect(th.getAttribute('scope')).toBe('col'));
+    });
+  });
+
   describe('Payments tab (transaction history)', () => {
     function svc() {
       return TestBed.inject(PaymentsService) as unknown as { getTransactions: jasmine.Spy };

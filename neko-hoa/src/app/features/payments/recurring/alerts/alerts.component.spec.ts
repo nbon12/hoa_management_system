@@ -106,4 +106,41 @@ describe('PaymentAlertsComponent', () => {
     expect(comp.error()).toContain('Phone already in use.');
     expect(comp.saving()).toBeFalse();
   });
+
+  describe('accessibility (T088 / WCAG 2.1 AA)', () => {
+    it('associates the SMS phone field with a label and its consent helper text', async () => {
+      const { fixture } = await renderComponent(ENROLLED_SMS);
+      const el = fixture.nativeElement as HTMLElement;
+
+      const input = el.querySelector('#alert-phone-input') as HTMLInputElement;
+      expect(input).toBeTruthy();
+      // A <label for> must point at the input's id, and aria-describedby at the consent copy.
+      expect(el.querySelector('label[for="alert-phone-input"]')).toBeTruthy();
+      expect(input.getAttribute('aria-describedby')).toBe('alert-sms-consent');
+      expect(el.querySelector('#alert-sms-consent')?.textContent).toContain('SMS payment alerts');
+    });
+
+    it('announces a validation error via role="alert"', async () => {
+      const { fixture } = await renderComponent(OFF);
+      const comp = fixture.componentInstance;
+      comp.smsOptIn = true;
+      comp.alertPhone = '';
+      await comp.save();
+      fixture.detectChanges();
+
+      const alert = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="alerts-error"]');
+      expect(alert?.getAttribute('role')).toBe('alert');
+    });
+
+    it('announces the saved confirmation via a live status region', async () => {
+      const { fixture } = await renderComponent(OFF);
+      const comp = fixture.componentInstance;
+      comp.emailOptIn = true;
+      await comp.save();
+      fixture.detectChanges();
+
+      const saved = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="alerts-saved"]');
+      expect(saved?.getAttribute('role')).toBe('status');
+    });
+  });
 });

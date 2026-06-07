@@ -8,6 +8,7 @@ using HOAManagementCompany.Features.Payments.Services;
 using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
 
 namespace HOAManagementCompany.Features.Payments.OneTime;
@@ -107,6 +108,11 @@ public class ConfirmPaymentEndpoint(
             await tx.CommitAsync(ct);
         });
         txn.Receipt = receipt;
+        // Audit trail (FR-029): record the financial-record write with non-PII identifiers only —
+        // no card/bank data, names, or amounts-as-PII. Serilog ships this to the structured sink.
+        Logger.LogInformation(
+            "audit payments.one-time.confirm recorded transaction {TransactionId} status {Status} method {Method} property {PropertyId}",
+            txn.Id, txn.Status, method, propertyId);
         await SendOkAsync(Map(txn), ct);
     }
 
