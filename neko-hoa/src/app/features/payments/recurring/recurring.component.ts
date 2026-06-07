@@ -8,6 +8,7 @@ import { environment } from '../../../../environments/environment';
 import {
   PaymentsService, RecurringInfo, RecurringSaveRequest, DraftRow,
 } from '../../../core/services/payments.service';
+import { PaymentAlertsComponent } from './alerts/alerts.component';
 
 type AmountType = 'assessment' | 'balance' | 'fixed';
 
@@ -22,7 +23,7 @@ const MANDATE_TEXT =
 @Component({
   selector: 'app-recurring',
   standalone: true,
-  imports: [FormsModule, RouterLink, CurrencyPipe, DatePipe, StripePaymentElementComponent],
+  imports: [FormsModule, RouterLink, CurrencyPipe, DatePipe, StripePaymentElementComponent, PaymentAlertsComponent],
   template: `
     <div class="page-header">
       <h1 class="page-title">Auto-pay</h1>
@@ -152,6 +153,9 @@ const MANDATE_TEXT =
       @if (saved()) {
         <div class="alert alert--success" data-testid="saved"><span>✓</span> Auto-pay settings saved.</div>
       }
+
+      <!-- Payment alerts opt-in (US3) -->
+      <app-payment-alerts />
 
       <!-- Draft history -->
       <div class="card card--dashed">

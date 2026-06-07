@@ -66,6 +66,9 @@ describe('Auto-pay setup (Stripe SetupIntent + Payment Element)', () => {
     cy.intercept('GET', '**/api/*/payments/recurring', NOT_ENROLLED).as('getRecurring');
     cy.intercept('PUT', '**/api/*/payments/recurring', { statusCode: 200, body: ENROLLED }).as('save');
     cy.intercept('GET', '**/api/*/payments/drafts*', { statusCode: 200, body: DRAFTS }).as('drafts');
+    // The recurring page now embeds the payment-alerts section, which loads its own prefs.
+    cy.intercept('GET', '**/api/*/payments/alert-preferences',
+      { statusCode: 200, body: { smsOptIn: false, emailOptIn: false, alertPhone: null } }).as('alertPrefs');
     cy.intercept('POST', '**/telemetry', { statusCode: 200, body: {} });
   });
 
