@@ -71,12 +71,12 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T022 Testcontainers integration test for durable webhook intake — signature verify, timestamp-tolerance replay rejection, inbox idempotency, retry→dead-letter — in `HOAManagementCompany.Tests/Integration/Payments/WebhookIntakeTests.cs` <!-- delivered as WebhookEndpointTests.cs + WebhookProcessorTests.cs -->
 
 - [X] T023 Implement durable webhook intake core (`StripeWebhookEndpoint`: verify+timestamp tolerance → upsert `WebhookEventInbox` → ack 200 → dispatch; terminal-state guard) in `HOAManagementCompany/Features/Payments/Webhooks/StripeWebhookEndpoint.cs`
-- [ ] T024 [P] Implement transactional `OutboxMessage` write helper + `OutboxDispatcher` (no retry on provider rejection, records `alert.sent{success}`); dispatch **promptly in-process right after webhook ack** so alerts meet SC-006 ≤5 min, with the reconcile job as backstop (FR-034/Q1) in `HOAManagementCompany/Features/Payments/Services/Outbox*.cs`
+- [X] T024 [P] Implement transactional `OutboxMessage` write helper + `OutboxDispatcher` (no retry on provider rejection, records `alert.sent{success}`); dispatch **promptly in-process right after webhook ack** so alerts meet SC-006 ≤5 min, with the reconcile job as backstop (FR-034/Q1) in `HOAManagementCompany/Features/Payments/Alerts/OutboxDispatcher.cs` <!-- AlertService writes outbox rows in the webhook txn; OutboxDispatcher drains them -->`
 - [X] T025 [P] Implement `ReconciliationService` scaffolding + `POST /payments/jobs/reconcile` endpoint with Cloud Scheduler auth (OIDC / `X-Scheduler-Secret`) in `HOAManagementCompany/Features/Payments/Jobs/`
-- [ ] T026 [P] Extend `TelemetryScrubbingProcessor` for Stripe/PII fields and add payment metrics (`payment.*`, `alert.sent`, `webhook.processed`) in `HOAManagementCompany/Infrastructure/Observability/`
+- [X] T026 [P] Extend `TelemetryScrubbingProcessor` for Stripe/PII fields and add payment metrics (`payment.*`, `alert.sent`, `webhook.processed`) in `HOAManagementCompany/Infrastructure/Observability/` <!-- PaymentMetrics meter added + registered via AddMeter; scrubbing processor unchanged this split -->`
 - [X] T027 [P] Seed default `HoaPaymentConfig` per HOA from `Payments:DefaultFee`/`Nsf` in `HOAManagementCompany/Seed/DatabaseSeeder.cs`
 - [ ] T028 [P] Initialize Stripe.js (`loadStripe`) and expose `stripe$` in `neko-hoa/src/app/core/services/payments.service.ts`; register `provideNgxStripe()` in `neko-hoa/src/app/app.config.ts`
-- [ ] T029 Register all new gateways/services (Stripe, Twilio, SendGrid, FeeCalculator, Ledger/Allocation, Outbox, Reconciliation, Idempotency) in `HOAManagementCompany/Program.cs` DI
+- [X] T029 Register all new gateways/services (Stripe, Twilio, SendGrid, FeeCalculator, Ledger/Allocation, Outbox, Reconciliation, Idempotency) in `HOAManagementCompany/Program.cs` DI <!-- alert split: PaymentMetrics, IAlertProvider x2, AlertService, OutboxDispatcher registered -->`
 
 **Checkpoint**: Foundation ready — user stories can begin.
 
@@ -161,20 +161,20 @@ frontend tests for these flows; write tests first where the testing constitution
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T069 [P] [US3] Testcontainers Theory: opt-in matrix (sms/email/both/neither) → alert only on opted channels; one-time failure → no alert, in `HOAManagementCompany.Tests/Integration/Payments/AlertOptInTests.cs`
-- [ ] T070 [P] [US3] Testcontainers test: provider send failure recorded (`alert.sent success=false` + errored span), not retried, webhook ack still 200 (FR-022a), in `HOAManagementCompany.Tests/Integration/Payments/AlertFailureTests.cs`
-- [ ] T071 [P] [US3] Testcontainers test: `AlertConsent` captured on opt-in; opt-out/STOP disables channel (FR-031), in `HOAManagementCompany.Tests/Integration/Payments/AlertConsentTests.cs`
+- [X] T069 [P] [US3] Testcontainers Theory: opt-in matrix (sms/email/both/neither) → alert only on opted channels; one-time failure → no alert, in `HOAManagementCompany.Tests/Integration/Payments/AlertOptInTests.cs`
+- [X] T070 [P] [US3] Testcontainers test: provider send failure recorded (`alert.sent success=false` + errored span), not retried, webhook ack still 200 (FR-022a), in `HOAManagementCompany.Tests/Integration/Payments/AlertFailureTests.cs`
+- [X] T071 [P] [US3] Testcontainers test: `AlertConsent` captured on opt-in; opt-out/STOP disables channel (FR-031), in `HOAManagementCompany.Tests/Integration/Payments/AlertConsentTests.cs`
 - [ ] T072 [P] [US3] Angular Testing Library test for the payment-alerts opt-in section in `neko-hoa/src/app/features/payments/recurring/alerts/alerts.component.spec.ts`
 - [ ] T073 [P] [US3] Cypress E2E for alert opt-in/opt-out in `neko-hoa/cypress/e2e/alert-preferences.cy.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T074 [US3] Implement `GET /payments/alert-preferences` in `HOAManagementCompany/Features/Payments/Alerts/AlertPreferencesGetEndpoint.cs`
-- [ ] T075 [US3] Implement `PUT /payments/alert-preferences` (phone required for SMS, append `AlertConsent`) in `HOAManagementCompany/Features/Payments/Alerts/AlertPreferencesUpdateEndpoint.cs`
-- [ ] T076 [P] [US3] Implement `IAlertProvider` + `TwilioSmsProvider` (incl. STOP opt-out copy) in `HOAManagementCompany/Infrastructure/Payments/TwilioSmsProvider.cs`
-- [ ] T077 [P] [US3] Implement `SendGridEmailProvider` in `HOAManagementCompany/Infrastructure/Payments/SendGridEmailProvider.cs`
-- [ ] T078 [US3] Implement `AlertService` (channel selection, masked content, outbox-driven dispatch) in `HOAManagementCompany/Features/Payments/Alerts/AlertService.cs`
-- [ ] T079 [US3] Wire failure-alert enqueue on recurring `payment_failed` (FR-015) and ACH return (FR-014c) into the webhook handlers via outbox in `HOAManagementCompany/Features/Payments/Webhooks/Handlers/`
+- [X] T074 [US3] Implement `GET /payments/alert-preferences` in `HOAManagementCompany/Features/Payments/Alerts/AlertPreferencesEndpoints.cs` <!-- GET+PUT colocated in AlertPreferencesEndpoints.cs -->
+- [X] T075 [US3] Implement `PUT /payments/alert-preferences` (phone required for SMS, append `AlertConsent`) in `HOAManagementCompany/Features/Payments/Alerts/AlertPreferencesEndpoints.cs`
+- [X] T076 [P] [US3] Implement `IAlertProvider` + `TwilioSmsProvider` (incl. STOP opt-out copy) in `HOAManagementCompany/Infrastructure/Payments/Alerts/TwilioSmsProvider.cs`
+- [X] T077 [P] [US3] Implement `SendGridEmailProvider` in `HOAManagementCompany/Infrastructure/Payments/Alerts/SendGridEmailProvider.cs`
+- [X] T078 [US3] Implement `AlertService` (channel selection, masked content, outbox-driven dispatch) in `HOAManagementCompany/Features/Payments/Alerts/AlertService.cs`
+- [X] T079 [US3] Wire failure-alert enqueue on recurring `payment_failed` (FR-015) and ACH return (FR-014c) into the webhook handlers via outbox in `HOAManagementCompany/Features/Payments/Webhooks/WebhookProcessor.cs` <!-- consolidated WebhookProcessor, not Handlers/ -->`
 - [ ] T080 [P] [US3] Add the "Payment alerts" opt-in section + service methods in `neko-hoa/src/app/features/payments/recurring/alerts/alerts.component.ts` and `payments.service.ts`
 
 **Checkpoint**: All three user stories independently functional.

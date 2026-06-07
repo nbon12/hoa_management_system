@@ -243,6 +243,15 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.Allocat
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Webhooks.WebhookProcessor>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Jobs.ReconciliationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Recurring.RecurringDraftService>();
+// US3 failure alerts (006-stripe-payments): transactional outbox + opt-in alerting.
+builder.Services.AddMetrics(); // ensures IMeterFactory is available for PaymentMetrics.
+builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Observability.PaymentMetrics>();
+builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.Alerts.IAlertProvider,
+    HOAManagementCompany.Infrastructure.Payments.Alerts.TwilioSmsProvider>();
+builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.Alerts.IAlertProvider,
+    HOAManagementCompany.Infrastructure.Payments.Alerts.SendGridEmailProvider>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Alerts.AlertService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Alerts.OutboxDispatcher>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.PropertyService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.CommunityService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>();

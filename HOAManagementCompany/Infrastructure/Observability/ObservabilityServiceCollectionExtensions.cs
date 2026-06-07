@@ -96,5 +96,8 @@ public static class ObservabilityServiceCollectionExtensions
     {
         metrics.AddAspNetCoreInstrumentation();
         metrics.AddHttpClientInstrumentation();
+
+        // US3: custom payment-domain counters (payment.processed / webhook.processed / alert.sent).
+        metrics.AddMeter(PaymentMetrics.MeterName);
     }
 }

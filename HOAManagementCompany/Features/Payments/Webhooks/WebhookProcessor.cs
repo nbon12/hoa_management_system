@@ -1,7 +1,9 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Features.Payments.Alerts;
 using HOAManagementCompany.Features.Payments.Ledger;
 using HOAManagementCompany.Features.Payments.Services;
+using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +28,8 @@ public sealed class WebhookProcessor(
     LedgerService ledger,
     PaymentConfigService config,
     IStripeGateway gateway,
+    AlertService alerts,
+    PaymentMetrics metrics,
     ILogger<WebhookProcessor> logger)
 {
     public async Task ProcessAsync(Event evt, CancellationToken ct = default)
@@ -78,6 +82,7 @@ public sealed class WebhookProcessor(
             await ledger.AddPaymentAsync(txn.PropertyId, txn.Id, txn.GrossAmount,
                 $"Online Payment – ACH – {txn.StripeChargeId}", ct: ct);
             await EnsureReceiptAsync(txn, ct);
+            metrics.RecordPaymentProcessed("succeeded");
         }
         txn.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -97,12 +102,19 @@ public sealed class WebhookProcessor(
             await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, txn.GrossAmount,
                 LedgerEntryType.Reversal, $"ACH return – {txn.ReturnCode ?? "unknown"}", ct: ct);
             await ApplyNsfFeeAsync(txn, ct);
+            // A settled debit was clawed back — always alert the owner who opted in (FR-014c).
+            await alerts.EnqueueFailureAlertAsync(txn, txn.ReturnCode, ct);
+            metrics.RecordPaymentProcessed("returned");
         }
         else if (txn.Status is TransactionStatus.Pending or TransactionStatus.Succeeded)
         {
             txn.Status = TransactionStatus.Failed;
             txn.FailureCode = error?.Code;
             txn.FailureMessage = Scrub(error?.Message);
+            // Only recurring (off-session) failures alert; a one-time failure is shown inline (FR-015).
+            if (txn.IsRecurring)
+                await alerts.EnqueueFailureAlertAsync(txn, txn.FailureCode, ct);
+            metrics.RecordPaymentProcessed("failed");
         }
         txn.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -119,6 +131,7 @@ public sealed class WebhookProcessor(
 
         txn.CumulativeRefundedAmount = cumulative;
         txn.Status = cumulative >= txn.Total ? TransactionStatus.Refunded : TransactionStatus.PartiallyRefunded;
+        metrics.RecordPaymentProcessed(txn.Status == TransactionStatus.Refunded ? "refunded" : "partially_refunded");
         // Fee is retained on refund (mirrors Stripe keeping its processing fee, FR-004d).
         await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, delta,
             LedgerEntryType.Refund, $"Refund – {charge.Id}", ct: ct);
@@ -135,6 +148,7 @@ public sealed class WebhookProcessor(
         txn.Status = TransactionStatus.Disputed;
         await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, txn.GrossAmount,
             LedgerEntryType.Chargeback, $"Dispute opened – {dispute.Id}", ct: ct);
+        metrics.RecordPaymentProcessed("disputed");
         txn.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
     }
@@ -150,11 +164,13 @@ public sealed class WebhookProcessor(
             txn.Status = TransactionStatus.Succeeded;
             await ledger.AddPaymentAsync(txn.PropertyId, txn.Id, txn.GrossAmount,
                 $"Dispute won – funds restored – {dispute.Id}", ct: ct);
+            metrics.RecordPaymentProcessed("dispute_won");
         }
         else if (dispute.Status == "lost")
         {
             txn.Status = TransactionStatus.DisputeLost;   // Reversal already stands from creation.
             await ApplyNsfFeeAsync(txn, ct);
+            metrics.RecordPaymentProcessed("dispute_lost");
         }
         txn.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
