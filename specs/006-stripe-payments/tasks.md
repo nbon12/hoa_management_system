@@ -133,9 +133,9 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T054 [P] [US2] Testcontainers test: recurring upsert persists `PaymentAuthorization` (text/version/IP/UA/terms), drops masked fields, requires mandate, in `HOAManagementCompany.Tests/Integration/Payments/RecurringSetupTests.cs`
 - [X] T055 [P] [US2] Testcontainers Theory: run-drafts resolves amount (assessment/open-balance/fixed), applies fee, charges off-session, writes recurring txn + draft, idempotent per `{recurringId}:{period}`, in `HOAManagementCompany.Tests/Integration/Payments/RecurringDraftTests.cs`
 - [X] T056 [P] [US2] Testcontainers test: variable-amount advance notice enqueued before draft (FR-011c); disable→no drafts; **failed draft is NOT auto-retried within the cycle and waits for the next draft day (FR-011a)**, in `HOAManagementCompany.Tests/Integration/Payments/RecurringNoticeTests.cs`
-- [ ] T057 [P] [US2] Angular Testing Library test for auto-pay component in `neko-hoa/src/app/features/payments/recurring/recurring.component.spec.ts`
-- [ ] T058 [P] [US2] Cypress E2E for auto-pay setup in `neko-hoa/cypress/e2e/recurring-setup.cy.ts`
-- [ ] T059 [P] [US2] Storybook story for the auto-pay status card + drafts table in `neko-hoa/src/app/features/payments/recurring/recurring.stories.ts`
+- [X] T057 [P] [US2] Angular Testing Library test for auto-pay component in `neko-hoa/src/app/features/payments/recurring/recurring.component.spec.ts`
+- [X] T058 [P] [US2] Cypress E2E for auto-pay setup in `neko-hoa/cypress/e2e/recurring-setup.cy.ts`
+- [X] T059 [P] [US2] Storybook story for the auto-pay status card + drafts table in `neko-hoa/src/app/features/payments/recurring/recurring.stories.ts`
 
 ### Implementation for User Story 2
 
@@ -145,8 +145,8 @@ frontend tests for these flows; write tests first where the testing constitution
 - [X] T063 [P] [US2] Update `DELETE /payments/recurring` (disable + set `TerminatedAt` on authorization) in `HOAManagementCompany/Features/Payments/Recurring/RecurringDeleteEndpoint.cs`
 - [X] T064 [US2] Implement `POST /payments/jobs/run-drafts` (due drafts, amount resolution, off-session charge, fee, draft entry, per-period idempotency, variable notice) in `HOAManagementCompany/Features/Payments/Jobs/RunDraftsEndpoint.cs`
 - [X] T065 [P] [US2] Update drafts query to surface status from linked `PaymentTransaction` and add `limit`/`offset` pagination (constitution §4) in `HOAManagementCompany/Features/Payments/DraftsEndpoint.cs`
-- [ ] T066 [P] [US2] Rebuild auto-pay page (SetupIntent element, amount type, draft day, mandate checkbox, status card, drafts table) in `neko-hoa/src/app/features/payments/recurring/recurring.component.ts`
-- [ ] T067 [P] [US2] Add setup-intent/recurring methods to `neko-hoa/src/app/core/services/payments.service.ts`
+- [X] T066 [P] [US2] Rebuild auto-pay page (SetupIntent element, amount type, draft day, mandate checkbox, status card, drafts table) in `neko-hoa/src/app/features/payments/recurring/recurring.component.ts`
+- [X] T067 [P] [US2] Add setup-intent/recurring methods to `neko-hoa/src/app/core/services/payments.service.ts`
 - [ ] T068 [US2] Add validation/error shape/audit logging and verify Swagger + PII-free telemetry for recurring + job endpoints
 
 **Checkpoint**: One-time AND recurring both work independently.
