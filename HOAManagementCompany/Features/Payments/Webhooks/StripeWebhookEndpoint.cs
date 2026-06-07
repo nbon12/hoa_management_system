@@ -1,6 +1,8 @@
 using FastEndpoints;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Features.Payments.Alerts;
+using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +17,13 @@ namespace HOAManagementCompany.Features.Payments.Webhooks;
 /// delivery is acked without reprocessing; a processing failure is left <c>Received</c> for the
 /// reconciliation sweep to retry. Anonymous: authenticity comes from the signature, not a session.
 /// </summary>
-public class StripeWebhookEndpoint(IStripeGateway gateway, WebhookProcessor processor, ApplicationDbContext db)
+public class StripeWebhookEndpoint(
+    IStripeGateway gateway,
+    WebhookProcessor processor,
+    ApplicationDbContext db,
+    OutboxDispatcher dispatcher,
+    PaymentMetrics metrics,
+    ILogger<StripeWebhookEndpoint> logger)
     : EndpointWithoutRequest
 {
     public override void Configure()
@@ -39,6 +47,7 @@ public class StripeWebhookEndpoint(IStripeGateway gateway, WebhookProcessor proc
         }
         catch (StripeException)
         {
+            metrics.RecordWebhookProcessed("unknown", "invalid_signature");
             await SendAsync(null, StatusCodes.Status400BadRequest, ct);
             return;
         }
@@ -47,6 +56,7 @@ public class StripeWebhookEndpoint(IStripeGateway gateway, WebhookProcessor proc
         var inbox = await db.WebhookEventInbox.FirstOrDefaultAsync(w => w.StripeEventId == evt.Id, ct);
         if (inbox is { Status: WebhookProcessingStatus.Processed })
         {
+            metrics.RecordWebhookProcessed(evt.Type, "duplicate");
             await SendOkAsync(ct);
             return;
         }
@@ -65,11 +75,13 @@ public class StripeWebhookEndpoint(IStripeGateway gateway, WebhookProcessor proc
         }
 
         inbox.Attempts++;
+        var processed = false;
         try
         {
             await processor.ProcessAsync(evt, ct);
             inbox.Status = WebhookProcessingStatus.Processed;
             inbox.ProcessedAt = DateTimeOffset.UtcNow;
+            processed = true;
         }
         catch (Exception ex)
         {
@@ -77,6 +89,21 @@ public class StripeWebhookEndpoint(IStripeGateway gateway, WebhookProcessor proc
             inbox.LastError = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
         }
         await db.SaveChangesAsync(ct);
+        metrics.RecordWebhookProcessed(evt.Type, processed ? "processed" : "failed");
+
+        // Promptly drain any alerts the handler enqueued (SC-006 ≤5 min); reconcile is the backstop.
+        // Never let a delivery hiccup fail the 2xx ack — Stripe would otherwise redeliver.
+        if (processed)
+        {
+            try
+            {
+                await dispatcher.DispatchPendingAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Prompt outbox dispatch failed after webhook {EventId}; reconcile will retry", evt.Id);
+            }
+        }
 
         await SendOkAsync(ct);
     }
