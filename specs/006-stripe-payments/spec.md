@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-stripe-payments`  
 **Created**: 2026-06-05  
-**Status**: Draft  
+**Status**: Implemented  
 **Input**: User description: "Implement the two payment methods for Stripe — recurring billing and one-time payments — for the NekoHOA resident portal. Replace simulated/raw card collection with PCI-compliant hosted payment fields, vault payment methods, record a Stripe-specific transaction audit trail, handle payment lifecycle webhooks, send opt-in SMS/email alerts on recurring payment failures, and emit PII-scrubbed telemetry."
 
 ## Clarifications
