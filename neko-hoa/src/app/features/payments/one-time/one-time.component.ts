@@ -78,7 +78,7 @@ type WizardStep = 1 | 2 | 3 | 4;
                [style.border-color]="method() === 'card' ? 'var(--ink)' : 'var(--line)'"
                [style.background]="method() === 'card' ? 'var(--pink)' : 'var(--paper)'"
                (click)="selectMethod('card')">
-            <div style="font-size:24px;">💳</div>
+            <div style="font-size:24px;" aria-hidden="true">💳</div>
             <div style="font-weight:600;margin-top:6px;">Credit card</div>
             <div class="muted" style="font-size:11px;">{{ cardFeeLabel() }}</div>
           </div>
@@ -86,20 +86,20 @@ type WizardStep = 1 | 2 | 3 | 4;
                [style.border-color]="method() === 'ach' ? 'var(--ink)' : 'var(--line)'"
                [style.background]="method() === 'ach' ? 'var(--pink)' : 'var(--paper)'"
                (click)="selectMethod('ach')">
-            <div style="font-size:24px;">🏦</div>
+            <div style="font-size:24px;" aria-hidden="true">🏦</div>
             <div style="font-weight:600;margin-top:6px;">eCheck (ACH)</div>
             <div class="muted" style="font-size:11px;">{{ achFeeLabel() }}</div>
           </div>
         </div>
 
         @if (!clientSecret() && loading()) {
-          <div class="muted" style="margin-top:16px;display:flex;align-items:center;gap:8px;">
-            <span class="spinner"></span> Preparing secure payment form…
+          <div class="muted" role="status" style="margin-top:16px;display:flex;align-items:center;gap:8px;">
+            <span class="spinner" aria-hidden="true"></span> Preparing secure payment form…
           </div>
         }
 
         @if (error()) {
-          <div class="alert alert--error" style="margin-top:10px;"><span>⚠</span> {{ error() }}</div>
+          <div class="alert alert--error" role="alert" style="margin-top:10px;"><span aria-hidden="true">⚠</span> {{ error() }}</div>
         }
       </div>
     }
@@ -141,18 +141,18 @@ type WizardStep = 1 | 2 | 3 | 4;
           </div>
         </div>
         <div class="card card--pink" style="margin-top:14px;font-size:11px;display:flex;gap:8px;">
-          <span>ⓘ</span> Posts within 1 business day.
+          <span aria-hidden="true">ⓘ</span> Posts within 1 business day.
         </div>
         @if (error()) {
-          <div class="alert alert--error" style="margin-top:10px;"><span>⚠</span> {{ error() }}</div>
+          <div class="alert alert--error" role="alert" style="margin-top:10px;"><span aria-hidden="true">⚠</span> {{ error() }}</div>
         }
       </div>
     }
 
     <!-- Step 4: Confirmation -->
     @if (currentStep() === 4 && result()) {
-      <div class="card card--lav" style="max-width:480px;text-align:center;padding:32px;" data-testid="receipt">
-        <div style="font-size:48px;">✅</div>
+      <div class="card card--lav" role="status" style="max-width:480px;text-align:center;padding:32px;" data-testid="receipt">
+        <div style="font-size:48px;" aria-hidden="true">✅</div>
         <h2 style="margin-top:12px;font-weight:600;">Payment submitted!</h2>
         <p class="muted" style="margin-top:6px;">Confirmation # <b class="mono" data-testid="confirmation-number">{{ result()!.confirmationNumber }}</b></p>
         <p class="muted">{{ result()!.total | currency }} — {{ result()!.maskedMethod }}</p>
@@ -173,7 +173,7 @@ type WizardStep = 1 | 2 | 3 | 4;
         }
         <button class="btn btn--primary" style="margin-left:auto;"
                 (click)="next()" [disabled]="loading() || (currentStep() === 2 && !clientSecret())">
-          @if (loading()) { <span class="spinner"></span> }
+          @if (loading()) { <span class="spinner" aria-hidden="true"></span> }
           @else if (currentStep() === 3) { Submit payment }
           @else { Continue → }
         </button>

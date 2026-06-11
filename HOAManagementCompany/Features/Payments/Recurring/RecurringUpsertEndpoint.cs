@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Payments.Models;
+using Microsoft.Extensions.Logging;
 
 namespace HOAManagementCompany.Features.Payments.Recurring;
 
@@ -18,6 +19,10 @@ public class RecurringUpsertEndpoint(PaymentService paymentService) : Endpoint<R
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.FirstOrDefault();
         var result = await paymentService.UpsertRecurringAsync(propertyId, req, ip, userAgent, ct);
+        // Audit trail (FR-029): schedule-config change recorded with non-PII identifiers only.
+        Logger.LogInformation(
+            "audit payments.recurring.upsert property {PropertyId} amountType {AmountType} draftDay {DraftDay}",
+            propertyId, req.AmountType, req.DraftDay);
         await SendOkAsync(result, ct);
     }
 }

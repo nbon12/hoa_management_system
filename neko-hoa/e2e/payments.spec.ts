@@ -97,59 +97,9 @@ test.describe('One-time payment wizard', () => {
     await expect(page.getByText(/eCheck/i)).toBeVisible();
   });
 
-  test('full ACH flow results in "Payment submitted!" confirmation', async ({ page }) => {
-    // Wait for balance to load so presets have amounts
-    await page.waitForFunction(
-      () => document.querySelectorAll('.spinner').length === 0,
-      { timeout: 10_000 },
-    );
-
-    // Step 1: pick "Next due" preset ($250 assessment - always > 0 regardless of ledger state)
-    await page.getByText('Next due').click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await expect(page.getByText(/Step 2/i)).toBeVisible({ timeout: 5_000 });
-
-    // Step 2: select eCheck and fill ACH fields
-    await page.getByText(/eCheck/i).click();
-
-    // Fill routing number and account number (input.mono inputs visible after eCheck selected)
-    const monoInputs = page.locator('input.mono');
-    await expect(monoInputs.first()).toBeVisible({ timeout: 5_000 });
-    await monoInputs.first().fill('021000021');  // routing number
-    await monoInputs.nth(1).fill('987654321');   // account number
-
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await expect(page.getByText(/Step 3/i)).toBeVisible({ timeout: 5_000 });
-
-    // Step 3: review — submit
-    await page.getByRole('button', { name: /Submit payment/i }).click();
-
-    // Step 4: confirmation
-    await expect(page.getByText(/Payment submitted/i)).toBeVisible({ timeout: 15_000 });
-  });
-
-  test('confirmation step shows a confirmation number', async ({ page }) => {
-    await page.waitForFunction(
-      () => document.querySelectorAll('.spinner').length === 0,
-      { timeout: 10_000 },
-    );
-    // Use "Next due" ($250) to ensure amount is always > 0 regardless of current balance
-    await page.getByText('Next due').click();
-    await page.getByRole('button', { name: /Continue/i }).click();
-    await expect(page.getByText(/Step 2/i)).toBeVisible({ timeout: 5_000 });
-    await page.getByText(/eCheck/i).click();
-    const monoInputs = page.locator('input.mono');
-    await expect(monoInputs.first()).toBeVisible({ timeout: 5_000 });
-    await monoInputs.first().fill('021000021');
-    await monoInputs.nth(1).fill('987654321');
-    await page.getByRole('button', { name: /Continue/i }).click();
-    // Wait for step 3 to render before submitting
-    await expect(page.getByText(/Step 3/i)).toBeVisible({ timeout: 5_000 });
-    await page.getByRole('button', { name: /Submit payment/i }).click();
-    await expect(page.getByText(/Payment submitted/i)).toBeVisible({ timeout: 15_000 });
-    const body = await page.locator('app-one-time').textContent();
-    expect(body).toMatch(/[A-Z0-9]{6,}/);
-  });
+  // Full card entry + confirmation drives the Stripe-hosted iframe and so lives in
+  // `payment-element.spec.ts` (T093, local-only). Raw routing/account inputs were removed in Split 3
+  // (SC-001) — no card/bank number is ever typed into an Angular-owned field here.
 });
 
 // ─── Recurring payment CRUD ───────────────────────────────────────────────────
@@ -172,68 +122,41 @@ test.describe.serial('Recurring payment CRUD', () => {
     await expect(rows.first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('READ: enrolled toggle or pill is shown', async ({ page }) => {
-    const enrolledPill = page.locator('.pill').filter({ hasText: /Enrolled/i });
-    const toggleOn = page.locator('.toggle--on');
-    await expect(enrolledPill.or(toggleOn).first()).toBeVisible({ timeout: 10_000 });
+  test('SETUP: opening setup reveals amount type, draft day, mandate and a Stripe-mounted method', async ({ page }) => {
+    await page.getByTestId('setup-toggle').click();
+
+    // Amount type + draft day are Angular-owned (non-sensitive) and editable.
+    await expect(page.getByTestId('draft-day')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('draft-day').selectOption('15');
+
+    // The mandate gate and the Save button exist; Save stays disabled until the method + mandate are ready.
+    await expect(page.getByTestId('mandate-checkbox')).toBeVisible();
+    await expect(page.getByTestId('save')).toBeDisabled();
   });
 
-  test('UPDATE: change draft day to 15th and save', async ({ page }) => {
-    const draftDaySelect = page.locator('select.field');
-    await draftDaySelect.selectOption('15');
-    await page.getByRole('button', { name: /Save changes/i }).click();
-    await expect(page.locator('.alert--success')).toBeVisible({ timeout: 10_000 });
+  test('SETUP: card/bank details are collected only inside the Stripe iframe (SC-001)', async ({ page }) => {
+    await page.getByTestId('setup-toggle').click();
+    await page.waitForFunction(
+      () => document.querySelectorAll('.spinner').length === 0,
+      { timeout: 15_000 },
+    );
+    // The payment method is a cross-origin Stripe iframe — there is no Angular-owned routing/account input.
+    await expect(page.locator('app-recurring').locator('input.mono')).toHaveCount(0);
+    await expect(page.locator('iframe[title="Secure payment input frame"]')).toBeVisible({ timeout: 20_000 });
   });
 
-  test('UPDATE: restore draft day to 1st', async ({ page }) => {
-    const draftDaySelect = page.locator('select.field');
-    await draftDaySelect.selectOption('1');
-    await page.getByRole('button', { name: /Save changes/i }).click();
-    await expect(page.locator('.alert--success')).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('DELETE: cancel recurring payment via Turn off button', async ({ page }) => {
+  test('DELETE: Turn off cancels auto-pay when enrolled', async ({ page }) => {
     page.on('dialog', async (dialog) => dialog.accept());
-    const turnOffBtn = page.getByRole('button', { name: /Turn off/i });
-    if (await turnOffBtn.isVisible()) {
+    const turnOffBtn = page.getByTestId('turn-off');
+    if (await turnOffBtn.isVisible().catch(() => false)) {
       await turnOffBtn.click();
-      await page.waitForTimeout(2_000);
-      // After cancellation toggle is off or re-enrollment UI is shown
-      const toggleOff = page.locator('.toggle:not(.toggle--on)');
-      const saveBtn = page.getByRole('button', { name: /Save changes/i });
-      await expect(toggleOff.or(saveBtn).first()).toBeVisible({ timeout: 10_000 });
+      // Once disabled, the page offers to set up auto-pay again.
+      await expect(page.getByTestId('setup-toggle')).toBeVisible({ timeout: 10_000 });
     } else {
       test.skip();
     }
   });
 
-  test('CREATE: re-enroll with ACH and save', async ({ page }) => {
-    // Ensure toggle is on
-    const toggleOff = page.locator('.toggle:not(.toggle--on)').first();
-    if (await toggleOff.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await toggleOff.click();
-    }
-    // Pick "Just the assessment"
-    const assessmentOption = page.locator('.radio').filter({ hasText: /Just the assessment/i });
-    if (await assessmentOption.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await assessmentOption.click();
-    }
-    // Bank ACH method
-    const achBtn = page.getByRole('button', { name: /Bank/i });
-    if (await achBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await achBtn.click();
-    }
-    // Fill routing and account
-    const monoInputs = page.locator('input.mono');
-    const inputCount = await monoInputs.count();
-    if (inputCount >= 1) await monoInputs.first().fill('021000021');
-    if (inputCount >= 2) await monoInputs.nth(1).fill('987654321');
-    // Draft day 1st
-    const draftSelect = page.locator('select.field');
-    if (await draftSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await draftSelect.selectOption('1');
-    }
-    await page.getByRole('button', { name: /Save changes/i }).click();
-    await expect(page.locator('.alert--success')).toBeVisible({ timeout: 15_000 });
-  });
+  // Vaulting a method end-to-end (SetupIntent confirm + mandate) drives the Stripe iframe and lives in
+  // `payment-element.spec.ts` (T093, local-only).
 });

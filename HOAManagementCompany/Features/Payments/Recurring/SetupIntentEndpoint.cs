@@ -19,7 +19,8 @@ public class SetupIntentEndpoint(
     public override void Configure()
     {
         Post("/payments/recurring/setup-intent");
-        Description(x => x.WithName("CreateSetupIntent").WithTags("Payments"));
+        // Throttle vaulting attempts alongside the one-time intent/confirm endpoints (FR-028).
+        Description(x => x.WithName("CreateSetupIntent").WithTags("Payments").RequireRateLimiting("payments"));
     }
 
     public override async Task HandleAsync(CancellationToken ct)

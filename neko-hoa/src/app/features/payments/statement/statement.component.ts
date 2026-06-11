@@ -25,10 +25,11 @@ import { LedgerEntry } from '../../../core/models';
 
     <!-- Filter bar -->
     <div class="card card--lav" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div style="display:flex;gap:6px;padding:3px;background:var(--paper);border-radius:999px;border:1.5px solid var(--ink);">
-        <button class="tab" [class.tab--active]="activeTab==='statement'" (click)="switchTab('statement')" data-testid="tab-statement">Statement</button>
-        <button class="tab" [class.tab--active]="activeTab==='balance'" (click)="switchTab('balance')" data-testid="tab-balance">Open balance</button>
-        <button class="tab" [class.tab--active]="activeTab==='payments'" (click)="switchTab('payments')" data-testid="tab-payments">Payments</button>
+      <div role="tablist" aria-label="Account views"
+           style="display:flex;gap:6px;padding:3px;background:var(--paper);border-radius:999px;border:1.5px solid var(--ink);">
+        <button class="tab" role="tab" [attr.aria-selected]="activeTab==='statement'" [class.tab--active]="activeTab==='statement'" (click)="switchTab('statement')" data-testid="tab-statement">Statement</button>
+        <button class="tab" role="tab" [attr.aria-selected]="activeTab==='balance'" [class.tab--active]="activeTab==='balance'" (click)="switchTab('balance')" data-testid="tab-balance">Open balance</button>
+        <button class="tab" role="tab" [attr.aria-selected]="activeTab==='payments'" [class.tab--active]="activeTab==='payments'" (click)="switchTab('payments')" data-testid="tab-payments">Payments</button>
       </div>
       <div class="field-label" style="margin:0;">From</div>
       <input class="field field--dashed" type="date" style="width:150px;" [(ngModel)]="startDate">
@@ -75,10 +76,11 @@ import { LedgerEntry } from '../../../core/models';
       <!-- Table -->
       <div class="scroll-area" style="max-height:420px;">
         <table class="data-table">
+          <caption class="sr-only">Account ledger: charges and payments with running balance</caption>
           <thead>
             <tr>
-              <th>Type</th><th>Date</th><th>Doc #</th><th>Description</th>
-              <th class="num">Charge</th><th class="num">Payment</th><th class="num">Balance</th>
+              <th scope="col">Type</th><th scope="col">Date</th><th scope="col">Doc #</th><th scope="col">Description</th>
+              <th scope="col" class="num">Charge</th><th scope="col" class="num">Payment</th><th scope="col" class="num">Balance</th>
             </tr>
           </thead>
           <tbody>
@@ -123,17 +125,18 @@ import { LedgerEntry } from '../../../core/models';
     @if (activeTab === 'payments') {
     <div class="card" style="padding:0;overflow:hidden;" data-testid="transactions-card">
       @if (txnLoading()) {
-        <div class="muted" style="padding:32px;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <span class="spinner"></span> Loading payment history…
+        <div class="muted" role="status" style="padding:32px;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span class="spinner" aria-hidden="true"></span> Loading payment history…
         </div>
       } @else {
         <div class="scroll-area" style="max-height:460px;">
           <table class="data-table" data-testid="transactions-table">
+            <caption class="sr-only">Stripe payment history: card and bank transactions, masked methods only</caption>
             <thead>
               <tr>
-                <th>Date</th><th>Type</th><th>Method</th>
-                <th class="num">Amount</th><th class="num">Fee</th><th class="num">Total</th>
-                <th>Status</th><th class="num">Refunded</th>
+                <th scope="col">Date</th><th scope="col">Type</th><th scope="col">Method</th>
+                <th scope="col" class="num">Amount</th><th scope="col" class="num">Fee</th><th scope="col" class="num">Total</th>
+                <th scope="col">Status</th><th scope="col" class="num">Refunded</th>
               </tr>
             </thead>
             <tbody>

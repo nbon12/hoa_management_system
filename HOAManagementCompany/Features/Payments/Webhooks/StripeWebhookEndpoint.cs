@@ -10,6 +10,11 @@ using Stripe;
 
 namespace HOAManagementCompany.Features.Payments.Webhooks;
 
+// <!-- REPOWISE:START domain=payments-webhooks -->
+// Stripe webhook ingress: signature verification, inbox dedupe (ProcessedWebhookEvents), and
+// dispatch into WebhookProcessor. Always acks 200 after persisting the event (FR-022a).
+// <!-- REPOWISE:END -->
+
 /// <summary>
 /// POST /payments/webhooks/stripe — the single Stripe webhook sink (FR-032, FR-017). The raw body is
 /// signature-verified, persisted to the durable inbox <em>before</em> the 2xx ack so nothing is lost
