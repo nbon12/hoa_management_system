@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-13
 - N/A — no schema, migration, or persistence changes. (008-config-validation)
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); GitHub + FastEndpoints, EF Core 9 (Npgsql), Serilog, Sentry; Angular CLI; (009-dev-auto-deploy)
 - PostgreSQL — isolated **Neon Dev** database (separate from Staging/Prod); Cloudflare (009-dev-auto-deploy)
+- HCL for **OpenTofu** ≥ 1.8 (Terraform-compatible); GitHub Actions YAML + Bash + Providers (versions pinned in `versions.tf`) — `hashicorp/google` & (010-dev-env-iac-opentofu)
+- Remote state in a **single versioned GCS bucket**, per-environment prefix (010-dev-env-iac-opentofu)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -32,10 +34,9 @@ npm test && npm run lint
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 010-dev-env-iac-opentofu: Added HCL for **OpenTofu** ≥ 1.8 (Terraform-compatible); GitHub Actions YAML + Bash + Providers (versions pinned in `versions.tf`) — `hashicorp/google` &
 - 008-config-validation: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) + FastEndpoints (bundles **FluentValidation** — already used for
 - 009-dev-auto-deploy: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); GitHub + FastEndpoints, EF Core 9 (Npgsql), Serilog, Sentry; Angular CLI;
-- 007-integration-ci-tests: Added C# / .NET 9.0 + Stripe.net, SendGrid SDK, Twilio SDK (all already referenced by the backend); xUnit, Testcontainers.PostgreSQL, Microsoft.AspNetCore.Mvc.Testing (test project)
-- 006-stripe-payments: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) + Backend — FastEndpoints, EF Core 9 (Npgsql), **Stripe.net**,
 
 
 <!-- MANUAL ADDITIONS START -->
