@@ -25,19 +25,6 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Begin SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=nekohoa-api
-            -Dsonar.sources=HOAManagementCompany
-            -Dsonar.tests=HOAManagementCompany.Tests
-            -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
-        continue-on-error: true
-
       - name: Restore
         run: dotnet restore
 
@@ -48,6 +35,22 @@ jobs:
         run: dotnet test --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
         env:
           ASPNETCORE_ENVIRONMENT: Test
+
+      # Scan runs after tests so coverage.opencover.xml exists; properties come
+      # from sonar-project.properties at the repo root.
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
+
+      - name: Check SonarQube quality gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
