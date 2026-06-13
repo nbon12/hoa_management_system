@@ -55,4 +55,18 @@ Markdown/spec artifacts under `specs/`. These changes do not exercise applicatio
 PR watching / CI babysitting is appropriate for `/speckit.implement` and other changes that
 touch application or infrastructure code — unless the user explicitly asks otherwise.
 
+## Spec Kit workflow: use the Spec Kit feature branch
+
+`/speckit.specify` creates a numbered feature branch (e.g. `010-dev-env-iac-opentofu`) and the
+matching `specs/<branch>/` directory. **That Spec Kit feature branch is the branch to use** for
+all of the feature's spec-kit work and its PR.
+
+- Do **not** move the work onto, or push it to, any `claude/*` branch that the harness may create
+  by default (this happens especially in cloud sessions). Prefer the Spec Kit feature branch even
+  when a `claude/*` development branch is designated for the session.
+- If the session starts on a `claude/*` branch, switch to (or create) the Spec Kit feature branch
+  reported by `/speckit.specify` and commit/push the spec-kit artifacts and PR there.
+- The Spec Kit scripts also key off the branch name; running them from the feature branch keeps
+  `check-prerequisites.sh` and friends working without needing `SPECIFY_FEATURE` overrides.
+
 <!-- MANUAL ADDITIONS END -->
