@@ -26,10 +26,10 @@ description: "Task list for 010-dev-env-iac-opentofu implementation"
 
 **Purpose**: Create the `infra/` tree and the pinned provider baseline.
 
-- [ ] T001 Create the `infra/` directory tree per plan.md (bootstrap/state-bucket/, modules/environment/, environments/dev/)
-- [ ] T002 [P] Add `infra/.gitignore` excluding `*.tfvars` (except `*.tfvars.example`), `*.tfstate*`, `*.tfplan`, and `.terraform/` (FR-022)
-- [ ] T003 [P] Author `infra/modules/environment/versions.tf` with `required_version >= 1.8` and **pinned** providers `hashicorp/google`, `hashicorp/google-beta`, `cloudflare/cloudflare`, and the **community** `kislerdm/neon` (exact pin + comment flagging it as community-maintained) (FR-021)
-- [ ] T004 [P] Create `infra/README.md` skeleton with a Repowise marker region `<!-- REPOWISE:START section=infra-overview -->` describing what `infra/` provisions and its link to the 009 pipeline
+- [X] T001 Create the `infra/` directory tree per plan.md (bootstrap/state-bucket/, modules/environment/, environments/dev/)
+- [X] T002 [P] Add `infra/.gitignore` excluding `*.tfvars` (except `*.tfvars.example`), `*.tfstate*`, `*.tfplan`, and `.terraform/` (FR-022)
+- [X] T003 [P] Author `infra/modules/environment/versions.tf` with `required_version >= 1.8` and **pinned** providers `hashicorp/google`, `hashicorp/google-beta`, `cloudflare/cloudflare`, and the **community** `kislerdm/neon` (exact pin + comment flagging it as community-maintained) (FR-021)
+- [X] T004 [P] Create `infra/README.md` skeleton with a Repowise marker region `<!-- REPOWISE:START section=infra-overview -->` describing what `infra/` provisions and its link to the 009 pipeline
 
 **Checkpoint**: `infra/` skeleton exists; `tofu fmt` runs clean on empty configs.
 
@@ -42,13 +42,13 @@ resource file or apply can exist.
 
 **⚠️ CRITICAL**: No user story apply can run until this phase is complete.
 
-- [ ] T005 Author `infra/bootstrap/state-bucket/main.tf` + `variables.tf`: a **versioned** `google_storage_bucket` (uniform bucket-level access) using **local state**, plus `google_project_service` to enable `run`, `secretmanager`, `iam`, `iamcredentials`, `sts`, `storage` APIs (FR-020, FR-031)
-- [ ] T006 [P] Write `infra/bootstrap/state-bucket/README.md` documenting the one-time `tofu init && tofu apply` bootstrap and recording the bucket name for backends
-- [ ] T007 [P] Author `infra/environments/dev/backend.tf` with `backend "gcs"` (`prefix = "state/dev"`, bucket placeholder filled from bootstrap) (FR-020)
-- [ ] T008 Author `infra/modules/environment/variables.tf` with the full input surface from data-model.md (env_name, **aspnet_environment**, **secret_prefix**, gcp_project_id, gcp_region, github_repository, frontend_domain, api_domain, api_dns_proxied, container_image, neon_region_id, neon_api_key, cloudflare_*; operator_secrets map; deploy_alert_webhook_url) marking secret-bearing vars `sensitive = true`; document that `aspnet_environment` maps `dev→Dev`/`staging→Staging`/`prod→Production` (NOT `title(env_name)`) (FR-015, FR-030)
-- [ ] T009 [P] Create `infra/environments/dev/terraform.tfvars.example` — a non-secret, placeholder-only template of every variable (FR-022)
-- [ ] T010 Author `infra/environments/dev/variables.tf` + `main.tf` instantiating `module "environment"` with `env_name = "dev"`, `aspnet_environment = "Dev"`, `secret_prefix = "dev"`, and Dev domains/region wired through (FR-030)
-- [ ] T011 [P] Configure provider blocks (`google`, `google-beta`, `cloudflare`, `neon`) in the dev env reading credentials from variables/`TF_VAR_*` (no static keys) (FR-027)
+- [X] T005 Author `infra/bootstrap/state-bucket/main.tf` + `variables.tf`: a **versioned** `google_storage_bucket` (uniform bucket-level access) using **local state**, plus `google_project_service` to enable `run`, `secretmanager`, `iam`, `iamcredentials`, `sts`, `storage` APIs (FR-020, FR-031)
+- [X] T006 [P] Write `infra/bootstrap/state-bucket/README.md` documenting the one-time `tofu init && tofu apply` bootstrap and recording the bucket name for backends
+- [X] T007 [P] Author `infra/environments/dev/backend.tf` with `backend "gcs"` (`prefix = "state/dev"`, bucket placeholder filled from bootstrap) (FR-020)
+- [X] T008 Author `infra/modules/environment/variables.tf` with the full input surface from data-model.md (env_name, **aspnet_environment**, **secret_prefix**, gcp_project_id, gcp_region, github_repository, frontend_domain, api_domain, api_dns_proxied, container_image, neon_region_id, neon_api_key, cloudflare_*; operator_secrets map; deploy_alert_webhook_url) marking secret-bearing vars `sensitive = true`; document that `aspnet_environment` maps `dev→Dev`/`staging→Staging`/`prod→Production` (NOT `title(env_name)`) (FR-015, FR-030)
+- [X] T009 [P] Create `infra/environments/dev/terraform.tfvars.example` — a non-secret, placeholder-only template of every variable (FR-022)
+- [X] T010 Author `infra/environments/dev/variables.tf` + `main.tf` instantiating `module "environment"` with `env_name = "dev"`, `aspnet_environment = "Dev"`, `secret_prefix = "dev"`, and Dev domains/region wired through (FR-030)
+- [X] T011 [P] Configure provider blocks (`google`, `google-beta`, `cloudflare`, `neon`) in the dev env reading credentials from variables/`TF_VAR_*` (no static keys) (FR-027)
 
 **Checkpoint**: `tofu init`/`validate` succeed for `environments/dev` against the bootstrapped backend; module input contract is fixed.
 
@@ -65,19 +65,19 @@ the .NET keyword string; re-plan shows zero drift.
 
 ### Resource definitions for User Story 1
 
-- [ ] T012 [P] [US1] Author `infra/modules/environment/neon.tf`: `neon_project`, `neon_branch` (name `dev`), `neon_database`, `neon_role`; assemble the **pooled** .NET keyword connection string (`Host=…-pooler;…;SSL Mode=Require;Channel Binding=Require`) as a `local` (FR-001/002/003)
-- [ ] T013 [P] [US1] Author `infra/modules/environment/cloud_run.tf`: `google_cloud_run_v2_service` named `nekohoa-api-${env_name}` (Dev → `nekohoa-api-dev`), `min_instance_count = 0`, container port `8080`, env `ASPNETCORE_ENVIRONMENT = var.aspnet_environment` (Dev → `Dev`), startup+liveness probe on `/health`, runtime SA, secret env refs for the 9 secrets → their .NET keys, and `lifecycle { ignore_changes = [image, client, client_version] }` (FR-005/006/007/008)
-- [ ] T014 [US1] Add `google_cloud_run_v2_service_iam_member` granting `roles/run.invoker` to `allUsers` (= allow-unauthenticated) in `cloud_run.tf` (FR-006)
-- [ ] T015 [US1] Add `google_cloud_run_domain_mapping` for `api-dev.nekohoa.com` in `cloud_run.tf` (FR-018)
-- [ ] T016 [P] [US1] Author `infra/modules/environment/iam.tf`: runtime SA + deployer SA; bind deployer `roles/run.admin` (project) and `roles/iam.serviceAccountUser` on the runtime SA (FR-009/010)
-- [ ] T017 [US1] In `iam.tf` add the WIF pool + OIDC provider (issuer `token.actions.githubusercontent.com`, attribute map, **attribute condition** `assertion.repository == var.github_repository`) and a `workloadIdentityUser` binding for the deployer SA via `principalSet…/attribute.repository/<repo>` (FR-011/012)
-- [ ] T018 [P] [US1] Author `infra/modules/environment/secrets.tf`: the nine `google_secret_manager_secret` with IDs `"${var.secret_prefix}-…"` (Dev resolves to the exact `dev-*` IDs); `${secret_prefix}-db-connection` version = the Neon keyword local; the eight operator secrets' versions from `var.operator_secrets` with `lifecycle { ignore_changes = [secret_data] }`; per-secret `secretAccessor` IAM member for the runtime SA (FR-013/014/015)
-- [ ] T019 [P] [US1] Author `infra/modules/environment/cloudflare.tf`: `cloudflare_pages_project` `nekohoa-${env_name}` (`production_branch = "main"`), `cloudflare_pages_domain` for `dev.nekohoa.com`, `cloudflare_r2_bucket` for Dev documents, `cloudflare_record` for `dev.nekohoa.com` (CNAME→Pages, proxied) and `api-dev.nekohoa.com` (CNAME→`ghs.googlehosted.com`, `proxied = var.api_dns_proxied`) (FR-016/017/018/019)
+- [X] T012 [P] [US1] Author `infra/modules/environment/neon.tf`: `neon_project`, `neon_branch` (name `dev`), `neon_database`, `neon_role`; assemble the **pooled** .NET keyword connection string (`Host=…-pooler;…;SSL Mode=Require;Channel Binding=Require`) as a `local` (FR-001/002/003)
+- [X] T013 [P] [US1] Author `infra/modules/environment/cloud_run.tf`: `google_cloud_run_v2_service` named `nekohoa-api-${env_name}` (Dev → `nekohoa-api-dev`), `min_instance_count = 0`, container port `8080`, env `ASPNETCORE_ENVIRONMENT = var.aspnet_environment` (Dev → `Dev`), startup+liveness probe on `/health`, runtime SA, secret env refs for the 9 secrets → their .NET keys, and `lifecycle { ignore_changes = [image, client, client_version] }` (FR-005/006/007/008)
+- [X] T014 [US1] Add `google_cloud_run_v2_service_iam_member` granting `roles/run.invoker` to `allUsers` (= allow-unauthenticated) in `cloud_run.tf` (FR-006)
+- [X] T015 [US1] Add `google_cloud_run_domain_mapping` for `api-dev.nekohoa.com` in `cloud_run.tf` (FR-018)
+- [X] T016 [P] [US1] Author `infra/modules/environment/iam.tf`: runtime SA + deployer SA; bind deployer `roles/run.admin` (project) and `roles/iam.serviceAccountUser` on the runtime SA (FR-009/010)
+- [X] T017 [US1] In `iam.tf` add the WIF pool + OIDC provider (issuer `token.actions.githubusercontent.com`, attribute map, **attribute condition** `assertion.repository == var.github_repository`) and a `workloadIdentityUser` binding for the deployer SA via `principalSet…/attribute.repository/<repo>` (FR-011/012)
+- [X] T018 [P] [US1] Author `infra/modules/environment/secrets.tf`: the nine `google_secret_manager_secret` with IDs `"${var.secret_prefix}-…"` (Dev resolves to the exact `dev-*` IDs); `${secret_prefix}-db-connection` version = the Neon keyword local; the eight operator secrets' versions from `var.operator_secrets` with `lifecycle { ignore_changes = [secret_data] }`; per-secret `secretAccessor` IAM member for the runtime SA (FR-013/014/015)
+- [X] T019 [P] [US1] Author `infra/modules/environment/cloudflare.tf`: `cloudflare_pages_project` `nekohoa-${env_name}` (`production_branch = "main"`), `cloudflare_pages_domain` for `dev.nekohoa.com`, `cloudflare_r2_bucket` for Dev documents, `cloudflare_record` for `dev.nekohoa.com` (CNAME→Pages, proxied) and `api-dev.nekohoa.com` (CNAME→`ghs.googlehosted.com`, `proxied = var.api_dns_proxied`) (FR-016/017/018/019)
 
 ### Validation for User Story 1
 
-- [ ] T020 [US1] Run `tofu fmt -check` and `tofu validate` on the module + dev env; fix until clean
-- [ ] T021 [US1] Run `tofu plan` for `environments/dev` (grey-cloud: `api_dns_proxied = false`); confirm planned names/values match `contracts/matrix-conformance.md` rows 1–20 — including that the resolved secret IDs equal the literal `dev-*` (with `secret_prefix = "dev"`) and `ASPNETCORE_ENVIRONMENT = Dev` (FR-029)
+- [X] T020 [US1] Run `tofu fmt -check` and `tofu validate` on the module + dev env; fix until clean
+- [X] T021 [US1] Run `tofu plan` for `environments/dev` (grey-cloud: `api_dns_proxied = false`); confirm planned names/values match `contracts/matrix-conformance.md` rows 1–20 — including that the resolved secret IDs equal the literal `dev-*` (with `secret_prefix = "dev"`) and `ASPNETCORE_ENVIRONMENT = Dev` (FR-029)
 - [ ] T022 [US1] `tofu apply` step 1 (grey-cloud), wait for the Cloud Run domain-mapping cert, set `api_dns_proxied = true`, `tofu apply` step 2 (proxied Full(strict)) per quickstart.md Steps 3–4 (FR-019)
 - [ ] T023 [US1] Verify acceptance: `gcloud run services describe nekohoa-api-dev` shows rows 1–6 + secret refs; `dev-db-connection` is keyword format (no `postgresql://`); the Dev Neon project/branch is distinct from any Staging/Prod (FR-004); **re-`plan` reports zero drift** (SC-002/003/004)
 
@@ -94,9 +94,9 @@ masked and the "enable last" instruction.
 `contracts/github-actions-wiring.md`; sensitive ones show `<sensitive>`; `next_steps` ends with set
 `DEV_DEPLOY_ENABLED=true` last.
 
-- [ ] T024 [P] [US2] Author `infra/modules/environment/outputs.tf`: `db_connection_string` (`sensitive`), `wif_provider`, `deployer_service_account`, `gcp_region`, `cloudflare_account_id`, `cloudflare_api_token` (`sensitive`), `deploy_alert_webhook_url` (`sensitive`), `cloud_run_service_url`, and `next_steps` (FR-023/024)
-- [ ] T025 [P] [US2] Compose the `next_steps` output string: list the five secrets + `GCP_REGION`, then explicitly instruct setting `DEV_DEPLOY_ENABLED=true` **last** (FR-023)
-- [ ] T026 [US2] Re-export all module outputs from `infra/environments/dev/outputs.tf` unchanged
+- [X] T024 [P] [US2] Author `infra/modules/environment/outputs.tf`: `db_connection_string` (`sensitive`), `wif_provider`, `deployer_service_account`, `gcp_region`, `cloudflare_account_id`, `cloudflare_api_token` (`sensitive`), `deploy_alert_webhook_url` (`sensitive`), `cloud_run_service_url`, and `next_steps` (FR-023/024)
+- [X] T025 [P] [US2] Compose the `next_steps` output string: list the five secrets + `GCP_REGION`, then explicitly instruct setting `DEV_DEPLOY_ENABLED=true` **last** (FR-023)
+- [X] T026 [US2] Re-export all module outputs from `infra/environments/dev/outputs.tf` unchanged
 - [ ] T027 [US2] Verify acceptance: `tofu output` covers every row of `contracts/github-actions-wiring.md`; sensitive outputs are masked in the `apply` summary (SC-005/006)
 
 **Checkpoint**: An operator can wire GitHub Actions from outputs alone.
@@ -111,9 +111,9 @@ Prod gated behind a protected GitHub Environment.
 **Independent Test**: A PR editing `infra/` runs plan-only (no live change); a merge runs apply; both
 authenticate via WIF with no committed static keys.
 
-- [ ] T028 [P] [US3] Author `.github/workflows/infra-plan.yml`: `pull_request` + `paths: [infra/**]`; `google-github-actions/auth` via WIF (`GCP_WIF_PROVIDER`/`GCP_DEPLOY_SERVICE_ACCOUNT`); `tofu init/fmt -check/validate/plan` for `environments/dev`; post plan summary to the PR; CF/Neon creds via `TF_VAR_*` GitHub secrets (FR-025/027)
-- [ ] T029 [P] [US3] Author `.github/workflows/infra-apply.yml`: `push` to `main` + `paths: [infra/**]`; a **Dev** apply job that runs automatically; a placeholder/commented **Prod** apply job targeting a protected GitHub Environment `prod` with a required reviewer (auto-apply Dev/Staging, gate Prod) (FR-026)
-- [ ] T030 [US3] Document/create the GitHub Environment `prod` (required reviewer) and confirm `infra-plan.yml` makes no live changes while `infra-apply.yml` is path-filtered to `infra/**` (SC-007)
+- [X] T028 [P] [US3] Author `.github/workflows/infra-plan.yml`: `pull_request` + `paths: [infra/**]`; `google-github-actions/auth` via WIF (`GCP_WIF_PROVIDER`/`GCP_DEPLOY_SERVICE_ACCOUNT`); `tofu init/fmt -check/validate/plan` for `environments/dev`; post plan summary to the PR; CF/Neon creds via `TF_VAR_*` GitHub secrets (FR-025/027)
+- [X] T029 [P] [US3] Author `.github/workflows/infra-apply.yml`: `push` to `main` + `paths: [infra/**]`; a **Dev** apply job that runs automatically; a placeholder/commented **Prod** apply job targeting a protected GitHub Environment `prod` with a required reviewer (auto-apply Dev/Staging, gate Prod) (FR-026)
+- [X] T030 [US3] Document/create the GitHub Environment `prod` (required reviewer) and confirm `infra-plan.yml` makes no live changes while `infra-apply.yml` is path-filtered to `infra/**` (SC-007)
 
 **Checkpoint**: Infra changes flow through reviewed plan → gated apply.
 
@@ -128,9 +128,9 @@ module.
 skeleton instantiates the module with new tfvars + backend prefix and `tofu validate`s without
 touching `modules/environment`.
 
-- [ ] T031 [US4] Audit `modules/environment` for any hardcoded `dev`/region/domain; replace with `var.env_name`-derived values, `var.secret_prefix` for the `dev-*` IDs, and `var.aspnet_environment` for the runtime env (confirm no `title(env_name)` shortcut — prod must yield `Production`, not `Prod`) per `contracts/module-interface.md` (FR-030)
-- [ ] T032 [P] [US4] Add an `infra/environments/staging/` skeleton (backend `prefix = "state/staging"`, `terraform.tfvars.example`, `main.tf` module block) as proof of reuse — not applied (SC-009)
-- [ ] T033 [US4] Verify acceptance: `tofu validate` the staging skeleton; confirm no change was needed in `modules/environment` (SC-009)
+- [X] T031 [US4] Audit `modules/environment` for any hardcoded `dev`/region/domain; replace with `var.env_name`-derived values, `var.secret_prefix` for the `dev-*` IDs, and `var.aspnet_environment` for the runtime env (confirm no `title(env_name)` shortcut — prod must yield `Production`, not `Prod`) per `contracts/module-interface.md` (FR-030)
+- [X] T032 [P] [US4] Add an `infra/environments/staging/` skeleton (backend `prefix = "state/staging"`, `terraform.tfvars.example`, `main.tf` module block) as proof of reuse — not applied (SC-009)
+- [X] T033 [US4] Verify acceptance: `tofu validate` the staging skeleton; confirm no change was needed in `modules/environment` (SC-009)
 
 **Checkpoint**: Reuse to Staging/Prod is demonstrated structurally.
 
@@ -138,11 +138,11 @@ touching `modules/environment`.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T034 [P] Fill the `infra/README.md` Repowise region (`section=infra-overview`) and add `section=env-module-outputs` to `modules/environment/outputs.tf`; run the Repowise marker validation (constitution §9)
-- [ ] T035 [P] Final `tofu fmt -check` across `infra/`; ensure no secret value appears in any committed file (`git grep` for tfvars values / tokens) (SC-005)
+- [X] T034 [P] Fill the `infra/README.md` Repowise region (`section=infra-overview`) and add `section=env-module-outputs` to `modules/environment/outputs.tf`; run the Repowise marker validation (constitution §9)
+- [X] T035 [P] Final `tofu fmt -check` across `infra/`; ensure no secret value appears in any committed file (`git grep` for tfvars values / tokens) (SC-005)
 - [ ] T036 Run the full `quickstart.md` validation checklist end-to-end (SC-001–SC-008)
-- [ ] T037 Confirm PR scope is the focused cross-cutting infra slice and the 009 `deploy-dev` job's referenced secret/variable names still match `contracts/github-actions-wiring.md` (FR-029, §11)
-- [ ] T038 [P] Confirm the Sonar / Codecov / coverage CI gates **exclude `infra/**`** (e.g. `sonar-project.properties` exclusions + Codecov `ignore`/flags), or document the PR as a justified cross-cutting change under §11, so the HCL-only implement PR is not blocked by a 0%-coverage check (constitution §9/§11)
+- [X] T037 Confirm PR scope is the focused cross-cutting infra slice and the 009 `deploy-dev` job's referenced secret/variable names still match `contracts/github-actions-wiring.md` (FR-029, §11)
+- [X] T038 [P] Confirm the Sonar / Codecov / coverage CI gates **exclude `infra/**`** (e.g. `sonar-project.properties` exclusions + Codecov `ignore`/flags), or document the PR as a justified cross-cutting change under §11, so the HCL-only implement PR is not blocked by a 0%-coverage check (constitution §9/§11)
 
 ### Companion config-validation guard (constitution §8 — fail-fast config)
 
@@ -151,8 +151,8 @@ touching `modules/environment`.
 > "all configuration MUST be validated at startup" rule. Small companion change to the app (008 style);
 > if delivered separately to keep this PR infra-only, track it as a linked follow-up.
 
-- [ ] T039 [P] Add a **FluentValidation** startup validator asserting `ASPNETCORE_ENVIRONMENT` (host environment name) is in the known set — `Development` (local), `Dev` (deployed dev), `Test`, `Staging`, `Production` (matching the existing `appsettings.{Development,Dev,Test}.json` + Staging/Prod) — so the backend **fails fast** on a mis-set value (e.g. `prod`, or deployed-`Dev` vs local-`Development` confusion), following the existing pattern in `HOAManagementCompany/Infrastructure/Configuration/*OptionsValidator.cs` + `OptionsValidationExtensions.cs`; add an xUnit test proving startup fails on an invalid value (constitution §8)
-- [ ] T040 [P] Confirm the Angular **boot-time config guard** (008 style) fails loudly when its required environment configuration (e.g. `apiBaseUrl` for the Dev origin) is missing/invalid; extend it if the Dev environment introduces any newly-required value (constitution §8)
+- [X] T039 [P] Add a **FluentValidation** startup validator asserting `ASPNETCORE_ENVIRONMENT` (host environment name) is in the known set — `Development` (local), `Dev` (deployed dev), `Test`, `Staging`, `Production` (matching the existing `appsettings.{Development,Dev,Test}.json` + Staging/Prod) — so the backend **fails fast** on a mis-set value (e.g. `prod`, or deployed-`Dev` vs local-`Development` confusion), following the existing pattern in `HOAManagementCompany/Infrastructure/Configuration/*OptionsValidator.cs` + `OptionsValidationExtensions.cs`; add an xUnit test proving startup fails on an invalid value (constitution §8)
+- [X] T040 [P] Confirm the Angular **boot-time config guard** (008 style) fails loudly when its required environment configuration (e.g. `apiBaseUrl` for the Dev origin) is missing/invalid; extend it if the Dev environment introduces any newly-required value (constitution §8)
 
 ---
 

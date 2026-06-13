@@ -1,0 +1,42 @@
+# Copy to terraform.tfvars (gitignored) and fill with real values. PLACEHOLDERS ONLY here — never put
+# a real secret in this committed example (FR-022, SC-005).
+
+# --- GCP ---
+gcp_project_id = "your-gcp-project-id"
+gcp_region     = "us-central1"
+
+# --- GitHub (used verbatim in the WIF attribute condition) ---
+github_repository = "nbon12/hoa_management_system"
+
+# --- Cert flip: leave false for the first apply, set true after the cert is issued (FR-019) ---
+api_dns_proxied = false
+
+# --- Container image: placeholder for first create; the 009 pipeline owns it afterward (FR-007) ---
+container_image = "sakurapatch/nekohoa-api:latest"
+
+# --- Stripe publishable key (non-secret; set as a Cloud Run env var, NOT Secret Manager) ---
+stripe_publishable_key = "pk_test_REPLACE"
+
+# --- Neon ---
+neon_region_id = "aws-us-east-1"
+neon_api_key   = "REPLACE_WITH_NEON_API_KEY"
+
+# --- Cloudflare ---
+cloudflare_api_token  = "REPLACE_WITH_CLOUDFLARE_API_TOKEN"
+cloudflare_account_id = "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID"
+cloudflare_zone_id    = "REPLACE_WITH_CLOUDFLARE_ZONE_ID_FOR_nekohoa.com"
+
+# --- The eight operator secrets (become the first version of each dev-<key> secret) ---
+operator_secrets = {
+  "jwt-secret"            = "REPLACE_WITH_DEV_JWT_SIGNING_KEY"
+  "sentry-dsn"            = "REPLACE_WITH_DEV_SENTRY_DSN"
+  "stripe-secret-key"     = "sk_test_REPLACE"
+  "stripe-webhook-secret" = "whsec_REPLACE"
+  "storage-service-url"   = "https://<account>.r2.cloudflarestorage.com"
+  "storage-access-key"    = "REPLACE_WITH_R2_ACCESS_KEY_ID"
+  "storage-secret-key"    = "REPLACE_WITH_R2_SECRET_ACCESS_KEY"
+  "scheduler-secret"      = "REPLACE_WITH_DEV_SCHEDULER_SHARED_SECRET"
+}
+
+# --- Deploy alert webhook the 009 job posts to ---
+deploy_alert_webhook_url = "REPLACE_WITH_DEPLOY_ALERT_WEBHOOK_URL"

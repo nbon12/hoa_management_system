@@ -85,6 +85,16 @@ public class PaymentSeeder(ApplicationDbContext db, SeedResult result, ILogger l
             });
         }
 
+        // Assign the per-property monotonic Sequence the same way the runtime write path does
+        // (LedgerService) and the IX_LedgerEntries_PropertyId_Sequence unique index requires. Without
+        // this every entry keeps the default 0 and the batch insert violates the unique constraint
+        // (the entries list is already in chronological / running-balance order).
+        long sequence = 0;
+        foreach (var entry in entries)
+        {
+            entry.Sequence = ++sequence;
+        }
+
         db.LedgerEntries.AddRange(entries);
 
         db.RecurringPayments.Add(new RecurringPayment

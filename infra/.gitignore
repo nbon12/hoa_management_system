@@ -1,0 +1,25 @@
+# OpenTofu / Terraform — never commit state or secret-bearing var files (FR-022, SC-005).
+
+# Variable files may contain secrets (Neon/Cloudflare tokens, operator secret values).
+# Only the placeholder-only *.example template is committed.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# State and plan artifacts (may embed secret values).
+*.tfstate
+*.tfstate.*
+*.tfplan
+tf.plan
+
+# Provider plugins / lock dirs / crash logs.
+.terraform/
+.terraform.lock.hcl.bak
+crash.log
+crash.*.log
+
+# Operator override files.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

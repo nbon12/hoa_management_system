@@ -1,0 +1,124 @@
+# Cloud Run v2 API service (matrix rows 1-8). Name nekohoa-api-${env_name} (Dev → nekohoa-api-dev),
+# scale-to-zero, port 8080, ASPNETCORE_ENVIRONMENT from var.aspnet_environment ("Dev"), /health
+# probes, the nine secret env refs, runtime SA. The image is PIPELINE-OWNED — ignore_changes keeps an
+# infra apply from reverting the revision the 009 deploy job pushes (FR-005/006/007/008).
+
+locals {
+  # .NET env key → unprefixed secret name (the nine refs, matrix rows 8-16). The literal-name fidelity
+  # lives in secrets.tf; here we just wire each container env var to its secret's latest version.
+  secret_env = {
+    "ConnectionStrings__DefaultConnection" = "db-connection"
+    "Jwt__Secret"                          = "jwt-secret"
+    "Sentry__Dsn"                          = "sentry-dsn"
+    "Stripe__SecretKey"                    = "stripe-secret-key"
+    "Stripe__WebhookSigningSecret"         = "stripe-webhook-secret"
+    "Storage__ServiceUrl"                  = "storage-service-url"
+    "Storage__AccessKey"                   = "storage-access-key"
+    "Storage__SecretKey"                   = "storage-secret-key"
+    "Jobs__SchedulerSharedSecret"          = "scheduler-secret"
+  }
+}
+
+resource "google_cloud_run_v2_service" "api" {
+  project  = var.gcp_project_id
+  name     = "nekohoa-api-${var.env_name}"
+  location = var.gcp_region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    service_account = google_service_account.runtime.email
+
+    scaling {
+      min_instance_count = 0
+    }
+
+    containers {
+      image = var.container_image
+
+      ports {
+        container_port = 8080
+      }
+
+      # Literal runtime environment selector (matrix row 4). Dev → "Dev".
+      env {
+        name  = "ASPNETCORE_ENVIRONMENT"
+        value = var.aspnet_environment
+      }
+
+      # Stripe publishable key — non-secret (browser-safe), so a plain env var rather than a Secret
+      # Manager ref. Required by StripeOptionsValidator at startup; deployed envs supply it here.
+      env {
+        name  = "Stripe__PublishableKey"
+        value = var.stripe_publishable_key
+      }
+
+      # The nine secret-backed env vars, each pointing at its Secret Manager secret's latest version.
+      dynamic "env" {
+        for_each = local.secret_env
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.this[env.value].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+        }
+      }
+
+      liveness_probe {
+        http_get {
+          path = "/health"
+        }
+      }
+    }
+  }
+
+  # The deploy pipeline owns the image and revision metadata; never let an infra apply revert them
+  # (FR-007). image is the live :sha pushed by 009; client/client_version churn on every gcloud deploy.
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      client,
+      client_version,
+    ]
+  }
+
+  # Secrets + accessor IAM must exist before the service references them.
+  depends_on = [
+    google_secret_manager_secret_version.db_connection,
+    google_secret_manager_secret_version.operator,
+    google_secret_manager_secret_iam_member.runtime_accessor,
+  ]
+}
+
+# Public access: allow-unauthenticated (matrix row 5).
+resource "google_cloud_run_v2_service_iam_member" "public" {
+  project  = var.gcp_project_id
+  location = google_cloud_run_v2_service.api.location
+  name     = google_cloud_run_v2_service.api.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# Custom domain mapping for the API (matrix row 20). The Cloudflare record for this host is in
+# cloudflare.tf; grey-cloud first lets Google issue the managed cert (FR-018/019).
+resource "google_cloud_run_domain_mapping" "api" {
+  project  = var.gcp_project_id
+  location = var.gcp_region
+  name     = var.api_domain
+
+  metadata {
+    namespace = var.gcp_project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.api.name
+  }
+}

@@ -1,0 +1,89 @@
+# Plan-only preview for PRs touching infra/ (FR-025). Authenticates via WIF (no static keys, FR-027),
+# runs fmt -check / validate / plan for environments/dev, and posts the plan summary to the PR.
+# Makes NO live changes (SC-007).
+name: infra-plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-plan.yml"
+
+permissions:
+  contents: read
+  id-token: write # required for WIF OIDC
+  pull-requests: write # to post the plan summary comment
+
+concurrency:
+  group: infra-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan-dev:
+    name: Plan (dev)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/environments/dev
+    env:
+      # Non-GCP provider credentials + non-ADC inputs come in as TF_VAR_* from GitHub secrets.
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      TF_VAR_deploy_alert_webhook_url: ${{ secrets.DEPLOY_ALERT_WEBHOOK_URL }}
+      # operator_secrets is a map → supply as a single JSON-encoded secret.
+      TF_VAR_operator_secrets: ${{ secrets.TF_VAR_OPERATOR_SECRETS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # WIF: impersonate the deployer SA via the repo-scoped provider. No long-lived keys (FR-027).
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.8.0"
+
+      - name: tofu fmt -check
+        run: tofu fmt -check -recursive ../..
+
+      - name: tofu init
+        run: tofu init -input=false
+
+      - name: tofu validate
+        run: tofu validate
+
+      - name: tofu plan
+        id: plan
+        run: |
+          set -o pipefail
+          tofu plan -input=false -no-color -out tf.plan | tee plan.txt
+
+      - name: Post plan summary to PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let plan = '';
+            try { plan = fs.readFileSync('infra/environments/dev/plan.txt', 'utf8'); }
+            catch (e) { plan = `Plan output unavailable: ${e.message}`; }
+            const max = 60000;
+            const body = [
+              '### OpenTofu plan — `environments/dev`',
+              '',
+              '```',
+              plan.length > max ? plan.slice(0, max) + '\n... (truncated)' : plan,
+              '```',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
