@@ -117,11 +117,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // Registered via a factory so the DI container owns and disposes its connection pool.
 builder.Services.AddSingleton(_ => ObservabilityNpgsql.BuildTracedDataSource(connectionString));
 
+// ConfigureWarnings ignores ManyServiceProvidersCreatedWarning: it fires only when 20+ EF internal
+// providers are built in one process — a WebApplicationFactory test artifact (many factories per
+// run), not a real issue here since the app uses one shared NpgsqlDataSource singleton. Matches the
+// suppression IntegrationTestBase already applies, so test factories booting Program don't throw.
 builder.Services.AddDbContext<ApplicationDbContext>((sp, o) =>
-    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3)));
+    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3))
+     .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, o) =>
-    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3)), ServiceLifetime.Scoped);
+    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3))
+     .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)), ServiceLifetime.Scoped);
 
 // ── ASP.NET Core Identity ──────────────────────────────────────────────────
 builder.Services.AddIdentityCore<ApplicationUser>(o =>
