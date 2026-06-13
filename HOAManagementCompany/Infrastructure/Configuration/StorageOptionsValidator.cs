@@ -16,9 +16,9 @@ public sealed class StorageOptionsValidator : AbstractValidator<StorageOptions>
         RuleFor(x => x.ServiceUrl).NotEmpty()
             .WithMessage("Storage:ServiceUrl is required.");
         RuleFor(x => x.ServiceUrl)
-            .Must(BeAbsoluteUri)
+            .Must(BeHttpUri)
             .When(x => !string.IsNullOrWhiteSpace(x.ServiceUrl))
-            .WithMessage("Storage:ServiceUrl must be a valid absolute URI.");
+            .WithMessage("Storage:ServiceUrl must be a valid absolute http or https URI.");
 
         RuleFor(x => x.AccessKey).NotEmpty()
             .WithMessage("Storage:AccessKey is required.");
@@ -28,11 +28,15 @@ public sealed class StorageOptionsValidator : AbstractValidator<StorageOptions>
             .WithMessage("Storage:BucketName is required.");
 
         RuleFor(x => x.PublicServiceUrl)
-            .Must(BeAbsoluteUri)
+            .Must(BeHttpUri)
             .When(x => !string.IsNullOrWhiteSpace(x.PublicServiceUrl))
-            .WithMessage("Storage:PublicServiceUrl must be a valid absolute URI when set.");
+            .WithMessage("Storage:PublicServiceUrl must be a valid absolute http or https URI when set.");
     }
 
-    private static bool BeAbsoluteUri(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && Uri.TryCreate(value, UriKind.Absolute, out _);
+    // The S3/MinIO endpoint is an http(s) URL. Require the scheme explicitly: on Unix,
+    // Uri.TryCreate treats "host:port" and bare paths as absolute URIs, which we must reject.
+    private static bool BeHttpUri(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 }

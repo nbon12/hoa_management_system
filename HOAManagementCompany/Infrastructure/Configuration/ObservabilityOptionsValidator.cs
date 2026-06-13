@@ -22,13 +22,18 @@ public sealed class ObservabilityOptionsValidator : AbstractValidator<Observabil
             .WithMessage("Observability:OtlpProtocol must be 'http/protobuf'.");
 
         RuleFor(x => x.OtlpEndpoint)
-            .Must(BeAbsoluteUri)
-            .WithMessage("Observability:OtlpEndpoint must be a valid absolute URI.");
+            .Must(BeHttpUri)
+            .WithMessage("Observability:OtlpEndpoint must be a valid absolute http or https URI.");
 
         RuleFor(x => x.TelemetryProxyMaxBodyBytes).GreaterThan(0)
             .WithMessage("Observability:TelemetryProxyMaxBodyBytes must be greater than 0.");
     }
 
-    private static bool BeAbsoluteUri(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && Uri.TryCreate(value, UriKind.Absolute, out _);
+    // An OTLP endpoint is an http(s) URL. Require the scheme explicitly: on Unix, Uri.TryCreate
+    // treats bare paths ("/foo") and "host:port" as absolute URIs with file/host schemes, which
+    // we must reject.
+    private static bool BeHttpUri(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 }
