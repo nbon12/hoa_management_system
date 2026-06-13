@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -71,11 +70,6 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
     /// </summary>
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
 
-    // Shared across all test class instances in a session so tokens signed by one
-    // WebApplicationFactory are accepted by another (e.g. RefreshSwitchTests).
-    private static readonly string TestJwtSecret =
-        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-
     protected IntegrationTestBase(TestDatabaseFixture fixture)
     {
         Fixture = fixture;
@@ -100,7 +94,13 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Serilog:MinimumLevel:Default"] = "Information",
                         // Small telemetry-proxy rate limit so the 429 test is fast/deterministic.
                         ["Observability:TelemetryProxyRateLimitPerMinute"] = "5",
-                        ["Jwt:Secret"] = TestJwtSecret,
+                        // Jwt:Secret is intentionally NOT overridden here. Program.cs reads it at
+                        // startup (for token validation) BEFORE WebApplicationFactory's in-memory
+                        // config is applied, while AuthService reads it at request time (for signing)
+                        // AFTER. Overriding it here would only change the signing side, so tokens
+                        // would be signed with one key and validated with another → 401. Letting both
+                        // fall back to appsettings.Test.json keeps them in agreement. That file is
+                        // listed in sonar.exclusions, so the test-only secret triggers no S2068.
                         ["Jwt:Issuer"] = "nekohoa-api",
                         ["Jwt:Audience"] = "nekohoa-frontend",
                         ["Jwt:AccessTokenExpiryMinutes"] = "15",
