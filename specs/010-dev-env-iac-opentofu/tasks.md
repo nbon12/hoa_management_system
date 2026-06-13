@@ -29,7 +29,7 @@ description: "Task list for 010-dev-env-iac-opentofu implementation"
 - [X] T001 Create the `infra/` directory tree per plan.md (bootstrap/state-bucket/, modules/environment/, environments/dev/)
 - [X] T002 [P] Add `infra/.gitignore` excluding `*.tfvars` (except `*.tfvars.example`), `*.tfstate*`, `*.tfplan`, and `.terraform/` (FR-022)
 - [X] T003 [P] Author `infra/modules/environment/versions.tf` with `required_version >= 1.8` and **pinned** providers `hashicorp/google`, `hashicorp/google-beta`, `cloudflare/cloudflare`, and the **community** `kislerdm/neon` (exact pin + comment flagging it as community-maintained) (FR-021)
-- [X] T004 [P] Create `infra/README.md` skeleton with a Repowise marker region `<!-- REPOWISE:START section=infra-overview -->` describing what `infra/` provisions and its link to the 009 pipeline
+- [X] T004 [P] Create `infra/README.md` skeleton with a Repowise marker region (`section=infra-overview`) describing what `infra/` provisions and its link to the 009 pipeline
 
 **Checkpoint**: `infra/` skeleton exists; `tofu fmt` runs clean on empty configs.
 
