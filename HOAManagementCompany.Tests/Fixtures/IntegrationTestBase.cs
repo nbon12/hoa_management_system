@@ -71,6 +71,11 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
     /// </summary>
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
 
+    // Shared across all test class instances in a session so tokens signed by one
+    // WebApplicationFactory are accepted by another (e.g. RefreshSwitchTests).
+    private static readonly string TestJwtSecret =
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
     protected IntegrationTestBase(TestDatabaseFixture fixture)
     {
         Fixture = fixture;
@@ -95,7 +100,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Serilog:MinimumLevel:Default"] = "Information",
                         // Small telemetry-proxy rate limit so the 429 test is fast/deterministic.
                         ["Observability:TelemetryProxyRateLimitPerMinute"] = "5",
-                        ["Jwt:Secret"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                        ["Jwt:Secret"] = TestJwtSecret,
                         ["Jwt:Issuer"] = "nekohoa-api",
                         ["Jwt:Audience"] = "nekohoa-frontend",
                         ["Jwt:AccessTokenExpiryMinutes"] = "15",
