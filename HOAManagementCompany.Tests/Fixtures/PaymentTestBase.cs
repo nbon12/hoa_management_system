@@ -26,12 +26,14 @@ public abstract class PaymentTestBase : IntegrationTestBase
 
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
     [
-        // Placeholder Stripe config — FakeStripeGateway replaces the real adapter so
-        // these values are never sent to the network; non-empty strings satisfy options binding.
-        new("Stripe:SecretKey", "sk_test_" + Guid.NewGuid().ToString("N")),
-        new("Stripe:PublishableKey", "pk_test_" + Guid.NewGuid().ToString("N")),
-        new("Stripe:WebhookSigningSecret", "whsec_" + Guid.NewGuid().ToString("N")),
-        new("Jobs:SchedulerSharedSecret", Guid.NewGuid().ToString("N")),
+        // Dummy Stripe config so options binding/startup never touches the real network adapter
+        // (FakeStripeGateway replaces it). These are non-secret placeholders that the payment
+        // tests assert against directly — e.g. the SetupIntent test expects "pk_test_dummy" and
+        // the job endpoints expect the "test-scheduler-secret" header — so they must stay stable.
+        new("Stripe:SecretKey", "sk_test_dummy"),
+        new("Stripe:PublishableKey", "pk_test_dummy"),
+        new("Stripe:WebhookSigningSecret", "whsec_test_dummy"),
+        new("Jobs:SchedulerSharedSecret", "test-scheduler-secret"),
     ];
 
     /// <summary>Authenticates as the seeded resident (property aaaaaaaa-…-0001) and sets the bearer token.</summary>
