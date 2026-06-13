@@ -7,10 +7,14 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<Applicatio
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
+        var connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? throw new InvalidOperationException(
+                "Set the ConnectionStrings__DefaultConnection environment variable before running " +
+                "EF Core design-time tools (dotnet ef migrations add / database update).");
+
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(
-                Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                ?? "Host=localhost;Port=5432;Database=nekohoa;Username=nekohoa;Password=nekohoa")
+            .UseNpgsql(connectionString)
             .Options;
 
         return new ApplicationDbContext(options);

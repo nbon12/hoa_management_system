@@ -100,8 +100,8 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Jwt:AccessTokenExpiryMinutes"] = "15",
                         ["Jwt:RefreshTokenExpiryDays"] = "30",
                         ["Storage:ServiceUrl"] = fixture.MinioEndpoint,
-                        ["Storage:AccessKey"] = "minioadmin",
-                        ["Storage:SecretKey"] = "minioadmin",
+                        ["Storage:AccessKey"] = fixture.MinioAccessKey,
+                        ["Storage:SecretKey"] = fixture.MinioSecretKey,
                         ["Storage:BucketName"] = "hoa-documents",
                         ["Storage:ForcePathStyle"] = "true",
                         ["Sentry:Dsn"] = ""
@@ -145,7 +145,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                     var s3Descriptors = services.Where(d => d.ServiceType == typeof(IAmazonS3)).ToList();
                     foreach (var d in s3Descriptors) services.Remove(d);
                     services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
-                        new BasicAWSCredentials("minioadmin", "minioadmin"),
+                        new BasicAWSCredentials(fixture.MinioAccessKey, fixture.MinioSecretKey),
                         new AmazonS3Config
                         {
                             ServiceURL = fixture.MinioEndpoint,
@@ -195,7 +195,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
         var endpointUri = new Uri(Fixture.MinioEndpoint);
         var minio = new MinioClient()
             .WithEndpoint($"{endpointUri.Host}:{endpointUri.Port}")
-            .WithCredentials("minioadmin", "minioadmin")
+            .WithCredentials(Fixture.MinioAccessKey, Fixture.MinioSecretKey)
             .WithSSL(endpointUri.Scheme == "https")
             .Build();
 
