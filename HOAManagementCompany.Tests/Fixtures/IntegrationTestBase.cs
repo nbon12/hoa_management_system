@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -94,7 +95,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Serilog:MinimumLevel:Default"] = "Information",
                         // Small telemetry-proxy rate limit so the 429 test is fast/deterministic.
                         ["Observability:TelemetryProxyRateLimitPerMinute"] = "5",
-                        ["Jwt:Secret"] = "test-secret-for-integration-tests-must-be-32-chars!!",
+                        ["Jwt:Secret"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
                         ["Jwt:Issuer"] = "nekohoa-api",
                         ["Jwt:Audience"] = "nekohoa-frontend",
                         ["Jwt:AccessTokenExpiryMinutes"] = "15",
