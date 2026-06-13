@@ -31,35 +31,21 @@ If Repowise MCP is unavailable, say so and fall back to built-in search.
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-06-07 (commit b5287d0). Confidence: 100%.
+Last indexed: 2026-06-13 (commit 8a8d2a3). Confidence: 100%.
 ### Architecture
-Neho HOA is a full-stack Homeowners Association management platform: it ingests community member, property, violation, and payment data through a RESTful API built with ASP.NET Core (C#), processes domain logic and persistence via Entity Framework Core in a clean-architecture pipeline, and serves a feature-rich Angular web application (TypeScript) for board members and residents to manage accounts, schedule recurring payments, log violations, and view community history. The system outputs a responsive admin dashboard, a Stripe-powered payment flow, and an API surface consumable by mobile apps or third-party integrations. | Layer       | Technology                                      |
-|-------------|-------------------------------------------------|
-| Backend     | C# 12, ASP.NET Core 8, Entity Framework Core, MediatR, FluentValidation |
-| Frontend    | Angular 18, TypeScript 5, RxJS, NgRx (optional), Angular Material |
-| Testing     | xUnit (backend), Jasmine/Karma (frontend), Storybook (component library) |
-| Database    | SQL Server (development), SQLite (tests)        |
-| Payments    | Stripe SDK, Stripe Webhooks                     |
-| DevOps      | Docker, Docker Compose, GitHub Actions          |
-| Tooling     | .NET CLI, Angular CLI, Yarn, Husky              |
+Repo is an HOA management platform: it ingests user commands and configuration through an Angular single-page application and a C# REST API, processes business logic across domain models for violations, payments, community records, and authentication, persists state to a SQL database via Entity Framework Core, and produces notifications through Twilio (SMS) and SendGrid (email) integrations. | Layer         | Technology                             | Usage                                     |
+|---------------|----------------------------------------|-------------------------------------------|
+| **Backend**   | C# (.NET)                              | REST API, domain logic, persistence       |
+| **Frontend**  | TypeScript (Angular)                   | Single-page application, user interface   |
+| **UI Toolkit**| Storybook                              | Component documentation and development   |
+| **Database**  | SQL Server (via Entity Framework Core) | Relational storage for HOA data           |
+| **Testing**   | xUnit (C#), Jasmine/Karma (Angular)    | Unit and integration tests                |
+| **Infrastructure** | Docker, shell scripts             | Containerisation, CI/CD pipeline          |
+| **External**  | Twilio, SendGrid                       | SMS and email notification delivery       |
 
 
 
-| Entry Point                                 | Role                                                                 |
-|---------------------------------------------|----------------------------------------------------------------------|
-| HOAManagementCompany/Program.cs           | ASP.NET Core host bootstrap; configures DI, middleware, and endpoints |
-| neko-hoa/src/main.ts                      | Angular application bootstrap (root module & platform browser)       |
-| neko-hoa/src/app/core/models/index.ts     | Core domain model barrel file (shared interfaces, DTOs, enums)       |
-| neko-hoa/.storybook/main.ts               | Storybook configuration for isolated UI component development        |
-
-
-
-The repository is organised as a monorepo with two main packages:
-
-
-A **clean architecture** solution split into:
-
-- **Domain** – Entities (AddressHistory, Violation, etc.), Enums (ViolationCategory), and domain services. No external dependencies.
+- HOAManagementCompany/Program.cs — .NET backend application bootstrap and API configuration. - neko-hoa/src/main.ts — Angular frontend bootstrap and module initialisation. - neko-hoa/src/app/core/models/index.ts — Frontend data model definitions (shared domain objects).
 ### Key Modules
 | Module | Purpose | Owner |
 |--------|---------|-------|
@@ -110,13 +96,13 @@ A **clean architecture** solution split into:
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
 | `neko-hoa/package-lock.json` | 100.0th %ile | 4 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.7th %ile | 4 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.8th %ile | 4 | Nicholas |
 | `neko-hoa/src/app/features/payments/recurring/recurring.component.ts` | 99.5th %ile | 4 | Nicholas |
-| `neko-hoa/src/app/features/payments/one-time/one-time.component.ts` | 99.2th %ile | 3 | Nicholas |
+| `neko-hoa/src/app/features/payments/one-time/one-time.component.ts` | 99.3th %ile | 3 | Nicholas |
 | `neko-hoa/src/app/core/services/payments.service.ts` | 99.0th %ile | 4 | Nicholas |
 
 ## Code health
-Hotspot health: 9.4/10 (stable) ·
+Hotspot health: 9.41/10 (stable) ·
 Average: 9.52/10 ·
 Worst: 7.74/10 (`HOAManagementCompany/Features/Payments/Ledger/LedgerService.cs`)
 
