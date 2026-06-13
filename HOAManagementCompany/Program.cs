@@ -6,6 +6,9 @@
 // metrics → OTLP, scrubbing, sampling). Telemetry-init is guarded as non-fatal (FR-008).
 // All strongly-typed options groups are bound via AddValidatedOptions(...).ValidateOnStart(),
 // so invalid configuration fails the host at startup with a clear error (008-config-validation).
+// Startup behavior (apply-migrations / seed / Swagger) and CORS allowed-origins are
+// configuration-driven via StartupOptions and Cors:AllowedOrigins (009-dev-auto-deploy), so a
+// deployed `Dev` service migrates+seeds and exposes Swagger while Production stays locked down.
 // <!-- REPOWISE:END -->
 
 using System.Security.Claims;
@@ -36,6 +39,12 @@ using Serilog.Events;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: true);
+
+// ── Startup behavior (config-driven; replaces hardcoded IsDevelopment() gating) ──────────────
+// Drives migrations/seed/Swagger from the "Startup" section so a deployed `Dev` service behaves
+// correctly without running as `Development` (which would leak dev error pages and localhost CORS).
+// Defaults preserve existing local Development behavior. See StartupOptions (009-dev-auto-deploy).
+var startupOptions = StartupOptions.Resolve(builder.Configuration, builder.Environment);
 
 // ── Serilog ────────────────────────────────────────────────────────────────
 // 3-arg form so DI-registered ILogEventSink/ILogEventEnricher (e.g. the integration
@@ -217,11 +226,18 @@ builder.Services.AddRateLimiter(o =>
 });
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-// Explicit header list covers: JWT bearer, content negotiation, W3C trace context
-// (traceparent/tracestate/baggage), and the non-safelisted Content-Type values
-// (application/x-protobuf) used by the browser telemetry proxy (FR-028).
+// Origins are configuration-driven via Cors:AllowedOrigins so each environment sets its own
+// (Dev → the Cloudflare Pages Dev origin); local Development falls back to localhost when unset
+// (009-dev-auto-deploy). The explicit header list covers: JWT bearer, content negotiation, W3C
+// trace context (traceparent/tracestate/baggage), and the non-safelisted Content-Type values
+// (application/x-protobuf) used by the browser telemetry proxy (FR-028). AllowAnyHeader/
+// AllowAnyMethod are intentionally NOT used (SonarCloud S5122).
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+if (corsOrigins is null || corsOrigins.Length == 0)
+    corsOrigins = ["http://localhost:4200", "https://localhost:4200"];
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins("http://localhost:4200", "https://localhost:4200")
+    p.WithOrigins(corsOrigins)
      .WithHeaders(
          "Authorization", "Content-Type", "Accept",
          "traceparent", "tracestate", "baggage")
@@ -240,7 +256,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient(); // used by the browser telemetry proxy forward (FR-029)
 builder.Services.AddFastEndpoints();
 
-if (builder.Environment.IsDevelopment())
+if (startupOptions.EnableSwagger)
     builder.Services.SwaggerDocument(o => o.DocumentSettings = s =>
     {
         s.Title = "NekoHOA API";
@@ -299,9 +315,9 @@ var app = builder.Build();
 // ── --seed CLI flag (T068 amendment) ──────────────────────────────────────
 if (args.Contains("--seed"))
 {
-    if (!app.Environment.IsDevelopment())
+    if (!StartupOptions.IsDevLike(app.Environment))
     {
-        await Console.Error.WriteLineAsync("ERROR: Seeder is restricted to the Development environment.");
+        await Console.Error.WriteLineAsync("ERROR: Seeder is restricted to the Development and Dev environments.");
         return 1;
     }
     await using var scope = app.Services.CreateAsyncScope();
@@ -341,23 +357,32 @@ app.UseFastEndpoints(c =>
     };
 });
 
-if (app.Environment.IsDevelopment())
-{
+if (startupOptions.EnableSwagger)
     app.UseSwaggerGen();
 
-    await using (var scope = app.Services.CreateAsyncScope())
+// Apply migrations and/or seed at startup, driven by config (009-dev-auto-deploy). SeedAsync runs
+// MigrateAsync first and is idempotent (skips inserts when the seed user already exists), so a
+// fresh database (local `docker-compose up` or a cold Dev deploy) becomes a ready-to-use,
+// login-able environment without a manual --seed step. The migrations-only branch covers
+// environments that want the schema applied without synthetic seed data.
+if (startupOptions.SeedData || startupOptions.ApplyMigrations)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+
+    if (startupOptions.SeedData)
     {
-        // Apply migrations + seed dev data on every startup. SeedAsync runs
-        // MigrateAsync first and is idempotent (skips inserts when the seed user
-        // already exists), so a fresh `docker-compose up` yields a ready-to-use,
-        // login-able database without a manual --seed step.
         var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
         await seeder.SeedAsync();
 
-        // Refresh document PDFs in object storage on every startup — the minio
-        // volume can be reset independently of the database.
+        // Refresh document PDFs in object storage on every startup — the bucket can be reset
+        // independently of the database, and SeedAsync skips this on the already-seeded path.
         var storageInit = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DocumentStorageInitializer>();
         await storageInit.EnsureValidPdfsAsync();
+    }
+    else
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.MigrateAsync();
     }
 }
 

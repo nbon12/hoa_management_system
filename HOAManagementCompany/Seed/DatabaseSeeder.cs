@@ -5,7 +5,7 @@ namespace HOAManagementCompany.Seed;
 
 /// <summary>
 /// Orchestrates all sub-seeders in dependency order. Idempotent — checks for resident@nekohoa.dev before inserting.
-/// Restricted to Development environment (enforced in Program.cs).
+/// Restricted to the Development and Dev environments (enforced in Program.cs).
 /// </summary>
 public class DatabaseSeeder(
     ApplicationDbContext db,

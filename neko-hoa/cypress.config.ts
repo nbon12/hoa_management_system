@@ -5,7 +5,10 @@ import { defineConfig } from 'cypress';
 // live API or real card iframe (in-iframe entry is deferred to the Playwright suite — Split 5/T093).
 export default defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:4200',
+    // baseUrl is overridable via the CYPRESS_BASE_URL env var so the same suite can run against a
+    // local `ng serve` (CI happy-path) or the deployed Dev preview URL as the promotion gate
+    // (009-dev-auto-deploy / `npm run e2e:dev`). Cypress also honors CYPRESS_BASE_URL natively.
+    baseUrl: process.env['CYPRESS_BASE_URL'] || 'http://localhost:4200',
     specPattern: 'cypress/e2e/**/*.cy.ts',
     supportFile: false,
     fixturesFolder: false,
