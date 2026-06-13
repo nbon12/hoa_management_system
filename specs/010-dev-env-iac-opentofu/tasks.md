@@ -151,7 +151,7 @@ touching `modules/environment`.
 > "all configuration MUST be validated at startup" rule. Small companion change to the app (008 style);
 > if delivered separately to keep this PR infra-only, track it as a linked follow-up.
 
-- [ ] T039 [P] Add a **FluentValidation** startup validator asserting `ASPNETCORE_ENVIRONMENT` (host environment name) is in the known set (`Development`, `Dev`, `Staging`, `Production`) so the backend **fails fast** on a mis-set value, following the existing pattern in `HOAManagementCompany/Infrastructure/Configuration/*OptionsValidator.cs` + `OptionsValidationExtensions.cs`; add an xUnit test proving startup fails on an invalid value (constitution §8)
+- [ ] T039 [P] Add a **FluentValidation** startup validator asserting `ASPNETCORE_ENVIRONMENT` (host environment name) is in the known set — `Development` (local), `Dev` (deployed dev), `Test`, `Staging`, `Production` (matching the existing `appsettings.{Development,Dev,Test}.json` + Staging/Prod) — so the backend **fails fast** on a mis-set value (e.g. `prod`, or deployed-`Dev` vs local-`Development` confusion), following the existing pattern in `HOAManagementCompany/Infrastructure/Configuration/*OptionsValidator.cs` + `OptionsValidationExtensions.cs`; add an xUnit test proving startup fails on an invalid value (constitution §8)
 - [ ] T040 [P] Confirm the Angular **boot-time config guard** (008 style) fails loudly when its required environment configuration (e.g. `apiBaseUrl` for the Dev origin) is missing/invalid; extend it if the Dev environment introduces any newly-required value (constitution §8)
 
 ---

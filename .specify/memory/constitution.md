@@ -229,8 +229,9 @@ The UI MUST function and render correctly at:
   (bound-and-validated at startup); the service MUST **fail fast** — refuse to start — on invalid
   or missing configuration rather than deferring failures to request time. Validation rules MUST be
   **environment-aware**, and MUST include validating the runtime environment name
-  (`ASPNETCORE_ENVIRONMENT`) against the known set (e.g. `Development`, `Dev`, `Staging`,
-  `Production`) so a mis-set environment (such as `prod` instead of `Production`) is rejected at boot.
+  (`ASPNETCORE_ENVIRONMENT`) against the known set (`Development` = local machine, `Dev` = deployed
+  dev, `Test`, `Staging`, `Production`) so a mis-set environment (such as `prod` instead of
+  `Production`, or the deployed-`Dev`-vs-local-`Development` confusion) is rejected at boot.
   The **frontend** MUST apply the equivalent boot-time guard for its required configuration, failing
   loudly (refusing to boot / surfacing a clear error) when required values are missing or invalid.
   New configuration of any kind MUST ship with its validator.
