@@ -5,6 +5,12 @@
 **Status**: Draft  
 **Input**: User description: "Add startup configuration validation to the .NET backend, test project, and Angular frontend — strongly-typed options classes are bound without validation; misconfiguration surfaces late (mid-request, deferred throws, or null reference) instead of failing fast. Validate all options at startup using FluentValidation (already a dependency) so the application refuses to start when configured incorrectly, with environment-aware rules. Add tests proving the app fails to start on invalid config, and add a frontend boot-time guard that fails loudly on missing required values."
 
+## Clarifications
+
+### Session 2026-06-13
+
+- Q: Should configuration validation be environment-aware (secrets required only in Production), or strict in all environments? → A: Strict in all environments — there is no environment-conditional relaxation. Every option group, including secret *presence*, is validated identically in Development, Test, and Production. Local and CI environments satisfy secret-presence checks with non-functional placeholder values (injected by the test fixture / committed to dev config), never real credentials.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Backend refuses to start on invalid configuration (Priority: P1)
@@ -28,9 +34,9 @@ configuration and confirm it starts normally.
 
 **Acceptance Scenarios**:
 
-1. **Given** a Production environment with the payment secret key or webhook signing
-   secret unset, **When** the application starts, **Then** startup fails with an error
-   identifying the missing payment configuration field.
+1. **Given** any environment with the payment secret key or webhook signing secret unset
+   (no placeholder provided), **When** the application starts, **Then** startup fails with
+   an error identifying the missing payment configuration field.
 2. **Given** a payments fee policy configured as a percentage fee with an "all cards"
    scope, **When** the application starts, **Then** startup fails with an error stating
    that percentage fees must be scoped to credit cards only.
@@ -48,34 +54,38 @@ configuration and confirm it starts normally.
 
 ---
 
-### User Story 2 - Environment-aware rules keep local and CI workflows frictionless (Priority: P1)
+### User Story 2 - Local and CI workflows stay frictionless without real credentials (Priority: P1)
 
 A developer runs the backend locally or in CI without real third-party credentials. The
-test suite uses in-memory fakes for the payment provider and other integrations. The
-validation rules must require production secrets only where they are genuinely needed
-(Production), while allowing Development and Test environments to start without them, so
-local development and CI remain fast and do not demand live credentials.
+test suite uses in-memory fakes for the payment provider and other integrations.
+Validation is strict in every environment — there is no environment-conditional
+relaxation — so to satisfy secret-presence checks the local and CI configurations supply
+non-functional **placeholder** values (the test fixture injects them; dev config commits
+throwaway values). The app boots normally because presence is satisfied, and no real
+credentials are ever required or committed.
 
-**Why this priority**: Equally critical to P1 — validation that is too strict would break
-every local run and the CI pipeline, which relies on fake gateways and absent secrets.
-Getting the environment-awareness right is what makes strict production validation
-adoptable.
+**Why this priority**: Equally critical to P1 — strict validation in every environment is
+only adoptable if local runs and the CI pipeline (which rely on fake gateways) can satisfy
+it without live credentials. Uniform rules plus placeholder values keep development and CI
+fast while still catching a genuinely missing secret.
 
-**Independent Test**: Boot the backend in the Development and Test environments with
-secrets absent and confirm it starts; boot the same configuration in Production and
-confirm it refuses to start until the secrets are supplied.
+**Independent Test**: Boot the backend in Development and Test with placeholder secret
+values and confirm it starts; remove a required secret entirely (no placeholder) and
+confirm it refuses to start in that same environment.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Development environment with payment and other provider secrets unset,
-   **When** the application starts, **Then** it starts successfully.
-2. **Given** the Test environment used by the automated test suite, **When** the test
-   host starts, **Then** it starts successfully without real provider credentials.
-3. **Given** the Production environment with required secrets unset, **When** the
-   application starts, **Then** it refuses to start and names the missing secrets.
+1. **Given** the Development environment with placeholder secret values supplied, **When**
+   the application starts, **Then** it starts successfully.
+2. **Given** the Test environment whose fixture injects placeholder secret values, **When**
+   the test host starts, **Then** it starts successfully without any real provider
+   credentials.
+3. **Given** any environment with a required secret entirely unset (no placeholder),
+   **When** the application starts, **Then** it refuses to start and names the missing
+   secret.
 4. **Given** any environment, **When** a structural rule is violated (e.g. an out-of-range
-   numeric value or contradictory fee policy), **Then** startup fails regardless of
-   environment, because such rules are not secret-dependent.
+   numeric value or contradictory fee policy), **Then** startup fails — validation rules
+   are identical across all environments.
 
 ---
 
@@ -151,9 +161,9 @@ the app boots normally.
   identifier present with no usable authentication pairing).
 - **Boundary values**: Sample ratios of exactly 0 and exactly 1 MUST be accepted; values
   just outside (e.g. -0.01, 1.01) MUST be rejected.
-- **Environment detection ambiguity**: If the running environment cannot be determined,
-  the system MUST default to the stricter (Production-like) ruleset rather than the
-  permissive one.
+- **Placeholder vs. missing secret**: A non-empty placeholder value satisfies a
+  secret-presence check (validation enforces presence, not authenticity); a secret that is
+  entirely unset or whitespace-only MUST be rejected in every environment.
 
 ## Requirements *(mandatory)*
 
@@ -165,11 +175,13 @@ the app boots normally.
   configuration section and field(s) that failed and the reason for each failure.
 - **FR-003**: When multiple configuration values are invalid, the startup error MUST
   aggregate and report all detected failures rather than only the first.
-- **FR-004**: Validation MUST be environment-aware: values that are secrets or
-  deployment-only (e.g. payment secret key, webhook signing secret, scheduler shared
-  secret) MUST be required in Production but MAY be absent in Development and Test.
-- **FR-005**: Structural and business-rule validation that is not secret-dependent MUST be
-  enforced in every environment (Development, Test, and Production).
+- **FR-004**: Validation MUST apply uniformly across all environments (Development, Test,
+  Production) with no environment-conditional relaxation. Required secrets (e.g. payment
+  secret key, webhook signing secret, scheduler shared secret) MUST be present (non-empty)
+  in every environment; presence is validated, not authenticity, so a placeholder value
+  satisfies the check.
+- **FR-005**: All validation — structural, business-rule, and secret-presence — MUST be
+  enforced identically in every environment (Development, Test, and Production).
 - **FR-006**: The payments fee policy MUST be validated such that: fee type is one of the
   supported values ("Flat" or "Percentage"); card scope is one of the supported values
   ("AllCards" or "CreditOnly"); a percentage fee MUST be scoped to credit cards only; all
@@ -194,13 +206,13 @@ the app boots normally.
   rather than during a request.
 - **FR-014**: The automated test suite MUST include tests that boot a host with invalid
   configuration and assert that startup is rejected, covering at minimum: an out-of-range
-  sample ratio, a missing required secret in a Production-like environment, and a
-  contradictory fee policy.
+  sample ratio, a required secret left entirely unset (no placeholder), and a contradictory
+  fee policy.
 - **FR-015**: The automated test suite MUST include focused tests for each configuration
   validator covering both passing and failing inputs.
-- **FR-016**: The automated test suite MUST include a test confirming that a valid
-  configuration for the Test environment starts successfully (guarding against
-  over-strict validation breaking CI).
+- **FR-016**: The automated test suite MUST include a test confirming that a valid Test
+  configuration — using placeholder secret values to satisfy presence checks — starts
+  successfully (guarding against validation breaking CI).
 - **FR-017**: The frontend MUST validate required configuration values during application
   startup and surface a clear, visible failure when a required value (at minimum the
   payment publishable key and the API base URL) is missing in a production build.
@@ -219,9 +231,10 @@ the app boots normally.
   group — required-ness (possibly environment-dependent), allowed value sets, numeric
   ranges, format checks (e.g. absolute URL), and cross-field rules (e.g. percentage fee
   implies credit-only scope).
-- **Runtime environment**: The active deployment context (Development, Test, Production)
-  that determines which secret-dependent rules apply; an undeterminable environment
-  defaults to the strict ruleset.
+- **Runtime environment**: The active deployment context (Development, Test, Production).
+  It does not change which validation rules apply — rules are uniform across environments —
+  but it does select which configuration source supplies values (e.g. dev config /
+  test-fixture placeholders vs. real deployed secrets).
 - **Frontend runtime configuration**: The set of values the single-page application needs
   at startup (e.g. API base URL, payment publishable key, telemetry endpoint) whose
   required members are checked during boot.
@@ -271,9 +284,9 @@ the app boots normally.
 - **SC-002**: A deployment with any single invalid required configuration value fails to
   start in 100% of cases, with an error message that names the offending section and
   field.
-- **SC-003**: Local Development and CI/Test runs continue to start successfully without any
-  real third-party credentials in 100% of cases (no regression to developer or pipeline
-  workflows).
+- **SC-003**: Local Development and CI/Test runs continue to start successfully using only
+  placeholder secret values (no real third-party credentials) in 100% of cases (no
+  regression to developer or pipeline workflows).
 - **SC-004**: Every configuration rule described in this specification is covered by at
   least one automated test asserting both a passing and a failing case.
 - **SC-005**: For a misconfiguration, the time from "bad config deployed" to "operator sees
@@ -285,9 +298,10 @@ the app boots normally.
 
 ## Assumptions
 
-- The existing environment names Development, Test, and Production are the relevant
-  contexts for environment-aware rules; Test is treated as permissive (no real secrets
-  required) to keep the existing fake-gateway CI path working.
+- Validation rules are uniform across all environments (no environment-conditional
+  relaxation); local and CI environments satisfy secret-presence checks with
+  non-functional placeholder values (committed dev config / test-fixture injection), never
+  real credentials. This keeps the existing fake-gateway CI path working.
 - Alerting providers (SMS and email) are intentionally optional and are expected to be
   disabled when their configuration is absent; validation only hardens against
   partially-configured providers.
