@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-dotnet-api-backend`  
 **Created**: 2026-05-24  
-**Status**: Draft  
+**Status**: Implemented  
 **Input**: User description: "implement a .NET backend that fulfils this openapi.yaml contract. Also add test data seeder that seeds the local dev environment with test users, with test usernames and passwords, test violations, test payment history, etc."
 
 ## Clarifications
@@ -67,19 +67,19 @@ A resident views their account ledger to review charges and payments, optionally
 
 **Why this priority**: Payments represent the most financially sensitive and frequently used resident workflow. Residents need accurate ledger visibility and the ability to pay without contacting management.
 
-**Independent Test**: Can be fully tested independently for each sub-flow: ledger retrieval with filters, one-time ACH payment submission, one-time card payment submission, recurring payment setup, and recurring payment cancellation.
+**Independent Test**: Can be fully tested independently for each sub-flow: ledger retrieval with filters, one-time payment via Stripe Payment Element (card and ACH), recurring payment setup via Stripe SetupIntent, and recurring payment cancellation.
 
 **Acceptance Scenarios**:
 
-1. **Given** an authenticated resident, **When** `GET /payments/ledger` is called without filters, **Then** the response returns paginated ledger entries with `data`, `total`, `page`, `pageSize`, and `currentBalance`.
+1. **Given** an authenticated resident, **When** `GET /payments/ledger` is called without filters, **Then** the response returns paginated ledger entries with `Items`, `TotalCount`, `Page`, `PageSize`, and `TotalPages`; each entry carries a `runningBalance` field reflecting the ledger balance through that entry.
 2. **Given** a `startDate` and `endDate` query parameter, **When** `GET /payments/ledger` is called, **Then** only entries within that date range are returned.
 3. **Given** a `type` query parameter of `Payment`, **When** `GET /payments/ledger` is called, **Then** only payment-type entries are returned.
-4. **Given** a valid ACH payment body (`method: ach`, `routingNumber`, `accountNumber`, `accountType`), **When** `POST /payments/one-time` is called, **Then** the system returns HTTP 200 with a `confirmationNumber`, `amount`, and `date`.
-5. **Given** a valid card payment body (`method: card`, `cardNumber`, `cardExpiry`, `cardCvv`, `cardholderName`, `billingZip`), **When** `POST /payments/one-time` is called, **Then** the system returns HTTP 200 and a processing fee of $1.95 is added server-side.
-6. **Given** an invalid payment body (missing required field), **When** `POST /payments/one-time` is called, **Then** the system returns HTTP 422 with field-level validation errors.
-7. **Given** a valid upsert body, **When** `PUT /payments/recurring` is called, **Then** the system returns HTTP 200 with the updated recurring payment configuration.
+4. **Given** a resident with an outstanding balance, **When** `POST /payments/intent` is called with a gross amount and method (`card` or `ach`), **Then** the system creates a Stripe PaymentIntent with server-authoritative gross/fee split in metadata and returns a `paymentIntentId`, `clientSecret`, `amount`, `fee`, and `total` for the Stripe Payment Element.
+5. **Given** a PaymentIntent confirmed by the Stripe Payment Element, **When** `POST /payments/one-time/confirm` is called with the `paymentIntentId`, **Then** the system records an immutable `PaymentTransaction`; for card it writes the ledger entry and issues a receipt immediately (Succeeded); for ACH the transaction is Pending and the ledger entry is deferred until the settlement webhook.
+6. **Given** an invalid body (e.g. missing amount or unsupported method), **When** `POST /payments/intent` is called, **Then** the system returns HTTP 422 with field-level validation errors.
+7. **Given** a valid upsert body including a confirmed `setupIntentId` and `mandateAccepted: true`, **When** `PUT /payments/recurring` is called, **Then** the system returns HTTP 200 with the updated recurring payment configuration and masked vaulted method.
 8. **Given** an active recurring payment, **When** `DELETE /payments/recurring` is called, **Then** the system returns HTTP 204 and the recurring payment status becomes `inactive` (record is retained).
-9. **Given** an authenticated resident, **When** `GET /payments/drafts` is called, **Then** up to 12 months of draft history (paid, scheduled, failed) is returned.
+9. **Given** an authenticated resident, **When** `GET /payments/drafts` is called, **Then** up to 12 months of draft history (paid, scheduled, failed) is returned using limit/offset pagination.
 
 ---
 
@@ -161,9 +161,10 @@ A developer clones the repository, starts the local environment, and runs a sing
 ### Edge Cases
 
 - What happens when a JWT is structurally valid but expired? The system must return HTTP 401 with `UNAUTHORIZED`.
-- What happens when `amount` is 0 or negative in a one-time payment? The system must return HTTP 422.
-- What happens when `method: ach` is submitted but `routingNumber` is missing? The system must return HTTP 422 with a field-level validation error.
-- What happens when `method: card` is submitted but `cardNumber` is missing? The system must return HTTP 422 with a field-level validation error.
+- What happens when `amount` is 0 or negative in `POST /payments/intent`? The system must return HTTP 422.
+- What happens when `method` is missing or invalid in `POST /payments/intent`? The system must return HTTP 422 with a field-level validation error.
+- What happens when `paymentIntentId` is missing in `POST /payments/one-time/confirm`? The system must return HTTP 422.
+- What happens when `setupIntentId` is missing or `mandateAccepted` is false in a recurring payment upsert? The system must return HTTP 422.
 - What happens when `fixedAmount` is null but `amountType: fixed` is set in a recurring payment upsert? The system must return HTTP 422.
 - What happens when `draftDay` exceeds 28 in a recurring payment upsert? The system must return HTTP 422.
 - What happens when `page` is 0 or negative in a paginated endpoint? The system must return HTTP 422.
@@ -193,21 +194,23 @@ A developer clones the repository, starts the local environment, and runs a sing
 **Payments — Ledger**
 - **FR-009**: The system MUST return paginated ledger entries (charges and payments) sorted by date descending.
 - **FR-010**: The system MUST support optional filtering of ledger entries by `startDate`, `endDate`, `type`, and full-text `search` across description and document number.
-- **FR-011**: The ledger response MUST include `currentBalance` reflecting the running balance as of the last entry.
+- **FR-011**: Each ledger entry in the response MUST include a `runningBalance` field reflecting the cumulative balance through that entry; the balance as of the most recent entry is therefore available as the `runningBalance` of the first item in a date-descending page.
 - **FR-012**: The ledger response MUST support pagination via `page` (min 1) and `pageSize` (min 1, max 200, default 50).
 
 **Payments — One-Time**
-- **FR-013**: The system MUST accept a one-time payment via ACH, requiring `routingNumber` (9 digits), `accountNumber`, and `accountType` (`checking` or `savings`).
-- **FR-014**: The system MUST accept a one-time payment via card, requiring `cardNumber`, `cardExpiry` (MM/YY format), `cardCvv`, `cardholderName`, and `billingZip`.
-- **FR-015**: The system MUST add a $1.95 processing fee server-side for card payments (not modifiable by the client).
-- **FR-016**: Successful one-time payments MUST return a `confirmationNumber`, `amount`, and `date`.
+- **FR-013**: The system MUST expose `GET /payments/options` returning payment amount presets (current balance, next assessment, balance + next, credit balance) and the configurable card-fee policy (type, value, scope, surcharging enabled) for the payment screen.
+- **FR-014**: The system MUST expose `POST /payments/intent`: given a gross `amount` and `method` (`card` or `ach`), compute server-authoritative fees, create a Stripe PaymentIntent with the gross/fee split stored in PaymentIntent metadata, and return the `paymentIntentId`, `clientSecret`, `amount`, `fee`, and `total`. No raw card or bank data is accepted at this or any endpoint.
+- **FR-015**: The system MUST expose `POST /payments/one-time/confirm`: given a confirmed `paymentIntentId`, retrieve the intent from Stripe, record an immutable `PaymentTransaction`, and — for card — write the ledger payment entry and issue a receipt immediately (Succeeded); ACH is recorded as Pending and its ledger entry is deferred until the settlement webhook arrives.
+- **FR-016**: Successful one-time payment confirmation MUST return `transactionId`, `status`, `grossAmount`, `feeAmount`, `total`, `maskedMethod`, and (for settled card) a `confirmationNumber` and `receiptId`.
+- **FR-016a**: The system MUST expose `GET /payments/transactions` (paginated, limit/offset) returning the resident's payment history with masked methods and transaction status. The system MUST expose `GET /payments/receipts/{id}` returning a durable receipt for a given transaction.
 
 **Payments — Recurring**
-- **FR-017**: The system MUST return the current recurring payment configuration via `GET /payments/recurring`.
-- **FR-018**: The system MUST create or fully replace the recurring payment configuration via `PUT /payments/recurring`, accepting `amountType` (`assessment`, `balance`, or `fixed`), `method` (`ach` or `card`), `draftDay` (1–28), and relevant bank or card fields.
-- **FR-019**: When `amountType` is `fixed`, the system MUST require a non-null `fixedAmount`.
+- **FR-017**: The system MUST return the current recurring payment configuration (including masked vaulted method and next draft date/amount) via `GET /payments/recurring`.
+- **FR-018**: The system MUST create or fully replace the recurring payment configuration via `PUT /payments/recurring`, accepting `amountType` (`assessment`, `balance`, or `fixed`), `draftDay` (1–28), a confirmed `setupIntentId` (Stripe SetupIntent returned by `POST /payments/recurring/setup-intent`), and `mandateAccepted: true`. No raw bank or card data is accepted; vaulted method details are resolved from Stripe.
+- **FR-018a**: The system MUST expose `POST /payments/recurring/setup-intent` to create (or reuse) the resident's Stripe customer and return a SetupIntent `clientSecret` and `publishableKey` for the hosted Stripe Elements vault flow.
+- **FR-019**: When `amountType` is `fixed`, the system MUST require a non-null, positive `fixedAmount`.
 - **FR-020**: The system MUST cancel the recurring payment (set status to `inactive`) via `DELETE /payments/recurring` while retaining the record for audit history.
-- **FR-021**: The system MUST return up to 12 months of draft history (paid, scheduled, failed) via `GET /payments/drafts`.
+- **FR-021**: The system MUST return draft history (paid, scheduled, failed) via `GET /payments/drafts` using limit/offset pagination; the default window covers up to 12 months.
 
 **Property**
 - **FR-022**: The system MUST return the full property record associated with the authenticated resident's account via `GET /property`.
@@ -260,11 +263,17 @@ A developer clones the repository, starts the local environment, and runs a sing
 - **UserProperty**: Join table linking a `User` to a `Property`. Fields: `userId` (FK → ApplicationUser), `propertyId` (FK → Property), `linkedAt` (timestamp). Enables multi-property ownership.
 - **RefreshToken**: Server-side record of an issued refresh token. Fields: `id`, `userId` (FK → ApplicationUser), `token` (opaque string, hashed at rest), `expiresAt`, `createdAt`, `revokedAt` (nullable). Deleted on logout; rotated on each refresh exchange.
 - **Property**: Represents a single HOA-managed parcel. Contains account number, community association, physical address, lot/section details, assessment schedule, and financial rate configuration.
-- **Owner**: Contact and preference record linked to a property. Includes name(s), email, phone, mailing preference, notification preference flags, and voting rights.
+- **Owner**: Contact and preference record linked to a property. Includes name(s), email, phone, mailing preference, notification preference flags, voting rights, Stripe customer id (`stripeCustomerId`), SMS/email alert opt-in flags (`alertSmsOptIn`, `alertEmailOptIn`, both default OFF), and an E.164 alert phone number (`alertPhone`) used for SMS alert delivery.
 - **AddressHistory**: Immutable log of mailing address changes for a property. Each entry records the event type (created, change), address string, and date.
 - **DirectoryField**: A named field (e.g., phone, email) with a resident-controlled visibility flag (`shared`) determining whether it appears in the community directory.
-- **LedgerEntry**: A financial transaction record (assessment charge, payment, late fee, finance charge) with a date, document number, description, charge/payment amounts, and running balance.
-- **RecurringPayment**: Configuration for a monthly auto-draft. Tracks amount type, method, draft day, bank or card details (masked), processing fee, and active/inactive status.
+- **LedgerEntry**: An append-only accounting record with a date, document number, description, charge/payment amounts, running balance, entry type (RegularAssessment, Payment, LateFee, FinanceCharge, Refund, Reversal, Chargeback, ReturnedPaymentFee, Credit, Adjustment), a monotonic per-property `Sequence` as the authoritative balance-recompute order key, a UTC `CreatedAt` timestamp, an optional GL `FundCode`, and an optional FK to the `PaymentTransaction` that produced it. Entries are never mutated or deleted; corrections use compensating entries.
+- **RecurringPayment**: Configuration for a monthly auto-draft. Tracks amount type (assessment/balance/fixed), fixed amount when applicable, method, draft day, active/inactive status, processing fee, and vaulted payment-method references (Stripe `pm_…` id, display brand, last 4, card funding type). Also carries a FK to the active `PaymentAuthorization` (mandate) record. No raw or self-masked card/bank numbers are stored.
+- **PaymentTransaction**: Immutable audit record for every payment attempt. Carries Stripe PaymentIntent and charge ids, gross amount and fee amount as two distinct fields, total, cumulative refunded amount, currency, status (Pending/Succeeded/Failed/PartiallyRefunded/Refunded/Disputed/DisputeLost/Returned), payment method type, card funding type, failure/return codes, recurring flag, idempotency key, settlement references (Stripe balance-transaction id, processor fee, payout id), and timestamps. Referenced by the ledger entries it produces.
+- **WebhookEventInbox**: Durable record of each verified Stripe webhook event (event id, type, PII-scrubbed payload, processing status: Received/Processed/DeadLettered). Used for idempotent deduplication, retry on downstream failure, and dead-letter on exhausted retries.
+- **OutboxMessage**: Transactional outbox record for alert and receipt dispatch (fire-after-commit, exactly-once delivery). Tracks kind (sms_alert, email_alert, receipt_email, variable_notice), owner id, transaction id, dedup key, payload JSON, status (Pending/Sent/Failed), attempt count, and last error.
+- **PaymentAuthorization**: Immutable mandate record capturing the exact recurring-ACH authorization text and version, acceptance timestamp (UTC), resident IP address, user-agent, and agreed amount/draft-day terms. Retained at least two years after the schedule terminates (NACHA WEB-debit requirement). Includes a Stripe mandate id reference.
+- **AlertConsent**: TCPA proof-of-consent record for SMS/email alert opt-in. Captures channel, action (opt_in/opt_out), consent text/version, source IP, and timestamp. Each opt-in or opt-out appends a new immutable row.
+- **Receipt**: Durable payment receipt linked to a `PaymentTransaction`. Stores masked payment method (brand + last 4), confirmation number, gross amount, fee, total, issue timestamp, and a render model (JSON for PDF/HTML generation). Retrievable in the portal.
 - **DraftEntry**: A historical or scheduled recurring draft event with date, source label, amount, and status (paid, scheduled, failed).
 - **Announcement**: A community communication with a title, body, date, category, pinned flag, like/comment counts, author info, and optional image.
 - **Poll**: A time-limited community question with options, per-option vote percentages, total vote count, and a closing label. Tracks which residents have voted.
@@ -292,7 +301,7 @@ A developer clones the repository, starts the local environment, and runs a sing
 
 ### Measurable Outcomes
 
-- **SC-001**: All 30 endpoints (28 from `openapi.yaml` + `POST /auth/refresh` and `POST /auth/switch-property` added per `contracts/auth-contract-additions.md`) respond correctly for happy-path scenarios as verified by an integration test suite — no manual testing required to confirm contract compliance.
+- **SC-001**: All backend API endpoints respond correctly for happy-path scenarios as verified by an integration test suite — no manual testing required to confirm contract compliance. This includes the original auth/dashboard/property/community endpoints and the additional Stripe payment endpoints (intent, confirm, setup-intent, recurring CRUD, webhooks, alert-preferences, transactions, receipts, statements) introduced by spec 006-stripe-payments.
 - **SC-002**: Authentication round-trip (register → login → /me → logout) completes in under 500ms under normal load conditions.
 - **SC-003**: The dashboard endpoint returns a complete, correctly structured response in under 300ms for a resident with up to 24 months of ledger history.
 - **SC-004**: One-time payment submissions return a confirmation within 2 seconds under normal conditions.
@@ -305,11 +314,11 @@ A developer clones the repository, starts the local environment, and runs a sing
 
 ## Assumptions
 
-- The Angular frontend (`neko-hoa`) currently uses `MockDataService` to simulate all API responses. This backend will replace those mocks with real data, and the frontend's service layer will be updated in a separate task to point to `http://localhost:5000/api/v1`.
+- The Angular frontend (`neko-hoa`) was updated alongside this backend to use real API services (replacing the earlier `MockDataService` stubs). The frontend's service layer calls the API at the configured base URL (e.g., `http://localhost:5000/api/v1` locally).
 - PostgreSQL is the primary data store, consistent with the existing project setup using Entity Framework Core 9 and Npgsql.
 - A user may be linked to multiple properties (via a `UserProperty` join table). The JWT access token carries the active `propertyId` claim. The login response defaults to the user's first property. Switching properties requires calling `POST /auth/switch-property` to obtain a new token pair.
 - A single HOA community (Sakura Heights) is the initial target tenant. Multi-HOA isolation is designed into the data model but not required to be UI-accessible in this phase.
-- Payment processing (ACH and card) is simulated server-side for the initial implementation — no real payment gateway integration is required. The $1.95 card processing fee is enforced by the server regardless of gateway status.
+- Payment processing uses Stripe as the payment processor (see spec 006-stripe-payments for the full Stripe specification). The one-time payment flow uses a two-step Stripe PaymentIntent approach: `POST /payments/intent` creates the intent with server-authoritative fee metadata; the browser confirms it through the hosted Stripe Payment Element; `POST /payments/one-time/confirm` records the result. The recurring flow uses `POST /payments/recurring/setup-intent` to create a SetupIntent for vaulting the payment method, then `PUT /payments/recurring` to save the schedule. Card fees use a configurable model (flat convenience fee or percentage surcharge, scoped to credit-only or all cards, with per-jurisdiction enable/disable); ACH payments carry no processing fee. All fee parameters are configuration-driven per HOA, not hard-coded.
 - Document file storage (pre-signed URLs) uses MinIO locally and Cloudflare R2 in production. MinIO is a required service in `docker-compose.yaml`; the download endpoint always generates real pre-signed URLs against the configured object store. No stub URL fallback exists.
 - ASP.NET Core Identity is used for user account management and password hashing, consistent with existing tooling decisions.
 - JWT access tokens have a default expiry of 15 minutes. A refresh token (opaque, stored in PostgreSQL with an expiry of 30 days) is issued alongside each access token. Clients exchange a valid refresh token for a new access token via `POST /auth/refresh`. Logout deletes the refresh token server-side; the short-lived access token expires naturally.

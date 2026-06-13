@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-dashboard-violations-summary`  
 **Created**: 2025-03-14  
-**Status**: Draft  
+**Status**: Implemented  
 **Input**: User description: "As a homeowner and/or board member (who MAY also be a homeowner) I want to be able to login and see the Dashboard when I login. Upon logging in, I should see four boxes. One of these boxes should show me the count of violations I have, and if I click that number, it should take me to the 'My Violations' page, which shows any violations associated to me."
 
 ## Clarifications
