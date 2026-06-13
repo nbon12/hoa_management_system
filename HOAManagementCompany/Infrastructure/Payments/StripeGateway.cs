@@ -24,7 +24,10 @@ public sealed class StripeGateway : IStripeGateway
         // constructs this singleton at startup even in environments with no configured secret
         // (CI/tests, where the in-memory FakeStripeGateway is used instead). Defer the throw to
         // first real use so a missing key only fails when Stripe is actually called.
-        _client = new Lazy<StripeClient>(() => new StripeClient(_options.SecretKey));
+        // Trim the key: a secret sourced from an env var or secret store can pick up a trailing
+        // newline, and StripeClient rejects any whitespace ("API key cannot contain whitespace").
+        // Stripe keys never legitimately contain surrounding whitespace, so trimming is safe.
+        _client = new Lazy<StripeClient>(() => new StripeClient(_options.SecretKey.Trim()));
     }
 
     private StripeClient Client => _client.Value;
