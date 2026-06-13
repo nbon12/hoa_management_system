@@ -38,7 +38,7 @@ Repo is an HOA management platform: it ingests user commands and configuration t
 | **Backend**   | C# (.NET)                              | REST API, domain logic, persistence       |
 | **Frontend**  | TypeScript (Angular)                   | Single-page application, user interface   |
 | **UI Toolkit**| Storybook                              | Component documentation and development   |
-| **Database**  | SQL Server (via Entity Framework Core) | Relational storage for HOA data           |
+| **Database**  | PostgreSQL via Entity Framework Core 9 (Npgsql); Neon in prod, Testcontainers in CI/local | Relational storage for HOA data           |
 | **Testing**   | xUnit (C#), Jasmine/Karma (Angular)    | Unit and integration tests                |
 | **Infrastructure** | Docker, shell scripts             | Containerisation, CI/CD pipeline          |
 | **External**  | Twilio, SendGrid                       | SMS and email notification delivery       |
