@@ -312,19 +312,10 @@ catch (Exception ex)
 // ═══════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
-// ── --seed CLI flag (T068 amendment) ──────────────────────────────────────
-if (args.Contains("--seed"))
-{
-    if (!StartupOptions.IsDevLike(app.Environment))
-    {
-        await Console.Error.WriteLineAsync("ERROR: Seeder is restricted to the Development and Dev environments.");
-        return 1;
-    }
-    await using var scope = app.Services.CreateAsyncScope();
-    var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
-    await seeder.SeedAsync();
-    return 0;
-}
+// ── --seed CLI flag (T068 amendment) — bootstrap glue lives in StartupTasks (009) ─────────
+var seedExitCode = await StartupTasks.RunSeedCommandAsync(app, args);
+if (seedExitCode is not null)
+    return seedExitCode.Value;
 
 // ── Middleware Pipeline ────────────────────────────────────────────────────
 app.UseExceptionHandler();
@@ -360,31 +351,10 @@ app.UseFastEndpoints(c =>
 if (startupOptions.EnableSwagger)
     app.UseSwaggerGen();
 
-// Apply migrations and/or seed at startup, driven by config (009-dev-auto-deploy). SeedAsync runs
-// MigrateAsync first and is idempotent (skips inserts when the seed user already exists), so a
-// fresh database (local `docker-compose up` or a cold Dev deploy) becomes a ready-to-use,
-// login-able environment without a manual --seed step. The migrations-only branch covers
-// environments that want the schema applied without synthetic seed data.
-if (startupOptions.SeedData || startupOptions.ApplyMigrations)
-{
-    await using var scope = app.Services.CreateAsyncScope();
-
-    if (startupOptions.SeedData)
-    {
-        var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
-        await seeder.SeedAsync();
-
-        // Refresh document PDFs in object storage on every startup — the bucket can be reset
-        // independently of the database, and SeedAsync skips this on the already-seeded path.
-        var storageInit = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DocumentStorageInitializer>();
-        await storageInit.EnsureValidPdfsAsync();
-    }
-    else
-    {
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Database.MigrateAsync();
-    }
-}
+// Apply migrations and/or seed at startup, driven by config (009-dev-auto-deploy). The imperative
+// side-effects live in StartupTasks (excluded from coverage — they need a live database); the
+// decision logic is the config-driven StartupOptions, which is unit-tested.
+await StartupTasks.ApplyStartupDatabaseAsync(app, startupOptions);
 
 app.Run();
 return 0;
