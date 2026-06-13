@@ -19,13 +19,31 @@ Auto-generated from all feature plans. Last updated: 2026-06-13
 ## Project Structure
 
 ```text
-src/
-tests/
+HOAManagementCompany/            # C# / .NET 9.0 backend (REST API, domain, EF Core persistence)
+HOAManagementCompany.Tests/      # xUnit integration + performance tests (Testcontainers.PostgreSQL)
+HOAManagementCompany.sln         # Solution file
+neko-hoa/                        # Angular 17.3 frontend (single-page app, Storybook, Cypress/Playwright e2e)
+specs/                           # Spec Kit feature specs (001-… through 009-…)
+scripts/                         # Build/CI helper scripts
+repowise/                        # Repowise index/config
+wireframes/                      # UI wireframes
 ```
+
+Note: there is no root `package.json`. Frontend npm commands run from `neko-hoa/`.
 
 ## Commands
 
-npm test && npm run lint
+Backend (run from repo root):
+- `dotnet build`
+- `dotnet test`                          # full xUnit suite (HOAManagementCompany.Tests)
+
+Frontend (run from `neko-hoa/`):
+- `npm ci`                               # install deps
+- `npm run test:ci`                      # headless Karma unit tests (CI-safe)
+- `npm run build`                        # production build
+- `npm run e2e:ci`                       # Cypress e2e against a dev server
+
+There is no `lint` npm script; do not run `npm run lint`.
 
 ## Code Style
 
