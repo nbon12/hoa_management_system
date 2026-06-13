@@ -26,7 +26,10 @@ public abstract class PaymentTestBase : IntegrationTestBase
 
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
     [
-        // Dummy Stripe config so options binding/startup never touches the real network adapter.
+        // Dummy Stripe config so options binding/startup never touches the real network adapter
+        // (FakeStripeGateway replaces it). These are non-secret placeholders that the payment
+        // tests assert against directly — e.g. the SetupIntent test expects "pk_test_dummy" and
+        // the job endpoints expect the "test-scheduler-secret" header — so they must stay stable.
         new("Stripe:SecretKey", "sk_test_dummy"),
         new("Stripe:PublishableKey", "pk_test_dummy"),
         new("Stripe:WebhookSigningSecret", "whsec_test_dummy"),

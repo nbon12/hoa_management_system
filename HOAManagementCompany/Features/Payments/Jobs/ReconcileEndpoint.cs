@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Alerts;
 using Microsoft.Extensions.Options;
@@ -25,7 +27,9 @@ public class ReconcileEndpoint(
     {
         var expected = options.Value.SchedulerSharedSecret;
         var provided = HttpContext.Request.Headers["X-Scheduler-Secret"].FirstOrDefault();
-        if (string.IsNullOrEmpty(expected) || !string.Equals(expected, provided, StringComparison.Ordinal))
+        if (string.IsNullOrEmpty(expected) || !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(expected),
+                Encoding.UTF8.GetBytes(provided ?? string.Empty)))
         {
             await SendUnauthorizedAsync(ct);
             return;

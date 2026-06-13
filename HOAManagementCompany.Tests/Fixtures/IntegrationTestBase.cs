@@ -94,14 +94,20 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Serilog:MinimumLevel:Default"] = "Information",
                         // Small telemetry-proxy rate limit so the 429 test is fast/deterministic.
                         ["Observability:TelemetryProxyRateLimitPerMinute"] = "5",
-                        ["Jwt:Secret"] = "test-secret-for-integration-tests-must-be-32-chars!!",
+                        // Jwt:Secret is intentionally NOT overridden here. Program.cs reads it at
+                        // startup (for token validation) BEFORE WebApplicationFactory's in-memory
+                        // config is applied, while AuthService reads it at request time (for signing)
+                        // AFTER. Overriding it here would only change the signing side, so tokens
+                        // would be signed with one key and validated with another → 401. Letting both
+                        // fall back to appsettings.Test.json keeps them in agreement. That file is
+                        // listed in sonar.exclusions, so the test-only secret triggers no S2068.
                         ["Jwt:Issuer"] = "nekohoa-api",
                         ["Jwt:Audience"] = "nekohoa-frontend",
                         ["Jwt:AccessTokenExpiryMinutes"] = "15",
                         ["Jwt:RefreshTokenExpiryDays"] = "30",
                         ["Storage:ServiceUrl"] = fixture.MinioEndpoint,
-                        ["Storage:AccessKey"] = "minioadmin",
-                        ["Storage:SecretKey"] = "minioadmin",
+                        ["Storage:AccessKey"] = fixture.MinioAccessKey,
+                        ["Storage:SecretKey"] = fixture.MinioSecretKey,
                         ["Storage:BucketName"] = "hoa-documents",
                         ["Storage:ForcePathStyle"] = "true",
                         ["Sentry:Dsn"] = ""
@@ -145,7 +151,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                     var s3Descriptors = services.Where(d => d.ServiceType == typeof(IAmazonS3)).ToList();
                     foreach (var d in s3Descriptors) services.Remove(d);
                     services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
-                        new BasicAWSCredentials("minioadmin", "minioadmin"),
+                        new BasicAWSCredentials(fixture.MinioAccessKey, fixture.MinioSecretKey),
                         new AmazonS3Config
                         {
                             ServiceURL = fixture.MinioEndpoint,
@@ -195,7 +201,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
         var endpointUri = new Uri(Fixture.MinioEndpoint);
         var minio = new MinioClient()
             .WithEndpoint($"{endpointUri.Host}:{endpointUri.Port}")
-            .WithCredentials("minioadmin", "minioadmin")
+            .WithCredentials(Fixture.MinioAccessKey, Fixture.MinioSecretKey)
             .WithSSL(endpointUri.Scheme == "https")
             .Build();
 
