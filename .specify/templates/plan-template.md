@@ -56,6 +56,10 @@ Confirm the plan satisfies the active HOA Management Company Constitution:
   xUnit Theories; frontend tests use the constitution-approved tools.
 - **CI/CD and documentation**: Sonar, Codecov, coverage, deployment environment isolation,
   and Repowise-generated documentation updates are accounted for.
+- **Executable & living specs**: Acceptance criteria are backed by runnable, currently-passing
+  tests; the plan keeps `spec.md` truthful (no drift); `spec.md` and `tasks.md` are slated to
+  be updated before the PR; and any contradiction with a former spec is reconciled so the spec
+  corpus stays internally consistent.
 
 ## Project Structure
 

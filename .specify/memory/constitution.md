@@ -1,6 +1,25 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 2.1.0 -> 2.2.0
+Modified principles:
+  Added new section "Executable & Living Specifications" (now section 11) enforcing that
+    every spec.md remains executable at all times (acceptance criteria backed by runnable,
+    currently-passing tests), that specs are living documents kept in sync with reality
+    (drift is a defect to be fixed before merge), that spec.md and tasks.md must be current
+    before a PR is submitted, and that cross-spec contradictions (a new/amended spec whose
+    tests contradict a former spec) MUST be reconciled so the full spec corpus stays
+    internally consistent.
+  Renumbered prior "Governance & Amendments" from section 11 to section 12.
+Templates requiring updates:
+  .specify/templates/tasks-template.md updated (pre-PR spec/tasks freshness + drift task,
+    Polish review item)
+  .specify/templates/plan-template.md updated (Constitution Check: executable/living specs)
+  .specify/templates/spec-template.md updated (Constitution Requirements: executable spec +
+    cross-spec consistency)
+Follow-up TODOs: None
+
+----- prior amendment -----
 Version change: 2.0.0 -> 2.1.0
 Modified principles:
   Operations, Secrets, and Data Lifecycle — added mandatory startup configuration
@@ -39,7 +58,7 @@ Follow-up TODOs: None
 
 # HOA Management Company Constitution
 
-**Version**: 2.1.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-06-13
+**Version**: 2.2.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-06-13
 **Authors**: Project maintainers
 
 ## 1. Project Purpose
@@ -307,7 +326,38 @@ The UI MUST function and render correctly at:
   developers and automated tests can run against a **real PostgreSQL** instance analogous to
   production semantics.
 
-## 11. Governance & Amendments
+## 11. Executable & Living Specifications
+
+Specifications are not documentation that lags behind the code — they are the executable
+contract of the system and MUST stay true at all times.
+
+- **Always executable**: Every feature spec (`spec.md`) MUST remain executable at all times.
+  Each mandatory acceptance scenario and functional requirement MUST be backed by at least
+  one automated test (backend integration/business-process test or frontend
+  unit/component/E2E test) that can be run on demand and that **currently passes** against
+  the merged code. A spec whose acceptance criteria cannot be executed, or whose tests fail,
+  is a defect that MUST be fixed before merge.
+- **No unverified claims**: A spec MUST NOT describe behavior that no executable test
+  verifies. Acceptance scenarios MUST be traceable to tests, and tests MUST be traceable
+  back to acceptance criteria.
+- **Living and truthful**: Specs are living documents and MUST reflect the system as it is
+  actually built. When implemented behavior diverges from a spec, the divergence MUST be
+  resolved before the change merges — either the `spec.md` is updated so it reflects reality,
+  or the code is corrected to match the spec. **Spec drift is a defect**, not an acceptable
+  steady state.
+- **Pre-PR freshness**: Before a pull request is submitted, the feature's `spec.md` and
+  `tasks.md` MUST be brought up to date with the work actually performed. Any spec that has
+  drifted from the code MUST be updated so the spec reflects reality. (The `plan.md` is not
+  required to be updated for this gate.)
+- **Cross-spec consistency**: When a new or amended spec introduces tests or acceptance
+  criteria that **directly contradict** those of a former spec, the contradiction MUST be
+  reconciled before merge. Reconciliation means: update the superseded spec(s) so the full
+  spec corpus is internally consistent, explicitly record which spec prevails and why, and
+  ensure no two specs assert contradictory assertions that would both be expected to pass.
+- **Corpus invariant**: The full body of specs MUST be free of mutually contradictory
+  executable assertions at all times.
+
+## 12. Governance & Amendments
 
 - Changes to this constitution MUST be reviewed and approved like any architectural decision
   record affecting the whole project.
