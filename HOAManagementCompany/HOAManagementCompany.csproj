@@ -12,6 +12,11 @@
     <PackageReference Include="FastEndpoints" Version="5.*" />
     <PackageReference Include="FastEndpoints.Swagger" Version="5.*" />
 
+    <!-- Configuration validation (008-config-validation). Aligned with the FluentValidation
+         version FastEndpoints bundles; referenced explicitly because config validators use
+         AbstractValidator<T>/IValidator<T> directly, outside FastEndpoints' Validator<T>. -->
+    <PackageReference Include="FluentValidation" Version="11.*" />
+
     <!-- Authentication / Identity -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.*" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.*" />
