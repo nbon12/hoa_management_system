@@ -31,6 +31,14 @@ public sealed class SendGridEmailProvider(IOptions<SendGridOptions> options, ILo
                 message.Subject ?? "NekoHOA payment alert",
                 message.Body,
                 message.Body);
+            // <!-- REPOWISE:START domain=payments-alerts -->
+            // Stage 2 (007) no-deliver seam. When Sandbox is on, SendGrid validates the request
+            // (auth + payload — note it does NOT enforce sender verification in sandbox) and returns
+            // 2xx WITHOUT delivering — the only no-deliver guardrail for email (keys have no test/live
+            // form). Default-off: the production path leaves MailSettings unset and delivers as before.
+            if (_options.Sandbox)
+                msg.MailSettings = new MailSettings { SandboxMode = new SandboxMode { Enable = true } };
+            // <!-- REPOWISE:END -->
             var response = await client.SendEmailAsync(msg, ct);
             var code = (int)response.StatusCode;
             return code is >= 200 and < 300

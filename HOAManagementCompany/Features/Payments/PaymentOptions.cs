@@ -79,11 +79,24 @@ public sealed class TwilioOptions
     public string ApiKeySecret { get; set; } = string.Empty;
     public string FromNumber { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Test-credential Auth Token (Stage 2 sandbox, 007). When set and <see cref="ApiKeySid"/> is
+    /// empty, the adapter authenticates with <c>Init(AccountSid, AuthToken)</c> basic auth so Twilio
+    /// honors magic numbers (test mode). Empty in production, where API-key auth is used.
+    /// </summary>
+    public string AuthToken { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Configured when an account + from-number plus a usable auth pair are present. Production uses
+    /// API-key auth (<see cref="ApiKeySid"/> + <see cref="ApiKeySecret"/>); the Stage 2 sandbox uses
+    /// basic auth (<see cref="AuthToken"/>). Either pair satisfies the adapter — mirror its auth
+    /// selection so an Auth-Token-only test credential isn't reported as "not configured".
+    /// </summary>
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(AccountSid)
-        && !string.IsNullOrWhiteSpace(ApiKeySid)
-        && !string.IsNullOrWhiteSpace(ApiKeySecret)
-        && !string.IsNullOrWhiteSpace(FromNumber);
+        && !string.IsNullOrWhiteSpace(FromNumber)
+        && ((!string.IsNullOrWhiteSpace(ApiKeySid) && !string.IsNullOrWhiteSpace(ApiKeySecret))
+            || !string.IsNullOrWhiteSpace(AuthToken));
 }
 
 /// <summary>SendGrid email credentials (US3 alerts / receipts). Disabled when unset.</summary>
@@ -94,6 +107,15 @@ public sealed class SendGridOptions
     public string ApiKey { get; set; } = string.Empty;
     public string FromEmail { get; set; } = string.Empty;
     public string FromName { get; set; } = "NekoHOA";
+
+    /// <summary>
+    /// When true, the adapter sets <c>MailSettings.SandboxMode.Enable=true</c> so SendGrid validates
+    /// the request (auth + payload; sender verification is <b>not</b> enforced in sandbox) and returns
+    /// 2xx <b>without delivering</b> (Stage 2 sandbox, 007).
+    /// SendGrid API keys have no test/live distinction, so this flag is the sole no-deliver guardrail —
+    /// it is <b>false</b> in production. The Stage 2 harness refuses to send unless this is true.
+    /// </summary>
+    public bool Sandbox { get; set; }
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(FromEmail);

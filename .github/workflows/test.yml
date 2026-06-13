@@ -45,7 +45,10 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
+        # Exclude the Stage-2 sandbox tier (007) so PRs and non-main pushes stay hermetic —
+        # no provider secrets, no real Stripe/SendGrid/Twilio calls. The sandbox tier runs
+        # only in the `integration-sandbox` job on push to main.
+        run: dotnet test --no-build --configuration Release --filter "Category!=Sandbox" --collect:"XPlat Code Coverage" --results-directory ./coverage
         env:
           ASPNETCORE_ENVIRONMENT: Test
 
@@ -129,10 +132,45 @@ jobs:
         # happy-path. The Stripe instance is faked at the window.Stripe seam — no live Stripe calls.
         run: npm run e2e:ci
 
+  integration-sandbox:
+    name: Integration (provider sandbox)
+    runs-on: ubuntu-latest
+    needs: test
+    # Stage 2 (007): runs the REAL Stripe/SendGrid/Twilio adapters against each provider's
+    # test/sandbox mode. main-push only (FR-001) so PRs/forks never see provider secrets.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Sandbox integration tests
+        # Only the Sandbox tier. A FAIL = real regression (blocks the release). A SKIP = provider
+        # outage or an unconfigured secret = job stays green (does not block, SC-005). Secrets are
+        # test-scoped and GitHub masks them in logs (FR-006/FR-010).
+        run: dotnet test --filter "Category=Sandbox" --configuration Release
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+          Stripe__SecretKey: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          Stripe__WebhookSigningSecret: ${{ secrets.STRIPE_WEBHOOK_SIGNING_SECRET_TEST }}
+          SendGrid__ApiKey: ${{ secrets.SENDGRID_API_KEY }}
+          SendGrid__FromEmail: ${{ secrets.SENDGRID_FROM_EMAIL }}
+          SendGrid__Sandbox: 'true'
+          Twilio__AccountSid: ${{ secrets.TWILIO_TEST_ACCOUNT_SID }}
+          Twilio__AuthToken: ${{ secrets.TWILIO_TEST_AUTH_TOKEN }}
+          Twilio__FromNumber: '+15005550006'
+          TWILIO_TEST_CREDENTIALS: 'true'
+
   docker-push:
     name: Push Docker Image
     runs-on: ubuntu-latest
-    needs: test
+    # FR-003: a broken provider integration must not ship. A sandbox FAILURE blocks the image;
+    # a SKIP (outage/unconfigured) leaves integration-sandbox green, so deploy still proceeds.
+    needs: [test, integration-sandbox]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:

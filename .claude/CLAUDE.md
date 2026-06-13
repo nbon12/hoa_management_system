@@ -31,17 +31,35 @@ If Repowise MCP is unavailable, say so and fall back to built-in search.
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-06-06 (commit 8f47b5c). Confidence: 100%.
+Last indexed: 2026-06-07 (commit b5287d0). Confidence: 100%.
 ### Architecture
-This repository is a full-stack Homeowners Association (HOA) management system: it ingests user actions through a single-page web application and REST API, processes those requests through a layered C# ASP.NET Core backend built with domain-driven design and feature folders, and produces administrative workflows for property registration, violation tracking, community announcements, and membership management, delivered as an Angular frontend and backed by a relational database. | Tier            | Technology                                | Notes                                       |
-|-----------------|-------------------------------------------|---------------------------------------------|
-| **Backend**     | C#, ASP.NET Core 8 (Minimal APIs), Entity Framework Core, SQL Server | Hosted in HOAManagementCompany/           |
-| **Frontend**    | TypeScript, Angular (with standalone components), RxJS, SCSS | Packaged as neko-hoa                      |
-| **Testing**     | xUnit, IntegrationTestBase, TestDataSeeder | In HOAManagementCompany.Tests/            |
-| **Infrastructure** | Docker, Docker Compose                 | Dockerfile and docker-compose           |
-| **CI/CD**       | GitHub Actions / Shell scripts            | shell and yaml files present            |
+Neho HOA is a full-stack Homeowners Association management platform: it ingests community member, property, violation, and payment data through a RESTful API built with ASP.NET Core (C#), processes domain logic and persistence via Entity Framework Core in a clean-architecture pipeline, and serves a feature-rich Angular web application (TypeScript) for board members and residents to manage accounts, schedule recurring payments, log violations, and view community history. The system outputs a responsive admin dashboard, a Stripe-powered payment flow, and an API surface consumable by mobile apps or third-party integrations. | Layer       | Technology                                      |
+|-------------|-------------------------------------------------|
+| Backend     | C# 12, ASP.NET Core 8, Entity Framework Core, MediatR, FluentValidation |
+| Frontend    | Angular 18, TypeScript 5, RxJS, NgRx (optional), Angular Material |
+| Testing     | xUnit (backend), Jasmine/Karma (frontend), Storybook (component library) |
+| Database    | SQL Server (development), SQLite (tests)        |
+| Payments    | Stripe SDK, Stripe Webhooks                     |
+| DevOps      | Docker, Docker Compose, GitHub Actions          |
+| Tooling     | .NET CLI, Angular CLI, Yarn, Husky              |
 
-Additional libraries: MediatR (implied by feature/folder structure), FluentValidation (common in ASP.NET projects), and standard Angular tooling. **HOAManagementCompany/Program.cs** – The ASP.NET Core startup file. Registers services, configures middleware (authentication, CORS, OpenAPI), maps minimal API endpoints (e.g., /register, /violations, /community), and builds the host.
+
+
+| Entry Point                                 | Role                                                                 |
+|---------------------------------------------|----------------------------------------------------------------------|
+| HOAManagementCompany/Program.cs           | ASP.NET Core host bootstrap; configures DI, middleware, and endpoints |
+| neko-hoa/src/main.ts                      | Angular application bootstrap (root module & platform browser)       |
+| neko-hoa/src/app/core/models/index.ts     | Core domain model barrel file (shared interfaces, DTOs, enums)       |
+| neko-hoa/.storybook/main.ts               | Storybook configuration for isolated UI component development        |
+
+
+
+The repository is organised as a monorepo with two main packages:
+
+
+A **clean architecture** solution split into:
+
+- **Domain** – Entities (AddressHistory, Violation, etc.), Enums (ViolationCategory), and domain services. No external dependencies.
 ### Key Modules
 | Module | Purpose | Owner |
 |--------|---------|-------|
@@ -50,17 +68,18 @@ Additional libraries: MediatR (implied by feature/folder structure), FluentValid
 | `HOAManagementCompany.Tests` | HOAManagementCompany.Tests is the integration and performance test suite for the | — |
 | `.github` | > **Maintainer:** Nicholas Bonilla · **Language:** Python · **Symbols:** 15 publ | — |
 | `HOAManagementCompany` | HOAManagementCompany is the primary backend application for a Homeowners Associa | — |
-| `community-1` | The hoamanagementcompany/features module is the **application-layer entry point* | — |
+| `community-1` | The neko-hoa/features module is the **payment UI subsystem** of the neko-hoa app | — |
 | `community-63` | The hoamanagementcompany.tests/integration module is the **system-level verifica | — |
-| `community-0` | The neko-hoa/features module is the **presentation and orchestration layer** of  | — |
-| `community-3` | The hoamanagementcompany module is the domain and application layer of an HOA (H | — |
+| `community-0` | The hoamanagementcompany/features module is the **payment orchestration and aler | — |
+| `community-3` | The features module is the presentation layer of neko-hoa’s payment subsystem —  | — |
 | `community-2` | The features module is the **entry-point and orchestration layer** of the neko-h | — |
 ### Entry Points
 - `neko-hoa/src/app/core/models/index.ts`
+- `neko-hoa-mock/models/index.ts`
 - `HOAManagementCompany/Program.cs`
+- `neko-hoa/.storybook/main.ts`
 - `neko-hoa/scripts/generate-build-id.mjs`
 - `neko-hoa/src/main.ts`
-- `neko-hoa-mock/models/index.ts`
 ### Tech Stack
 **Languages:** C#
 **Frameworks:** .NET, ASP.NET Core
@@ -90,19 +109,18 @@ Additional libraries: MediatR (implied by feature/folder structure), FluentValid
 ### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `neko-hoa/package-lock.json` | 100.0th %ile | 2 | Nicholas Bonilla |
-| `neko-hoa/src/app/core/services/mock-data.service.ts` | 99.6th %ile | 2 | Nicholas |
-| `HOAManagementCompany/Program.cs` | 99.5th %ile | 3 | Nicholas |
-| `neko-hoa-mock/services/mock-data.service.ts` | 99.2th %ile | 2 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.0th %ile | 1 | Nicholas |
+| `neko-hoa/package-lock.json` | 100.0th %ile | 4 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.7th %ile | 4 | Nicholas |
+| `neko-hoa/src/app/features/payments/recurring/recurring.component.ts` | 99.5th %ile | 4 | Nicholas |
+| `neko-hoa/src/app/features/payments/one-time/one-time.component.ts` | 99.2th %ile | 3 | Nicholas |
+| `neko-hoa/src/app/core/services/payments.service.ts` | 99.0th %ile | 4 | Nicholas |
 
 ## Code health
 Hotspot health: 9.4/10 (stable) ·
-Average: 9.53/10 ·
-Worst: 6.98/10 (`HOAManagementCompany/Program.cs`)
+Average: 9.52/10 ·
+Worst: 7.74/10 (`HOAManagementCompany/Features/Payments/Ledger/LedgerService.cs`)
 
 ### Critical biomarkers
-- `HOAManagementCompany/Program.cs` — change entropy — impact −3.0
 - `neko-hoa/src/app/core/models/index.ts` — untested hotspot — impact −2.0
 - `.github/scripts/check-repowise-health-gates.py` — complex method (main) — impact −1.1
 

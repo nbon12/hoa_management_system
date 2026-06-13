@@ -27,7 +27,17 @@ public sealed class TwilioSmsProvider(IOptions<TwilioOptions> options, ILogger<T
         if (!IsConfigured) return AlertSendResult.Fail("Twilio is not configured.");
         try
         {
-            TwilioClient.Init(_options.ApiKeySid, _options.ApiKeySecret, _options.AccountSid);
+            // <!-- REPOWISE:START domain=payments-alerts -->
+            // Stage 2 (007) test-credential path. Twilio honors magic numbers (test mode) only under
+            // Account SID + Auth Token basic auth, not API-key auth. When no API key is configured but
+            // an Auth Token is, authenticate basic so the sandbox tests can exercise the real adapter.
+            // Default-off: production keeps API-key auth (ApiKeySid set), unchanged.
+            if (string.IsNullOrWhiteSpace(_options.ApiKeySid) && !string.IsNullOrWhiteSpace(_options.AuthToken))
+                TwilioClient.Init(_options.AccountSid, _options.AuthToken);
+            else
+                TwilioClient.Init(_options.ApiKeySid, _options.ApiKeySecret, _options.AccountSid);
+            // <!-- REPOWISE:END -->
+
             var body = message.Body.Contains("STOP", StringComparison.OrdinalIgnoreCase)
                 ? message.Body
                 : message.Body + OptOutSuffix;
