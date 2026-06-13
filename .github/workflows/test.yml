@@ -39,7 +39,7 @@ jobs:
       # Scan runs after tests so coverage.opencover.xml exists; properties come
       # from sonar-project.properties at the repo root.
       - name: SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
