@@ -38,7 +38,9 @@ jobs:
 
       # Scan runs after tests so coverage.opencover.xml exists; properties come
       # from sonar-project.properties at the repo root.
+      # Steps are skipped (not failed) when SONAR_HOST_URL is not configured.
       - name: SonarQube scan
+        if: ${{ secrets.SONAR_HOST_URL != '' }}
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -47,6 +49,7 @@ jobs:
           args: -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
 
       - name: Check SonarQube quality gate
+        if: ${{ secrets.SONAR_HOST_URL != '' }}
         uses: SonarSource/sonarqube-quality-gate-action@v1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
