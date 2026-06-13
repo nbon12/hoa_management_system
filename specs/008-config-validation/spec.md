@@ -10,6 +10,7 @@
 ### Session 2026-06-13
 
 - Q: Should configuration validation be environment-aware (secrets required only in Production), or strict in all environments? → A: Strict in all environments — there is no environment-conditional relaxation. Every option group, including secret *presence*, is validated identically in Development, Test, and Production. Local and CI environments satisfy secret-presence checks with non-functional placeholder values (injected by the test fixture / committed to dev config), never real credentials.
+- Q: How should a configuration failure be surfaced to the user/operator? → A: Frontend — halt bootstrap and render a minimal, static full-page error message naming the missing value (the app does not load). Backend — refuse to start and emit the failure to the startup logs/console (no rendered UI; a server has no user-facing surface at startup).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -131,16 +132,17 @@ risk, but valuable because a missed deploy-time key injection currently produces
 confusing in-browser failure during a real payment rather than an obvious boot failure.
 
 **Independent Test**: Produce a production frontend configuration with the publishable key
-empty and confirm the app surfaces a clear startup failure; with the key present, confirm
-the app boots normally.
+empty and confirm the app halts bootstrap and renders a full-page error; with the key
+present, confirm the app boots normally.
 
 **Acceptance Scenarios**:
 
 1. **Given** a production frontend configuration with the payment publishable key empty,
-   **When** the app starts, **Then** it surfaces a clear, visible error indicating the
-   required configuration value is missing.
+   **When** the app starts, **Then** it halts bootstrap and renders a minimal, static
+   full-page error naming the missing value (the app does not load).
 2. **Given** a production frontend configuration with the API base URL empty, **When** the
-   app starts, **Then** it surfaces a clear startup error naming the missing value.
+   app starts, **Then** it halts bootstrap and renders a full-page error naming the missing
+   value.
 3. **Given** a complete and valid frontend configuration, **When** the app starts, **Then**
    it boots normally with no configuration error.
 4. **Given** a non-production (development) build, **When** required values follow local
@@ -171,8 +173,11 @@ the app boots normally.
 
 - **FR-001**: The backend MUST validate all strongly-typed configuration option groups at
   application startup and refuse to start when any validation rule fails.
-- **FR-002**: Startup validation failures MUST produce a clear error that identifies the
-  configuration section and field(s) that failed and the reason for each failure.
+- **FR-002**: Backend startup validation failures MUST produce a clear error — emitted to
+  the application's startup logs/console — that identifies the configuration section and
+  field(s) that failed and the reason for each failure. The backend has no user-facing
+  surface at startup; the failure is observed by the operator via logs and the non-zero
+  exit / failed start.
 - **FR-003**: When multiple configuration values are invalid, the startup error MUST
   aggregate and report all detected failures rather than only the first.
 - **FR-004**: Validation MUST apply uniformly across all environments (Development, Test,
@@ -214,8 +219,10 @@ the app boots normally.
   configuration — using placeholder secret values to satisfy presence checks — starts
   successfully (guarding against validation breaking CI).
 - **FR-017**: The frontend MUST validate required configuration values during application
-  startup and surface a clear, visible failure when a required value (at minimum the
-  payment publishable key and the API base URL) is missing in a production build.
+  startup and, when a required value (at minimum the payment publishable key and the API
+  base URL) is missing in a production build, MUST halt bootstrap and render a minimal,
+  static full-page error message naming the missing value (the app MUST NOT load into a
+  partially-working state).
 - **FR-018**: The frontend startup configuration guard MUST NOT block startup for
   non-production builds that rely on local defaults.
 - **FR-019**: Configuration error messages MUST NOT echo secret values; they may name the
@@ -263,9 +270,9 @@ the app boots normally.
   itself validated. Telemetry initialization remains non-fatal where it is today; this
   feature adds validation of the *configuration values*, not new telemetry that could block
   startup.
-- **Accessibility**: The frontend startup failure indication for missing configuration MUST
-  be perceivable (a visible message, not a silent console-only failure) so the deployment
-  problem is noticeable.
+- **Accessibility**: The frontend missing-configuration failure MUST be perceivable — a
+  rendered, full-page DOM message (not a silent console-only failure or blank page) so the
+  deployment problem is noticeable to any viewer.
 - **Quality gates**: New validation logic and validators require unit and startup-level
   test coverage (FR-014–FR-016) consistent with the project's coverage expectations;
   Theory-style data variations should cover boundary values (e.g. 0 and 1 for ratios) and
