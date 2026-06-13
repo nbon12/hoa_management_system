@@ -30,10 +30,32 @@ frontend; US3 makes deploys safe; US4 verifies isolation.
 
 ---
 
-## Phase 1: Setup (Platform Provisioning & CI Secrets)
+## Status & deferred scope (handoff — PR #35)
 
-**Purpose**: One-time platform resources the pipeline deploys into. No application code. See
-`quickstart.md` "One-time provisioning".
+**Delivered in PR #35:**
+- **Phase 2** backend env-name refactor (T007–T013) — implemented, built, unit-tested.
+- **Phase 4** frontend Dev build config (T019–T020) — implemented, build-verified.
+- **Phases 3 & 5** `deploy-dev` workflow + E2E parameterization (T014–T018, T021–T027) —
+  **authored & YAML-validated**, plus `--allow-unauthenticated` and a startup-migration test.
+  **Gated off** by `DEV_DEPLOY_ENABLED` (safe to merge); **not yet run against live infrastructure.**
+
+**Deferred (NOT in PR #35):**
+- **Phase 1 provisioning (T001–T006)** → delivered declaratively by the **IaC feature** instead of
+  by hand. See [`HANDOFF-infra-as-code.md`](./HANDOFF-infra-as-code.md) (OpenTofu).
+- **Phase 6 isolation verification (T028–T031, T031a)** and **Phase 7 live polish (T032, T033,
+  T035)** → require the provisioned, deployed Dev environment; verify after the first live deploy.
+- **Known limitation:** the E2E gate (T023/T024) is currently frontend-only (Cypress specs stub the
+  backend). Making it a true backend integration gate is a follow-up.
+
+Tasks below remain `[X]` (done) or `[ ]` (deferred, per the phase tags).
+
+---
+
+## Phase 1: Setup (Platform Provisioning & CI Secrets) — **DEFERRED → IaC feature (`HANDOFF-infra-as-code.md`)**
+
+**Purpose**: One-time platform resources the pipeline deploys into. No application code. **Now
+provisioned declaratively with OpenTofu, not manually** — see the handoff. `quickstart.md`
+"One-time provisioning" still documents the resource list/wiring.
 
 - [ ] T001 Provision isolated **Neon Dev** database (scale-to-zero, low `Maximum Pool Size`); record the connection target in `specs/009-dev-auto-deploy/contracts/environment-matrix.md`
 - [ ] T002 [P] Provision Cloudflare **R2 Dev** documents bucket + scoped access/secret keys; record in `specs/009-dev-auto-deploy/contracts/environment-matrix.md`
@@ -123,7 +145,7 @@ failures are visible in team chat.
 
 ---
 
-## Phase 6: User Story 4 - Dev environment is isolated and self-configuring (Priority: P3)
+## Phase 6: User Story 4 - Dev environment is isolated and self-configuring (Priority: P3) — **DEFERRED (live verification)**
 
 **Goal**: Prove and harden that Dev uses its own DB/identity/secrets, sourced from a managed store,
 never committed or baked into images.
@@ -141,9 +163,10 @@ isolation and no-leaked-secret checks pass.
 
 ---
 
-## Phase 7: Polish & Cross-Cutting Concerns
+## Phase 7: Polish & Cross-Cutting Concerns — **DEFERRED (needs live Dev env)**
 
-**Purpose**: Final validation and constitution gates.
+**Purpose**: Final validation and constitution gates. These run after the first live deploy
+(post-IaC provisioning + `DEV_DEPLOY_ENABLED=true`).
 
 - [ ] T032 [P] Run the `specs/009-dev-auto-deploy/quickstart.md` end-to-end verification (merge → watch `deploy-dev` → confirm live); **record the end-to-end wall-clock from merge to live and confirm it is ≤ 30 minutes** incl. the E2E gate (SC-002) — if exceeded, treat the 30-min target as monitored and note the cause
 - [ ] T033 [P] Confirm Sentry on the Dev service carries `environment=Dev` + release id and excludes sensitive content

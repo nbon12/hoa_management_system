@@ -2,8 +2,33 @@
 
 **Feature Branch**: `009-dev-auto-deploy`  
 **Created**: 2026-06-13  
-**Status**: Draft  
+**Status**: Partially delivered (PR #35) — see Delivery Status below  
 **Input**: User description: "I want to create a dev environment that automatically gets pushed to upon merges to main. review the constitution for what it should be setup like."
+
+## Delivery Status & Deferred Scope *(PR #35)*
+
+**Shipped in PR #35** (the `deploy-dev` pipeline is **gated off** via `DEV_DEPLOY_ENABLED`, so the
+PR is safe to merge before any cloud resources exist):
+
+- Config-driven backend startup (migrations / seed / Swagger / CORS) so a deployed `Dev` service
+  behaves correctly (FR-004, FR-004a, FR-011a, Swagger gate) — implemented + tested.
+- Frontend `dev` build configuration pointed at the Dev API (FR-005) — build-verified.
+- The `deploy-dev` GitHub Actions job: candidate deploy, health + E2E gate, promotion, latest-wins
+  concurrency, failure notification (FR-001, FR-003, FR-006–FR-009) — **authored & YAML-validated,
+  not yet run against live infrastructure.**
+
+**Deferred (not in PR #35):**
+
+- **Environment provisioning** (the isolated Neon DB, Cloud Run service, Cloudflare Pages/DNS/R2,
+  Secret Manager, WIF — FR-010/FR-011/FR-015/FR-016 *infrastructure*) is delivered declaratively by
+  a follow-up **Infrastructure-as-Code feature** (OpenTofu) rather than by hand — see
+  [`HANDOFF-infra-as-code.md`](./HANDOFF-infra-as-code.md).
+- **Live verification** of the isolation and success criteria (SC-002, SC-005, SC-006, SC-009, and
+  the US3/US4 acceptance runs) happens after the first real deploy once provisioning and
+  `DEV_DEPLOY_ENABLED=true` are in place.
+- **Known limitation:** the E2E gate runs the Cypress suite, which currently stubs the backend
+  in-spec — so it validates the Dev frontend but not yet the Dev backend end-to-end. Promoting it to
+  a true integration gate is a follow-up.
 
 ## User Scenarios & Testing *(mandatory)*
 

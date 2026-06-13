@@ -3,6 +3,13 @@
 **Branch**: `009-dev-auto-deploy` | **Date**: 2026-06-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/009-dev-auto-deploy/spec.md`
 
+> **Delivery status (PR #35):** The backend startup refactor, frontend `dev` config, and the
+> (gated-off) `deploy-dev` pipeline are shipped. **Deferred:** environment **provisioning** is moved
+> to a follow-up Infrastructure-as-Code feature (OpenTofu) — see
+> [`HANDOFF-infra-as-code.md`](./HANDOFF-infra-as-code.md) — and **live verification** runs after the
+> first real deploy. Full breakdown in [`spec.md`](./spec.md) → "Delivery Status & Deferred Scope"
+> and [`tasks.md`](./tasks.md) → "Status & deferred scope".
+
 ## Summary
 
 Stand up an isolated **Dev** environment that is automatically deployed on every merge to
