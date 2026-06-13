@@ -21,8 +21,11 @@ public abstract class SandboxIntegrationTestBase : IntegrationTestBase
 {
     protected SandboxIntegrationTestBase(TestDatabaseFixture fixture) : base(fixture) { }
 
+    // Trim env-sourced secrets: a value pasted into a CI secret store often carries a trailing
+    // newline, and a Stripe key with any whitespace is rejected by the SDK ("API key cannot contain
+    // whitespace"). Treat whitespace-only values as absent so the matching RequireX() skips cleanly.
     private static string? Env(string name) =>
-        Environment.GetEnvironmentVariable(name) is { Length: > 0 } v ? v : null;
+        Environment.GetEnvironmentVariable(name)?.Trim() is { Length: > 0 } v ? v : null;
 
     /// <summary>
     /// Inject real test-mode secrets from the environment. Absent values are omitted so the matching
