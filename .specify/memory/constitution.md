@@ -1,6 +1,16 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 2.0.0 -> 2.1.0
+Modified principles:
+  Operations, Secrets, and Data Lifecycle — added mandatory startup configuration
+    validation: all backend options via FluentValidation (fail-fast, environment-aware,
+    incl. ASPNETCORE_ENVIRONMENT), and a frontend boot-time guard that fails loudly on
+    missing required configuration. Codifies the 008-config-validation feature.
+Templates requiring updates: none (additive rule).
+Follow-up TODOs: None
+
+----- prior amendment -----
 Version change: 1.1 -> 2.0.0
 Modified principles:
   Project Purpose — expanded HOA scope, multi-association membership, and content ownership.
@@ -29,7 +39,7 @@ Follow-up TODOs: None
 
 # HOA Management Company Constitution
 
-**Version**: 2.0.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-05-03
+**Version**: 2.1.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-06-13
 **Authors**: Project maintainers
 
 ## 1. Project Purpose
@@ -214,6 +224,17 @@ The UI MUST function and render correctly at:
 - Secrets MUST NOT be committed.
 - Environment-specific configuration MUST come from environment variables or managed secret
   stores.
+- **All application configuration MUST be validated at startup.** On the backend, every
+  strongly-typed options/configuration class MUST be validated with **FluentValidation**
+  (bound-and-validated at startup); the service MUST **fail fast** — refuse to start — on invalid
+  or missing configuration rather than deferring failures to request time. Validation rules MUST be
+  **environment-aware**, and MUST include validating the runtime environment name
+  (`ASPNETCORE_ENVIRONMENT`) against the known set (`Development` = local machine, `Dev` = deployed
+  dev, `Test`, `Staging`, `Production`) so a mis-set environment (such as `prod` instead of
+  `Production`, or the deployed-`Dev`-vs-local-`Development` confusion) is rejected at boot.
+  The **frontend** MUST apply the equivalent boot-time guard for its required configuration, failing
+  loudly (refusing to boot / surfacing a clear error) when required values are missing or invalid.
+  New configuration of any kind MUST ship with its validator.
 - Dev, Staging, and Prod secrets MUST be isolated.
 - Docker images MUST NOT bake in secrets.
 - Backend services MUST emit structured JSON logs.
