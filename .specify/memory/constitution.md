@@ -5,11 +5,13 @@ Version change: 2.1.0 -> 2.2.0
 Modified principles:
   Added new section "Executable & Living Specifications" (now section 11) enforcing that
     every spec.md remains executable at all times (acceptance criteria backed by runnable,
-    currently-passing tests), that specs are living documents kept in sync with reality
-    (drift is a defect to be fixed before merge), that spec.md and tasks.md must be current
-    before a PR is submitted, and that cross-spec contradictions (a new/amended spec whose
-    tests contradict a former spec) MUST be reconciled so the full spec corpus stays
-    internally consistent.
+    currently-passing tests), that spec.md is a living document kept in sync with reality
+    (drift is a defect to be fixed before merge — including for older, already-merged specs),
+    that the active feature's spec.md and tasks.md must be current before a PR is submitted
+    (older specs only need their spec.md kept truthful; tasks.md/plan.md/research.md are
+    point-in-time artifacts not required to be refreshed), and that cross-spec contradictions
+    (a new/amended spec whose tests contradict a former spec) MUST be reconciled so the full
+    spec corpus stays internally consistent.
   Renumbered prior "Governance & Amendments" from section 11 to section 12.
 Templates requiring updates:
   .specify/templates/tasks-template.md updated (pre-PR spec/tasks freshness + drift task,
@@ -340,15 +342,19 @@ contract of the system and MUST stay true at all times.
 - **No unverified claims**: A spec MUST NOT describe behavior that no executable test
   verifies. Acceptance scenarios MUST be traceable to tests, and tests MUST be traceable
   back to acceptance criteria.
-- **Living and truthful**: Specs are living documents and MUST reflect the system as it is
-  actually built. When implemented behavior diverges from a spec, the divergence MUST be
-  resolved before the change merges — either the `spec.md` is updated so it reflects reality,
-  or the code is corrected to match the spec. **Spec drift is a defect**, not an acceptable
-  steady state.
-- **Pre-PR freshness**: Before a pull request is submitted, the feature's `spec.md` and
-  `tasks.md` MUST be brought up to date with the work actually performed. Any spec that has
-  drifted from the code MUST be updated so the spec reflects reality. (The `plan.md` is not
-  required to be updated for this gate.)
+- **Living and truthful (`spec.md` only)**: `spec.md` is a living document and MUST reflect
+  the system as it is actually built. When implemented behavior diverges from a `spec.md` —
+  **including older, already-merged specs** — the divergence MUST be resolved before the change
+  merges: either the `spec.md` is updated so it reflects reality, or the code is corrected to
+  match the spec. **Spec drift is a defect**, not an acceptable steady state. Only `spec.md`
+  carries this freshness obligation; `tasks.md`, `plan.md`, and `research.md` are point-in-time
+  artifacts and are **NOT** required to be kept up to date for prior, already-merged features.
+- **Pre-PR freshness**: Before a pull request is submitted, the **active feature's** `spec.md`
+  **and** `tasks.md` MUST be brought up to date with the work actually performed, and **any
+  older `spec.md` that has drifted from the code MUST be updated** so it reflects reality. The
+  active feature's `plan.md` and `research.md` are NOT required to be refreshed for this gate,
+  and the `tasks.md`, `plan.md`, and `research.md` of older, already-merged features are
+  likewise NOT required to be refreshed — only their `spec.md` must stay truthful.
 - **Cross-spec consistency**: When a new or amended spec introduces tests or acceptance
   criteria that **directly contradict** those of a former spec, the contradiction MUST be
   reconciled before merge. Reconciliation means: update the superseded spec(s) so the full

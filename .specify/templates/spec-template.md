@@ -134,9 +134,11 @@
   visual regression expectations]
 - **Executable & living spec**: [Confirm every mandatory acceptance scenario / functional
   requirement maps to an automated test that can be run on demand and currently passes; this
-  spec stays in sync with the code (drift is fixed before merge); `spec.md` and `tasks.md`
-  are updated before the PR; and any direct contradiction with a former spec is reconciled so
-  the full spec corpus is internally consistent]
+  `spec.md` stays in sync with the code (drift is fixed before merge, including for older
+  already-merged specs); this feature's `spec.md` and `tasks.md` are updated before the PR
+  (older specs only need their `spec.md` kept truthful — `tasks.md`/`plan.md`/`research.md`
+  are not required to be refreshed); and any direct contradiction with a former spec is
+  reconciled so the full spec corpus is internally consistent]
 
 ## Success Criteria *(mandatory)*
 

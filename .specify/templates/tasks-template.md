@@ -199,9 +199,11 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Verify Sonar PR scan passes
 - [ ] TXXX Verify Codecov reports at least 95% coverage for relevant changed/added files
 - [ ] TXXX Confirm pull request scope is a focused vertical slice or justified cross-cutting change
-- [ ] TXXX **Before submitting the PR**: bring `spec.md` AND `tasks.md` up to date with the
-      work actually performed; update any spec section that drifted from the code so the spec
-      reflects reality (the `plan.md` is not required for this gate)
+- [ ] TXXX **Before submitting the PR**: bring this feature's `spec.md` AND `tasks.md` up to
+      date with the work actually performed, and update any older `spec.md` that drifted from
+      the code so it reflects reality. Only `spec.md` must be kept truthful for prior features;
+      `tasks.md`/`plan.md`/`research.md` of older, already-merged specs (and this feature's
+      `plan.md`/`research.md`) are not required to be refreshed for this gate
 - [ ] TXXX Verify the spec stays executable: every mandatory acceptance scenario / functional
       requirement is backed by an automated test that currently passes; no spec claim is left
       unverified
