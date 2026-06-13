@@ -200,13 +200,15 @@ builder.Services.AddRateLimiter(o =>
 });
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-// AllowAnyHeader/AllowAnyMethod already permit the W3C `traceparent`/`tracestate`
-// request headers and the `application/x-protobuf` content type (a non-safelisted type
-// that triggers a CORS preflight) used by the browser telemetry proxy path (FR-028).
+// Explicit header list covers: JWT bearer, content negotiation, W3C trace context
+// (traceparent/tracestate/baggage), and the non-safelisted Content-Type values
+// (application/x-protobuf) used by the browser telemetry proxy (FR-028).
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.WithOrigins("http://localhost:4200", "https://localhost:4200")
-     .AllowAnyHeader()
-     .AllowAnyMethod()
+     .WithHeaders(
+         "Authorization", "Content-Type", "Accept",
+         "traceparent", "tracestate", "baggage")
+     .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
      .AllowCredentials()));
 
 // ── Exception Handler ──────────────────────────────────────────────────────
