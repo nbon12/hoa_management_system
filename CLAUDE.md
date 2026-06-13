@@ -39,4 +39,20 @@ C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard c
 
 
 <!-- MANUAL ADDITIONS START -->
+
+## Spec Kit workflow: PR watching
+
+Spec Kit commands other than `/speckit.implement` (i.e. `/speckit.specify`,
+`/speckit.clarify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.analyze`,
+`/speckit.checklist`, `/speckit.constitution`, `/speckit.taskstoissues`) only produce
+Markdown/spec artifacts under `specs/`. These changes do not exercise application code, so:
+
+- Do **not** subscribe to PR activity, watch CI, or schedule self check-ins for PRs that
+  contain only Spec Kit / Markdown document changes.
+- Do **not** treat CI runs triggered by such doc-only PRs as something to babysit or autofix.
+- Still commit and push the artifacts and open/update the draft PR as usual.
+
+PR watching / CI babysitting is appropriate for `/speckit.implement` and other changes that
+touch application or infrastructure code — unless the user explicitly asks otherwise.
+
 <!-- MANUAL ADDITIONS END -->
