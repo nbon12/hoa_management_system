@@ -41,7 +41,7 @@ jobs:
       # Steps are skipped (not failed) when SONAR_HOST_URL is not configured.
       - name: SonarQube scan
         if: ${{ secrets.SONAR_HOST_URL != '' }}
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -50,7 +50,7 @@ jobs:
 
       - name: Check SonarQube quality gate
         if: ${{ secrets.SONAR_HOST_URL != '' }}
-        uses: SonarSource/sonarqube-quality-gate-action@v1
+        uses: SonarSource/sonarqube-quality-gate-action@d304d050d930b02a896b0f85935344f023928496 # v1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
