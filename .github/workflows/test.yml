@@ -199,3 +199,126 @@ jobs:
           tags: |
             sakurapatch/nekohoa-api:latest
             sakurapatch/nekohoa-api:${{ github.sha }}
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: [docker-push]
+    # Auto-deploy to the isolated Dev environment on merge to main (009-dev-auto-deploy). Reuses the
+    # image docker-push already published, so the deployed artifact == the one CI validated.
+    # Gated on the DEV_DEPLOY_ENABLED repo variable so this job is a NO-OP until the Dev platform
+    # (Neon Dev DB, Cloud Run nekohoa-api-dev, Cloudflare Pages, WIF + Secret Manager) is provisioned
+    # and the variable is set to 'true'. vars.* (not secrets.*) is used in the if so the workflow parses.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEV_DEPLOY_ENABLED == 'true'
+    # Latest merged commit wins: a newer run cancels an in-flight older deploy (FR-009 / SC-007).
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write   # required for Google Workload Identity Federation
+    env:
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      DEV_SERVICE: nekohoa-api-dev
+      IMAGE: sakurapatch/nekohoa-api:${{ github.sha }}
+      PAGES_PROJECT: nekohoa-dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Auth to GCP via Workload Identity Federation (no exportable key — S6719/SC-006) ──
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      # ── Backend: deploy a NO-TRAFFIC candidate revision. Migrations + seed run at candidate
+      #    startup (ASPNETCORE_ENVIRONMENT=Dev → StartupOptions). All secrets are --set-secrets
+      #    refs (no literal values in the workflow or image — FR-010/SC-006). ──
+      - name: Deploy backend candidate (no traffic)
+        run: |
+          gcloud run deploy "$DEV_SERVICE" \
+            --image "$IMAGE" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --allow-unauthenticated \
+            --no-traffic --tag candidate \
+            --min-instances 0 \
+            --set-env-vars ASPNETCORE_ENVIRONMENT=Dev \
+            --set-secrets "ConnectionStrings__DefaultConnection=dev-db-connection:latest,Jwt__Secret=dev-jwt-secret:latest,Sentry__Dsn=dev-sentry-dsn:latest,Stripe__SecretKey=dev-stripe-secret-key:latest,Stripe__WebhookSigningSecret=dev-stripe-webhook-secret:latest,Storage__ServiceUrl=dev-storage-service-url:latest,Storage__AccessKey=dev-storage-access-key:latest,Storage__SecretKey=dev-storage-secret-key:latest,Jobs__SchedulerSharedSecret=dev-scheduler-secret:latest" \
+            --quiet
+
+      - name: Resolve candidate URL
+        id: candidate
+        run: |
+          url=$(gcloud run services describe "$DEV_SERVICE" --region "$GCP_REGION" --format=json \
+            | python3 -c "import sys,json;d=json.load(sys.stdin);print(next((t.get('url','') for t in d['status'].get('traffic',[]) if t.get('tag')=='candidate'),''))")
+          if [ -z "$url" ]; then echo "Could not resolve candidate URL"; exit 1; fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # ── Health gate (migration-aware: ~5 min budget for startup migrations) ──
+      - name: Backend health gate
+        run: |
+          url="${{ steps.candidate.outputs.url }}/health"
+          echo "Polling $url"
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
+            if [ "$code" = "200" ]; then echo "Healthy after ${i} attempt(s)"; exit 0; fi
+            sleep 5
+          done
+          echo "Candidate never became healthy within the timeout"; exit 1
+
+      # ── Frontend: build the dev configuration and deploy a Cloudflare Pages PREVIEW ──
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: neko-hoa/package-lock.json
+
+      - name: Build frontend (dev configuration)
+        working-directory: neko-hoa
+        run: |
+          npm ci
+          npm run build -- --configuration=dev
+
+      - name: Deploy frontend preview (Cloudflare Pages)
+        id: pages
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy neko-hoa/dist/neko-hoa/browser --project-name=${{ env.PAGES_PROJECT }} --branch=preview-${{ github.sha }}
+
+      # ── E2E gate: full suite against the Dev preview BEFORE promotion. Health + E2E run as
+      #    ordered steps, so a failure here fail-fasts the job and the promote steps below never
+      #    run — the prior healthy release keeps 100% of traffic (FR-006/FR-007/SC-003/SC-010). ──
+      - name: E2E gate (full suite vs Dev)
+        working-directory: neko-hoa
+        env:
+          CYPRESS_BASE_URL: ${{ steps.pages.outputs.deployment-url }}
+          DEV_API_BASE_URL: ${{ steps.candidate.outputs.url }}/api/v1
+        run: npm run e2e:dev
+
+      # ── Promote (reached only when health + E2E passed) ──
+      - name: Promote backend traffic to candidate
+        run: gcloud run services update-traffic "$DEV_SERVICE" --region "$GCP_REGION" --to-tags candidate=100 --quiet
+
+      - name: Promote frontend preview to Dev production
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy neko-hoa/dist/neko-hoa/browser --project-name=${{ env.PAGES_PROJECT }} --branch=main
+
+      # ── Notify team chat on ANY failure of this job (success stays silent — FR-008/SC-008) ──
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -s -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"🚨 Dev deploy failed for commit ${{ github.sha }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "${{ secrets.DEPLOY_ALERT_WEBHOOK_URL }}" || true

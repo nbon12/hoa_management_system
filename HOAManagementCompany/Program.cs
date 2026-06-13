@@ -6,6 +6,9 @@
 // metrics → OTLP, scrubbing, sampling). Telemetry-init is guarded as non-fatal (FR-008).
 // All strongly-typed options groups are bound via AddValidatedOptions(...).ValidateOnStart(),
 // so invalid configuration fails the host at startup with a clear error (008-config-validation).
+// Startup behavior (apply-migrations / seed / Swagger) and CORS allowed-origins are
+// configuration-driven via StartupOptions and Cors:AllowedOrigins (009-dev-auto-deploy), so a
+// deployed `Dev` service migrates+seeds and exposes Swagger while Production stays locked down.
 // <!-- REPOWISE:END -->
 
 using System.Security.Claims;
@@ -36,6 +39,12 @@ using Serilog.Events;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: true);
+
+// ── Startup behavior (config-driven; replaces hardcoded IsDevelopment() gating) ──────────────
+// Drives migrations/seed/Swagger from the "Startup" section so a deployed `Dev` service behaves
+// correctly without running as `Development` (which would leak dev error pages and localhost CORS).
+// Defaults preserve existing local Development behavior. See StartupOptions (009-dev-auto-deploy).
+var startupOptions = StartupOptions.Resolve(builder.Configuration, builder.Environment);
 
 // ── Serilog ────────────────────────────────────────────────────────────────
 // 3-arg form so DI-registered ILogEventSink/ILogEventEnricher (e.g. the integration
@@ -108,11 +117,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // Registered via a factory so the DI container owns and disposes its connection pool.
 builder.Services.AddSingleton(_ => ObservabilityNpgsql.BuildTracedDataSource(connectionString));
 
+// ConfigureWarnings ignores ManyServiceProvidersCreatedWarning: it fires only when 20+ EF internal
+// providers are built in one process — a WebApplicationFactory test artifact (many factories per
+// run), not a real issue here since the app uses one shared NpgsqlDataSource singleton. Matches the
+// suppression IntegrationTestBase already applies, so test factories booting Program don't throw.
 builder.Services.AddDbContext<ApplicationDbContext>((sp, o) =>
-    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3)));
+    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3))
+     .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, o) =>
-    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3)), ServiceLifetime.Scoped);
+    o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>(), npgsql => npgsql.EnableRetryOnFailure(3))
+     .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)), ServiceLifetime.Scoped);
 
 // ── ASP.NET Core Identity ──────────────────────────────────────────────────
 builder.Services.AddIdentityCore<ApplicationUser>(o =>
@@ -217,11 +232,18 @@ builder.Services.AddRateLimiter(o =>
 });
 
 // ── CORS ───────────────────────────────────────────────────────────────────
-// Explicit header list covers: JWT bearer, content negotiation, W3C trace context
-// (traceparent/tracestate/baggage), and the non-safelisted Content-Type values
-// (application/x-protobuf) used by the browser telemetry proxy (FR-028).
+// Origins are configuration-driven via Cors:AllowedOrigins so each environment sets its own
+// (Dev → the Cloudflare Pages Dev origin); local Development falls back to localhost when unset
+// (009-dev-auto-deploy). The explicit header list covers: JWT bearer, content negotiation, W3C
+// trace context (traceparent/tracestate/baggage), and the non-safelisted Content-Type values
+// (application/x-protobuf) used by the browser telemetry proxy (FR-028). AllowAnyHeader/
+// AllowAnyMethod are intentionally NOT used (SonarCloud S5122).
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+if (corsOrigins is null || corsOrigins.Length == 0)
+    corsOrigins = ["http://localhost:4200", "https://localhost:4200"];
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins("http://localhost:4200", "https://localhost:4200")
+    p.WithOrigins(corsOrigins)
      .WithHeaders(
          "Authorization", "Content-Type", "Accept",
          "traceparent", "tracestate", "baggage")
@@ -240,7 +262,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient(); // used by the browser telemetry proxy forward (FR-029)
 builder.Services.AddFastEndpoints();
 
-if (builder.Environment.IsDevelopment())
+if (startupOptions.EnableSwagger)
     builder.Services.SwaggerDocument(o => o.DocumentSettings = s =>
     {
         s.Title = "NekoHOA API";
@@ -296,19 +318,10 @@ catch (Exception ex)
 // ═══════════════════════════════════════════════════════════════════════════
 var app = builder.Build();
 
-// ── --seed CLI flag (T068 amendment) ──────────────────────────────────────
-if (args.Contains("--seed"))
-{
-    if (!app.Environment.IsDevelopment())
-    {
-        await Console.Error.WriteLineAsync("ERROR: Seeder is restricted to the Development environment.");
-        return 1;
-    }
-    await using var scope = app.Services.CreateAsyncScope();
-    var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
-    await seeder.SeedAsync();
-    return 0;
-}
+// ── --seed CLI flag (T068 amendment) — bootstrap glue lives in StartupTasks (009) ─────────
+var seedExitCode = await StartupTasks.RunSeedCommandAsync(app, args);
+if (seedExitCode is not null)
+    return seedExitCode.Value;
 
 // ── Middleware Pipeline ────────────────────────────────────────────────────
 app.UseExceptionHandler();
@@ -341,25 +354,13 @@ app.UseFastEndpoints(c =>
     };
 });
 
-if (app.Environment.IsDevelopment())
-{
+if (startupOptions.EnableSwagger)
     app.UseSwaggerGen();
 
-    await using (var scope = app.Services.CreateAsyncScope())
-    {
-        // Apply migrations + seed dev data on every startup. SeedAsync runs
-        // MigrateAsync first and is idempotent (skips inserts when the seed user
-        // already exists), so a fresh `docker-compose up` yields a ready-to-use,
-        // login-able database without a manual --seed step.
-        var seeder = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DatabaseSeeder>();
-        await seeder.SeedAsync();
-
-        // Refresh document PDFs in object storage on every startup — the minio
-        // volume can be reset independently of the database.
-        var storageInit = scope.ServiceProvider.GetRequiredService<HOAManagementCompany.Seed.DocumentStorageInitializer>();
-        await storageInit.EnsureValidPdfsAsync();
-    }
-}
+// Apply migrations and/or seed at startup, driven by config (009-dev-auto-deploy). The imperative
+// side-effects live in StartupTasks (excluded from coverage — they need a live database); the
+// decision logic is the config-driven StartupOptions, which is unit-tested.
+await StartupTasks.ApplyStartupDatabaseAsync(app, startupOptions);
 
 app.Run();
 return 0;
