@@ -13,6 +13,8 @@ jobs:
   test:
     name: Build & Test
     runs-on: ubuntu-latest
+    env:
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +42,7 @@ jobs:
       # from sonar-project.properties at the repo root.
       # Steps are skipped (not failed) when SONAR_HOST_URL is not configured.
       - name: SonarQube scan
-        if: ${{ secrets.SONAR_HOST_URL != '' }}
+        if: env.SONAR_HOST_URL != ''
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -49,7 +51,7 @@ jobs:
           args: -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
 
       - name: Check SonarQube quality gate
-        if: ${{ secrets.SONAR_HOST_URL != '' }}
+        if: env.SONAR_HOST_URL != ''
         uses: SonarSource/sonarqube-quality-gate-action@d304d050d930b02a896b0f85935344f023928496 # v1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
