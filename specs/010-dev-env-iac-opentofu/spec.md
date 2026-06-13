@@ -19,6 +19,15 @@ The output is a contract: once the infrastructure is applied and the operator se
 GitHub Actions secrets/variables and flips `DEV_DEPLOY_ENABLED=true`, the `009` pipeline does the
 rest with no further manual cloud setup.
 
+## Clarifications
+
+### Session 2026-06-13
+
+- Q: How should the OpenTofu code under `infra/` be structured for multi-environment reuse with isolated state? → A: A reusable shared module (`infra/modules/*`) called by per-environment directories (`infra/environments/dev`, `.../staging`, `.../prod`), each with its own tfvars and backend config.
+- Q: What gate should guard the apply-on-merge workflow? → A: **Prod** apply requires manual approval (protected GitHub Environment with a required reviewer); **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
+- Q: How should remote state (GCS) be isolated across environments? → A: A single versioned GCS state bucket with a distinct prefix/path per environment (e.g. `state/dev`, `state/staging`, `state/prod`).
+- Q: Beyond restricting deployer-SA impersonation to this repo, should the WIF trust also be ref-restricted? → A: No — repo-scoped only (any branch/ref in this repo may impersonate the deployer); this keeps PR plan-only runs able to authenticate without a second identity.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The "users" of this feature are **platform/infrastructure operators** (the engineering team members
@@ -115,9 +124,10 @@ the gated apply runs and converges the environment.
 
 1. **Given** a pull request that modifies infrastructure definitions, **When** the workflow runs,
    **Then** it produces a plan only and makes no changes to live resources.
-2. **Given** an infrastructure change is merged, **When** the apply workflow runs, **Then** it
-   applies the change behind an explicit gate (it does not apply automatically without the
-   configured approval/condition).
+2. **Given** an infrastructure change to **Dev** (or Staging) is merged, **When** the apply
+   workflow runs, **Then** it applies the change automatically to that environment; **Given** the
+   change targets **Prod**, the apply MUST pause for a required reviewer's approval (protected
+   environment) before touching live resources.
 3. **Given** either workflow runs, **When** it authenticates to the cloud accounts, **Then** it does
    so without any long-lived static credentials committed to the repo.
 
@@ -210,7 +220,10 @@ new isolated state target — not duplicating or editing the resource definition
   that allows the GitHub repository to impersonate the deployer identity **without** long-lived
   static keys.
 - **FR-012**: The federation trust condition MUST restrict impersonation to **this specific
-  repository** so no other repository can assume the deployer identity.
+  repository** so no other repository can assume the deployer identity. The condition is
+  **repo-scoped only** (not further restricted by git ref/branch), so any branch or PR in this
+  repository — including plan-only PR runs — can authenticate without provisioning a second
+  identity.
 
 #### Secret store (Secret Manager)
 
@@ -239,7 +252,9 @@ new isolated state target — not duplicating or editing the resource definition
 
 #### State, secrets handling, and outputs
 
-- **FR-020**: Remote state MUST be stored in a cloud object-storage state backend (GCS bucket).
+- **FR-020**: Remote state MUST be stored in a **single versioned** cloud object-storage state
+  backend (one GCS bucket), with a **distinct prefix/path per environment** (e.g. `state/dev`,
+  `state/staging`, `state/prod`) so each environment's state object is isolated.
 - **FR-021**: The required provider versions MUST be **pinned**, and the community-maintained
   database provider (`kislerdm/neon`) MUST be explicitly called out as community-maintained (not
   vendor-verified) with a pinned version.
@@ -260,8 +275,11 @@ new isolated state target — not duplicating or editing the resource definition
 
 - **FR-025**: A GitHub Actions workflow MUST run a **plan-only** preview on pull requests that touch
   the infrastructure definitions, making **no** changes to live resources.
-- **FR-026**: A GitHub Actions workflow MUST run a **gated apply** on merge (it MUST NOT apply
-  automatically without the configured gate/approval).
+- **FR-026**: A GitHub Actions workflow MUST run an **apply** on merge to `main`. For **Dev** (and
+  Staging) the apply runs **automatically** with no approval step; for **Prod** the apply MUST be
+  **gated** behind a protected GitHub Environment requiring a reviewer's manual approval before any
+  live change. (This feature delivers the Dev path; the gate configuration MUST be designed so Prod
+  is approval-gated when added.)
 - **FR-027**: The automation workflows MUST authenticate to the cloud accounts without committing
   long-lived static credentials to the repo (using the federated identity from FR-011).
 - **FR-028**: The configuration MUST be idempotent: re-running the plan against an unchanged
@@ -278,7 +296,10 @@ new isolated state target — not duplicating or editing the resource definition
 
 - **FR-030**: Environment-specific values (names, region, domains, branch) MUST be parameterized so
   the same definitions extend cleanly to Staging and Prod with isolated state and isolated
-  resources (constitution §10), without duplicating the resource definitions.
+  resources (constitution §10), without duplicating the resource definitions. The structure MUST
+  be a **reusable shared module** (`infra/modules/*`) consumed by **per-environment directories**
+  (`infra/environments/dev`, and later `.../staging`, `.../prod`), each supplying its own tfvars and
+  backend configuration.
 
 #### Bootstrap
 
