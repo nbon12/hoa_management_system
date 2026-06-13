@@ -30,4 +30,4 @@ SendGrid API keys have **no test/live distinction**. The Stage 2 harness MUST as
 
 ## Repowise marker
 
-Wrap the new sandbox branch in `// <!-- REPOWISE:START domain=payments-alerts -->` … `END` describing the no-deliver seam.
+Wrap the new sandbox branch in a Repowise marker region (`domain=payments-alerts`) — paired START/END comment markers — describing the no-deliver seam.
