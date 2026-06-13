@@ -197,5 +197,5 @@ jobs:
           file: HOAManagementCompany/Dockerfile
           push: true
           tags: |
-            nekohoa/api:latest
-            nekohoa/api:${{ github.sha }}
+            sakurapatch/api:latest
+            sakurapatch/api:${{ github.sha }}
