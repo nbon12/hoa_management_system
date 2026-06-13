@@ -45,7 +45,7 @@ CI gates already exist project-wide — not repeated here.)
 **⚠️ CRITICAL**: No backend user story (US1–US3) can begin until this phase is complete. US4
 (frontend) is independent of this phase.
 
-- [ ] T004 Implement generic `FluentValidateOptions<T> : IValidateOptions<T>` in `HOAManagementCompany/Infrastructure/Configuration/FluentValidateOptions.cs` — resolves `IValidator<T>`, maps failures to `ValidateOptionsResult.Fail(...)`, MUST NOT include raw values in messages (FR-019); add `// <!-- REPOWISE:START domain=configuration -->` marker region
+- [ ] T004 Implement generic `FluentValidateOptions<T> : IValidateOptions<T>` in `HOAManagementCompany/Infrastructure/Configuration/FluentValidateOptions.cs` — resolves `IValidator<T>`, maps failures to `ValidateOptionsResult.Fail(...)`, MUST NOT include raw values in messages (FR-019); wrap the file in a Repowise marker region (`domain=configuration`)
 - [ ] T005 Implement `AddValidatedOptions<TOptions, TValidator>(section)` extension in `HOAManagementCompany/Infrastructure/Configuration/OptionsValidationExtensions.cs` — registers `IValidator<TOptions>`, binds the section, adds the adapter, calls `ValidateOnStart()` (research R1, contracts/backend-config-validation.md); add REPOWISE marker region (depends on T004)
 
 **Checkpoint**: Validation engine ready — US1–US3 can proceed.
@@ -75,7 +75,7 @@ naming the field; boot with valid config and confirm it starts.
 - [ ] T012 [P] [US1] Implement `TwilioOptionsValidator` in `HOAManagementCompany/Infrastructure/Configuration/TwilioOptionsValidator.cs` — all-empty is valid; if any field set, require `AccountSid` + `FromNumber` + a usable auth pair (ApiKeySid+ApiKeySecret OR AuthToken), mirroring `TwilioOptions.IsConfigured` (FR-012)
 - [ ] T013 [P] [US1] Implement `SendGridOptionsValidator` in `HOAManagementCompany/Infrastructure/Configuration/SendGridOptionsValidator.cs` — all-empty is valid; if any field set, require `ApiKey` + valid `FromEmail` (FR-012)
 - [ ] T014 [US1] Wire all seven via `AddValidatedOptions<…>(section)` in `HOAManagementCompany/Program.cs`, replacing the plain `Configure<T>` calls; remove the null-forgiving `GetSection("Storage").Get<StorageOptions>()!` and resolve `IOptions<StorageOptions>` for the `IAmazonS3` singleton instead (FR-011; research R7) (depends on T004, T005, T007–T013)
-- [ ] T015 [US1] Refresh the `// <!-- REPOWISE:START domain=bootstrap -->` region in `HOAManagementCompany/Program.cs` to note that options are now validated at startup
+- [ ] T015 [US1] Refresh the existing Repowise `domain=bootstrap` marker region in `HOAManagementCompany/Program.cs` to note that options are now validated at startup
 - [ ] T016 [US1] Run `StartupValidationTests` to green; manually confirm a bad value produces a `Section:Field` message and that **no secret value** appears in the output (FR-002, FR-019)
 
 **Checkpoint**: Backend fails fast on invalid config — US1 independently testable.
@@ -140,7 +140,7 @@ confirm normal boot.
 
 ### Implementation for User Story 4
 
-- [ ] T028 [P] [US4] Implement `findMissingRequiredConfig(cfg)` in `neko-hoa/src/app/core/config/runtime-config.validator.ts` — enforces only when `production === true`; checks `apiBaseUrl` and `stripePublishableKey` (FR-017, FR-018); add `<!-- REPOWISE:START domain=configuration -->` marker
+- [ ] T028 [P] [US4] Implement `findMissingRequiredConfig(cfg)` in `neko-hoa/src/app/core/config/runtime-config.validator.ts` — enforces only when `production === true`; checks `apiBaseUrl` and `stripePublishableKey` (FR-017, FR-018); wrap the file in a Repowise marker region (`domain=configuration`)
 - [ ] T029 [P] [US4] Implement `renderConfigError(missing)` in `neko-hoa/src/app/core/config/config-error.render.ts` — injects a minimal static full-page error naming the missing value(s) into the app root
 - [ ] T030 [US4] Wire the guard **before** `bootstrapApplication` in `neko-hoa/src/main.ts` — on missing config, call `renderConfigError` and skip bootstrap; otherwise bootstrap normally (research R6; depends on T028, T029)
 - [ ] T031 [US4] Run guard tests to green and `npm run lint`; confirm dev build (`environment.development.ts`) is never blocked
