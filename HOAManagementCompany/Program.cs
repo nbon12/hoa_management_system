@@ -4,6 +4,8 @@
 // user-GUID enrichment), Sentry-on-OTel (consumes the OpenTelemetry activity pipeline
 // with an independent trace sample rate), and builder.AddObservability() (OTel tracing/
 // metrics → OTLP, scrubbing, sampling). Telemetry-init is guarded as non-fatal (FR-008).
+// All strongly-typed options groups are bound via AddValidatedOptions(...).ValidateOnStart(),
+// so invalid configuration fails the host at startup with a clear error (008-config-validation).
 // <!-- REPOWISE:END -->
 
 using System.Security.Claims;
@@ -16,6 +18,7 @@ using FastEndpoints.Swagger;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Payments;
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Infrastructure.Storage;
@@ -25,6 +28,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Serilog;
 using Serilog.Events;
@@ -144,12 +148,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// ── S3 / MinIO ─────────────────────────────────────────────────────────────
-builder.Services.Configure<StorageOptions>(builder.Configuration.GetSection("Storage"));
+// ── Validated configuration (008-config-validation) ─────────────────────────
+// Every strongly-typed options group is bound AND validated at startup via FluentValidation
+// (FluentValidateOptions<T>) + ValidateOnStart, so misconfiguration fails the host fast with a
+// clear Section:Field error instead of surfacing later mid-request (FR-001/FR-013). Validation
+// is uniform across environments; local/CI satisfy secret presence with placeholder values.
+builder.Services.AddValidatedOptions<StorageOptions, StorageOptionsValidator>(
+    builder.Configuration, "Storage");
+builder.Services.AddValidatedOptions<StripeOptions, StripeOptionsValidator>(
+    builder.Configuration, StripeOptions.SectionName);
+builder.Services.AddValidatedOptions<PaymentsOptions, PaymentsOptionsValidator>(
+    builder.Configuration, PaymentsOptions.SectionName);
+builder.Services.AddValidatedOptions<JobsOptions, JobsOptionsValidator>(
+    builder.Configuration, JobsOptions.SectionName);
+builder.Services.AddValidatedOptions<TwilioOptions, TwilioOptionsValidator>(
+    builder.Configuration, TwilioOptions.SectionName);
+builder.Services.AddValidatedOptions<SendGridOptions, SendGridOptionsValidator>(
+    builder.Configuration, SendGridOptions.SectionName);
+builder.Services.AddValidatedOptions<ObservabilityOptions, ObservabilityOptionsValidator>(
+    builder.Configuration, ObservabilityOptions.SectionName);
 
-var storageOpts = builder.Configuration.GetSection("Storage").Get<StorageOptions>()!;
-builder.Services.AddSingleton<IAmazonS3>(_ =>
+// ── S3 / MinIO ─────────────────────────────────────────────────────────────
+// Resolve the validated StorageOptions (guaranteed non-null/valid post ValidateOnStart) rather
+// than a raw, possibly-null bind (FR-011).
+builder.Services.AddSingleton<IAmazonS3>(sp =>
 {
+    var storageOpts = sp.GetRequiredService<IOptions<StorageOptions>>().Value;
     var config = new AmazonS3Config
     {
         ServiceURL = storageOpts.ServiceUrl,
@@ -161,13 +185,6 @@ builder.Services.AddSingleton<IAmazonS3>(_ =>
         config);
 });
 builder.Services.AddScoped<IDocumentStorage, S3DocumentStorage>();
-
-// ── Payments (Stripe / alerts / jobs) ──────────────────────────────────────
-builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
-builder.Services.Configure<PaymentsOptions>(builder.Configuration.GetSection(PaymentsOptions.SectionName));
-builder.Services.Configure<JobsOptions>(builder.Configuration.GetSection(JobsOptions.SectionName));
-builder.Services.Configure<TwilioOptions>(builder.Configuration.GetSection(TwilioOptions.SectionName));
-builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 
 // ── Rate Limiting ──────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(o =>

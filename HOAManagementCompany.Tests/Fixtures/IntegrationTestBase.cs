@@ -110,7 +110,13 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                         ["Storage:SecretKey"] = fixture.MinioSecretKey,
                         ["Storage:BucketName"] = "hoa-documents",
                         ["Storage:ForcePathStyle"] = "true",
-                        ["Sentry:Dsn"] = ""
+                        ["Sentry:Dsn"] = "",
+                        // Non-functional placeholders so strict startup validation (008) passes.
+                        // Tests use FakeStripeGateway, so these are never sent to Stripe.
+                        ["Stripe:SecretKey"] = "sk_test_placeholder",
+                        ["Stripe:PublishableKey"] = "pk_test_placeholder",
+                        ["Stripe:WebhookSigningSecret"] = "whsec_placeholder",
+                        ["Jobs:SchedulerSharedSecret"] = "test-scheduler-shared-secret-placeholder"
                     });
 
                     // Per-test overrides (e.g. CaptureSqlText) win over the defaults above.
