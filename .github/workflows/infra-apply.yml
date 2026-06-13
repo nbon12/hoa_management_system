@@ -1,0 +1,90 @@
+# Apply on merge to main for infra/ changes (FR-026). Dev (and later Staging) auto-apply; Prod is
+# GATED behind a protected GitHub Environment (`prod`) with a required reviewer — see the commented
+# job below and T030. Authenticates via WIF (FR-027).
+name: infra-apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-apply.yml"
+
+permissions:
+  contents: read
+  id-token: write # required for WIF OIDC
+
+concurrency:
+  group: infra-apply-dev
+  cancel-in-progress: false # never cancel an in-flight apply
+
+jobs:
+  apply-dev:
+    name: Apply (dev)
+    runs-on: ubuntu-latest
+    # Dev/Staging auto-apply with no manual gate (FR-026). No `environment:` protection here.
+    defaults:
+      run:
+        working-directory: infra/environments/dev
+    env:
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      TF_VAR_deploy_alert_webhook_url: ${{ secrets.DEPLOY_ALERT_WEBHOOK_URL }}
+      TF_VAR_operator_secrets: ${{ secrets.TF_VAR_OPERATOR_SECRETS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.8.0"
+
+      - name: tofu init
+        run: tofu init -input=false
+
+      - name: tofu apply
+        run: tofu apply -input=false -auto-approve
+
+  # --- Prod apply (ENABLE WHEN environments/prod EXISTS) -------------------------------------------
+  # Prod is gated: the `environment: prod` reference pauses the job for a required reviewer configured
+  # on that protected GitHub Environment (FR-026, T030). Uncomment and point working-directory at
+  # infra/environments/prod once the Prod env directory is added (Phase 6 / future).
+  #
+  # apply-prod:
+  #   name: Apply (prod) — gated
+  #   needs: apply-dev
+  #   runs-on: ubuntu-latest
+  #   environment: prod        # ← protected Environment with a required reviewer (manual approval)
+  #   defaults:
+  #     run:
+  #       working-directory: infra/environments/prod
+  #   env:
+  #     TF_VAR_gcp_project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
+  #     TF_VAR_neon_api_key: ${{ secrets.PROD_NEON_API_KEY }}
+  #     TF_VAR_cloudflare_api_token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
+  #     TF_VAR_cloudflare_account_id: ${{ secrets.PROD_CLOUDFLARE_ACCOUNT_ID }}
+  #     TF_VAR_cloudflare_zone_id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
+  #     TF_VAR_deploy_alert_webhook_url: ${{ secrets.PROD_DEPLOY_ALERT_WEBHOOK_URL }}
+  #     TF_VAR_operator_secrets: ${{ secrets.PROD_TF_VAR_OPERATOR_SECRETS }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - id: auth
+  #       uses: google-github-actions/auth@v2
+  #       with:
+  #         workload_identity_provider: ${{ secrets.PROD_GCP_WIF_PROVIDER }}
+  #         service_account: ${{ secrets.PROD_GCP_DEPLOY_SERVICE_ACCOUNT }}
+  #     - uses: opentofu/setup-opentofu@v1
+  #       with:
+  #         tofu_version: "1.8.0"
+  #     - name: tofu init
+  #       run: tofu init -input=false
+  #     - name: tofu apply
+  #       run: tofu apply -input=false -auto-approve
