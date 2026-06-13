@@ -22,7 +22,7 @@ cloud resources** and the **module's input/output interface**. All resources are
 
 | Resource | Key attributes | FR |
 |----------|----------------|----|
-| `google_cloud_run_v2_service.api` | name `nekohoa-api-dev`, region var, min-instances 0, port 8080, `ASPNETCORE_ENVIRONMENT=Dev`, `/health` probes, secret env refs, runtime SA | FR-005/006/008 |
+| `google_cloud_run_v2_service.api` | name `nekohoa-api-${env_name}`, region var, min-instances 0, port 8080, `ASPNETCORE_ENVIRONMENT=var.aspnet_environment` (Dev), `/health` probes, secret env refs, runtime SA | FR-005/006/008 |
 | `google_cloud_run_v2_service_iam_member.public` | `roles/run.invoker` → `allUsers` | unauthenticated |
 | `google_cloud_run_domain_mapping.api` | host `api-dev.nekohoa.com` | FR-018 |
 | `google_service_account.runtime` | `…-run-dev@` | FR-009 |
@@ -33,7 +33,7 @@ cloud resources** and the **module's input/output interface**. All resources are
 | `google_iam_workload_identity_pool.github` | pool id `github-pool` | FR-011 |
 | `google_iam_workload_identity_pool_provider.github` | OIDC issuer, attr map, condition `repository=="nbon12/hoa_management_system"` | FR-011/012 |
 | `google_service_account_iam_member.wif_deployer` | `roles/iam.workloadIdentityUser` → `principalSet:.../attribute.repository/<repo>` | FR-012 |
-| `google_secret_manager_secret.*` (×9) | exact secret IDs | FR-013 |
+| `google_secret_manager_secret.*` (×9) | IDs `${secret_prefix}-…` (Dev → the exact `dev-*` IDs) | FR-013 |
 | `google_secret_manager_secret_version.db_connection` | payload = Neon keyword string | FR-014 |
 | `google_secret_manager_secret_version.<8 operator secrets>` | payload from tfvars; `ignore_changes=[secret_data]` | FR-015 |
 
@@ -75,6 +75,8 @@ cloudflare: pages_project → pages_domain(dev.nekohoa.com); r2_bucket; record.f
 | Variable | Type | Example (Dev) | Sensitive |
 |----------|------|---------------|-----------|
 | `env_name` | string | `"dev"` | no |
+| `aspnet_environment` | string | `"Dev"` (maps dev→Dev, staging→Staging, prod→**Production**) | no |
+| `secret_prefix` | string | `"dev"` (Dev resolves the literal `dev-*` IDs; FR-013/029) | no |
 | `gcp_project_id` | string | `"nekohoa"` | no |
 | `gcp_region` | string | `"us-central1"` | no |
 | `github_repository` | string | `"nbon12/hoa_management_system"` | no |
@@ -107,7 +109,12 @@ cloudflare: pages_project → pages_domain(dev.nekohoa.com); r2_bucket; record.f
 ## Validation / invariants
 
 - `container_image` change is **ignored** after first apply (FR-007).
-- `secret_id` strings are literals matching the matrix exactly (FR-013/029).
+- `secret_id` = `"${var.secret_prefix}-…"`; with `secret_prefix = "dev"` they equal the literal
+  matrix IDs exactly (FR-013/029) — the implement step asserts this.
+- `aspnet_environment` for Dev is `"Dev"`; for a future Prod it MUST be `"Production"` (not `"prod"`)
+  and Staging `"Staging"`.
+- Neon project/branch are created **per environment instantiation**, so the Dev database is distinct
+  from any Staging/Prod database (FR-004).
 - `db_connection_string` matches `^Host=.*;SSL Mode=Require;Channel Binding=Require$` and contains no
   `postgresql://` (FR-003).
 - WIF attribute condition equals `assertion.repository == "nbon12/hoa_management_system"` (FR-012).

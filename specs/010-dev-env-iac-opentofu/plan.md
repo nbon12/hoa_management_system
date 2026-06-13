@@ -85,8 +85,9 @@ day-(-1) accounts and the one-time state-bucket bootstrap (FR-031/SC-001).
   and matrix conformance replace unit/integration suites (no application code ships). The 95%
   coverage gate targets app code and is N/A here (documented in spec → Constitution Requirements).
 - **CI/CD and documentation**: ✅ Plan-on-PR + gated apply-on-merge via GitHub Actions; environment
-  isolation per §10; Repowise marker regions refreshed for the PR. Sonar/Codecov operate on app code
-  and are unaffected by HCL-only changes.
+  isolation per §10; Repowise marker regions refreshed for the PR. Sonar/Codecov operate on app
+  code — **the implement PR MUST confirm those gates exclude `infra/**`** (or invoke the §11
+  cross-cutting exemption) so a 0%-coverage check on HCL cannot block merge (see task T038).
 
 **Result**: PASS — no violations; Complexity Tracking left empty.
 

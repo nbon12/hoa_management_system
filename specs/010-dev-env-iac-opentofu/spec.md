@@ -299,7 +299,10 @@ new isolated state target — not duplicating or editing the resource definition
   resources (constitution §10), without duplicating the resource definitions. The structure MUST
   be a **reusable shared module** (`infra/modules/*`) consumed by **per-environment directories**
   (`infra/environments/dev`, and later `.../staging`, `.../prod`), each supplying its own tfvars and
-  backend configuration.
+  backend configuration. Parameterized values MUST include the runtime environment name
+  `ASPNETCORE_ENVIRONMENT` — which is **not** a 1:1 echo of the directory name: it maps
+  `dev → Dev`, `staging → Staging`, `prod → Production` — and the secret-ID prefix (Dev resolves to
+  the literal `dev-*` IDs the 009 contract fixes; see FR-013/FR-029).
 
 #### Bootstrap
 
@@ -353,11 +356,19 @@ new isolated state target — not duplicating or editing the resource definition
 - **Observability**: Provisions the `dev-sentry-dsn` secret slot so the runtime can report to the
   Dev Sentry project with environment/release tags (§8); this feature wires the secret slot, not the
   application's Sentry initialization.
+- **Configuration validation**: This feature **sets** `ASPNETCORE_ENVIRONMENT=Dev` on the runtime
+  (FR-006). Per constitution §8 (all configuration validated at startup), the application MUST
+  **validate** that value at boot via FluentValidation and fail fast on a mis-set environment (e.g.
+  `prod` vs `Production`), with the frontend's boot-time guard covering its required config. The
+  validator/guard is a small companion app-side change tracked by tasks T039–T040.
 - **Quality gates**: This is an infrastructure-configuration feature; the 95% line-coverage gate
   applies to application code and is not meaningful for declarative infrastructure files. Validation
   is instead by plan/apply success, idempotent re-plan (no drift), and verification against the
-  `009` environment matrix. Repowise-maintained regions MUST be refreshed for the PR per §9. PR
-  scope is a focused, cross-cutting infrastructure slice (allowed under §11).
+  `009` environment matrix. The **Sonar / Codecov / coverage CI gates MUST be configured to exclude
+  `infra/**`** (or the PR treated as a justified cross-cutting change under §11) so an HCL-only
+  change is not blocked by a 0%-coverage check on files that have no executable test layer.
+  Repowise-maintained regions MUST be refreshed for the PR per §9. PR scope is a focused,
+  cross-cutting infrastructure slice (allowed under §11).
 - **Accessibility / Frontend testing**: Not applicable — no UI is added by this feature.
 
 ## Success Criteria *(mandatory)*
