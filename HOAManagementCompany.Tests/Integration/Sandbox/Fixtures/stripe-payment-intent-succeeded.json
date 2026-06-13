@@ -1,0 +1,27 @@
+{
+  "id": "__EVENT_ID__",
+  "object": "event",
+  "api_version": "__API_VERSION__",
+  "created": 1700000000,
+  "livemode": false,
+  "pending_webhooks": 1,
+  "request": {
+    "id": null,
+    "idempotency_key": null
+  },
+  "type": "payment_intent.succeeded",
+  "data": {
+    "object": {
+      "id": "pi_stage2_sandbox_0001",
+      "object": "payment_intent",
+      "amount": 1500,
+      "amount_received": 1500,
+      "currency": "usd",
+      "status": "succeeded",
+      "livemode": false,
+      "customer": null,
+      "payment_method_types": ["card"],
+      "metadata": {}
+    }
+  }
+}

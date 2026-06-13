@@ -20,6 +20,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <!-- Dynamic skips for the Stage-2 sandbox tier (007): a provider outage or an unconfigured
+         secret resolves to Skipped, not Failed, via [SkippableFact]/[SkippableTheory] + SkipException. -->
+    <PackageReference Include="Xunit.SkippableFact" Version="1.*" />
 
     <!-- Testcontainers -->
     <PackageReference Include="Testcontainers" Version="3.*" />
@@ -36,6 +39,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\HOAManagementCompany\HOAManagementCompany.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Stage-2 sandbox fixtures (captured provider event payloads) must sit next to the test DLL. -->
+    <None Include="Integration\Sandbox\Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
