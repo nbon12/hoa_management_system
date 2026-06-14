@@ -29,6 +29,10 @@ resource "google_project_service" "required" {
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
     "storage.googleapis.com",
+    # Needed for project-IAM management (google_project_iam_member) and API enablement when the
+    # environment is applied by the deployer SA in CI.
+    "cloudresourcemanager.googleapis.com",
+    "serviceusage.googleapis.com",
   ])
 
   project            = var.gcp_project_id
