@@ -38,6 +38,17 @@ resource "google_storage_bucket_iam_member" "deployer_state" {
   member = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# CI runs `tofu apply` of the ENTIRE environment as this SA (via WIF), which requires broad management
+# across IAM, WIF, Secret Manager, Cloud Run, and project IAM bindings. Per operator decision, grant
+# project Owner. NOTE: this SA is assumable by GitHub pushes to the repo — the blast radius is bounded
+# only by the repo-scoped WIF condition (assertion.repository == owner/repo) and main-branch
+# protection. The narrower run.admin / serviceAccountUser grants above are retained for documentation.
+resource "google_project_iam_member" "deployer_owner" {
+  project = var.gcp_project_id
+  role    = "roles/owner"
+  member  = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 # --- Workload Identity Federation: lets this GitHub repo impersonate the deployer SA via OIDC. ---
 # Pool id derived from env_name so multiple environments can coexist in one project (reuse-safe).
 resource "google_iam_workload_identity_pool" "github" {
