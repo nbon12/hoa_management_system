@@ -47,7 +47,21 @@ Repo → Settings → Branches → branch protection for `main` → **Require st
 `IaC config scan (trivy config)` and `Image vulnerability scan (trivy image)`. This blocks merges
 (and therefore the post-merge push/deploy) when a scan fails.
 
-### 4. Create `.trivyignore`
+### 4. Define the severity policy variable (single source — FR-007)
+
+Set the failing-severity set **once** as a repository variable so both `security-scan.yml` and
+`test.yml` read the same value:
+
+```bash
+gh variable set TRIVY_SEVERITY --body 'CRITICAL,HIGH'
+```
+
+Or Repo → Settings → Secrets and variables → Actions → Variables → `TRIVY_SEVERITY = CRITICAL,HIGH`.
+Both workflows reference `${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}`, so the `|| 'CRITICAL,HIGH'`
+fallback keeps them working before the variable is set. To tighten later (e.g. add `MEDIUM`), change
+this one variable — no workflow edits.
+
+### 5. Create `.trivyignore`
 
 Start empty. Add documented exceptions only via review:
 
@@ -60,9 +74,10 @@ CVE-2025-12345
 
 ### Severity policy — one knob
 
-Edit `env.TRIVY_SEVERITY` in `security-scan.yml` (and the matching `severity:` in `test.yml`'s scan
-step) to tighten later, e.g. `CRITICAL,HIGH,MEDIUM`. The image scan keeps `--ignore-unfixed`, so only
-findings with an available fix block the build.
+Change the `TRIVY_SEVERITY` **repository variable** (see setup step 4) to tighten later, e.g.
+`gh variable set TRIVY_SEVERITY --body 'CRITICAL,HIGH,MEDIUM'`. Both workflows pick it up; no YAML
+edits. The image scan keeps `--ignore-unfixed`, so only findings with an available fix block the
+build.
 
 ### Reading results
 

@@ -12,7 +12,7 @@ The single source of truth for which findings fail the build.
 
 | Field | Value (current phase) | Where defined | Validation |
 |-------|----------------------|---------------|------------|
-| `failing_severities` | `CRITICAL,HIGH` | `env.TRIVY_SEVERITY` in `security-scan.yml` (and reused by the `docker-push` scan step) | Referenced by every Trivy step; changing it in one place changes the whole pipeline (FR-007) |
+| `failing_severities` | `CRITICAL,HIGH` | Repo variable `vars.TRIVY_SEVERITY` (default `CRITICAL,HIGH`), surfaced via `env.TRIVY_SEVERITY` in `security-scan.yml` and referenced directly by the `docker-push` scan step in `test.yml` | One repository variable referenced by both workflows; changing it in that single place changes the whole pipeline (FR-007) |
 | `reported_severities` | all (`CRITICAL,HIGH,MEDIUM,LOW`) | SARIF pass uses unfiltered/severity-broad reporting | MEDIUM/LOW appear in SARIF/logs but never set a non-zero exit (FR-006) |
 | `gate_exit_code` | `1` | Trivy gating pass `exit-code` | Non-zero ⇒ pipeline stops |
 | `ignore_unfixed` | `true` (image scan only) | `--ignore-unfixed` on `trivy image` | Findings with no upstream fix are reported, not failed (FR-015) |

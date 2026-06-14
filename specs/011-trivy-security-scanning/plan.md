@@ -8,18 +8,22 @@
 Add Trivy-based security scanning to the GitHub Actions delivery pipeline as **two discrete
 stages** (not Dockerfile layers): (1) a `trivy config` scan of the raw OpenTofu IaC under `infra/`
 that runs first, and (2) a `trivy image` scan of the **locally built** backend container image that
-runs *before* the image is pushed to Docker Hub (`sakurapatch/nekohoa-api`). Both stages enforce a
+runs *before* the image is pushed to Docker Hub (`sakurapatch/nekohoa-api`). The image
+scan job declares `needs: [iac-config]` so the IaC scan runs **first** and the image build does not
+start until it passes (FR-001/FR-002). Both stages enforce a
 single shared severity policy — fail only on **fixable** CRITICAL/HIGH findings (`--ignore-unfixed`
-+ a reviewed `.trivyignore` allowlist) — and upload SARIF so PR-introduced findings annotate the PR
++ a reviewed `.trivyignore` allowlist) — sourced from one repository variable `vars.TRIVY_SEVERITY`
+referenced by both workflows (FR-007). They upload SARIF so PR-introduced findings annotate the PR
 while pushes/scheduled runs on `main` populate the GitHub Security tab. All third-party actions in
 the new workflow are pinned to immutable commit SHAs.
 
 Technical approach: a new dedicated workflow `.github/workflows/security-scan.yml` (triggers:
 `pull_request` → main, `push` → main, nightly `schedule`) owns the config scan and the PR/scheduled
-image scan; the existing `test.yml` `docker-push` job is refactored to **build → scan → push** in
-sequence so the push physically cannot happen on a failing scan (FR-011). The scan jobs are
-registered as required status checks so a failing scan blocks the merge that would trigger a
-main-push deploy.
+image scan, with the image job gated on the config job; the existing `test.yml` `docker-push` job is
+refactored to **build → scan → push** in sequence so the push physically cannot happen on a failing
+scan (FR-011). The scan jobs are registered as required status checks so a failing scan blocks the
+merge that would trigger a main-push deploy (this also enforces IaC-before-build ordering on the
+cross-workflow post-merge path, where `needs:` cannot reach across workflows).
 
 ## Technical Context
 

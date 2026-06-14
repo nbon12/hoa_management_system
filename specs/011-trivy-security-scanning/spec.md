@@ -119,7 +119,7 @@ As a maintainer responsible for the security of the delivery pipeline itself, I 
 - **SC-003**: A reviewer can confirm, in under 2 minutes by reading the workflow definition, that every third-party action is pinned to an immutable commit SHA.
 - **SC-004**: When a scan fails, an engineer can identify the offending package/resource, its severity, and the available fix directly from the workflow run logs without running any tool locally.
 - **SC-005**: With no IaC files present (before `010` merges), the pipeline completes end-to-end (IaC scan → build → image scan) without a false failure, and the IaC stage begins enforcing automatically once OpenTofu files appear under `infra/` — with no further workflow changes required.
-- **SC-006**: The scan stages add no more than a few minutes of overhead to a typical pipeline run, keeping total feedback time acceptable for routine pull requests.
+- **SC-006**: On a typical pull request, the two scan stages together add no more than ~5 minutes (p50) of wall-clock overhead to the pipeline run (with the scanner database cached between runs), keeping feedback time acceptable for routine review.
 
 ## Assumptions
 

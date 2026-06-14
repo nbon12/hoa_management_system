@@ -14,9 +14,13 @@ implementation produced by `/speckit.plan`; `/speckit.tasks` + `/speckit.impleme
 
 ## Job graph & gating contract
 
-- `iac-config` and `image-scan` run independently (no `needs` between them in the new workflow); both
-  must pass for the workflow to be green.
+- `image-scan` declares `needs: [iac-config]` ⇒ the IaC config scan runs **first**, and the image
+  build/scan does not start until it passes (FR-001/FR-002; US2-AS1 "stops before the build stage").
 - Both jobs are registered as **required status checks** on `main` ⇒ a failing scan blocks merge.
+- On the post-merge `test.yml` path the build/scan/push lives in `docker-push`; cross-workflow
+  ordering against `iac-config` is enforced at **merge time** by the required `iac-config` check
+  (GitHub Actions cannot express `needs:` across workflows), so a vulnerable/misconfigured change
+  cannot merge to trigger that push.
 - On the main-push deploy path, `test.yml` `docker-push` runs the image scan as a **step before** the
   push step ⇒ a failing scan returns non-zero and the push step never executes (FR-011). `deploy-dev`
   already `needs: [docker-push]`, so a failed scan also stops the deploy.
@@ -32,7 +36,10 @@ permissions:
 
 ## Severity contract
 
-- `env.TRIVY_SEVERITY: "CRITICAL,HIGH"` — single source (FR-007).
+- **Single source of truth**: the repository variable `vars.TRIVY_SEVERITY` (set once in repo
+  Settings → Variables, default `CRITICAL,HIGH`). Both `security-scan.yml` and `test.yml` reference
+  `${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}`, so the failing-severity set is defined in exactly
+  one place across both workflows (FR-007).
 - Image scan: `--ignore-unfixed` + root `.trivyignore` (FR-015).
 - Gating pass: `exit-code: 1`. SARIF pass: `exit-code: 0`, reports all severities.
 
@@ -55,7 +62,9 @@ permissions:
   pull-requests: read
 
 env:
-  TRIVY_SEVERITY: 'CRITICAL,HIGH'      # single source of truth for failing severities (FR-007)
+  # Single source of truth: repo variable vars.TRIVY_SEVERITY (default CRITICAL,HIGH) — FR-007.
+  # test.yml references the same vars.TRIVY_SEVERITY, so the policy lives in exactly one place.
+  TRIVY_SEVERITY: ${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}
   IMAGE_LOCAL_TAG: 'nekohoa-api:scan'
   PUBLISHED_IMAGE: 'sakurapatch/nekohoa-api:latest'
 
@@ -121,6 +130,7 @@ jobs:
   image-scan:
     name: Image vulnerability scan (trivy image)
     runs-on: ubuntu-latest
+    needs: [iac-config]          # IaC scan runs first; build/scan gated on it (FR-001/FR-002)
     steps:
       - uses: actions/checkout@<SHA> # v4 (actions/checkout)
 
@@ -213,7 +223,7 @@ and push. Only the relevant steps are shown; SHAs are pinned the same way.
         with:
           scan-type: image
           image-ref: nekohoa-api:scan-${{ github.sha }}
-          severity: 'CRITICAL,HIGH'      # keep in sync with security-scan.yml TRIVY_SEVERITY
+          severity: ${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}   # same single source as security-scan.yml (FR-007)
           ignore-unfixed: true
           exit-code: '1'
           trivyignores: .trivyignore
@@ -239,6 +249,7 @@ and push. Only the relevant steps are shown; SHAs are pinned the same way.
 
 | Acceptance scenario / FR | Contract element |
 |--------------------------|------------------|
+| IaC scan runs before build; build gated on it (FR-001/FR-002, US2-AS1) | `image-scan` `needs: [iac-config]` + required-check-at-merge for `test.yml` path |
 | US1 image fails on CRIT/HIGH before push (FR-003/FR-011) | `image-scan` gate + `docker-push` scan-before-push step |
 | US1 MEDIUM/LOW pass (FR-006) | gate severity = `CRITICAL,HIGH` only |
 | US2 IaC misconfig fails (FR-001/FR-005) | `iac-config` gate |
