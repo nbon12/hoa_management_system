@@ -28,6 +28,7 @@ jobs:
         working-directory: infra/environments/dev
     env:
       TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_stripe_publishable_key: ${{ vars.STRIPE_PUBLISHABLE_KEY }} # non-secret (browser-safe)
       TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
