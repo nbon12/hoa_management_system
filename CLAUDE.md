@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-13
+Auto-generated from all feature plans. Last updated: 2026-06-14
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-13
 - N/A — no schema, migration, or persistence changes. (008-config-validation)
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); GitHub + FastEndpoints, EF Core 9 (Npgsql), Serilog, Sentry; Angular CLI; (009-dev-auto-deploy)
 - PostgreSQL — isolated **Neon Dev** database (separate from Staging/Prod); Cloudflare (009-dev-auto-deploy)
+- YAML (GitHub Actions workflow syntax); Trivy CLI (via `aquasecurity/trivy-action`); OpenTofu/HCL is the *scanned* artifact, not authored here + `aquasecurity/trivy-action`, `github/codeql-action/upload-sarif`, `docker/build-push-action`, `docker/setup-buildx-action`, `docker/login-action`, `actions/checkout` — all SHA-pinned (011-trivy-security-scanning)
+- N/A (no application data, schema, or migrations) (011-trivy-security-scanning)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -50,10 +52,9 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 011-trivy-security-scanning: Added YAML (GitHub Actions workflow syntax); Trivy CLI (via `aquasecurity/trivy-action`); OpenTofu/HCL is the *scanned* artifact, not authored here + `aquasecurity/trivy-action`, `github/codeql-action/upload-sarif`, `docker/build-push-action`, `docker/setup-buildx-action`, `docker/login-action`, `actions/checkout` — all SHA-pinned
 - 008-config-validation: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) + FastEndpoints (bundles **FluentValidation** — already used for
 - 009-dev-auto-deploy: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); GitHub + FastEndpoints, EF Core 9 (Npgsql), Serilog, Sentry; Angular CLI;
-- 007-integration-ci-tests: Added C# / .NET 9.0 + Stripe.net, SendGrid SDK, Twilio SDK (all already referenced by the backend); xUnit, Testcontainers.PostgreSQL, Microsoft.AspNetCore.Mvc.Testing (test project)
-- 006-stripe-payments: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) + Backend — FastEndpoints, EF Core 9 (Npgsql), **Stripe.net**,
 
 
 <!-- MANUAL ADDITIONS START -->
