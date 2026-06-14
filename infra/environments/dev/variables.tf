@@ -22,9 +22,9 @@ variable "enable_api_domain" {
 }
 
 variable "api_dns_proxied" {
-  description = "false for the grey-cloud cert step, then true for proxied Full(strict) (FR-019)."
+  description = "Proxied Full(strict) for the API custom domain. Default true now that the managed cert is issued; CI keeps it proxied. (Set false only to re-issue/replace the cert via grey-cloud.)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "container_image" {
