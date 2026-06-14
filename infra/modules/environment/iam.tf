@@ -30,6 +30,14 @@ resource "google_service_account_iam_member" "deployer_sa_user" {
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# Deployer needs read/write on the Terraform-state bucket so CI (authenticating as this SA via WIF)
+# can manage remote state during plan/apply (the GCS backend lists/reads/writes state objects).
+resource "google_storage_bucket_iam_member" "deployer_state" {
+  bucket = var.state_bucket
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 # --- Workload Identity Federation: lets this GitHub repo impersonate the deployer SA via OIDC. ---
 # Pool id derived from env_name so multiple environments can coexist in one project (reuse-safe).
 resource "google_iam_workload_identity_pool" "github" {

@@ -26,6 +26,9 @@ module "environment" {
   env_name           = "staging"
   aspnet_environment = "Staging"
   secret_prefix      = "staging"
+  state_bucket       = "nekohoa-dev-tfstate" # matches backend.tf (shared state bucket, per-env prefix)
+
+
 
   gcp_project_id    = var.gcp_project_id
   gcp_region        = var.gcp_region
