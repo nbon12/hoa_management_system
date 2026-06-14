@@ -239,17 +239,19 @@ jobs:
       # ── Backend: deploy a NO-TRAFFIC candidate revision. Migrations + seed run at candidate
       #    startup (ASPNETCORE_ENVIRONMENT=Dev → StartupOptions). All secrets are --set-secrets
       #    refs (no literal values in the workflow or image — FR-010/SC-006). ──
+      # Image-only deploy: tofu is the single declarative owner of the service's env vars, secrets,
+      # probes, scaling, SA, and access. A new revision INHERITS all of that from the current
+      # (tofu-managed) service config; this step only swaps the image and stages it as a no-traffic
+      # candidate. (Re-asserting --set-env-vars here previously WIPED tofu's non-secret env vars and
+      # crashed startup.) Secret rotation still applies — the inherited :latest refs re-resolve per
+      # revision. SC-006 holds: no secret literals in the workflow.
       - name: Deploy backend candidate (no traffic)
         run: |
           gcloud run deploy "$DEV_SERVICE" \
             --image "$IMAGE" \
             --region "$GCP_REGION" \
             --platform managed \
-            --allow-unauthenticated \
             --no-traffic --tag candidate \
-            --min-instances 0 \
-            --set-env-vars ASPNETCORE_ENVIRONMENT=Dev \
-            --set-secrets "ConnectionStrings__DefaultConnection=dev-db-connection:latest,Jwt__Secret=dev-jwt-secret:latest,Sentry__Dsn=dev-sentry-dsn:latest,Stripe__SecretKey=dev-stripe-secret-key:latest,Stripe__WebhookSigningSecret=dev-stripe-webhook-secret:latest,Storage__ServiceUrl=dev-storage-service-url:latest,Storage__AccessKey=dev-storage-access-key:latest,Storage__SecretKey=dev-storage-secret-key:latest,Jobs__SchedulerSharedSecret=dev-scheduler-secret:latest" \
             --quiet
 
       - name: Resolve candidate URL
