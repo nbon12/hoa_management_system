@@ -18,7 +18,7 @@ variable "github_repository" {
 variable "enable_api_domain" {
   description = "Create the api-dev.nekohoa.com custom-domain mapping + record (needs Google domain verification first)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "api_dns_proxied" {
