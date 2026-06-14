@@ -102,13 +102,17 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
 
-  # The deploy pipeline owns the image and revision metadata; never let an infra apply revert them
-  # (FR-007). image is the live :sha pushed by 009; client/client_version churn on every gcloud deploy.
+  # The deploy pipeline owns the image AND traffic; never let an infra apply revert them (FR-007).
+  # tofu is the single declarative owner of all OTHER config (env vars, secrets, probes, scaling, SA),
+  # so the pipeline deploys image-only and shifts traffic (canary tags) without drift here. image is
+  # the live :sha pushed by 009; client/client_version churn on every gcloud deploy; traffic is the
+  # canary split (candidate tag → 100%) the deploy job manages.
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
       client,
       client_version,
+      traffic,
     ]
   }
 
