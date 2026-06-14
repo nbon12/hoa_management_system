@@ -50,6 +50,17 @@ variable "api_domain" {
   type        = string
 }
 
+variable "enable_api_domain" {
+  description = <<-EOT
+    Whether to create the Cloud Run custom-domain mapping for api_domain and its Cloudflare DNS record.
+    Google requires the domain to be ownership-verified (Search Console / Webmaster Central) before a
+    domain mapping can be created, which is a one-time MANUAL step. Leave false for the first apply
+    (the service is reachable at its *.run.app URL); after verifying the domain, set true and re-apply.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "api_dns_proxied" {
   description = <<-EOT
     Cloudflare orange/grey cloud for the API record. Two-step cert flow: apply with `false`

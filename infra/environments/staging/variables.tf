@@ -15,6 +15,11 @@ variable "github_repository" {
   default = "nbon12/hoa_management_system"
 }
 
+variable "enable_api_domain" {
+  type    = bool
+  default = false
+}
+
 variable "api_dns_proxied" {
   type    = bool
   default = false

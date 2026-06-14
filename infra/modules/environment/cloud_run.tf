@@ -132,6 +132,10 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
 # Custom domain mapping for the API (matrix row 20). The Cloudflare record for this host is in
 # cloudflare.tf; grey-cloud first lets Google issue the managed cert (FR-018/019).
 resource "google_cloud_run_domain_mapping" "api" {
+  # Requires one-time Google domain-ownership verification; gated so the environment applies before
+  # that manual step. Enable via var.enable_api_domain once the domain is verified (FR-018/019).
+  count = var.enable_api_domain ? 1 : 0
+
   project  = var.gcp_project_id
   location = var.gcp_region
   name     = var.api_domain
