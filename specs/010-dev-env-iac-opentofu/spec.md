@@ -2,7 +2,7 @@
 
 **Feature Branch**: `010-dev-env-iac-opentofu`  
 **Created**: 2026-06-13  
-**Status**: Draft  
+**Status**: Implemented — Dev applied & live as of 2026-06-14 (backend `nekohoa-api-dev` healthy; frontend live at `dev.nekohoa.com`). Custom API domain `api-dev.nekohoa.com` is created and awaiting Google managed-cert issuance. See **Implementation Notes & Deviations (2026-06-14)** at the end for what changed during implementation.  
 **Input**: User description: "Create a declarative Infrastructure-as-Code setup, committed in the repo under infra/, using OpenTofu, that provisions the entire Dev environment for the 009-dev-auto-deploy pipeline so no cloud resources are created by hand."
 
 ## Why This Feature Exists
@@ -202,10 +202,21 @@ new isolated state target — not duplicating or editing the resource definition
 - **FR-006**: The runtime service MUST be configured with: region taken from an input variable;
   minimum instances **0** (scale-to-zero); **unauthenticated** public access; container port
   **8080**; environment variable `ASPNETCORE_ENVIRONMENT=Dev`; and a health probe targeting
-  **`/health`**.
+  **`/health`**. The service MUST also set the application's **non-secret** runtime configuration as
+  plain environment variables (these are not secrets, so they are not Secret Manager entries):
+  `Stripe__PublishableKey` (the browser-safe `pk_test_…` key, an input variable),
+  `Storage__BucketName` (the provisioned R2 bucket — the app's default `hoa-documents` is the local
+  MinIO name and 404s on R2), and `Storage__ForcePathStyle=true` (R2 requires path-style addressing).
+  *(Discovered during implementation — the app's startup validation requires these; see Implementation
+  Notes.)*
 - **FR-007**: The runtime service's container image is **pulled, not built** by this configuration;
   the application image and revision are owned by the `009` pipeline, and an infrastructure apply
-  MUST NOT clobber the pipeline-managed revision.
+  MUST NOT clobber the pipeline-managed revision. The configuration is the **single declarative owner
+  of all other service config** (env vars, secret refs, probes, scaling, identity, access); the
+  pipeline owns **only the image and traffic split** (canary). Concretely, the infra `ignore_changes`
+  covers the image **and `traffic`**, and the `009` deploy step performs an **image-only** deploy
+  (it MUST NOT re-assert env vars/secrets, which would wipe infra-managed config). *(Refined during
+  implementation; see Implementation Notes.)*
 - **FR-008**: The runtime service MUST consume its secret values **by reference** from the secret
   store (not as literal values baked into the configuration or image).
 
@@ -213,9 +224,14 @@ new isolated state target — not duplicating or editing the resource definition
 
 - **FR-009**: The configuration MUST provision a **runtime** service identity granted the ability to
   access secrets (secret accessor role) and nothing broader than required.
-- **FR-010**: The configuration MUST provision a **deployer** service identity granted the
-  privileges the pipeline needs to deploy (runtime admin) and to act as the runtime identity
-  (service-account user), and nothing broader than required (least privilege, constitution §7).
+- **FR-010**: The configuration MUST provision a **deployer** service identity used by the pipeline.
+  It needs runtime-admin + service-account-user (to deploy revisions and act as the runtime identity).
+  **Deviation (operator decision, 2026-06-14):** because CI also runs `tofu apply` of the *entire*
+  environment as this identity (which requires managing IAM, federation, Secret Manager, and project
+  IAM bindings), it was granted **project Owner** rather than a minimal role set. The blast radius is
+  bounded by the repo-scoped federation condition (FR-012) and `main`-branch protection. A future
+  hardening option is a separate, narrower infra-admin identity for `tofu apply` distinct from the
+  app deployer. *(See Implementation Notes.)*
 - **FR-011**: The configuration MUST provision a **Workload Identity Federation** pool and provider
   that allows the GitHub repository to impersonate the deployer identity **without** long-lived
   static keys.
@@ -244,7 +260,12 @@ new isolated state target — not duplicating or editing the resource definition
 - **FR-017**: The configuration MUST provision the Dev documents object-storage (R2) bucket.
 - **FR-018**: The configuration MUST provision the DNS records for **`dev.nekohoa.com`** (frontend
   hosting) and **`api-dev.nekohoa.com`** (backend custom-domain mapping; CNAME →
-  `ghs.googlehosted.com`).
+  `ghs.googlehosted.com`). The custom-domain **mapping** additionally requires a **one-time, manual
+  Google domain-ownership verification** of `nekohoa.com` (Search Console) before it can be created —
+  this is a manual prerequisite the configuration cannot perform. The mapping and its DNS record are
+  therefore **gated behind an `enable_api_domain` input** so the rest of the environment applies
+  cleanly before verification; the service is reachable at its `*.run.app` URL meanwhile.
+  *(Discovered during implementation; see Implementation Notes.)*
 - **FR-019**: The API custom-domain record MUST account for the certificate-issuance ordering
   constraint (unproxied/"grey-cloud" until the certificate is issued, then proxied at
   Full(strict)); where a single declarative step cannot satisfy this, the required two-step or
@@ -424,3 +445,56 @@ new isolated state target — not duplicating or editing the resource definition
   behalf), keeping the repo free of any mechanism that could write its own CI secrets.
 - **Reasonable defaults** are used for unspecified resource settings (e.g., bucket location, IAM
   member formats) consistent with the `009` contract and the constitution.
+
+## Implementation Notes & Deviations (2026-06-14)
+
+Captured after the configuration was applied live (Dev). These reflect what the real apply +
+first deploy surfaced, so the spec matches reality.
+
+### Configuration ownership & the 009 pipeline
+- **Single declarative owner of service config.** The initial assumption that the `009` deploy could
+  re-assert env vars/secrets on each deploy proved wrong: `gcloud run deploy --set-env-vars` is
+  *replace-all* and wiped the infra-managed non-secret env vars (`Stripe__PublishableKey`,
+  `Storage__*`), crashing startup and blocking the frontend promote. Resolved by making the deploy
+  **image-only** and adding `traffic` to the infra `ignore_changes` (FR-007). This is a small change
+  to the **009 `deploy-dev` job** (`.github/workflows/test.yml`), not just this feature.
+- **Additional non-secret env vars** beyond the nine secrets are required at runtime (FR-006):
+  `Stripe__PublishableKey`, `Storage__BucketName`, `Storage__ForcePathStyle`. They are non-secret and
+  set as plain env vars, not Secret Manager entries.
+
+### Identity / privileges
+- **Deployer SA granted project Owner** (FR-010 deviation) so CI can `tofu apply` the whole
+  environment. Bounded by repo-scoped WIF + `main` protection; a separate infra-admin identity is the
+  documented future hardening.
+- **Bootstrap enables two more APIs** than first listed — `cloudresourcemanager.googleapis.com` and
+  `serviceusage.googleapis.com` — required for project-IAM management and API enablement when CI
+  applies as the deployer SA. (Original set: run, secretmanager, iam, iamcredentials, sts, storage.)
+
+### Custom API domain
+- Creating the Cloud Run domain mapping requires **one-time manual Google domain-ownership
+  verification** of `nekohoa.com` (Search Console) — a second manual prerequisite alongside the
+  state-bucket bootstrap (refines FR-031 / Assumptions). Gated behind `enable_api_domain` (FR-018).
+- The two-step cert flow (grey-cloud → proxied) is confirmed; managed-cert issuance can take 15–60+
+  minutes.
+
+### Provider/runtime specifics
+- **Neon**: `history_retention_seconds` must be pinned to the plan cap (21600 / 6h; the provider
+  default 7d is rejected); `org_id` is `ignore_changes` (the provider reads it back and otherwise
+  forces project replacement on every apply); the branch is named from `env_name`.
+- **Cloud Run startup probe** is tuned generously (~5 min) because the **first** boot runs EF
+  migrations + the full data seed before `/health` responds.
+
+### Deploy-surfaced application fixes (companion changes, tested)
+Running the real image for the first time exposed latent app bugs that had to be fixed for the
+environment to come up (all merged with tests):
+- **`PaymentSeeder`** never set `LedgerEntry.Sequence` → unique-index crash on the boot seed (the
+  production seeder was previously untested; the suite used a separate `TestDataSeeder`).
+- **`DocumentStorageInitializer`** called `PutBucket` and only tolerated "already exists"; Cloudflare
+  R2 returns 403 for bucket creation (the bucket is IaC-provisioned) → made best-effort.
+- **`ASPNETCORE_ENVIRONMENT` startup validator** added per the Configuration-validation requirement
+  (T039), rejecting a mis-set host environment at boot.
+
+### Operator convenience
+- The GitHub Actions secrets/variables were set directly via `gh` during this implementation (the
+  spec's Assumption that the operator sets them by hand still holds as the contract; the config
+  itself does not write them).
