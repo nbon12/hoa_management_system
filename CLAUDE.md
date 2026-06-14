@@ -88,4 +88,19 @@ all of the feature's spec-kit work and its PR.
 - The Spec Kit scripts also key off the branch name; running them from the feature branch keeps
   `check-prerequisites.sh` and friends working without needing `SPECIFY_FEATURE` overrides.
 
+## Git Branch Lifecycle
+
+After merging a branch into `main`, that branch is **immutable and closed**. Do not:
+- Commit to it
+- Push to it
+- Check it out to continue work
+
+If more work is needed after a merge:
+1. Switch to `main`
+2. Pull the latest changes: `git pull origin main`
+3. Create a new branch off of `main`: `git checkout -b <new-branch-name>`
+4. Do all further work on the new branch
+
+Merged branches exist only as historical artifacts. Treat them as read-only.
+
 <!-- MANUAL ADDITIONS END -->
