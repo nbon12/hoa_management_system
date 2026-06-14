@@ -30,6 +30,15 @@ variable "gcp_project_id" {
   type        = string
 }
 
+variable "state_bucket" {
+  description = <<-EOT
+    Name of the GCS Terraform-state bucket (from the bootstrap). The deployer SA is granted
+    objectAdmin on it so CI (authenticating as that SA via WIF) can read/write remote state during
+    plan/apply. Same value as the backend.tf bucket.
+  EOT
+  type        = string
+}
+
 variable "gcp_region" {
   description = "GCP region for the Cloud Run service. Surfaced as the gcp_region output → GH var GCP_REGION (matrix row 2)."
   type        = string
