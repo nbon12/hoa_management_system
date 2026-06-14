@@ -106,10 +106,13 @@ resource "google_cloud_run_v2_service" "api" {
   # tofu is the single declarative owner of all OTHER config (env vars, secrets, probes, scaling, SA),
   # so the pipeline deploys image-only and shifts traffic (canary tags) without drift here. image is
   # the live :sha pushed by 009; client/client_version churn on every gcloud deploy; traffic is the
-  # canary split (candidate tag → 100%) the deploy job manages.
+  # canary split (candidate tag → 100%) the deploy job manages. template[0].revision is also
+  # pipeline-owned: every gcloud deploy stamps a new revision name, which tofu would otherwise null
+  # on each apply (perpetual churn / an extra revision per apply).
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
+      template[0].revision,
       client,
       client_version,
       traffic,
