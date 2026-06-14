@@ -52,6 +52,19 @@ resource "google_cloud_run_v2_service" "api" {
         value = var.stripe_publishable_key
       }
 
+      # Document storage (Cloudflare R2). Non-secret config: the bucket is the one this module
+      # provisions (app default "hoa-documents" is the local-MinIO name and would 404 on R2), and R2
+      # requires PATH-STYLE addressing (the app default false yields virtual-host URLs R2 rejects).
+      # The R2 access key / secret / endpoint come from Secret Manager (storage-* secrets).
+      env {
+        name  = "Storage__BucketName"
+        value = cloudflare_r2_bucket.documents.name
+      }
+      env {
+        name  = "Storage__ForcePathStyle"
+        value = "true"
+      }
+
       # The nine secret-backed env vars, each pointing at its Secret Manager secret's latest version.
       dynamic "env" {
         for_each = local.secret_env
@@ -67,12 +80,21 @@ resource "google_cloud_run_v2_service" "api" {
       }
 
       startup_probe {
+        # First boot runs EF migrations + full data seed before /health is served; allow up to ~5 min
+        # (30 × 10s). Subsequent cold starts skip the seed and pass quickly.
+        initial_delay_seconds = 10
+        timeout_seconds       = 5
+        period_seconds        = 10
+        failure_threshold     = 30
         http_get {
           path = "/health"
         }
       }
 
       liveness_probe {
+        timeout_seconds   = 5
+        period_seconds    = 30
+        failure_threshold = 3
         http_get {
           path = "/health"
         }

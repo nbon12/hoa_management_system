@@ -25,9 +25,14 @@ public class DocumentStorageInitializer(
         {
             await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket, UseClientRegion = true }, ct);
         }
-        catch (AmazonS3Exception ex) when (ex.ErrorCode is "BucketAlreadyOwnedByYou" or "BucketAlreadyExists")
+        catch (AmazonS3Exception ex)
         {
-            // ok
+            // Creating the bucket is a local-MinIO convenience. In deployed environments the bucket is
+            // provisioned by IaC and the runtime credentials intentionally CANNOT create buckets
+            // (e.g. a Cloudflare R2 "Object Read & Write" token returns 403 Access Denied for
+            // PutBucket). Treat any create failure as non-fatal — the uploads below will surface a
+            // genuinely missing or inaccessible bucket.
+            logger.LogDebug(ex, "Skipping bucket create for {Bucket} (already exists or externally managed).", bucket);
         }
 
         var docs = await db.HoaDocuments.AsNoTracking().Select(d => new { d.StorageKey }).ToListAsync(ct);
