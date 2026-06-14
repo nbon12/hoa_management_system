@@ -113,6 +113,10 @@ resource "google_cloud_run_v2_service" "api" {
     ignore_changes = [
       template[0].containers[0].image,
       template[0].revision,
+      # gcloud image-only deploys re-emit the scaling block without the explicit min_instance_count=0
+      # (0 is the API default), so tofu perpetually wants to re-add it. min=0 (scale-to-zero) is the
+      # default regardless, so ignore the pipeline's scaling representation to stay drift-free.
+      template[0].scaling,
       client,
       client_version,
       traffic,
