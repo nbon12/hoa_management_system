@@ -33,6 +33,9 @@ resource "cloudflare_record" "frontend" {
 # API DNS: api-dev.nekohoa.com → Cloud Run's Google-hosted target. proxied toggles the cert flow:
 # false (grey-cloud) for first apply so Google issues the cert, then true for proxied Full(strict).
 resource "cloudflare_record" "api" {
+  # Created alongside the custom-domain mapping (gated on Google domain verification).
+  count = var.enable_api_domain ? 1 : 0
+
   zone_id = var.cloudflare_zone_id
   name    = var.api_domain
   type    = "CNAME"

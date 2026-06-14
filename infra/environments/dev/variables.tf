@@ -15,6 +15,12 @@ variable "github_repository" {
   default = "nbon12/hoa_management_system"
 }
 
+variable "enable_api_domain" {
+  description = "Create the api-dev.nekohoa.com custom-domain mapping + record (needs Google domain verification first)."
+  type        = bool
+  default     = false
+}
+
 variable "api_dns_proxied" {
   description = "false for the grey-cloud cert step, then true for proxied Full(strict) (FR-019)."
   type        = bool

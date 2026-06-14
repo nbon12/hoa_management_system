@@ -32,10 +32,11 @@ module "environment" {
   gcp_region        = var.gcp_region
   github_repository = var.github_repository
 
-  frontend_domain = "dev.nekohoa.com"
-  api_domain      = "api-dev.nekohoa.com"
-  api_dns_proxied = var.api_dns_proxied
-  container_image = var.container_image
+  frontend_domain   = "dev.nekohoa.com"
+  api_domain        = "api-dev.nekohoa.com"
+  enable_api_domain = var.enable_api_domain
+  api_dns_proxied   = var.api_dns_proxied
+  container_image   = var.container_image
 
   stripe_publishable_key = var.stripe_publishable_key
 
