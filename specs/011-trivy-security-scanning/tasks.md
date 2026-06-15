@@ -37,7 +37,7 @@ CI/infra feature — no `src/` tree. Deliverables: `.github/workflows/security-s
 
 - [X] T001 [P] Create `.trivyignore` at the repo root with a header explaining the format (one CVE/misconfig ID per line + `# reason — owner — review/expiry` comment); start empty (FR-015)
 - [X] T002 Create `.github/workflows/security-scan.yml` skeleton: `name`, `on:` (`pull_request` → `main`, `push` → `main`, `schedule` nightly `cron: '0 7 * * *'`), job-level `permissions` (`contents: read`, `security-events: write`, `pull-requests: read`), and top-level `env` (`TRIVY_SEVERITY: ${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}`, `IMAGE_LOCAL_TAG`, `PUBLISHED_IMAGE: 'sakurapatch/nekohoa-api:latest'`) (FR-007/FR-014/FR-016)
-- [ ] T003 [P] Define the `TRIVY_SEVERITY` repository variable (`gh variable set TRIVY_SEVERITY --body 'CRITICAL,HIGH'`) as the single severity source referenced by both `security-scan.yml` and `test.yml` (FR-007)
+- [X] T003 [P] Define the `TRIVY_SEVERITY` repository variable (`gh variable set TRIVY_SEVERITY --body 'CRITICAL,HIGH'`) as the single severity source referenced by both `security-scan.yml` and `test.yml` (FR-007)
 
 ---
 
@@ -112,8 +112,8 @@ CI/infra feature — no `src/` tree. Deliverables: `.github/workflows/security-s
 **Purpose**: Operational wiring and verification that spans the stories.
 
 - [X] T020 [P] Add `actionlint` validation (a CI step or a documented local run) for the new/edited workflow files; also assert no `trivy`/scanner step is embedded in `HOAManagementCompany/Dockerfile` (separation-of-stages check) (FR-004 / analyze C3)
-- [ ] T021 Configure `main` branch protection to require the `IaC config scan (trivy config)` and `Image vulnerability scan (trivy image)` status checks so a failing scan blocks the merge that would trigger the push/deploy and enforces IaC-before-build ordering on the cross-workflow post-merge path (quickstart §3) (FR-011/FR-002)
-- [ ] T022 Enable GitHub Code Scanning so SARIF populates the Security tab; confirm the artifact fallback still works when it is disabled (research D2) (FR-014)
+- [X] T021 Configure `main` branch protection to require the `IaC config scan (trivy config)` and `Image vulnerability scan (trivy image)` status checks so a failing scan blocks the merge that would trigger the push/deploy and enforces IaC-before-build ordering on the cross-workflow post-merge path (quickstart §3) (FR-011/FR-002)
+- [X] T022 Enable GitHub Code Scanning so SARIF populates the Security tab; confirm the artifact fallback still works when it is disabled (research D2) (FR-014)
 - [X] T023 Verify coverage/Sonar/Codecov gates exclude the new workflow YAML and `.trivyignore` (consistent with `010` excluding `infra/**`) so a 0%-coverage check does not block the PR
 - [ ] T024 [P] Run `quickstart.md` end-to-end validation (every row of the verification table)
 - [ ] T025 [P] (Optional follow-up) Pin the remaining floating-tag actions in `test.yml` via `pinact` — recommended hardening flagged in quickstart (out of this feature's required scope)
