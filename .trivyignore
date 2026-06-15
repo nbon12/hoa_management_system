@@ -1,0 +1,10 @@
+# Trivy allowlist — reviewed, documented exceptions only.
+#
+# Format: one CVE / misconfiguration ID per line (e.g. CVE-2025-12345, AVD-AWS-0089).
+# Every entry MUST carry a justification comment:
+#   <ID>            # reason — owner — review/expiry date
+#
+# Allowlisted findings remain visible in scan output (SARIF/logs) but do NOT fail the build.
+# Remove an entry once the upstream fix ships or the exception expires to restore enforcement.
+#
+# (Intentionally empty — add exceptions via pull-request review.)
