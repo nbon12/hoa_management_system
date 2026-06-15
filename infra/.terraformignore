@@ -1,0 +1,7 @@
+# Files excluded when this tree is packaged for a remote run.
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.md

@@ -183,6 +183,11 @@ builder.Services.AddValidatedOptions<SendGridOptions, SendGridOptionsValidator>(
 builder.Services.AddValidatedOptions<ObservabilityOptions, ObservabilityOptionsValidator>(
     builder.Configuration, ObservabilityOptions.SectionName);
 
+// The host environment name itself must be one of the known set — fail fast on a mis-set
+// ASPNETCORE_ENVIRONMENT (e.g. "prod" instead of "Production", or deployed-"Dev" vs local
+// "Development"). The 010 IaC sets this on Cloud Run (FR-006/FR-030); this guards it (constitution §8).
+builder.Services.AddValidatedHostEnvironment(builder.Environment);
+
 // ── S3 / MinIO ─────────────────────────────────────────────────────────────
 // Resolve the validated StorageOptions (guaranteed non-null/valid post ValidateOnStart) rather
 // than a raw, possibly-null bind (FR-011).

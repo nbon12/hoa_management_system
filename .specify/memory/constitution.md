@@ -1,6 +1,37 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 2.1.0 -> 2.2.0
+Modified principles:
+  Added new section "Executable & Living Specifications" (now section 11) enforcing that
+    every spec.md remains executable at all times (acceptance criteria backed by runnable,
+    currently-passing tests), that spec.md is a living document kept in sync with reality
+    (drift is a defect to be fixed before merge — including for older, already-merged specs),
+    that the active feature's spec.md and tasks.md must be current before a PR is submitted
+    (older specs only need their spec.md kept truthful; tasks.md/plan.md/research.md are
+    point-in-time artifacts not required to be refreshed), and that cross-spec contradictions
+    (a new/amended spec whose tests contradict a former spec) MUST be reconciled so the full
+    spec corpus stays internally consistent.
+  Renumbered prior "Governance & Amendments" from section 11 to section 12.
+Templates requiring updates:
+  .specify/templates/tasks-template.md updated (pre-PR spec/tasks freshness + drift task,
+    Polish review item)
+  .specify/templates/plan-template.md updated (Constitution Check: executable/living specs)
+  .specify/templates/spec-template.md updated (Constitution Requirements: executable spec +
+    cross-spec consistency)
+Follow-up TODOs: None
+
+----- prior amendment -----
+Version change: 2.0.0 -> 2.1.0
+Modified principles:
+  Operations, Secrets, and Data Lifecycle — added mandatory startup configuration
+    validation: all backend options via FluentValidation (fail-fast, environment-aware,
+    incl. ASPNETCORE_ENVIRONMENT), and a frontend boot-time guard that fails loudly on
+    missing required configuration. Codifies the 008-config-validation feature.
+Templates requiring updates: none (additive rule).
+Follow-up TODOs: None
+
+----- prior amendment -----
 Version change: 1.1 -> 2.0.0
 Modified principles:
   Project Purpose — expanded HOA scope, multi-association membership, and content ownership.
@@ -29,7 +60,7 @@ Follow-up TODOs: None
 
 # HOA Management Company Constitution
 
-**Version**: 2.0.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-05-03
+**Version**: 2.2.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-06-13
 **Authors**: Project maintainers
 
 ## 1. Project Purpose
@@ -214,6 +245,17 @@ The UI MUST function and render correctly at:
 - Secrets MUST NOT be committed.
 - Environment-specific configuration MUST come from environment variables or managed secret
   stores.
+- **All application configuration MUST be validated at startup.** On the backend, every
+  strongly-typed options/configuration class MUST be validated with **FluentValidation**
+  (bound-and-validated at startup); the service MUST **fail fast** — refuse to start — on invalid
+  or missing configuration rather than deferring failures to request time. Validation rules MUST be
+  **environment-aware**, and MUST include validating the runtime environment name
+  (`ASPNETCORE_ENVIRONMENT`) against the known set (`Development` = local machine, `Dev` = deployed
+  dev, `Test`, `Staging`, `Production`) so a mis-set environment (such as `prod` instead of
+  `Production`, or the deployed-`Dev`-vs-local-`Development` confusion) is rejected at boot.
+  The **frontend** MUST apply the equivalent boot-time guard for its required configuration, failing
+  loudly (refusing to boot / surfacing a clear error) when required values are missing or invalid.
+  New configuration of any kind MUST ship with its validator.
 - Dev, Staging, and Prod secrets MUST be isolated.
 - Docker images MUST NOT bake in secrets.
 - Backend services MUST emit structured JSON logs.
@@ -286,7 +328,42 @@ The UI MUST function and render correctly at:
   developers and automated tests can run against a **real PostgreSQL** instance analogous to
   production semantics.
 
-## 11. Governance & Amendments
+## 11. Executable & Living Specifications
+
+Specifications are not documentation that lags behind the code — they are the executable
+contract of the system and MUST stay true at all times.
+
+- **Always executable**: Every feature spec (`spec.md`) MUST remain executable at all times.
+  Each mandatory acceptance scenario and functional requirement MUST be backed by at least
+  one automated test (backend integration/business-process test or frontend
+  unit/component/E2E test) that can be run on demand and that **currently passes** against
+  the merged code. A spec whose acceptance criteria cannot be executed, or whose tests fail,
+  is a defect that MUST be fixed before merge.
+- **No unverified claims**: A spec MUST NOT describe behavior that no executable test
+  verifies. Acceptance scenarios MUST be traceable to tests, and tests MUST be traceable
+  back to acceptance criteria.
+- **Living and truthful (`spec.md` only)**: `spec.md` is a living document and MUST reflect
+  the system as it is actually built. When implemented behavior diverges from a `spec.md` —
+  **including older, already-merged specs** — the divergence MUST be resolved before the change
+  merges: either the `spec.md` is updated so it reflects reality, or the code is corrected to
+  match the spec. **Spec drift is a defect**, not an acceptable steady state. Only `spec.md`
+  carries this freshness obligation; `tasks.md`, `plan.md`, and `research.md` are point-in-time
+  artifacts and are **NOT** required to be kept up to date for prior, already-merged features.
+- **Pre-PR freshness**: Before a pull request is submitted, the **active feature's** `spec.md`
+  **and** `tasks.md` MUST be brought up to date with the work actually performed, and **any
+  older `spec.md` that has drifted from the code MUST be updated** so it reflects reality. The
+  active feature's `plan.md` and `research.md` are NOT required to be refreshed for this gate,
+  and the `tasks.md`, `plan.md`, and `research.md` of older, already-merged features are
+  likewise NOT required to be refreshed — only their `spec.md` must stay truthful.
+- **Cross-spec consistency**: When a new or amended spec introduces tests or acceptance
+  criteria that **directly contradict** those of a former spec, the contradiction MUST be
+  reconciled before merge. Reconciliation means: update the superseded spec(s) so the full
+  spec corpus is internally consistent, explicitly record which spec prevails and why, and
+  ensure no two specs assert contradictory assertions that would both be expected to pass.
+- **Corpus invariant**: The full body of specs MUST be free of mutually contradictory
+  executable assertions at all times.
+
+## 12. Governance & Amendments
 
 - Changes to this constitution MUST be reviewed and approved like any architectural decision
   record affecting the whole project.

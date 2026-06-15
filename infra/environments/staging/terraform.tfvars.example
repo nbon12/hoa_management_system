@@ -1,0 +1,31 @@
+# Staging skeleton — copy to terraform.tfvars (gitignored) and fill. PLACEHOLDERS ONLY (SC-005).
+# Demonstrates that a new environment needs only new inputs — no module edits (SC-009).
+
+gcp_project_id    = "your-gcp-project-id"
+gcp_region        = "us-central1"
+github_repository = "nbon12/hoa_management_system"
+
+api_dns_proxied = false
+container_image = "sakurapatch/nekohoa-api:latest"
+
+stripe_publishable_key = "pk_test_REPLACE"
+
+neon_region_id = "aws-us-east-1"
+neon_api_key   = "REPLACE_WITH_NEON_API_KEY"
+
+cloudflare_api_token  = "REPLACE_WITH_CLOUDFLARE_API_TOKEN"
+cloudflare_account_id = "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID"
+cloudflare_zone_id    = "REPLACE_WITH_CLOUDFLARE_ZONE_ID_FOR_nekohoa.com"
+
+operator_secrets = {
+  "jwt-secret"            = "REPLACE"
+  "sentry-dsn"            = "REPLACE"
+  "stripe-secret-key"     = "sk_test_REPLACE"
+  "stripe-webhook-secret" = "whsec_REPLACE"
+  "storage-service-url"   = "https://<account>.r2.cloudflarestorage.com"
+  "storage-access-key"    = "REPLACE"
+  "storage-secret-key"    = "REPLACE"
+  "scheduler-secret"      = "REPLACE"
+}
+
+deploy_alert_webhook_url = "REPLACE_WITH_DEPLOY_ALERT_WEBHOOK_URL"

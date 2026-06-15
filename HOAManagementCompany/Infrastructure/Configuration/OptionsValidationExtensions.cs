@@ -8,6 +8,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Infrastructure.Configuration;
@@ -38,6 +39,32 @@ public static class OptionsValidationExtensions
 
         services.AddOptions<TOptions>()
             .Bind(configuration.GetSection(sectionName))
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Validates the host's <c>ASPNETCORE_ENVIRONMENT</c> name at startup against
+    /// <see cref="HostEnvironmentOptions.KnownEnvironments"/>. Unlike the other options groups, the
+    /// value comes from <paramref name="environment"/> (not a configuration section), but it runs
+    /// through the same <see cref="FluentValidateOptions{T}"/> + <c>ValidateOnStart</c> pipeline so a
+    /// mis-set environment (e.g. <c>prod</c> instead of <c>Production</c>) throws
+    /// <see cref="OptionsValidationException"/> during host startup (010, constitution §8).
+    /// </summary>
+    public static IServiceCollection AddValidatedHostEnvironment(
+        this IServiceCollection services,
+        IHostEnvironment environment)
+    {
+        services.AddSingleton<IValidator<HostEnvironmentOptions>, HostEnvironmentOptionsValidator>();
+
+        services.AddSingleton<IValidateOptions<HostEnvironmentOptions>>(sp =>
+            new FluentValidateOptions<HostEnvironmentOptions>(
+                Microsoft.Extensions.Options.Options.DefaultName,
+                sp.GetRequiredService<IValidator<HostEnvironmentOptions>>()));
+
+        services.AddOptions<HostEnvironmentOptions>()
+            .Configure(o => o.EnvironmentName = environment.EnvironmentName)
             .ValidateOnStart();
 
         return services;
