@@ -182,16 +182,44 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      # Build locally (load into the runner daemon, no push) so Trivy can scan the exact
+      # artifact BEFORE it is published (011 / FR-003 / FR-011).
+      - name: Build image (local, no push)
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: HOAManagementCompany/Dockerfile
+          load: true
+          push: false
+          tags: nekohoa-api:scan-${{ github.sha }}
+
+      # Gate the push: a fixable CRITICAL/HIGH (not allowlisted) fails here and the push
+      # steps below never run (FR-011). Severity is the same single source as security-scan.yml.
+      - name: Trivy image scan (gate before push)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: nekohoa-api:scan-${{ github.sha }}
+          format: table
+          severity: ${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}
+          ignore-unfixed: true
+          exit-code: '1'
+          trivyignores: .trivyignore
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
+      # Reuses the Buildx cache from the scanned build, so the pushed image is the one Trivy validated.
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: HOAManagementCompany/Dockerfile
