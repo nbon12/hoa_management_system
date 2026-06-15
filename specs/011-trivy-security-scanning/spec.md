@@ -73,6 +73,7 @@ As a maintainer responsible for the security of the delivery pipeline itself, I 
 - **Unfixable CRITICAL/HIGH**: A CRITICAL/HIGH finding with no upstream fix available must be reported but must not fail the build (per the ignore-unfixed policy), so the pipeline is never permanently blocked by an un-actionable CVE.
 - **Allowlisted finding**: A finding explicitly listed in the reviewed `.trivyignore` allowlist must remain visible in the results but must not fail the build; removing it from the allowlist restores enforcement.
 - **Scheduled run with no PR build**: The nightly scheduled run has no fresh local image, so it must scan the most recently published image rather than skip the image stage; a clean PR build does not exempt `main` from later re-scans.
+- **Secret baked into the image**: Trivy's image scan also detects embedded secrets (a Trivy default). Non-production config that carries secret-shaped placeholders (e.g. `appsettings.Development.json` / `appsettings.Test.json`) MUST NOT be published into the runtime image; such a finding is treated as CRITICAL and fails the build. The fix is to keep that config out of the published image, not to suppress the finding.
 
 ## Requirements *(mandatory)*
 

@@ -64,4 +64,16 @@
     <Content Include="testdata\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Keep local-only environment configs OUT of the published image (011-trivy-security-scanning).
+       appsettings.Development.json / appsettings.Test.json hold non-functional placeholder values
+       (incl. a Stripe-key-shaped `sk_test_placeholder`) that the container never loads — it runs as
+       Production or Dev (appsettings.Dev.json), with real secrets injected from the managed secret
+       store. Excluding them from publish stops dev/test config being baked into the image and
+       tripping the Trivy image secret scan, while leaving them available for local `dotnet run` and
+       the xUnit test host (build output is unaffected; only publish output changes). -->
+  <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.Test.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
 </Project>
