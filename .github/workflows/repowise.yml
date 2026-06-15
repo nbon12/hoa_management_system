@@ -33,7 +33,7 @@ jobs:
           python -m pip install "repowise${{ env.REPOWISE_VERSION }}" pyyaml
 
       - name: Cache repowise index
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .repowise
           key: repowise-index-${{ runner.os }}-${{ hashFiles('.repowiseIgnore', 'repowise/health-gates.yaml') }}
