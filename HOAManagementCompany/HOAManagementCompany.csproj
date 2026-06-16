@@ -33,8 +33,9 @@
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.*" />
 
-    <!-- AWS S3 (MinIO / Cloudflare R2) -->
-    <PackageReference Include="AWSSDK.S3" Version="3.*" />
+    <!-- AWS S3 (MinIO / Cloudflare R2). Pinned exactly: a floating 3.* once pulled an SDK
+         whose default streaming-trailer checksum R2 rejects (501), silently breaking uploads. -->
+    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
 
     <!-- Payments & alerts (006-stripe-payments) -->
     <PackageReference Include="Stripe.net" Version="47.*" />

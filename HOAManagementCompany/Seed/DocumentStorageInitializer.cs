@@ -42,19 +42,35 @@ public class DocumentStorageInitializer(
             return;
         }
 
+        var succeeded = 0;
+        var failed = 0;
         foreach (var doc in docs)
         {
             try
             {
                 var pdfBytes = await TestDataFiles.ReadSamplePdfAsync(ct);
                 await storage.UploadAsync(doc.StorageKey, pdfBytes, ct: ct);
+                succeeded++;
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Could not refresh PDF for {StorageKey}", doc.StorageKey);
+                failed++;
+                logger.LogError(ex, "Could not refresh PDF for {StorageKey}", doc.StorageKey);
             }
         }
 
-        logger.LogInformation("Refreshed {Count} document PDFs in object storage.", docs.Count);
+        if (failed > 0)
+        {
+            // Every upload failing here means downloads will 404 (the object never lands in the
+            // bucket). Log at Error so a systemic storage misconfiguration can't masquerade as a
+            // healthy startup, as it previously did when this counted DB rows instead of successes.
+            logger.LogError(
+                "Object-storage refresh incomplete: {Succeeded}/{Total} PDFs uploaded, {Failed} failed.",
+                succeeded, docs.Count, failed);
+        }
+        else
+        {
+            logger.LogInformation("Refreshed {Count} document PDFs in object storage.", succeeded);
+        }
     }
 }
