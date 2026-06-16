@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload gate report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: repowise-gate-report
           path: /tmp/repowise-gate-report.txt
