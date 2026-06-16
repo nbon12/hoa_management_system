@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   globalSetup: require.resolve('./e2e/global-setup'),
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4200',
     storageState: 'e2e/.auth/state.json',
     video: 'retain-on-failure',
     screenshot: 'only-on-failure',
