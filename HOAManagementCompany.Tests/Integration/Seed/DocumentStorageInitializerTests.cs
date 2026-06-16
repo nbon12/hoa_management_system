@@ -94,6 +94,56 @@ public class DocumentStorageInitializerTests(TestDatabaseFixture fixture)
         Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("Refreshed"));
     }
 
+    [Fact]
+    public async Task EnsureValidPdfs_WhenUploadsSucceed_LogsRefreshedCountAndNoError()
+    {
+        var opts = Options.Create(new StorageOptions
+        {
+            ServiceUrl = fixture.MinioEndpoint,
+            AccessKey = fixture.MinioAccessKey,
+            SecretKey = fixture.MinioSecretKey,
+            BucketName = "hoa-documents",
+            ForcePathStyle = true,
+        });
+
+        using var s3 = new AmazonS3Client(
+            new BasicAWSCredentials(fixture.MinioAccessKey, fixture.MinioSecretKey),
+            new AmazonS3Config { ServiceURL = fixture.MinioEndpoint, ForcePathStyle = true });
+
+        var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(fixture.ConnectionString)
+            .Options;
+        await using var db = new ApplicationDbContext(dbOptions);
+
+        var storage = new RecordingDocumentStorage();
+        var logger = new CapturingLogger<DocumentStorageInitializer>();
+        var initializer = new DocumentStorageInitializer(db, storage, s3, opts, logger);
+
+        // Happy path: every upload succeeds (fake storage), so the run reports the refreshed count at
+        // Information and logs nothing at Error. A fake — rather than the real MinIO client — keeps this
+        // deterministic regardless of how the container handles the SDK's default checksum mode.
+        await initializer.EnsureValidPdfsAsync();
+
+        Assert.NotEmpty(storage.UploadedKeys);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information && e.Message.Contains("Refreshed"));
+        Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error);
+    }
+
+    /// <summary>Records successful uploads without touching a real object store.</summary>
+    private sealed class RecordingDocumentStorage : IDocumentStorage
+    {
+        public List<string> UploadedKeys { get; } = new();
+
+        public Task<string> GetPreSignedUrlAsync(string storageKey, CancellationToken ct = default)
+            => Task.FromResult($"https://example.test/{storageKey}");
+
+        public Task UploadAsync(string storageKey, byte[] content, string contentType = "application/pdf", CancellationToken ct = default)
+        {
+            UploadedKeys.Add(storageKey);
+            return Task.CompletedTask;
+        }
+    }
+
     /// <summary>Fails every upload, simulating R2 rejecting the request (e.g. the streaming-trailer 501).</summary>
     private sealed class ThrowingDocumentStorage : IDocumentStorage
     {
