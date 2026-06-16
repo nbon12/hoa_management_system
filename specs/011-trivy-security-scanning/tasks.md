@@ -116,7 +116,7 @@ CI/infra feature — no `src/` tree. Deliverables: `.github/workflows/security-s
 - [X] T022 Enable GitHub Code Scanning so SARIF populates the Security tab; confirm the artifact fallback still works when it is disabled (research D2) (FR-014)
 - [X] T023 Verify coverage/Sonar/Codecov gates exclude the new workflow YAML and `.trivyignore` (consistent with `010` excluding `infra/**`) so a 0%-coverage check does not block the PR
 - [X] T024 [P] Run `quickstart.md` end-to-end validation (every row of the verification table) — validated locally with Trivy 0.71.1 + Docker: vulnerable image blocked (node:18.12-bullseye-slim, exit 1), clean image/real `infra/` pass (exit 0), IaC misconfig caught (exit 1), empty `infra/` no-op (exit 0), all actions SHA-pinned. Nightly published-image row keys on the `schedule` event (not manually fireable) — logic in place, first run on the cron.
-- [ ] T025 [P] (Optional follow-up) Pin the remaining floating-tag actions in `test.yml` via `pinact` — recommended hardening flagged in quickstart (out of this feature's required scope)
+- [X] T025 [P] (Optional follow-up) Pin the remaining floating-tag actions in `test.yml` to commit SHAs — recommended hardening flagged in quickstart (out of this feature's required scope). Done in PR #61: checkout/setup-dotnet/setup-node/setup-python/upload-artifact/codecov pinned to SHAs (precise versions in trailing comments); behavior unchanged, Dependabot bumps them.
 
 ---
 
