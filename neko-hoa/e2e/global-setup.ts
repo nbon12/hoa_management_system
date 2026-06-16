@@ -2,16 +2,19 @@ import { chromium } from '@playwright/test';
 import { SEED_EMAIL, SEED_PASSWORD } from './helpers/auth';
 
 async function globalSetup() {
+  const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
+  const frontendBase = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4200';
+
   // Clean up any test users registered by previous E2E runs so the registration
   // test can run against an unclaimed SAKURA-003 property each time.
   try {
-    await fetch('http://localhost:5212/api/v1/e2e/cleanup', { method: 'DELETE' });
+    await fetch(`${apiBase}/api/v1/e2e/cleanup`, { method: 'DELETE' });
   } catch {
     // API unreachable or no test users exist — non-fatal
   }
 
   const browser = await chromium.launch();
-  const context = await browser.newContext({ baseURL: 'http://localhost:4200' });
+  const context = await browser.newContext({ baseURL: frontendBase });
   const page = await context.newPage();
 
   await page.goto('/login');
