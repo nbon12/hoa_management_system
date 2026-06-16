@@ -1,6 +1,6 @@
 // <!-- REPOWISE:START domain=bootstrap -->
 // Middleware pipeline and DI registration — HOAManagementCompany API.
-// Observability wiring lives here: Serilog (Console + OTLP/JSON sink, trace/span +
+// Observability wiring lives here: Serilog (Console JSON + OTLP sink, trace/span +
 // user-GUID enrichment), Sentry-on-OTel (consumes the OpenTelemetry activity pipeline
 // with an independent trace sample rate), and builder.AddObservability() (OTel tracing/
 // metrics → OTLP, scrubbing, sampling). Telemetry-init is guarded as non-fatal (FR-008).
@@ -35,6 +35,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,7 +57,7 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(services)
         .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
-        .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
+        .WriteTo.Console(new CompactJsonFormatter()) // CLEF JSON on stdout — required by Cloud Run log ingestion (FR-019/FR-020).
         .Enrich.FromLogContext()
         .Enrich.With(new ActivityTraceEnricher()) // trace_id/span_id on every record (FR-003).
         .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName);
