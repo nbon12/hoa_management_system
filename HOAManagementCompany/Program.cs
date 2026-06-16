@@ -199,6 +199,14 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
         ServiceURL = storageOpts.ServiceUrl,
         ForcePathStyle = storageOpts.ForcePathStyle,
         UseHttp = storageOpts.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
+        // Cloudflare R2 does not implement the SDK's default streaming-trailer checksum
+        // ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER not implemented" → 501), which silently
+        // breaks every PutObject in deployed envs. WhenRequired returns the SDK to a normal,
+        // SigV4-signed (x-amz-content-sha256) PUT — integrity is still covered by the signed
+        // payload hash + TLS. MinIO tolerates either, so local behaviour is unchanged.
+        RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+        // R2 expects SigV4 region "auto"; the SDK can't infer a region from a non-AWS ServiceURL.
+        AuthenticationRegion = "auto",
     };
     return new AmazonS3Client(
         new BasicAWSCredentials(storageOpts.AccessKey, storageOpts.SecretKey),
