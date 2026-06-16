@@ -14,6 +14,7 @@
     "cypress:run": "cypress run --e2e",
     "e2e:ci": "start-server-and-test \"ng serve --configuration development --port 4200\" http-get://localhost:4200 cypress:run",
     "e2e:dev": "cypress run --e2e",
+    "e2e:playwright-dev": "playwright test",
     "storybook": "ng run neko-hoa:storybook",
     "build-storybook": "ng run neko-hoa:build-storybook"
   },
