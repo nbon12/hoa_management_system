@@ -255,8 +255,14 @@ var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<st
 if (corsOrigins is null || corsOrigins.Length == 0)
     corsOrigins = ["http://localhost:4200", "https://localhost:4200"];
 
+// Cloudflare Pages preview deployments use a per-deploy origin (https://<hash>.nekohoa-dev.pages.dev)
+// that can't be enumerated up front, so the post-deploy Playwright smoke gate (which loads the preview
+// URL and logs in against this API) was blocked by CORS. Cors:AllowedOriginSuffixes lets Dev allow any
+// host under a trusted suffix; it is set ONLY for Dev, so Production keeps its exact-origin allow-list.
+var corsSuffixes = builder.Configuration.GetSection("Cors:AllowedOriginSuffixes").Get<string[]>() ?? [];
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins(corsOrigins)
+    p.SetIsOriginAllowed(origin => CorsOriginPolicy.IsAllowed(origin, corsOrigins, corsSuffixes))
      .WithHeaders(
          "Authorization", "Content-Type", "Accept",
          "traceparent", "tracestate", "baggage")
