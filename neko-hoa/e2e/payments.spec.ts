@@ -126,7 +126,8 @@ test.describe.serial('Recurring payment CRUD', () => {
   });
 
   test('READ: draft history table has entries', async ({ page }) => {
-    await expect(page.getByText(/Drafts/i)).toBeVisible();
+    // "Drafts" matches both the section title and the table caption; assert the table by testid.
+    await expect(page.getByTestId('drafts-table')).toBeVisible();
     const rows = page.locator('.data-table tbody tr');
     await expect(rows.first()).toBeVisible({ timeout: 10_000 });
   });
