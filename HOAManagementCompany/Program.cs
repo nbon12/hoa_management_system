@@ -217,9 +217,13 @@ builder.Services.AddScoped<IDocumentStorage, S3DocumentStorage>();
 // ── Rate Limiting ──────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(o =>
 {
+    // Permit count is env-tunable: the global "auth" window covers login + refresh for all clients,
+    // so the parallel post-deploy Playwright smoke suite (many seed-user logins/refreshes in one
+    // minute) exhausts the default and gets 429s. Dev raises it; Production keeps the strict default.
+    var authPermits = builder.Configuration.GetValue<int?>("RateLimiting:AuthPermitsPerMinute") ?? 10;
     o.AddFixedWindowLimiter("auth", opts =>
     {
-        opts.PermitLimit = 10;
+        opts.PermitLimit = authPermits;
         opts.Window = TimeSpan.FromMinutes(1);
         opts.QueueLimit = 0;
     });
