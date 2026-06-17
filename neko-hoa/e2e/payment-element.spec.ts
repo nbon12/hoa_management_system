@@ -43,7 +43,7 @@ async function fillCard(frame: FrameLocator) {
   if (await zip.count().then(c => c > 0).catch(() => false)) await zip.fill(TEST_ZIP).catch(() => {});
 }
 
-test.describe('Stripe Payment Element — one-time card (local-only)', () => {
+test.describe('Stripe Payment Element — one-time card (local-only)', { tag: '@local-only' }, () => {
   test('enters a card in the Stripe iframe and reaches the receipt', async ({ page }) => {
     await page.goto('/app/payments/one-time');
     await page.waitForFunction(
@@ -77,7 +77,7 @@ test.describe('Stripe Payment Element — one-time card (local-only)', () => {
   });
 });
 
-test.describe('Stripe Payment Element — recurring vaulting (local-only)', () => {
+test.describe('Stripe Payment Element — recurring vaulting (local-only)', { tag: '@local-only' }, () => {
   test('enters a card in the SetupIntent Element and saves auto-pay', async ({ page }) => {
     await page.goto('/app/payments/recurring');
     await page.waitForFunction(
