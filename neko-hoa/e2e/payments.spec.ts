@@ -71,7 +71,13 @@ test.describe('Statement', () => {
 
 test.describe('One-time payment wizard', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/app/payments/one-time');
+    // Preset amounts are populated from /payments/options; until it resolves they default to 0,
+    // and Continue refuses to advance (amount must be > 0). Wait for the response so the wizard
+    // is interactive before tests select a preset.
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/payments/options'), { timeout: 15_000 }).catch(() => null),
+      page.goto('/app/payments/one-time'),
+    ]);
   });
 
   test('step 1 shows "How much?" heading', async ({ page }) => {
@@ -79,19 +85,21 @@ test.describe('One-time payment wizard', () => {
   });
 
   test('step 1 shows amount preset cards', async ({ page }) => {
-    await expect(page.getByText('Current')).toBeVisible();
-    await expect(page.getByText('Next due')).toBeVisible();
-    await expect(page.getByText('Both')).toBeVisible();
+    // Scope to the preset cards' data-preset attributes — the labels ("Current", "Both")
+    // also appear elsewhere on the page, so getByText matches multiple elements.
+    await expect(page.locator('[data-preset="current"]')).toBeVisible();
+    await expect(page.locator('[data-preset="next"]')).toBeVisible();
+    await expect(page.locator('[data-preset="both"]')).toBeVisible();
   });
 
   test('selecting a preset and clicking Continue advances to step 2', async ({ page }) => {
-    await page.getByText('Current').click();
+    await page.locator('[data-preset="current"]').click();
     await page.getByRole('button', { name: /Continue/i }).click();
     await expect(page.getByText(/Step 2/i)).toBeVisible({ timeout: 5_000 });
   });
 
   test('step 2 shows Credit card and eCheck method options', async ({ page }) => {
-    await page.getByText('Current').click();
+    await page.locator('[data-preset="current"]').click();
     await page.getByRole('button', { name: /Continue/i }).click();
     await expect(page.getByText(/Credit card/i)).toBeVisible();
     await expect(page.getByText(/eCheck/i)).toBeVisible();
@@ -113,7 +121,8 @@ test.describe.serial('Recurring payment CRUD', () => {
   });
 
   test('READ: page shows "Auto-pay" title', async ({ page }) => {
-    await expect(page.getByText(/Auto-pay/i)).toBeVisible();
+    // "Auto-pay" also appears in the saved-alert and the history caption; match the page heading.
+    await expect(page.getByRole('heading', { name: /Auto-pay/i })).toBeVisible();
   });
 
   test('READ: draft history table has entries', async ({ page }) => {
