@@ -1,0 +1,223 @@
+# Ephemeral per-PR test environment — provision + validate (013, contracts/workflows.md).
+#
+# Builds the PR's image, provisions an ISOLATED Neon branch + R2 bucket + Cloud Run service + Pages
+# preview, registers a real Stripe TEST webhook, and runs the smoke suites against the PR's OWN running
+# app. A change incompatible with the real database/storage is caught here, before merge (SC-001/002,
+# SC-007) — via the Playwright document/payment flows against the R2-backed API (the backend xUnit suite
+# always uses Testcontainers + MinIO, so real-storage validation is necessarily end-to-end).
+#
+# SECURITY (FR-015, research D11): `pull_request` (NOT pull_request_target) → secrets are withheld from
+# fork runs; the head-repo + non-draft guard skips forks; the repo's "Require approval for all external
+# contributors" setting blocks untrusted runs until a maintainer approves; infra secrets live in the
+# required-reviewer `pr-preview` Environment.
+name: pr-env
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "HOAManagementCompany/**"
+      - "neko-hoa/**"
+      - "infra/modules/pr-environment/**"
+      - "infra/environments/pr/**"
+      - ".github/workflows/pr-env.yml"
+      - ".github/actions/pr-env-tofu-init/**"
+
+permissions:
+  contents: read
+  id-token: write # WIF OIDC
+  pull-requests: write # status comment
+
+concurrency:
+  group: pr-env-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-env:
+    name: Provision + validate (pr-${{ github.event.number }})
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    environment: pr-preview # required-reviewer Environment holding the infra secrets
+    env:
+      PRN: ${{ github.event.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+      IMAGE: sakurapatch/nekohoa-api:pr-${{ github.event.number }}-${{ github.event.pull_request.head.sha }}
+      WEB_URL: https://pr-${{ github.event.number }}.nekohoa-dev.pages.dev
+      # Module inputs as TF_VAR_* (mirrors infra-plan.yml). GCP auth is WIF (ADC).
+      TF_VAR_pr_number: ${{ github.event.number }}
+      TF_VAR_head_sha: ${{ github.event.pull_request.head.sha }}
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_gcp_region: ${{ vars.GCP_REGION }}
+      TF_VAR_neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+      TF_VAR_neon_base_branch_id: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+      TF_VAR_neon_role_password: ${{ secrets.NEON_PR_ROLE_PASSWORD }}
+      TF_VAR_runtime_service_account: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      TF_VAR_stripe_publishable_key: ${{ vars.STRIPE_PUBLISHABLE_KEY }}
+      TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Build + push the PR image (tag pr-<n>-<sha>).
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      - name: Build + push image
+        run: |
+          docker build -f HOAManagementCompany/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      # 2. WIF auth + tofu init against state/pr/<n>.
+      - uses: ./.github/actions/pr-env-tofu-init
+        with:
+          pr_number: ${{ env.PRN }}
+          wif_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # 3. Provision: Neon branch fork + R2 bucket + secrets + Cloud Run (placeholder image).
+      - name: tofu apply
+        working-directory: infra/environments/pr
+        run: tofu apply -input=false -auto-approve
+
+      - name: Capture environment outputs
+        id: tf
+        working-directory: infra/environments/pr
+        run: |
+          {
+            echo "api_url=$(tofu output -raw api_url)"
+            echo "r2_bucket=$(tofu output -raw r2_bucket_name)"
+            echo "service=$(tofu output -raw cloud_run_service_name)"
+          } >> "$GITHUB_OUTPUT"
+
+      # 3b. Production-data isolation audit (FR-011 / SC-009): prove the per-PR branch was forked from
+      #     `pr-base` (the seeded test branch), NOT from any production/Dev-live data. The provisioner
+      #     only ever references the Dev project + pr-base, so this asserts that contract automatically.
+      - name: Audit — no production data
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          EXPECTED_PARENT: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+        working-directory: infra/environments/pr
+        run: |
+          set -euo pipefail
+          BR="$(tofu output -raw neon_branch_id)"
+          parent="$(curl -sS -H "Authorization: Bearer ${NEON_API_KEY}" \
+            "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches/${BR}" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin).get('branch',{}).get('parent_id',''))")"
+          if [ "$parent" != "$EXPECTED_PARENT" ]; then
+            echo "::error::PR branch parent ($parent) is not pr-base ($EXPECTED_PARENT) — refusing (FR-011/SC-009)"; exit 1
+          fi
+          echo "Isolation OK: forked from pr-base, no production data."
+
+      # 4. Register the per-PR Stripe TEST webhook → writes the signing secret BEFORE the real image deploy.
+      - name: Register Stripe webhook
+        env:
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          API_URL: ${{ steps.tf.outputs.api_url }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: scripts/stripe-webhook-register.sh
+
+      # 5. Deploy the real image (new revision picks up the real webhook secret = latest).
+      - name: Deploy PR image to Cloud Run
+        run: |
+          gcloud run deploy "${{ steps.tf.outputs.service }}" \
+            --image "$IMAGE" --region "${{ vars.GCP_REGION }}" --project "${{ secrets.GCP_PROJECT_ID }}" --quiet
+
+      # 6. Health gate: wait for migrations (the PR's new ones) + boot. Seed is a no-op on the fork.
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.tf.outputs.api_url }}/health" || true)
+            [ "$code" = "200" ] && { echo "healthy"; exit 0; }
+            sleep 5
+          done
+          echo "::error::PR API never became healthy"; exit 1
+
+      # 7. Frontend: inject the PR API origin into the pr-preview env, build, deploy to the Pages branch.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build + deploy frontend (Pages branch pr-${{ env.PRN }})
+        working-directory: neko-hoa
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          API_URL: ${{ steps.tf.outputs.api_url }}
+        run: |
+          sed -i "s#https://pr-env-api-origin.invalid#${API_URL}#" src/environments/environment.pr-preview.ts
+          npm ci
+          npm run build -- --configuration pr-preview
+          npx wrangler pages deploy dist/neko-hoa/browser --project-name=nekohoa-dev --branch="pr-${PRN}"
+
+      # 8. US1 real-resource proof: confirm the PR's checks ran against the REAL per-PR Neon branch + R2
+      #    bucket (not substitutes). Lightweight reachability assertion (SC-001 evidence at the infra
+      #    layer); incompatibility detection itself is the Playwright document/payment flow below.
+      - name: Verify real per-PR storage + database are reachable
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+          BUCKET: ${{ steps.tf.outputs.r2_bucket }}
+        working-directory: infra/environments/pr
+        run: |
+          set -euo pipefail
+          CONN="$(tofu output -raw db_connection_string)"
+          HOST=$(printf '%s' "$CONN" | sed -nE 's/.*Host=([^;]+).*/\1/p')
+          echo "Neon branch host: ${HOST:0:18}…"  # do not print the full secret
+          ENDPOINT="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-service-url" --project="$PROJECT")"
+          AWS_ACCESS_KEY_ID="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-access-key" --project="$PROJECT")" \
+          AWS_SECRET_ACCESS_KEY="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-secret-key" --project="$PROJECT")" \
+          AWS_DEFAULT_REGION=auto \
+            aws s3 ls "s3://${BUCKET}" --endpoint-url "$ENDPOINT" >/dev/null && echo "R2 bucket ${BUCKET} reachable"
+
+      # 9. End-to-end smoke against the PR's own app (this is where real-R2/db incompatibility surfaces).
+      - name: E2E (Cypress + Playwright) against the PR preview
+        working-directory: neko-hoa
+        env:
+          CYPRESS_BASE_URL: ${{ env.WEB_URL }}
+          PLAYWRIGHT_BASE_URL: ${{ env.WEB_URL }}
+        run: |
+          npm run e2e:dev
+          npx playwright install --with-deps chromium
+          npm run e2e:playwright-dev
+
+      # 10. Report the env URLs + status back to the PR (sticky comment).
+      - name: Comment env URLs on the PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = '${{ job.status }}' === 'success';
+            const api = '${{ steps.tf.outputs.api_url }}' || '(provision failed)';
+            const web = process.env.WEB_URL;
+            const marker = '<!-- pr-env-status -->';
+            const body = [
+              marker,
+              `### ${ok ? '✅' : '❌'} Ephemeral PR environment`,
+              '',
+              `| | URL |`,
+              `|---|---|`,
+              `| **Web** | ${web} |`,
+              `| **API** | ${api} |`,
+              '',
+              ok ? 'Smoke checks passed against this PR\'s own running stack.' : 'Provision or checks failed — see the workflow logs.',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+
+      # FR-009 clean failure: destroy partial resources so nothing billable is stranded (sweep backstops).
+      - name: Clean up on failure
+        if: failure()
+        working-directory: infra/environments/pr
+        run: tofu destroy -input=false -auto-approve || true

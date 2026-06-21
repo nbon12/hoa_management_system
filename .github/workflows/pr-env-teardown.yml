@@ -1,0 +1,98 @@
+# Ephemeral per-PR environment — teardown on close/merge (013 contracts/workflows.md, FR-006, SC-004).
+# `closed` fires for both merge and plain close. Each step is best-effort/idempotent so one failure
+# doesn't strand the rest; the daily sweep (pr-env-sweep.yml) backstops anything missed.
+name: pr-env-teardown
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  id-token: write # WIF OIDC
+
+concurrency:
+  group: pr-env-${{ github.event.number }} # serialize against any in-flight provision
+  cancel-in-progress: false
+
+jobs:
+  teardown:
+    name: Teardown (state/pr/${{ github.event.number }})
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: pr-preview
+    env:
+      TF_VAR_pr_number: ${{ github.event.number }}
+      TF_VAR_head_sha: ${{ github.event.pull_request.head.sha }}
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_gcp_region: ${{ vars.GCP_REGION }}
+      TF_VAR_neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+      TF_VAR_neon_base_branch_id: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+      TF_VAR_neon_role_password: ${{ secrets.NEON_PR_ROLE_PASSWORD }}
+      TF_VAR_runtime_service_account: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      TF_VAR_stripe_publishable_key: ${{ vars.STRIPE_PUBLISHABLE_KEY }}
+      TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/pr-env-tofu-init
+        with:
+          pr_number: ${{ github.event.number }}
+          wif_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      # 1. Deregister the per-PR Stripe test webhook (D9).
+      - name: Deregister Stripe webhook
+        if: always()
+        env:
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: scripts/stripe-webhook-deregister.sh || true
+
+      # 2. Empty the R2 bucket — Cloudflare rejects deleting a non-empty bucket, so purge objects first
+      #    (test documents the app uploaded). aws cli is preinstalled on ubuntu runners.
+      - name: Purge R2 bucket objects
+        if: always()
+        working-directory: infra/environments/pr
+        env:
+          PRN: ${{ github.event.number }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+        run: |
+          set -uo pipefail
+          BUCKET="nekohoa-pr-${PRN}-documents"
+          ENDPOINT="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-service-url" --project="$PROJECT" 2>/dev/null)" || exit 0
+          AWS_ACCESS_KEY_ID="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-access-key" --project="$PROJECT")"
+          AWS_SECRET_ACCESS_KEY="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-secret-key" --project="$PROJECT")"
+          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=auto
+          aws s3 rm "s3://${BUCKET}" --recursive --endpoint-url "$ENDPOINT" || true
+
+      # 3. Authoritative teardown: destroy every per-PR resource from this PR's state (FR-006).
+      - name: tofu destroy
+        if: always()
+        working-directory: infra/environments/pr
+        run: tofu destroy -input=false -auto-approve
+
+      # 4. Remove the per-PR state objects so the prefix list (used by the sweep) reflects reality.
+      - name: Delete per-PR state objects
+        if: always()
+        run: gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${{ github.event.number }}" || true
+
+      # 5. Best-effort: delete the Pages branch deploys and the per-PR image tags (both cheap/free if
+      #    left, so failures are non-fatal). The sweep does not need these for correctness.
+      - name: Best-effort prune Pages + image tags
+        if: always()
+        env:
+          PRN: ${{ github.event.number }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          # Pages: delete deployments on the pr-<n> branch (free if left; pruned for tidiness).
+          curl -sS -H "Authorization: Bearer ${CF_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/pages/projects/nekohoa-dev/deployments?env=preview" \
+            | python3 -c "import sys,json;d=json.load(sys.stdin);print('\n'.join(x['id'] for x in d.get('result',[]) if x.get('deployment_trigger',{}).get('metadata',{}).get('branch')=='pr-'+'${PRN}'))" 2>/dev/null \
+            | while read -r dep; do [ -n "$dep" ] && curl -sS -X DELETE -H "Authorization: Bearer ${CF_TOKEN}" \
+                "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/pages/projects/nekohoa-dev/deployments/${dep}?force=true" >/dev/null || true; done || true
