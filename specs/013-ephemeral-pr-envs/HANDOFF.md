@@ -33,17 +33,17 @@ needs cloud consoles + a real test run. Read `spec.md`, `plan.md`, `research.md`
 - `NEON_PR_BASE_BRANCH_ID` = the pr-base branch id (T009)
 - `NEON_PR_ROLE_PASSWORD` = the `nekohoa_app` password on pr-base (T009)
 
+All secrets/vars are **repo-level** (no GitHub Environment is used — see below).
+
 ### Variables to ADD (missing):
 - `NEON_PROJECT_ID` = `super-water-18090867`
 - `GCP_RUNTIME_SERVICE_ACCOUNT` = `nekohoa-run-dev@nekohoa-dev.iam.gserviceaccount.com`
 - *(optional)* `SHARED_SECRET_PREFIX` = `dev` (workflows default to `dev`)
 
-### Environment
-Create environment **`pr-preview`** (Settings → Environments) with the owner as **Required reviewer**.
-The 3 workflows reference `environment: pr-preview`. NOTE: this gates **every** pr-env run on a manual
-approval click — if that friction is unwanted for solo use, instead remove the `environment: pr-preview:`
-line from the 3 workflows and rely on repo-level secrets (fork safety still holds via the head-repo guard
-+ the external-contributor approval setting below).
+### No GitHub Environment (intentional)
+The workflows do **not** use a `pr-preview` Environment — solo use shouldn't pause every run for a manual
+approval click. Do NOT create one. Fork safety is fully covered by `pull_request` (secrets withheld from
+forks) + the head-repo guard + the external-contributor approval setting below. Secrets live at repo level.
 
 ### Fork-safety setting (verify it's ON)
 Settings → Actions → General → "Fork pull request workflows from outside contributors" →

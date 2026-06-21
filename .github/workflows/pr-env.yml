@@ -39,7 +39,9 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    environment: pr-preview # required-reviewer Environment holding the infra secrets
+    # No GitHub Environment gate: solo use shouldn't pause every run for manual approval. Fork safety is
+    # already enforced by `pull_request` (secrets withheld from forks) + the head-repo guard above + the
+    # repo's "Require approval for all external contributors" Actions setting. Infra secrets are repo-level.
     env:
       PRN: ${{ github.event.number }}
       SHA: ${{ github.event.pull_request.head.sha }}

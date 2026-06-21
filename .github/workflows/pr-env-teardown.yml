@@ -20,7 +20,7 @@ jobs:
     name: Teardown (state/pr/${{ github.event.number }})
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    environment: pr-preview
+    # No GitHub Environment gate (solo use — no per-run approval). Repo-level secrets; fork-safe via guard.
     env:
       TF_VAR_pr_number: ${{ github.event.number }}
       TF_VAR_head_sha: ${{ github.event.pull_request.head.sha }}

@@ -26,7 +26,7 @@ env:
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    environment: pr-preview
+    # No GitHub Environment gate (scheduled job; repo-level secrets).
     env:
       TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_gcp_region: ${{ vars.GCP_REGION }}

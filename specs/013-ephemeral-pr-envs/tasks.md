@@ -49,7 +49,7 @@ frontend under `neko-hoa/`. Application backend is unchanged.
 - [X] T007 Enable `billingbudgets.googleapis.com` (and confirm `cloudresourcemanager`/`serviceusage`) in `infra/bootstrap/state-bucket/main.tf` (or the bootstrap APIs list)
 - [X] T008 Wire shared-primitive inputs into `infra/environments/pr/main.tf`: reference the existing Neon project `super-water-18090867`, WIF pool/provider `github-pool-dev`, runtime SA `nekohoa-run-dev`, and the 8 shared operator secret ids (no per-PR recreation)
 - [ ] T009 Create the long-lived **`pr-base`** Neon branch (Dev-shaped schema, seeded once) and document/automate its creation; set `neon_base_branch = "pr-base"` default
-- [ ] T010 [P] **Ops runbook task** (per `quickstart.md`): set Repo → Settings → Actions → "Require approval for all external contributors"; create a required-reviewer GitHub Environment (`pr-preview`) and move Neon/Cloudflare/GCP/Docker Hub/Stripe-test secrets into it
+- [ ] T010 [P] **Ops runbook task** (per `quickstart.md`): set Repo → Settings → Actions → "Require approval for all external contributors"; add the missing repo-level secrets/vars (`NEON_PR_BASE_BRANCH_ID`, `NEON_PR_ROLE_PASSWORD`, `NEON_PROJECT_ID`, `GCP_RUNTIME_SERVICE_ACCOUNT`, `TF_VAR_billing_account_id`). No GitHub Environment is used (solo: no per-run approval gate)
 - [X] T011 [P] Add a reusable composite step or snippet for WIF auth + `tofu init -backend-config="prefix=state/pr/${PR_NUMBER}"` to be shared by provision/teardown/sweep workflows
 
 **Checkpoint**: Shared primitives referenced, `pr-base` exists, fork gate + secret Environment configured.

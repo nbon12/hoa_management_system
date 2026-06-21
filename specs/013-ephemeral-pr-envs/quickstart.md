@@ -9,10 +9,11 @@ These are repo/ops settings, not code (see research D10/D11):
 1. **Trusted-CI gate** — Repo → Settings → Actions → General →
    *Fork pull request workflows from outside collaborators* → **"Require approval for all
    external contributors."** (Workflow token perms are already read-only.)
-2. **Required-reviewer Environment for infra secrets** — Settings → Environments → new
-   environment (e.g. `pr-preview`) with yourself as required reviewer; move the Neon /
-   Cloudflare / GCP / Docker Hub / Stripe-test secrets into it. The provisioning job
-   references `environment: pr-preview`.
+2. **Repo-level infra secrets (no GitHub Environment)** — the Neon / Cloudflare / GCP /
+   Docker Hub / Stripe-test secrets live at repo level. The workflows intentionally do NOT
+   use a `pr-preview` Environment, so solo runs aren't gated on a per-run approval click;
+   fork safety is covered by the external-contributor approval gate + the head-repo guard +
+   secrets being withheld from fork (`pull_request`) runs.
 3. **Enable billing budgets API** — bootstrap enables `billingbudgets.googleapis.com`;
    supply the billing account id and `pr_env_monthly_budget=25` tfvar; `tofu apply` the
    shared root once so the `google_billing_budget` (alert at 80%) exists.

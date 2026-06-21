@@ -208,7 +208,8 @@ validated by the existing `infra-plan`/Trivy pipeline (SC-008 "validated by exis
 (2) the `head.repo.full_name == github.repository` job guard skips forks entirely;
 (3) the repo's **"Require approval for all external contributors"** Actions setting blocks
 *all* workflow runs from non-collaborators until a maintainer approves; (4) infra secrets are
-scoped to a **required-reviewer GitHub Environment**; (5) `GITHUB_TOKEN` default is already
+at **repo level** (no required-reviewer GitHub Environment — solo runs are not gated on a manual
+approval click; items (1)–(3) + the external-contributor gate already cover fork safety); (5) `GITHUB_TOKEN` default is already
 read-only. Per-PR secrets live only in Secret Manager, are never echoed to logs, and are
 deleted on teardown/reclaim.
 
@@ -236,6 +237,6 @@ endpoint (gated by `DevTools.E2ECleanupEnabled`) is reused.
 | Frontend | — | Angular build: inject per-PR API base URL |
 | Backend | — | None expected (CORS preview-origin + e2e cleanup already exist) |
 | Scripts | Stripe webhook register/deregister; (optional) URL-comment helper | — |
-| Repo settings (ops, not code) | — | "Require approval for all external contributors"; required-reviewer Environment for infra secrets |
+| Repo settings (ops, not code) | — | "Require approval for all external contributors"; repo-level infra secrets (no GitHub Environment) |
 
 All NEEDS CLARIFICATION resolved. No open unknowns block Phase 1.
