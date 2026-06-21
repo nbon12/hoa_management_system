@@ -24,6 +24,7 @@ using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Persistence;
+using HOAManagementCompany.Infrastructure.RateLimiting;
 using HOAManagementCompany.Infrastructure.Storage;
 using Sentry.OpenTelemetry;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -182,6 +183,12 @@ builder.Services.AddValidatedOptions<SendGridOptions, SendGridOptionsValidator>(
     builder.Configuration, SendGridOptions.SectionName);
 builder.Services.AddValidatedOptions<ObservabilityOptions, ObservabilityOptionsValidator>(
     builder.Configuration, ObservabilityOptions.SectionName);
+builder.Services.AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsValidator>(
+    builder.Configuration, RateLimitingOptions.SectionName);
+// DevTools toggles are config-gated (not host-name-gated) so they evaluate correctly in the deployed
+// `Dev` environment; defaults derive from IsDevLike(env) and are forced off in Production (014 US3).
+builder.Services.AddValidatedOptions<DevToolsOptions, DevToolsOptionsValidator>(
+    builder.Configuration, DevToolsOptions.SectionName, o => o.ApplyEnvironmentDefaults(builder.Environment));
 
 // The host environment name itself must be one of the known set — fail fast on a mis-set
 // ASPNETCORE_ENVIRONMENT (e.g. "prod" instead of "Production", or deployed-"Dev" vs local
@@ -215,24 +222,38 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
 builder.Services.AddScoped<IDocumentStorage, S3DocumentStorage>();
 
 // ── Rate Limiting ──────────────────────────────────────────────────────────
+// Per-client limiting (014-post-deploy-hardening): the `auth` and `payments` policies are
+// PARTITIONED so one abusive client cannot throttle the whole user base (the prior global,
+// partition-less fixed-window limiters were a self-inflicted DoS — token refreshes alone exhausted
+// them). `auth` partitions by the true client IP resolved from Cloudflare's `CF-Connecting-IP`
+// (trusted only on edge-verified requests; forged headers are ignored → FR-002); `payments`
+// partitions by the authenticated user so NAT-shared users keep independent quotas. Un-attributable
+// requests collapse to one shared "unknown" bucket with its own strict quota. Thresholds are
+// env-tunable via the validated RateLimitingOptions (FR-004). NB: app.UseRateLimiter() runs AFTER
+// UseAuthentication/UseAuthorization (below), so HttpContext.User is populated for the `payments`
+// partition key.
+var rateLimitingOptions = new RateLimitingOptions();
+builder.Configuration.GetSection(RateLimitingOptions.SectionName).Bind(rateLimitingOptions);
 builder.Services.AddRateLimiter(o =>
 {
-    // Permit count is env-tunable: the global "auth" window covers login + refresh for all clients,
-    // so the parallel post-deploy Playwright smoke suite (many seed-user logins/refreshes in one
-    // minute) exhausts the default and gets 429s. Dev raises it; Production keeps the strict default.
-    var authPermits = builder.Configuration.GetValue<int?>("RateLimiting:AuthPermitsPerMinute") ?? 10;
-    o.AddFixedWindowLimiter("auth", opts =>
-    {
-        opts.PermitLimit = authPermits;
-        opts.Window = TimeSpan.FromMinutes(1);
-        opts.QueueLimit = 0;
-    });
-    o.AddFixedWindowLimiter("payments", opts =>
-    {
-        opts.PermitLimit = 20;
-        opts.Window = TimeSpan.FromMinutes(1);
-        opts.QueueLimit = 0;
-    });
+    o.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ClientIdentityResolver.ResolveAuthPartition(httpContext, rateLimitingOptions.TrustedEdge),
+            partitionKey => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = PermitsFor(partitionKey, rateLimitingOptions.AuthPermitsPerMinute, rateLimitingOptions),
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    o.AddPolicy("payments", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ClientIdentityResolver.ResolvePaymentsPartition(httpContext),
+            partitionKey => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = PermitsFor(partitionKey, rateLimitingOptions.PaymentsPermitsPerMinute, rateLimitingOptions),
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
     // Browser telemetry proxy limiter — keyed by client IP so a single noisy client
     // cannot exhaust the window for everyone (FR-031). Permit count is env-tunable.
     var telemetryPermits = builder.Configuration.GetValue<int?>("Observability:TelemetryProxyRateLimitPerMinute") ?? 120;
@@ -247,6 +268,10 @@ builder.Services.AddRateLimiter(o =>
             }));
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
+
+// The shared "unknown" partition gets its own (strict) quota, never the per-client quota.
+static int PermitsFor(string partitionKey, int clientPermits, RateLimitingOptions options) =>
+    partitionKey == ClientIdentityResolver.UnknownPartition ? options.UnknownPermitsPerMinute : clientPermits;
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 // Origins are configuration-driven via Cors:AllowedOrigins so each environment sets its own

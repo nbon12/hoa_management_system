@@ -1,6 +1,8 @@
 # Contract: Rate-limiting behavior (US1)
 
-Behavioral contract for the `auth` and `payments` rate-limit policies. Verified by `HOAManagementCompany.Tests/Integration/RateLimitingTests.cs` using `WebApplicationFactory` (no external infrastructure).
+Behavioral contract for the `auth` and `payments` rate-limit policies. Verified by:
+- `HOAManagementCompany.Tests/Unit/RateLimiting/ClientIdentityResolverTests.cs` — partition-key/forged-header logic (RL-2, RL-3, RL-5; no host needed).
+- `HOAManagementCompany.Tests/Integration/RateLimiting/RateLimitingIsolationTests.cs` — end-to-end isolation against the live `auth` policy via `WebApplicationFactory` (RL-1, RL-2 evasion, RL-6).
 
 ## Applies to
 

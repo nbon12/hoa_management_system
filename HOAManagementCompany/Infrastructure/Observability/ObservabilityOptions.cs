@@ -68,9 +68,11 @@ public sealed class ObservabilityOptions
         var options = new ObservabilityOptions();
         configuration.GetSection(SectionName).Bind(options);
 
-        // SQL text defaults to ON in Development, OFF elsewhere, unless explicitly set.
+        // SQL text defaults to ON in dev-like environments (local Development AND deployed Dev),
+        // OFF elsewhere, unless explicitly set. Using IsDevLike (not IsDevelopment) so the deployed
+        // `Dev` environment actually captures SQL text rather than silently no-opping (014 US3).
         if (configuration[$"{SectionName}:CaptureSqlText"] is null)
-            options.CaptureSqlText = environment.IsDevelopment();
+            options.CaptureSqlText = HOAManagementCompany.Infrastructure.Configuration.StartupOptions.IsDevLike(environment);
 
         // Standard OTEL_* env vars win over section defaults so operators can repoint
         // telemetry with the canonical OpenTelemetry knobs (FR-007).

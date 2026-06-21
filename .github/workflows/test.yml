@@ -334,16 +334,18 @@ jobs:
           DEV_API_BASE_URL: ${{ steps.candidate.outputs.url }}/api/v1
         run: npm run e2e:dev
 
-      # ── Playwright smoke suite: real-stack tests (auth, payments, Stripe iframes) against
-      #    the live Dev preview. Runs after Cypress passes. Failure blocks promotion. ──
-      - name: Playwright smoke suite (vs Dev preview)
+      # ── Playwright smoke gate: a curated, read-only, deterministic @smoke subset (014 US2)
+      #    against the live Dev preview — "is this deployment healthy?", NOT the full local
+      #    regression suite. Runs after Cypress passes. Failure blocks promotion. The full
+      #    Playwright suite stays runnable locally/PR via `npm run e2e`. ──
+      - name: Playwright smoke gate (vs Dev preview)
         working-directory: neko-hoa
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.pages.outputs.deployment-url }}
           PLAYWRIGHT_API_URL: ${{ steps.candidate.outputs.url }}
         run: |
           npx playwright install --with-deps chromium
-          npm run e2e:playwright-dev
+          npm run e2e:playwright-smoke
 
       # ── Promote (reached only when health + E2E + Playwright passed) ──
       - name: Promote backend traffic to candidate

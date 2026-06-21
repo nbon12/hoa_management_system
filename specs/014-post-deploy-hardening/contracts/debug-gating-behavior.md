@@ -1,6 +1,6 @@
 # Contract: Config-gated debug behavior (US3)
 
-Verified by `HOAManagementCompany.Tests/Integration/DebugGatingTests.cs` (host built per environment with config overrides).
+Verified by `HOAManagementCompany.Tests/Unit/Configuration/DebugGatingTests.cs` — exercises the resolution logic directly (`DevToolsOptions.ApplyEnvironmentDefaults` and `ObservabilityOptions.FromConfiguration`) across environments and config overrides; deterministic, no host/DB needed.
 
 ## Exception detail (`GlobalExceptionHandler`)
 
