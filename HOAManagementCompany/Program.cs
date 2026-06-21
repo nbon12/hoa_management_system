@@ -233,9 +233,13 @@ builder.Services.AddScoped<IDocumentStorage, S3DocumentStorage>();
 // UseAuthentication/UseAuthorization (below), so HttpContext.User is populated for the `payments`
 // partition key.
 var rateLimitingOptions = new RateLimitingOptions();
-builder.Configuration.GetSection(RateLimitingOptions.SectionName).Bind(rateLimitingOptions);
 builder.Services.AddRateLimiter(o =>
 {
+    // Bind inside the configure delegate (which runs at options-build time, after
+    // WebApplication.CreateBuilder) so host/test configuration overrides are honored — same reason
+    // the telemetry permit is read here. Binding at registration time would capture only the
+    // appsettings defaults and ignore later in-memory overrides (e.g. WebApplicationFactory tests).
+    builder.Configuration.GetSection(RateLimitingOptions.SectionName).Bind(rateLimitingOptions);
     o.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             ClientIdentityResolver.ResolveAuthPartition(httpContext, rateLimitingOptions.TrustedEdge),
