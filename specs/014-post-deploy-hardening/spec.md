@@ -14,6 +14,7 @@ This product is a .NET API (FastEndpoints) plus an Angular frontend, deployed to
 ### Session 2026-06-21
 
 - Q: Which header is the trusted source for the rate-limiting client identity? → A: Trust the Cloudflare-set `CF-Connecting-IP` header, accepted only when the request arrives via the known Cloudflare/Cloud Run edge; a client-supplied value from any other source is ignored.
+- Q: How are requests handled when a trusted client identity cannot be resolved? → A: Route them all to a single shared `"unknown"` rate-limit partition with its own strict quota, isolated from attributable clients (fail-safe; never falls back to the shared proxy/connection address).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -81,7 +82,7 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 
 - A burst of legitimate traffic from many users behind a single corporate NAT (shared client IP) — limits must be tuned to avoid false positives while still curbing abuse.
 - Forwarded-header trust: only the known edge proxy may set the client-identity header; direct or forged values from untrusted sources must be rejected or ignored.
-- A request that arrives without a resolvable trusted client identity (e.g., missing the edge header) must still be handled safely without granting an unbounded or shared bucket that re-creates the global-throttle fault.
+- A request that arrives without a resolvable trusted client identity (e.g., missing the edge header, or arriving outside the Cloudflare/Cloud Run edge) MUST be routed to a single shared `"unknown"` partition that has its own strict quota — never falling back to the shared proxy/connection address, and never granting an unbounded bucket that re-creates the global-throttle fault. Because legitimate traffic always transits the edge, this partition is expected to be near-empty in normal production operation.
 - Exposing exception detail or SQL text in any environment must never leak secrets or PII; "Dev" enablement must still respect sensitive-data exclusions.
 - The smoke subset must still fail loudly on genuine deployment breakage (auth down, key pages not rendering, API unreachable) — curation must not hollow out the gate.
 
