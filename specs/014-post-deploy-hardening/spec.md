@@ -9,13 +9,19 @@
 
 This product is a .NET API (FastEndpoints) plus an Angular frontend, deployed to Google Cloud Run behind Cloudflare, with Cloudflare R2 for object storage and Neon (PostgreSQL) for data. A separate effort introduces ephemeral per-PR test environments to catch real-infrastructure issues before merge. The three concerns below are **orthogonal** to that effort — an isolated per-PR environment does not surface or resolve them — so they are scoped here independently. Each is an independently deliverable slice.
 
+## Clarifications
+
+### Session 2026-06-21
+
+- Q: Which header is the trusted source for the rate-limiting client identity? → A: Trust the Cloudflare-set `CF-Connecting-IP` header, accepted only when the request arrives via the known Cloudflare/Cloud Run edge; a client-supplied value from any other source is ignored.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - API rate limiting protects per-client, not globally (Priority: P1)
 
 As a legitimate end user (and as the operator protecting the service), I need the authentication and payment rate limits to throttle an individual abusive client without throttling the entire user base, so that normal activity — including routine token refreshes — is never rejected because of someone else's traffic.
 
-**Current problem (observed):** In `HOAManagementCompany/Program.cs` the limiters are registered with `AddFixedWindowLimiter("auth", …)` (permit limit 10/min) and `AddFixedWindowLimiter("payments", …)` (permit limit 20/min). These named limiters have **no partition key**, so all clients share a single global bucket: the entire user base is collectively capped at 10 auth requests (login **and** token refresh combined) per minute and 20 payment requests per minute. At trivial real traffic this throttles legitimate users (token refreshes alone exhaust it) — effectively a self-inflicted denial of service. The `telemetry` limiter in the same block already uses the partitioned pattern (`AddPolicy` + `RateLimitPartition.GetFixedWindowLimiter(...)`), but partitions on `httpContext.Connection.RemoteIpAddress`, which behind Cloud Run + Cloudflare is the proxy/load-balancer address — so even that is effectively global. With no forwarded-headers handling configured anywhere in the codebase, no limiter can currently see the true client. A correct fix has two parts: (a) resolve the true client identity from the trusted edge (e.g., the Cloudflare client-IP header or a correctly configured forwarded-for chain), and (b) partition the auth and payment limiters by that resolved identity.
+**Current problem (observed):** In `HOAManagementCompany/Program.cs` the limiters are registered with `AddFixedWindowLimiter("auth", …)` (permit limit 10/min) and `AddFixedWindowLimiter("payments", …)` (permit limit 20/min). These named limiters have **no partition key**, so all clients share a single global bucket: the entire user base is collectively capped at 10 auth requests (login **and** token refresh combined) per minute and 20 payment requests per minute. At trivial real traffic this throttles legitimate users (token refreshes alone exhaust it) — effectively a self-inflicted denial of service. The `telemetry` limiter in the same block already uses the partitioned pattern (`AddPolicy` + `RateLimitPartition.GetFixedWindowLimiter(...)`), but partitions on `httpContext.Connection.RemoteIpAddress`, which behind Cloud Run + Cloudflare is the proxy/load-balancer address — so even that is effectively global. With no forwarded-headers handling configured anywhere in the codebase, no limiter can currently see the true client. A correct fix has two parts: (a) resolve the true client identity from the trusted edge — the Cloudflare-set `CF-Connecting-IP` header, trusted only when the request arrives via the known Cloudflare/Cloud Run edge — and (b) partition the auth and payment limiters by that resolved identity.
 
 **Why this priority**: It is a live production fault affecting real end users right now, independent of any test tooling.
 
@@ -84,7 +90,7 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 ### Functional Requirements
 
 - **FR-001**: Auth and payment rate limits MUST be enforced per individual client identity, not as a single global bucket shared by all clients.
-- **FR-002**: The system MUST derive client identity for rate limiting from the trusted edge proxy's forwarded client address, and MUST reject or ignore forwarded-identity values originating from untrusted sources.
+- **FR-002**: The system MUST derive client identity for rate limiting from the Cloudflare-set `CF-Connecting-IP` header, trusting it only when the request arrives via the known Cloudflare/Cloud Run edge, and MUST reject or ignore any client-supplied identity value that does not originate from that trusted edge.
 - **FR-003**: A single client exceeding a limit MUST NOT cause rate-limit rejections for other clients.
 - **FR-004**: Rate-limit thresholds MUST be configurable per environment without code changes.
 - **FR-005**: The post-deploy smoke gate MUST execute only a designated subset of checks oriented to deployment health, excluding state-mutating and local-only tests.
@@ -124,7 +130,7 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 
 ## Assumptions
 
-- The production edge is Cloudflare in front of Cloud Run; the trusted client-identity source is the edge's forwarded header. The exact header and trusted-proxy configuration are confirmed during planning.
+- The production edge is Cloudflare in front of Cloud Run; the trusted client-identity source is the Cloudflare-set `CF-Connecting-IP` header, honored only for requests arriving via the known Cloudflare/Cloud Run edge. The exact trusted-edge verification mechanism (source-range check and/or shared edge secret) is finalized during planning.
 - Rate-limit thresholds are set conservatively for production and may be raised for non-production environments via configuration.
 - The smoke subset is defined by tagging (or an equivalent selection mechanism) the deployment-health-appropriate checks; the full suite continues to exist unchanged for local/PR runs.
 - "Dev" debugging enablement (exception detail, SQL text) is acceptable from a data-sensitivity standpoint for a non-production environment, provided secret/PII exclusions still apply.
