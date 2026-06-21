@@ -33,6 +33,8 @@ No persistent/relational data is introduced or changed (no entities, tables, or 
 | `E2ECleanupEnabled` | bool | (existing) | Already used by `E2ECleanupEndpoint`. |
 | `ExposeExceptionDetail` | bool | `IsDevLike(env)` | New. Populates `GlobalExceptionHandler` `detail`. **Forced `false` in Production** regardless of config (mirrors the Swagger invariant). |
 
+**Validation** (FluentValidation, fail-fast at startup per Constitution §8 — *new config MUST ship with its validator*): `DevToolsOptions` is bound-and-validated at startup. The booleans have no range constraint, but the validator MUST exist and be registered so the class participates in the fail-fast startup-validation pipeline (mirrors `RateLimitingOptions` and the 008-config-validation pattern).
+
 ### ObservabilityOptions (existing — one default changed)
 
 | Field | Change |
@@ -46,7 +48,9 @@ Computed per request by `ClientIdentityResolver`; not persisted.
 | Policy | Partition key source | Fallback |
 |--------|----------------------|----------|
 | `auth` | Trusted `CF-Connecting-IP` (string) | `"unknown"` |
-| `payments` | Authenticated user identity from `HttpContext.User` (subject/owner id) | `"unknown"` |
+| `payments` | Authenticated user subject claim: `HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? FindFirst("sub")?.Value` (same pattern as `MeEndpoint`/`LogoutEndpoint`/`TraceEnrichmentMiddleware`) | `"unknown"` |
+
+> The `payments` policy reads the subject claim, so the limiter MUST run after authentication in the pipeline (`UseRateLimiter` already follows `UseAuthentication`/`UseAuthorization` in `Program.cs`).
 
 **Invariants**:
 - A client-supplied `CF-Connecting-IP` from an un-verified edge MUST NOT influence the key (forged-header resistance, FR-002/SC-003).

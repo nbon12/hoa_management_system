@@ -35,7 +35,8 @@ No database schema, migration, or persistence change. No new external dependency
 - **Security and operations**: ✅ Client-IP trust is resistant to forged headers (trusted-edge verification + ignore otherwise); exception detail and SQL text default off and are hard-off in Production; secrets/PII stay excluded (existing `ScrubbedKeys`, no secret in exception `detail` beyond current Dev behavior). Serilog/Sentry unaffected.
 - **File storage**: ✅ N/A — no blob/file storage introduced.
 - **Caching/edge**: ✅ N/A — no response caching changed. The Cloudflare edge is consumed (read `CF-Connecting-IP`), not reconfigured for caching.
-- **Testing discipline**: ✅ Behavior is covered test-first with xUnit `WebApplicationFactory` integration tests (one-client-doesn't-throttle-another, forged-header rejection, unknown-partition isolation, config-gated detail on/off). No PostgreSQL needed (no persistence). Theories cover header-trust variations. Playwright smoke selection covered by the gate itself.
+- **Testing discipline**: ✅ Behavior is covered test-first with xUnit `WebApplicationFactory` integration tests (one-client-doesn't-throttle-another, forged-header rejection, unknown-partition isolation, config-gated detail on/off). No PostgreSQL needed (no persistence). Theories cover header-trust variations. The post-deploy smoke gate intentionally uses **Playwright** (continuing the existing 014 post-deploy arrangement and Constitution §9's "browser tests outside the E2E suite" lane); the **Cypress** E2E suite (`e2e:dev`) remains the full regression gate, so the §9 Cypress-for-E2E expectation is not regressed.
+- **Configuration validation**: ✅ Both new options classes (`RateLimitingOptions`, `DevToolsOptions`) ship FluentValidation validators registered in the fail-fast startup pipeline (Constitution §8); no new config is introduced without a validator.
 - **CI/CD and documentation**: ✅ Smoke gate change is a CI workflow + npm script edit; Sonar/Codecov unaffected. Repowise markers refreshed for touched backend files.
 - **Executable & living specs**: ✅ Every acceptance scenario maps to a runnable test (see contracts/ and quickstart). `spec.md`/`tasks.md` updated before PR; no contradiction with prior specs (extends the 009 `StartupOptions`/`DevTools` config-flag pattern rather than reverting it).
 
@@ -67,7 +68,9 @@ HOAManagementCompany/                          # .NET 9 backend
 │   ├── Configuration/
 │   │   ├── StartupOptions.cs                  # [reuse] IsDevLike(...) helper, DevEnvironmentName
 │   │   ├── RateLimitingOptions.cs             # [new] thresholds + trusted-edge config (bound from "RateLimiting")
-│   │   └── DevToolsOptions.cs                 # [new|extend] ExposeExceptionDetail flag (bound from "DevTools")
+│   │   ├── RateLimitingOptionsValidator.cs    # [new] FluentValidation, fail-fast (Constitution §8)
+│   │   ├── DevToolsOptions.cs                 # [new|extend] ExposeExceptionDetail flag (bound from "DevTools")
+│   │   └── DevToolsOptionsValidator.cs        # [new] FluentValidation, fail-fast (Constitution §8 — new config ships its validator)
 │   ├── RateLimiting/
 │   │   └── ClientIdentityResolver.cs          # [new] resolves trusted client IP + user identity for partition keys
 │   └── Observability/
