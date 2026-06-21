@@ -15,6 +15,7 @@ This product is a .NET API (FastEndpoints) plus an Angular frontend, deployed to
 
 - Q: Which header is the trusted source for the rate-limiting client identity? → A: Trust the Cloudflare-set `CF-Connecting-IP` header, accepted only when the request arrives via the known Cloudflare/Cloud Run edge; a client-supplied value from any other source is ignored.
 - Q: How are requests handled when a trusted client identity cannot be resolved? → A: Route them all to a single shared `"unknown"` rate-limit partition with its own strict quota, isolated from attributable clients (fail-safe; never falls back to the shared proxy/connection address).
+- Q: What is the partition key for each limiter? → A: The payment limiter partitions by the authenticated user identity (account/user id); the auth limiter (login/refresh, pre-identity) partitions by the resolved client IP from `CF-Connecting-IP`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -80,7 +81,7 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 
 ### Edge Cases
 
-- A burst of legitimate traffic from many users behind a single corporate NAT (shared client IP) — limits must be tuned to avoid false positives while still curbing abuse.
+- A burst of legitimate traffic from many users behind a single corporate NAT (shared client IP): authenticated payment limits are unaffected because they partition by user identity, while the IP-partitioned auth limit must be tuned to avoid false positives for the shared address while still curbing abuse.
 - Forwarded-header trust: only the known edge proxy may set the client-identity header; direct or forged values from untrusted sources must be rejected or ignored.
 - A request that arrives without a resolvable trusted client identity (e.g., missing the edge header, or arriving outside the Cloudflare/Cloud Run edge) MUST be routed to a single shared `"unknown"` partition that has its own strict quota — never falling back to the shared proxy/connection address, and never granting an unbounded bucket that re-creates the global-throttle fault. Because legitimate traffic always transits the edge, this partition is expected to be near-empty in normal production operation.
 - Exposing exception detail or SQL text in any environment must never leak secrets or PII; "Dev" enablement must still respect sensitive-data exclusions.
@@ -90,7 +91,7 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 
 ### Functional Requirements
 
-- **FR-001**: Auth and payment rate limits MUST be enforced per individual client identity, not as a single global bucket shared by all clients.
+- **FR-001**: Auth and payment rate limits MUST be enforced per individual client identity, not as a single global bucket shared by all clients. The auth limiter (login/refresh, which run before the caller is identified) MUST partition by the resolved client IP; the payment limiter (authenticated) MUST partition by the authenticated user identity, so that users sharing a network address (e.g., corporate NAT) do not share a payment quota.
 - **FR-002**: The system MUST derive client identity for rate limiting from the Cloudflare-set `CF-Connecting-IP` header, trusting it only when the request arrives via the known Cloudflare/Cloud Run edge, and MUST reject or ignore any client-supplied identity value that does not originate from that trusted edge.
 - **FR-003**: A single client exceeding a limit MUST NOT cause rate-limit rejections for other clients.
 - **FR-004**: Rate-limit thresholds MUST be configurable per environment without code changes.
@@ -102,7 +103,7 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 
 ### Key Entities *(include if feature involves data)*
 
-- **Rate-limit partition key**: the per-client identity used to bucket auth/payment requests, resolved from the trusted edge.
+- **Rate-limit partition key**: the per-client identity used to bucket requests — the authenticated user identity for the payment limiter, and the resolved client IP (from the trusted edge) for the auth limiter; un-attributable requests fall to a shared `"unknown"` partition.
 - **Smoke check set**: the curated collection of deployment-health checks, distinct from the full regression suite.
 - **Environment feature flag**: a configuration value that enables or disables an environment-conditional behavior independent of the host environment name.
 
