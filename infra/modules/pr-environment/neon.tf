@@ -15,17 +15,16 @@ resource "neon_branch" "pr" {
 
 # New read-write compute endpoint for the per-PR branch. Transaction-mode connection pooling multiplexes
 # the app's connections so each PR env holds few real Postgres connections — keeping total connections
-# bounded across many concurrent PR envs (constitution §8, T040). Small autoscaling cap keeps idle
-# compute (and cost) minimal; the endpoint autosuspends when idle (scale-to-zero economics, SC-008).
+# bounded across many concurrent PR envs (constitution §8, T040). The endpoint autosuspends on the
+# account's default interval when idle (scale-to-zero economics, SC-008). NOTE: autoscaling CU limits and
+# a custom suspend_timeout_seconds are paid-tier Neon features (HTTP 412 on this account), so they are
+# intentionally omitted — matches the working Dev module's endpoint.
 resource "neon_endpoint" "pr" {
-  project_id               = var.neon_project_id
-  branch_id                = neon_branch.pr.id
-  type                     = "read_write"
-  pooler_enabled           = true
-  pooler_mode              = "transaction"
-  autoscaling_limit_min_cu = 0.25
-  autoscaling_limit_max_cu = 1
-  suspend_timeout_seconds  = 300
+  project_id     = var.neon_project_id
+  branch_id      = neon_branch.pr.id
+  type           = "read_write"
+  pooler_enabled = true
+  pooler_mode    = "transaction"
 }
 
 locals {
