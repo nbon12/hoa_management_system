@@ -183,6 +183,11 @@ jobs:
         env:
           CYPRESS_BASE_URL: ${{ env.WEB_URL }}
           PLAYWRIGHT_BASE_URL: ${{ env.WEB_URL }}
+          # global-setup uses PLAYWRIGHT_API_URL to reset e2e test state (DELETE /api/v1/e2e/cleanup);
+          # without it the cleanup hits localhost and no-ops, leaving seed state that blocks the
+          # registration test. Point it at this PR's API.
+          PLAYWRIGHT_API_URL: ${{ steps.tf.outputs.api_url }}
+          DEV_API_BASE_URL: ${{ steps.tf.outputs.api_url }}/api/v1
         run: |
           npm run e2e:dev
           npx playwright install --with-deps chromium
