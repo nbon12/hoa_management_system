@@ -122,6 +122,7 @@ jobs:
           STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
           API_URL: ${{ steps.tf.outputs.api_url }}
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          PR_NUMBER: ${{ github.event.number }}
         run: scripts/stripe-webhook-register.sh
 
       # 5. Deploy the real image (new revision picks up the real webhook secret = latest).
