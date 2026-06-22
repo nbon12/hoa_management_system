@@ -48,8 +48,8 @@ frontend under `neko-hoa/`. Application backend is unchanged.
 
 - [X] T007 Enable `billingbudgets.googleapis.com` (and confirm `cloudresourcemanager`/`serviceusage`) in `infra/bootstrap/state-bucket/main.tf` (or the bootstrap APIs list)
 - [X] T008 Wire shared-primitive inputs into `infra/environments/pr/main.tf`: reference the existing Neon project `super-water-18090867`, WIF pool/provider `github-pool-dev`, runtime SA `nekohoa-run-dev`, and the 8 shared operator secret ids (no per-PR recreation)
-- [ ] T009 Create the long-lived **`pr-base`** Neon branch (Dev-shaped schema, seeded once) and document/automate its creation; set `neon_base_branch = "pr-base"` default
-- [ ] T010 [P] **Ops runbook task** (per `quickstart.md`): set Repo → Settings → Actions → "Require approval for all external contributors"; add the missing repo-level secrets/vars (`NEON_PR_BASE_BRANCH_ID`, `NEON_PR_ROLE_PASSWORD`, `NEON_PROJECT_ID`, `GCP_RUNTIME_SERVICE_ACCOUNT`, `TF_VAR_billing_account_id`). No GitHub Environment is used (solo: no per-run approval gate)
+- [X] T009 Create the long-lived **`pr-base`** Neon branch (Dev-shaped schema, seeded once) and document/automate its creation; set `neon_base_branch = "pr-base"` default
+- [X] T010 [P] **Ops runbook task** (per `quickstart.md`): set Repo → Settings → Actions → "Require approval for all external contributors"; add the missing repo-level secrets/vars (`NEON_PR_BASE_BRANCH_ID`, `NEON_PR_ROLE_PASSWORD`, `NEON_PROJECT_ID`, `GCP_RUNTIME_SERVICE_ACCOUNT`, `TF_VAR_billing_account_id`). No GitHub Environment is used (solo: no per-run approval gate)
 - [X] T011 [P] Add a reusable composite step or snippet for WIF auth + `tofu init -backend-config="prefix=state/pr/${PR_NUMBER}"` to be shared by provision/teardown/sweep workflows
 
 **Checkpoint**: Shared primitives referenced, `pr-base` exists, fork gate + secret Environment configured.
@@ -112,7 +112,7 @@ frontend under `neko-hoa/`. Application backend is unchanged.
 - [X] T031 [US3] Create `.github/workflows/pr-env-sweep.yml`: `schedule: cron "13 7 * * *"` + `workflow_dispatch`; enumerate `state/pr/*` prefixes; destroy orphans (PR closed but env present, SC-005) and inactive envs (PR open, last commit > 7 days, FR-007) with a reclaim comment
 - [X] T032 [US3] Add `pr-base` self-heal to the sweep: recreate the base Neon branch from Dev if missing (D3)
 - [X] T033 [P] [US3] Add `google_billing_budget` to `infra/environments/dev` filtered by label `pr-env=true`, amount via new tfvar `pr_env_monthly_budget` (default 25), threshold rules 0.8 + 1.0, notification channel; add `billing_account_id` input (SC-008)
-- [ ] T034 [US3] Verify teardown completeness: after closing a PR, confirm zero resources labeled `pr-env=true,pr-number=<n>` remain across Cloud Run, R2, Neon branches, secrets, and `state/pr/<n>` (FR-006)
+- [X] T034 [US3] Verify teardown completeness: after closing a PR, confirm zero resources labeled `pr-env=true,pr-number=<n>` remain across Cloud Run, R2, Neon branches, secrets, and `state/pr/<n>` (FR-006)
 
 **Checkpoint**: All three stories functional — provision, validate, tear down, reclaim, and cap cost.
 
@@ -126,7 +126,7 @@ frontend under `neko-hoa/`. Application backend is unchanged.
 - [X] T038 Cost sanity check: confirm scale-to-zero on Cloud Run (`min-instances=0`) and Neon branch autosuspend so idle PR envs cost ~pennies/day; confirm CI minutes are free (public repo)
 - [X] T039 [P] **Production-data isolation audit** (FR-011 / SC-009): add an automated check confirming no PR env resource references a production project, Neon branch, R2 bucket, or secret — branches fork only from `pr-base`; assert in the provision workflow and/or the sweep
 - [X] T040 [P] **Neon concurrency check** (constitution §8): verify that, at the expected number of simultaneous PR envs, per-PR pooled endpoints with low max-connections do not exhaust Neon capacity (document the headroom; tighten pool size if needed)
-- [ ] T041 Run `quickstart.md` validation end-to-end (one real PR: provision → URLs → smoke → close → teardown) and confirm SC-003 (≤10 min ready) and SC-004 (≤30 min torn down)
+- [X] T041 Run `quickstart.md` validation end-to-end (one real PR: provision → URLs → smoke → close → teardown) and confirm SC-003 (≤10 min ready) and SC-004 (≤30 min torn down)
 - [X] T042 **Before submitting the PR**: bring this feature's `spec.md` AND `tasks.md` up to date with the work actually performed; update any older `spec.md` that drifted; reconcile cross-spec contradictions (the out-of-scope items belong to a separate spec — keep that boundary explicit)
 - [X] T043 Verify the spec stays executable: every mandatory acceptance scenario / FR maps to a runnable workflow/suite check that currently passes (constitution §11); confirm PR scope is a focused vertical slice or justified cross-cutting infra change
 
