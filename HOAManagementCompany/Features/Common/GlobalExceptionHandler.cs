@@ -1,11 +1,26 @@
+// <!-- REPOWISE:START domain=error-handling -->
+// Global exception handler: logs the unhandled exception server-side and returns a consistent,
+// client-safe error envelope ({ code, message, detail }). Whether `detail` carries the full
+// exception text is config-gated via DevToolsOptions.ExposeExceptionDetail (014 US3) instead of the
+// old host-name check (env.IsDevelopment()), which silently returned no detail in the deployed `Dev`
+// environment. The flag defaults to dev-like and is forced off in Production, so production responses
+// never leak stack traces or internal paths (FR-009/SC-007).
+// <!-- REPOWISE:END -->
+
+using HOAManagementCompany.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Features.Common;
 
-public class GlobalExceptionHandler(IHostEnvironment env, ILogger<GlobalExceptionHandler> logger)
+public class GlobalExceptionHandler(
+    IOptions<DevToolsOptions> devToolsOptions,
+    ILogger<GlobalExceptionHandler> logger)
     : IExceptionHandler
 {
+    private readonly bool _exposeDetail = devToolsOptions.Value.ExposeExceptionDetail ?? false;
+
     public async ValueTask<bool> TryHandleAsync(
         HttpContext context,
         Exception exception,
@@ -17,7 +32,7 @@ public class GlobalExceptionHandler(IHostEnvironment env, ILogger<GlobalExceptio
         {
             Status = StatusCodes.Status500InternalServerError,
             Title = "An unexpected error occurred.",
-            Detail = env.IsDevelopment() ? exception.ToString() : null
+            Detail = _exposeDetail ? exception.ToString() : null
         };
 
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;

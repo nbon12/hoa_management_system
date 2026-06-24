@@ -45,6 +45,34 @@ public static class OptionsValidationExtensions
     }
 
     /// <summary>
+    /// Same as <see cref="AddValidatedOptions{TOptions,TValidator}(IServiceCollection,IConfiguration,string)"/>
+    /// but applies <paramref name="postConfigure"/> after binding (e.g. to derive environment-aware
+    /// defaults) before validation runs, so the validator sees the fully-resolved value.
+    /// </summary>
+    public static IServiceCollection AddValidatedOptions<TOptions, TValidator>(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string sectionName,
+        Action<TOptions> postConfigure)
+        where TOptions : class
+        where TValidator : class, IValidator<TOptions>
+    {
+        services.AddSingleton<IValidator<TOptions>, TValidator>();
+
+        services.AddSingleton<IValidateOptions<TOptions>>(sp =>
+            new FluentValidateOptions<TOptions>(
+                Microsoft.Extensions.Options.Options.DefaultName,
+                sp.GetRequiredService<IValidator<TOptions>>()));
+
+        services.AddOptions<TOptions>()
+            .Bind(configuration.GetSection(sectionName))
+            .PostConfigure(postConfigure)
+            .ValidateOnStart();
+
+        return services;
+    }
+
+    /// <summary>
     /// Validates the host's <c>ASPNETCORE_ENVIRONMENT</c> name at startup against
     /// <see cref="HostEnvironmentOptions.KnownEnvironments"/>. Unlike the other options groups, the
     /// value comes from <paramref name="environment"/> (not a configuration section), but it runs
