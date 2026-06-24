@@ -71,3 +71,16 @@ variable "deploy_alert_webhook_url" {
   type      = string
   sensitive = true
 }
+
+# --- 013: PR-environment cost guardrail (budget.tf, SC-008) ---
+
+variable "billing_account_id" {
+  description = "GCP billing account id (XXXXXX-XXXXXX-XXXXXX) the PR-env budget is created under. From TF_VAR_billing_account_id / GH secret."
+  type        = string
+}
+
+variable "pr_env_monthly_budget" {
+  description = "Monthly USD ceiling for all per-PR environments combined; alerts fire at 80% and 100% (SC-008). Alert-only — no hard cap."
+  type        = number
+  default     = 25
+}

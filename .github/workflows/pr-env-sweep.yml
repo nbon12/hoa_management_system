@@ -1,0 +1,127 @@
+# Ephemeral per-PR environment — daily reclaim sweep (013 contracts/workflows.md, FR-007/FR-008).
+# Enumerates live envs by listing the per-PR state prefixes, then destroys:
+#   - ORPHANS:  PR is closed/merged but the env still exists (SC-005), and
+#   - INACTIVE: PR is open but has had no new commit for > 7 days (FR-007; clock resets on push,
+#               no absolute-age cap). A reclaimed open PR re-provisions on its next push.
+# Also self-heals the pre-seeded `pr-base` Neon branch if it has gone missing (research D3).
+name: pr-env-sweep
+
+on:
+  schedule:
+    - cron: "13 7 * * *" # off the :00 mark on purpose
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # WIF OIDC
+  pull-requests: write # reclaim comment
+
+concurrency:
+  group: pr-env-sweep
+  cancel-in-progress: false
+
+env:
+  INACTIVITY_DAYS: "7"
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    # No GitHub Environment gate (scheduled job; repo-level secrets).
+    env:
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_gcp_region: ${{ vars.GCP_REGION }}
+      TF_VAR_neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+      TF_VAR_neon_base_branch_id: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+      TF_VAR_neon_role_password: ${{ secrets.NEON_PR_ROLE_PASSWORD }}
+      TF_VAR_runtime_service_account: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      TF_VAR_stripe_publishable_key: ${{ vars.STRIPE_PUBLISHABLE_KEY }}
+      TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.8.0"
+
+      # pr-base self-heal (D3): if the pre-seeded base branch id is unset/missing, alert. (Recreating +
+      # seeding is app-driven; surfacing the gap loudly beats a silently broken provisioner.)
+      - name: Verify pr-base branch exists
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BASE_BRANCH_ID: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+        run: |
+          set -uo pipefail
+          ok="$(curl -sS -H "Authorization: Bearer ${NEON_API_KEY}" \
+            "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches/${BASE_BRANCH_ID}" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin).get('branch',{}).get('id',''))" 2>/dev/null)"
+          if [ "$ok" != "$BASE_BRANCH_ID" ]; then
+            echo "::error::pr-base Neon branch ${BASE_BRANCH_ID} is missing — re-create + re-seed it (see specs/013 T009) before new PR envs can provision."
+          else
+            echo "pr-base branch OK (${ok})."
+          fi
+
+      - name: Reclaim orphaned + inactive environments
+        env:
+          REPO: ${{ github.repository }}
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+        run: |
+          set -uo pipefail
+          now=$(date -u +%s)
+          cutoff=$(( INACTIVITY_DAYS * 86400 ))
+
+          # Enumerate live PR envs from the state prefixes (state/pr/<n>/...).
+          prs=$(gcloud storage ls "gs://nekohoa-dev-tfstate/state/pr/" 2>/dev/null \
+            | sed -nE 's#.*/state/pr/([0-9]+)/?$#\1#p' | sort -u)
+          [ -z "$prs" ] && { echo "No per-PR environments found."; exit 0; }
+
+          for n in $prs; do
+            state=$(gh api "repos/${REPO}/pulls/${n}" --jq '.state' 2>/dev/null || echo "unknown")
+            reason=""
+            if [ "$state" = "closed" ]; then
+              reason="orphan (PR #${n} is closed)"
+            elif [ "$state" = "open" ]; then
+              last=$(gh api "repos/${REPO}/pulls/${n}/commits?per_page=100" \
+                --jq '.[-1].commit.committer.date' 2>/dev/null || echo "")
+              if [ -n "$last" ]; then
+                age=$(( now - $(date -u -d "$last" +%s 2>/dev/null || echo "$now") ))
+                [ "$age" -gt "$cutoff" ] && reason="inactive (PR #${n}, no commit in > ${INACTIVITY_DAYS}d)"
+              fi
+            else
+              echo "PR #${n}: state '${state}' — skipping (cannot confirm)."; continue
+            fi
+
+            [ -z "$reason" ] && { echo "PR #${n}: active — keeping."; continue; }
+            echo "Reclaiming PR #${n}: ${reason}"
+
+            # Deregister Stripe + purge R2 + destroy + delete state (same as teardown).
+            PR_NUMBER="$n" scripts/stripe-webhook-deregister.sh || true
+            ENDPOINT="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-service-url" --project="$PROJECT" 2>/dev/null || true)"
+            if [ -n "$ENDPOINT" ]; then
+              AWS_ACCESS_KEY_ID="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-access-key" --project="$PROJECT")" \
+              AWS_SECRET_ACCESS_KEY="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-secret-key" --project="$PROJECT")" \
+              AWS_DEFAULT_REGION=auto \
+                aws s3 rm "s3://nekohoa-pr-${n}-documents" --recursive --endpoint-url "$ENDPOINT" || true
+            fi
+
+            ( cd infra/environments/pr \
+              && tofu init -input=false -reconfigure -backend-config="prefix=state/pr/${n}" \
+              && TF_VAR_pr_number="$n" TF_VAR_head_sha="sweep" tofu destroy -input=false -auto-approve ) || true
+            gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${n}" || true
+
+            if [[ "$reason" == inactive* ]]; then
+              gh pr comment "$n" --repo "$REPO" --body \
+                "🧹 This PR's ephemeral environment was reclaimed after ${INACTIVITY_DAYS} days with no new commits. Push any commit (or re-run the **pr-env** workflow) to rebuild it." || true
+            fi
+          done
