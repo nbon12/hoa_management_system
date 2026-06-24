@@ -33,21 +33,23 @@ If Repowise MCP is unavailable, say so and fall back to built-in search.
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-06-13 (commit 8a8d2a3). Confidence: 100%.
+Last indexed: 2026-06-21 (commit 096082b). Confidence: 100%.
 ### Architecture
-Repo is an HOA management platform: it ingests user commands and configuration through an Angular single-page application and a C# REST API, processes business logic across domain models for violations, payments, community records, and authentication, persists state to a SQL database via Entity Framework Core, and produces notifications through Twilio (SMS) and SendGrid (email) integrations. | Layer         | Technology                             | Usage                                     |
-|---------------|----------------------------------------|-------------------------------------------|
-| **Backend**   | C# (.NET)                              | REST API, domain logic, persistence       |
-| **Frontend**  | TypeScript (Angular)                   | Single-page application, user interface   |
-| **UI Toolkit**| Storybook                              | Component documentation and development   |
-| **Database**  | PostgreSQL via Entity Framework Core 9 (Npgsql); Neon in prod, Testcontainers in CI/local | Relational storage for HOA data           |
-| **Testing**   | xUnit (C#), Jasmine/Karma (Angular)    | Unit and integration tests                |
-| **Infrastructure** | Docker, shell scripts             | Containerisation, CI/CD pipeline          |
-| **External**  | Twilio, SendGrid                       | SMS and email notification delivery       |
+Repo is a full-stack Homeowners Association (HOA) management platform: it ingests community, resident, violation, and payment data through a C# REST API (built with .NET), processes business rules (e.g., violation categorization, payment options), persists state via Entity Framework Core to a relational database, and surfaces management dashboards and workflows through an Angular frontend (neko-hoa), with cloud infrastructure provisioned declaratively via Terraform across dev, staging, and ephemeral PR environments. | Layer          | Technology                                                     |
+|----------------|----------------------------------------------------------------|
+| **Backend**    | C# 12, .NET 8, ASP.NET Core Web API, Entity Framework Core     |
+| **Frontend**   | Angular 17 (TypeScript), Tailwind CSS ? (implied), Storybook   |
+| **Database**   | PostgreSQL / SQL Server (inferred from EF Core + Terraform)    |
+| **Infrastructure** | Terraform, AWS (likely ECS/EKS, RDS, S3 for state)         |
+| **Testing**    | xUnit / NUnit (backend), TestDataSeeder fixture                |
+| **CI/CD**      | GitHub Actions (pr-env-sweep, pr-env-teardown workflows)       |
+| **Packaging**  | NuGet, npm                                                     |
 
 
 
-- HOAManagementCompany/Program.cs — .NET backend application bootstrap and API configuration. - neko-hoa/src/main.ts — Angular frontend bootstrap and module initialisation. - neko-hoa/src/app/core/models/index.ts — Frontend data model definitions (shared domain objects).
+The system has four primary entry points, each serving a distinct lifecycle:
+
+1. **HOAManagementCompany/Program.cs** – Backend API host.
 ### Key Modules
 | Module | Purpose | Owner |
 |--------|---------|-------|
@@ -58,13 +60,17 @@ Repo is an HOA management platform: it ingests user commands and configuration t
 | `HOAManagementCompany` | HOAManagementCompany is the primary backend application for a Homeowners Associa | — |
 | `community-1` | The neko-hoa/features module is the **payment UI subsystem** of the neko-hoa app | — |
 | `community-63` | The hoamanagementcompany.tests/integration module is the **system-level verifica | — |
-| `community-0` | The hoamanagementcompany/features module is the **payment orchestration and aler | — |
-| `community-3` | The features module is the presentation layer of neko-hoa’s payment subsystem —  | — |
+| `community-0` | The hoamanagementcompany/features module is the **application feature layer** of | — |
+| `community-3` | The external:microsoft.aspnetcore module is the **host-level entry point** of th | — |
 | `community-2` | The features module is the **entry-point and orchestration layer** of the neko-h | — |
 ### Entry Points
 - `neko-hoa/src/app/core/models/index.ts`
 - `neko-hoa-mock/models/index.ts`
 - `HOAManagementCompany/Program.cs`
+- `infra/bootstrap/state-bucket/main.tf`
+- `infra/environments/dev/main.tf`
+- `infra/environments/pr/main.tf`
+- `infra/environments/staging/main.tf`
 - `neko-hoa/.storybook/main.ts`
 - `neko-hoa/scripts/generate-build-id.mjs`
 - `neko-hoa/src/main.ts`
@@ -99,13 +105,13 @@ Repo is an HOA management platform: it ingests user commands and configuration t
 |------|-------|-------------|-------|
 | `neko-hoa/package-lock.json` | 100.0th %ile | 4 | Nicholas |
 | `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.8th %ile | 4 | Nicholas |
-| `neko-hoa/src/app/features/payments/recurring/recurring.component.ts` | 99.5th %ile | 4 | Nicholas |
+| `neko-hoa/src/app/features/payments/recurring/recurring.component.ts` | 99.6th %ile | 4 | Nicholas |
+| `HOAManagementCompany/Program.cs` | 99.5th %ile | 14 | Nicholas |
 | `neko-hoa/src/app/features/payments/one-time/one-time.component.ts` | 99.3th %ile | 3 | Nicholas |
-| `neko-hoa/src/app/core/services/payments.service.ts` | 99.0th %ile | 4 | Nicholas |
 
 ## Code health
-Hotspot health: 9.41/10 (stable) ·
-Average: 9.52/10 ·
+Hotspot health: 9.39/10 (stable) ·
+Average: 9.51/10 ·
 Worst: 7.74/10 (`HOAManagementCompany/Features/Payments/Ledger/LedgerService.cs`)
 
 ### Critical biomarkers

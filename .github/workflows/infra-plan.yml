@@ -36,6 +36,8 @@ jobs:
       TF_VAR_deploy_alert_webhook_url: ${{ secrets.DEPLOY_ALERT_WEBHOOK_URL }}
       # operator_secrets is a map → supply as a single JSON-encoded secret.
       TF_VAR_operator_secrets: ${{ secrets.TF_VAR_OPERATOR_SECRETS }}
+      # 013: account-level billing budget for PR ephemeral envs (no default in dev/budget.tf).
+      TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
 

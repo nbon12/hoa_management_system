@@ -1,0 +1,39 @@
+# Reusable setup for every per-PR OpenTofu operation (013 T011): WIF auth (no static keys, FR-016) +
+# OpenTofu + `tofu init` with the PER-PR state prefix (research D2). Shared by pr-env.yml (provision),
+# pr-env-teardown.yml (destroy), and pr-env-sweep.yml (reclaim) so the init contract lives in one place.
+name: "PR env tofu init"
+description: "Authenticate via WIF and init infra/environments/pr against state/pr/<pr_number>."
+
+inputs:
+  pr_number:
+    description: "PR number — selects the state prefix state/pr/<pr_number>."
+    required: true
+  wif_provider:
+    description: "GCP Workload Identity provider (secret GCP_WIF_PROVIDER)."
+    required: true
+  service_account:
+    description: "Deployer SA email (secret GCP_DEPLOY_SERVICE_ACCOUNT)."
+    required: true
+  tofu_version:
+    description: "OpenTofu version."
+    required: false
+    default: "1.8.0"
+
+runs:
+  using: composite
+  steps:
+    - id: auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.wif_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - uses: opentofu/setup-opentofu@v1
+      with:
+        tofu_version: ${{ inputs.tofu_version }}
+
+    # Per-PR remote state: same bucket as Dev, isolated by prefix state/pr/<n> (research D2).
+    - name: tofu init (state/pr/${{ inputs.pr_number }})
+      shell: bash
+      working-directory: infra/environments/pr
+      run: tofu init -input=false -backend-config="prefix=state/pr/${{ inputs.pr_number }}"

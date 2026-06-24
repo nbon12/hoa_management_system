@@ -33,6 +33,9 @@ resource "google_project_service" "required" {
     # environment is applied by the deployer SA in CI.
     "cloudresourcemanager.googleapis.com",
     "serviceusage.googleapis.com",
+    # 013: the SC-008 cost guardrail (google_billing_budget in the Dev root) needs the Billing
+    # Budget API enabled. disable_on_destroy=false (below) keeps it on for live budgets.
+    "billingbudgets.googleapis.com",
   ])
 
   project            = var.gcp_project_id
