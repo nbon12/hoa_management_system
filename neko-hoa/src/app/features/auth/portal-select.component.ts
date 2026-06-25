@@ -30,9 +30,13 @@ const PORTALS = [
           <p style="color:var(--ink-soft);max-width:320px;">
             Five portals, one community. Most folks want the Resident door.
           </p>
-          <div class="ph" style="margin-top:24px;height:140px;max-width:320px;border-radius:12px;">
-            🏠 illustrated houses
-          </div>
+          <picture>
+            <source srcset="assets/pink-home.webp" type="image/webp" />
+            <img src="assets/pink-home.png"
+                 alt="Illustrated pink community houses"
+                 width="320" height="140"
+                 style="margin-top:24px;width:100%;max-width:320px;height:140px;object-fit:cover;border-radius:12px;display:block;" />
+          </picture>
         </div>
 
         <!-- Right portal list -->
