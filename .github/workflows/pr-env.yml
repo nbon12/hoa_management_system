@@ -79,7 +79,7 @@ jobs:
           pr_number: ${{ env.PRN }}
           wif_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       # 3. Provision: Neon branch fork + R2 bucket + secrets + Cloud Run (placeholder image).
       - name: tofu apply
