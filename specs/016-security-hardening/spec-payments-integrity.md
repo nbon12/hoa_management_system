@@ -66,11 +66,12 @@ A ledger credit is written only when the settled amount reported by the payment 
 
 ### Functional Requirements
 
+- **FR-B0**: The remediation is **forward-only**. *(Clarified 2026-07-02: this program prevents new double-credits and does not auto-remediate any historical duplicate ledger credits that may already exist. Correcting pre-existing duplicates, if any, is handled separately and is out of scope here — no automated repair or detection pass is included.)*
 - **FR-B1**: The deferred-settlement path MUST commit the ledger credit, the transaction-status transition, and any receipt creation as a single atomic unit, so an interruption cannot leave a credit without its corresponding status change.
 - **FR-B2**: The ledger MUST enforce a durable uniqueness backstop that prevents more than one settlement credit per payment (per transaction and entry type), independent of application-level guards, while still permitting distinct compensating entries.
 - **FR-B3**: Settlement processing MUST be safe under webhook redelivery and under concurrent execution with the reconciliation sweep, producing exactly one credit per settled payment.
 - **FR-B4**: Idempotency-key uniqueness MUST be scoped per tenant (property), matching the per-tenant replay lookup, and a key collision MUST be handled as a graceful replay/duplicate response rather than a server error.
-- **FR-B5**: A ledger settlement credit MUST be written only when the provider-reported received amount matches the server-computed expected total; mismatches MUST be recorded for review and MUST NOT credit the ledger.
+- **FR-B5**: A ledger settlement credit MUST be written only when the provider-reported received amount matches the server-computed expected total; on mismatch, the credit MUST be blocked and the mismatch MUST be recorded in a **manual review queue** for human resolution. *(Clarified 2026-07-02: block + manual review queue — no auto-credit of the expected amount and no alert-only handling; a review surface/runbook is in scope.)*
 - **FR-B6**: Payment endpoints MUST read the property claim defensively and return a clean authorization error when it is absent (shared with Sub-Spec A FR-A8; owned here for payment endpoints).
 
 ### Key Entities
@@ -78,6 +79,7 @@ A ledger credit is written only when the settled amount reported by the payment 
 - **Ledger entry**: An append-only record; settlement credits are now uniquely constrained per (transaction, entry type).
 - **Deferred settlement**: The ACH success path whose credit + status transition must be atomic.
 - **Idempotency record**: Per-tenant unique key used to collapse duplicate submissions.
+- **Settlement review queue**: A surface holding blocked settlements whose provider amount did not match the expected total, for human resolution.
 
 ### Security & Abuse Controls *(constitution subset)*
 

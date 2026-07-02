@@ -22,7 +22,7 @@ The scheduled agent that processes dependency update pull requests cannot be ste
 **Acceptance Scenarios**:
 
 1. **Given** a dependency PR whose body/changelog contains embedded instructions, **When** the agent processes it, **Then** it treats that text as data, acts only on structured metadata, and does not perform any action the embedded text requests.
-2. **Given** the agent's merge attempt, **When** it targets the protected branch, **Then** the merge succeeds only through enforced gating (required checks + review), never by the agent alone.
+2. **Given** the agent's merge attempt, **When** it targets the protected branch, **Then** the merge succeeds only if the required status checks pass and the PR is within the agent's permitted metadata-defined scope; the agent MUST NOT bypass or disable checks. *(Per the 2026-07-02 status-checks-only decision, no human review is required at this gate; the metadata/scope constraints and required checks are the enforced controls.)*
 3. **Given** the agent restricts itself to permitted update types (e.g., patch/minor), **When** a PR falls outside that scope, **Then** the agent defers to a human rather than merging.
 4. **Given** the agent performs an action, **When** it merges or modifies code, **Then** a notification is emitted so the activity is not silent.
 
@@ -99,16 +99,16 @@ The channel through which the local agent's prompts and completions flow is a kn
 ### Functional Requirements
 
 - **FR-F1**: The autonomous merge agent MUST treat all pull-request body/changelog/diff/comment text as untrusted data, never as instructions; its decisions MUST be driven by structured metadata (author is the dependency bot, labels, update type, check status), not free-text content.
-- **FR-F2**: The autonomous merge agent MUST NOT be the sole approver of a merge to the protected branch; merges MUST pass enforced branch protection (required status checks + review), consistent with Sub-Spec E FR-E7.
+- **FR-F2**: Every merge the agent performs MUST pass enforced branch protection (required status checks), consistent with Sub-Spec E FR-E7. *(Clarified 2026-07-02: the merge gate is **status-checks-only** — human review is not mandated — so the constrained agent MAY complete a merge on green. This is an accepted residual risk (Sub-Spec E FR-E7a); the agent is constrained by FR-F1/F3/F4/F6 rather than by a human approver, and the agent MUST NOT bypass or disable required checks.)*
 - **FR-F3**: The autonomous merge agent MUST restrict auto-merge to a defined safe scope (e.g., patch/minor dependency version updates from the trusted bot) and defer anything outside that scope to a human.
 - **FR-F4**: Agent actions that merge or modify code MUST emit a notification so activity is observable rather than silent.
 - **FR-F5**: The local agent permission configuration MUST NOT contain any entry that auto-approves arbitrary wrapped/passthrough shell commands.
-- **FR-F6**: The local agent MUST enforce a deny list that categorically blocks dangerous command classes (arbitrary command passthrough, piping remote content into a shell, repository merges, and writes to agent-configuration paths); deny MUST take precedence over allow.
+- **FR-F6**: The local agent MUST enforce a **minimal targeted** deny list that categorically blocks the known bypass — arbitrary command passthrough — and writes to agent-configuration paths; deny MUST take precedence over allow. *(Clarified 2026-07-02: minimal targeted deny, not a broad dangerous-class set, to minimize false positives. Broader classes — piping remote content into a shell, repository merges/pushes, destructive file ops, secret reads — are intentionally left to interactive prompting rather than hard deny.)*
 - **FR-F7**: Agent tooling installed at session start MUST be pinned to an immutable version and integrity-verified (checksum/signature) before execution, failing closed on mismatch; remote content MUST NOT be piped directly into a shell from a mutable reference.
 - **FR-F8**: Any hook that rewrites shell commands before execution MUST constrain its output to safe, known wrappers (or surface the rewrite for inspection) rather than executing opaque rewrite output as trusted.
 - **FR-F9**: Project guidance MUST instruct the agent to treat code-intelligence/tool output and indexed content as untrusted data to be verified against source before any side-effectful action; the competing "trust and act" guidance MUST be removed.
 - **FR-F10**: Agent-configuration paths (permission/hook/instruction files) MUST require review before changes take effect (via the code-ownership/branch-protection gate).
-- **FR-F11**: The local model channel MUST be a documented, trusted, access-restricted endpoint, or the override MUST be removed; third-party agent plugins in the command path MUST be pinned/verified like other tooling.
+- **FR-F11**: The local model channel MUST be confirmed to be a trusted, access-restricted local process, and documented (retained, not removed). *(Clarified 2026-07-02: keep the `ANTHROPIC_BASE_URL` proxy but verify ownership of `:8787` and document it.)* Third-party agent plugins in the command path (rtk and headroom) MUST be **retained but pinned and integrity-verified** like other tooling (FR-F7/F8), rather than removed. *(Clarified 2026-07-02: keep both tools for their token savings; close the supply-chain/rewrite risk via pinning + verification + constrained rewrite output.)*
 
 ### Key Entities
 
@@ -129,7 +129,7 @@ The channel through which the local agent's prompts and completions flow is a kn
 ### Measurable Outcomes
 
 - **SC-F1**: A dependency PR carrying embedded instructions in its body/changelog results in 0 actions taken on those instructions and 0 modifications to unrelated files, verified by a controlled test.
-- **SC-F2**: The autonomous agent cannot complete a merge to the protected branch outside the enforced gates, verified by attempting it; agent merges/modifications emit a notification.
+- **SC-F2**: The autonomous agent cannot merge a PR with failing/pending required checks, cannot merge a PR outside its permitted metadata-defined scope, and cannot bypass or disable checks, verified by attempting each; agent merges/modifications emit a notification. (Merging an in-scope PR on green without human review is expected behavior under the accepted-risk status-checks-only policy.)
 - **SC-F3**: The permission configuration contains 0 arbitrary-command-passthrough allow entries, and the deny list blocks the enumerated dangerous classes even when an allow entry would match, verified by inspection/test.
 - **SC-F4**: The session-start installer fetches a pinned, integrity-verified version and fails closed on mismatch, verified by inspection; the command-rewrite hook does not execute unconstrained opaque output.
 - **SC-F5**: Project guidance no longer instructs "trust and act" on tool/indexed content; agent-configuration paths require review, verified by inspection.
@@ -139,7 +139,7 @@ The channel through which the local agent's prompts and completions flow is a kn
 ## Assumptions
 
 - The scheduled merge agent's configuration lives outside the repository (in the cloud agent/routines dashboard); this sub-spec captures its required end state, and the change is actioned there while the branch-protection gate is enforced in the repository/platform.
-- Per the 2026-07-02 clarification, the AI merge agent is **retained** but constrained: its decisions are driven only by structured metadata (bot author, labels, update type, check status) — never free-text PR/changelog content — and every merge is gated behind branch protection (required status checks + review, per Sub-Spec E). The agent is never the sole approver.
+- Per the 2026-07-02 clarification, the AI merge agent is **retained** but constrained: its decisions are driven only by structured metadata (bot author, labels, update type, check status) — never free-text PR/changelog content — and every merge is gated behind branch protection (required status checks; human review is not mandated — status-checks-only, per Sub-Spec E FR-E7/FR-E7a). Because review is not required, the agent may merge in-scope PRs on green; this residual risk is accepted and offset by the metadata-only, scope-limited, notified, deny-listed constraints.
 - The read-only helper commands the allow-list intends to permit remain available after the passthrough entry is removed.
 - The update tooling that keeps pins current can advance the agent-tooling installer pin over time.
 - CI has no in-pipeline AI today; this sub-spec's job is to keep it that way and to constrain the out-of-pipeline agents that do hold privilege.

@@ -30,6 +30,21 @@ This umbrella spec deliberately contains **no implementation detail**. Each sub-
 - Q: Refresh-token storage target end-state (Sub-spec D)? → A: Full fix — backend-set HttpOnly/Secure/SameSite cookie, access token in memory, silent refresh on startup. No interim-only or frontend-only end-state.
 - Q: Autonomous dependency-merge agent end-state (Sub-spec F)? → A: Keep the AI agent but drive its decisions only from structured metadata (bot author, labels, update type, check status) and gate every merge behind branch protection; never decide from free-text PR/changelog content.
 - Q: Security-header / CSP delivery location (Sub-specs C and D)? → A: Repo-controlled — application middleware (API) plus a frontend build-output headers file (CSP) — asserted by automated tests; not the edge/dashboard.
+- Q: Login lockout policy (Sub-spec A)? → A: Lock the account for 30 minutes after 10 failed attempts, counted per-account (independent of source IP).
+- Q: Access-token revocation strength on logout/property-switch (Sub-spec A FR-A10)? → A: Accept the 15-minute stateless window as documented accepted risk; refresh-token rotation remains the control (no jti deny-list, no TTL reduction).
+- Q: Registration/claim enumeration defense (Sub-spec A)? → A: Require an email-verification gate — the caller must prove control of the email before any registration/claim state is revealed or a claim code is issued.
+- Q: One-time property-claim code validity window (Sub-spec A)? → A: 3 months (90 days), single-use. The long window is an accepted tradeoff for physical-mail delivery, mitigated by single-use, the email-verification gate, and delivery only to the owner's contact on file.
+- Q: Remediate historical duplicate ledger credits (Sub-spec B)? → A: Forward-only — prevent new double-credits; existing duplicates are not auto-remediated in this program.
+- Q: Settlement amount-mismatch handling (Sub-spec B FR-B5)? → A: Block the credit and record the mismatch in a manual review queue for human resolution.
+- Q: Owner email-change handling (Sub-spec C FR-C6)? → A: The new address takes effect only after the owner verifies control of it; the login/identity store is kept in sync.
+- Q: Deployed non-local (Dev) error detail (Sub-spec C FR-C5)? → A: Return only a generic error message plus a correlation ID; full detail is available only in local development and via server-side logs.
+- Q: CSP rollout mode (Sub-spec D)? → A: Ship the CSP in enforcing mode from day one (no report-only phase), given no unsafe sinks and a known origin set.
+- Q: CI deployer identity shape (Sub-spec E FR-E2)? → A: Split into a read-only plan identity (assumable from any ref) and a separate apply identity (assumable only from the protected default branch).
+- Q: Dependency-PR merge policy / branch protection (Sub-specs E & F)? → A: Status-checks-only — required checks gate merges; human review is NOT mandated. The constrained agent may therefore merge on green; this residual risk is ACCEPTED and offset by the agent's metadata-only decisions, scope limit, notifications, and deny-list.
+- Q: Per-PR ephemeral-env credential model (Sub-spec E FR-E12)? → A: Each PR environment uses a distinct database role/credential (no shared password).
+- Q: Agent tooling (rtk/headroom) in the Bash hot path (Sub-spec F)? → A: Keep both, but pin the installer to an immutable version with checksum verification and constrain the command-rewrite output.
+- Q: Local model channel ANTHROPIC_BASE_URL=127.0.0.1:8787 (Sub-spec F)? → A: Keep it, but confirm ownership, verify it is a trusted access-restricted local process, and document it.
+- Q: Agent deny-list aggressiveness (Sub-spec F FR-F6)? → A: Minimal targeted deny — block arbitrary command passthrough and writes to agent-config paths (rather than a broad dangerous-class set), to minimize false positives.
 
 ## User Scenarios & Testing *(mandatory)*
 

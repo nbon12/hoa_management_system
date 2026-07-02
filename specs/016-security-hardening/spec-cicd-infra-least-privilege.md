@@ -45,16 +45,16 @@ Workflows triggered by pull requests do not expose write-capable secrets or the 
 
 ### User Story 3 - Pin the supply chain and lock the default branch (Priority: P2)
 
-All third-party CI actions are pinned to immutable references, and the protected default branch requires status checks and review so no single automated actor can merge or deploy unreviewed code.
+All third-party CI actions are pinned to immutable references, and the protected default branch requires the defined status checks to pass before merge. *(Per the 2026-07-02 status-checks-only decision, human review is not a mandated gate; an automated actor may merge on green — see FR-E7a accepted risk.)*
 
 **Why this priority**: The privileged workflows pin actions to mutable tags — exactly the jobs holding the powerful credentials — so a hijacked tag executes with those credentials. There is no code-ownership/required-review file, and the branch-lock workflow is broken, so the default branch lacks an enforced human/automated review gate (this connects to Sub-Spec F).
 
-**Independent Test**: Verify every action reference is a full commit digest. Verify branch protection requires the defined status checks and review before merge.
+**Independent Test**: Verify every action reference is a full commit digest. Verify branch protection requires the defined status checks to pass before merge.
 
 **Acceptance Scenarios**:
 
 1. **Given** any workflow, **When** its action references are inspected, **Then** each is pinned to an immutable commit digest.
-2. **Given** the default branch, **When** a merge is attempted without passing required checks/review, **Then** it is blocked.
+2. **Given** the default branch, **When** a merge is attempted without passing the required status checks, **Then** it is blocked.
 
 ---
 
@@ -86,17 +86,18 @@ Container images run as non-root, base images are digest-pinned, local-developme
 ### Functional Requirements
 
 - **FR-E1**: The infrastructure deployer identity MUST hold an enumerated least-privilege role set with no project-Owner grant.
-- **FR-E2**: Apply/deploy-capable cloud identity MUST be assumable only from the protected default branch; a distinct read-only identity MUST be used for PR plan operations, assumable from any ref.
+- **FR-E2**: The deployer identity MUST be **split into two service accounts**: a read-only *plan* identity assumable from any ref, and a separate *apply/deploy* identity assumable only from the protected default branch. *(Clarified 2026-07-02: two-SA split, not a single ref-scoped SA.)*
 - **FR-E3**: Pull-request-triggered jobs MUST NOT expose write-capable or operator secrets to plans of PR-authored configuration; plan runs MUST use placeholder or read-only credentials.
 - **FR-E4**: Secrets in per-PR and infrastructure workflows MUST be scoped to only the specific steps that require them, never at job scope where PR-authored install/e2e code can read them.
 - **FR-E5**: Privileged infrastructure jobs MUST be gated behind a required-reviewer environment.
 - **FR-E6**: All third-party CI action references MUST be pinned to immutable commit digests.
-- **FR-E7**: The default branch MUST enforce branch protection requiring the defined status checks and review before merge; a code-ownership file MUST define required reviewers.
+- **FR-E7**: The default branch MUST enforce branch protection requiring the defined status checks to pass before merge. *(Clarified 2026-07-02: **status-checks-only** — human review is NOT mandated as a merge gate. This is an accepted trade-off; see the accepted-risk note below. A code-ownership file MAY be added to route review requests, but review is advisory, not a hard gate.)*
+- **FR-E7a (accepted risk)**: Because merges are gated by status checks only, an automated actor (including the constrained dependency-merge agent in Sub-Spec F) can complete a merge on green without human review. This residual risk is **accepted** and offset by: the agent acting only on structured metadata (F FR-F1), its restriction to a safe update scope (F FR-F3), merge/modify notifications (F FR-F4), the deny-list (F FR-F6), and required status checks including security scans. If this risk is later deemed too high, FR-E7 is tightened to require review.
 - **FR-E8**: Container images MUST run as a non-root user, and base images MUST be pinned by digest.
 - **FR-E9**: Local-development compose services (management/data planes) MUST bind to the loopback interface rather than all interfaces.
 - **FR-E10**: Attacker-influenced values (e.g., branch names) MUST be passed to tools as data or validated against a safe character pattern, never interpolated directly into a shell/command argument.
 - **FR-E11**: The branch-lock workflow MUST either be corrected to function with an appropriately privileged credential or replaced by native branch protection (FR-E7); it MUST NOT remain a silently failing control.
-- **FR-E12**: The per-PR database credential SHOULD be rotated on suspicion and its scope documented; where the plan allows, per-PR credentials SHOULD be distinct. (Accepted-risk fallback: documented shared credential for seeded, non-production test data.)
+- **FR-E12**: Each per-PR ephemeral environment MUST use a **distinct database role/credential**, so compromise of one PR environment does not disclose a credential valid for the others. *(Clarified 2026-07-02: distinct per-PR roles — not a shared rotated password.)*
 
 ### Key Entities
 
@@ -120,7 +121,7 @@ Container images run as non-root, base images are digest-pinned, local-developme
 - **SC-E2**: Apply/deploy-capable identity cannot be assumed from any non-default-branch workflow run, verified by attempting it.
 - **SC-E3**: No pull-request-triggered job exposes write-capable/operator secrets to PR-authored plan/install/e2e code, verified by reviewing job and step scoping.
 - **SC-E4**: 100% of third-party action references are digest-pinned.
-- **SC-E5**: The default branch cannot be merged to without passing required checks and review, verified by attempting an unqualified merge.
+- **SC-E5**: The default branch cannot be merged to without passing the required status checks, verified by attempting a merge with failing/pending checks.
 - **SC-E6**: All deployed containers run as non-root and reference digest-pinned base images, verified by inspection.
 - **SC-E7**: The fork-PR trust boundary remains intact (no `pull_request_target`; fork PRs get no secrets), verified by re-review.
 

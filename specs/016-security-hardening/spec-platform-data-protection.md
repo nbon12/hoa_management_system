@@ -52,7 +52,7 @@ Deployed non-local environments do not return raw exception detail to callers, u
 
 **Acceptance Scenarios**:
 
-1. **Given** a deployed non-local environment, **When** an unhandled error occurs, **Then** the response exposes only a sanitized type/message, not full internals (full detail remains available only in local development).
+1. **Given** a deployed non-local environment, **When** an unhandled error occurs, **Then** the response exposes only a generic message and a correlation ID, not type/stack/internals (full detail remains available only in local development and via server-side logs).
 2. **Given** an owner profile update, **When** oversized or malformed fields are submitted, **Then** they are rejected by validation with clear messages.
 3. **Given** any API response, **When** headers are inspected, **Then** the hardened security-header baseline is present (via the app or a verified edge configuration).
 
@@ -73,8 +73,8 @@ Deployed non-local environments do not return raw exception detail to callers, u
 - **FR-C2**: All collection/list endpoints MUST validate and clamp pagination parameters to safe bounds (minimum page, maximum page size) and MUST NOT allow page arithmetic to overflow or trigger a server error.
 - **FR-C3**: The telemetry proxy rate limiter MUST partition by the trusted-edge-resolved client identity, consistent with the authentication limiter, so it is effective behind the edge proxy.
 - **FR-C4**: A global default rate limit MUST apply to endpoints lacking a specific policy, including anonymous registration.
-- **FR-C5**: Deployed non-local environments MUST NOT return full exception detail to callers; only a sanitized type/message is exposed, with full detail restricted to local development. Production behavior (already sanitized) MUST be preserved.
-- **FR-C6**: User-editable profile fields MUST enforce maximum length and appropriate format validation (e.g., phone number format), and an owner email change MUST follow a defined verification/identity-sync path rather than an unverified direct update.
+- **FR-C5**: Deployed non-local environments (including the internet-reachable Dev host) MUST return only a **generic error message plus a correlation ID** to callers — no exception type, stack trace, or internals. Full exception detail MUST be available only in local development and via server-side logs keyed by the correlation ID. *(Clarified 2026-07-02: generic message + correlation ID, not a sanitized type/message.)* Production behavior (already sanitized) MUST be preserved.
+- **FR-C6**: User-editable profile fields MUST enforce maximum length and appropriate format validation (e.g., phone number format). An owner email change MUST take effect **only after the owner verifies control of the new address** (e.g., a confirmation link sent to it), and the login/identity store MUST be kept in sync with the verified value. *(Clarified 2026-07-02: verify-new-address-first; no immediate change with after-the-fact notification, and no admin-only path.)*
 - **FR-C7**: API responses MUST carry a hardened security-header baseline (at minimum content-type-options and, where applicable, transport-security and frame options), provided by **application-level middleware (repo-controlled)** and asserted by an automated test. *(Clarified 2026-07-02: headers are set in repo-controlled app config and tested, not relied upon from the edge/dashboard; the edge may add headers additionally but is not the source of truth.)*
 - **FR-C8**: Privileged fields MUST remain non-editable via profile update endpoints (no over-posting); this existing protection MUST be preserved and covered by a test.
 
@@ -98,7 +98,7 @@ Deployed non-local environments do not return raw exception detail to callers, u
 - **SC-C1**: 0 occurrences of a configured sensitive field in cleartext across emitted log events in testing; an automated test fails if the scrubbing enricher is unregistered.
 - **SC-C2**: 0 server errors and 0 full-table materializations for out-of-range pagination inputs across list endpoints in testing.
 - **SC-C3**: The telemetry limiter and a global default limiter demonstrably attribute and bound requests correctly behind the edge proxy, verified by test.
-- **SC-C4**: Deployed non-local environments return no raw stack traces on error, verified by test; production remains sanitized.
+- **SC-C4**: Deployed non-local environments return only a generic message + correlation ID on error (no type/stack/internals), verified by test; production remains sanitized.
 - **SC-C5**: Oversized/malformed profile inputs are rejected in 100% of tested cases; privileged fields remain non-editable.
 - **SC-C6**: The security-header baseline is present on responses, set by repo-controlled application middleware and verified by an automated test.
 
