@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-21
+Auto-generated from all feature plans. Last updated: 2026-07-02
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -20,6 +20,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-21
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 + Playwright 1.60 (frontend e2e) + FastEndpoints, `Microsoft.AspNetCore.RateLimiting` (built-in), OpenTelemetry (existing), `@playwright/test`; GitHub Actions (CI) (014-post-deploy-hardening)
 - HCL for OpenTofu ≥ 1.8 (provisioning); GitHub Actions YAML + Bash (CI); + OpenTofu providers `hashicorp/google ~5.0`, `hashicorp/google-beta ~5.0`, (013-ephemeral-pr-envs)
 - Per-PR Neon Postgres **branch** (copy-on-write from a pre-seeded `pr-base`); per-PR (013-ephemeral-pr-envs)
+- C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL for OpenTofu ≥ 1.8 (infra); GitHub Actions YAML (CI) + FastEndpoints (+ FastEndpoints.Swagger/NSwag for OpenAPI), EF Core 9 (Npgsql), Stripe.net (confined to `Infrastructure/Payments`), Serilog, Sentry, FluentValidation; Angular 17.3 + ngx-stripe; new dev-time additions: `NetArchTest.Rules` (architecture tests), `openapi-typescript` (types-only client codegen) (015-architecture-remediation)
+- PostgreSQL (Neon in deployed envs, Testcontainers locally/CI). **No schema changes**: remediation uses existing tables (`PaymentTransactions`, `LedgerEntries`, `WebhookEventInbox`, `OutboxMessages`); consistency detection is report-only (logs/alerts, no new tables) (015-architecture-remediation)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -57,10 +59,9 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 015-architecture-remediation: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL for OpenTofu ≥ 1.8 (infra); GitHub Actions YAML (CI) + FastEndpoints (+ FastEndpoints.Swagger/NSwag for OpenAPI), EF Core 9 (Npgsql), Stripe.net (confined to `Infrastructure/Payments`), Serilog, Sentry, FluentValidation; Angular 17.3 + ngx-stripe; new dev-time additions: `NetArchTest.Rules` (architecture tests), `openapi-typescript` (types-only client codegen)
 - 014-post-deploy-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 + Playwright 1.60 (frontend e2e) + FastEndpoints, `Microsoft.AspNetCore.RateLimiting` (built-in), OpenTelemetry (existing), `@playwright/test`; GitHub Actions (CI)
 - 013-ephemeral-pr-envs: Added HCL for OpenTofu ≥ 1.8 (provisioning); GitHub Actions YAML + Bash (CI); + OpenTofu providers `hashicorp/google ~5.0`, `hashicorp/google-beta ~5.0`,
-- 011-trivy-security-scanning: Added YAML (GitHub Actions workflow syntax); Trivy CLI (via `aquasecurity/trivy-action`); OpenTofu/HCL is the *scanned* artifact, not authored here + `aquasecurity/trivy-action`, `github/codeql-action/upload-sarif`, `docker/build-push-action`, `docker/setup-buildx-action`, `docker/login-action`, `actions/checkout` — all SHA-pinned
-- 010-dev-env-iac-opentofu: Added HCL for **OpenTofu** ≥ 1.8 (Terraform-compatible); GitHub Actions YAML + Bash + Providers (versions pinned in `versions.tf`) — `hashicorp/google` &
 
 
 <!-- MANUAL ADDITIONS START -->
