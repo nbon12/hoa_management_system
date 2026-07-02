@@ -75,7 +75,7 @@ Deployed non-local environments do not return raw exception detail to callers, u
 - **FR-C4**: A global default rate limit MUST apply to endpoints lacking a specific policy, including anonymous registration.
 - **FR-C5**: Deployed non-local environments MUST NOT return full exception detail to callers; only a sanitized type/message is exposed, with full detail restricted to local development. Production behavior (already sanitized) MUST be preserved.
 - **FR-C6**: User-editable profile fields MUST enforce maximum length and appropriate format validation (e.g., phone number format), and an owner email change MUST follow a defined verification/identity-sync path rather than an unverified direct update.
-- **FR-C7**: API responses MUST carry a hardened security-header baseline (at minimum content-type-options and, where applicable, transport-security and frame options), provided either by the application or a verified edge configuration; the chosen location MUST be documented and asserted.
+- **FR-C7**: API responses MUST carry a hardened security-header baseline (at minimum content-type-options and, where applicable, transport-security and frame options), provided by **application-level middleware (repo-controlled)** and asserted by an automated test. *(Clarified 2026-07-02: headers are set in repo-controlled app config and tested, not relied upon from the edge/dashboard; the edge may add headers additionally but is not the source of truth.)*
 - **FR-C8**: Privileged fields MUST remain non-editable via profile update endpoints (no over-posting); this existing protection MUST be preserved and covered by a test.
 
 ### Key Entities
@@ -100,11 +100,11 @@ Deployed non-local environments do not return raw exception detail to callers, u
 - **SC-C3**: The telemetry limiter and a global default limiter demonstrably attribute and bound requests correctly behind the edge proxy, verified by test.
 - **SC-C4**: Deployed non-local environments return no raw stack traces on error, verified by test; production remains sanitized.
 - **SC-C5**: Oversized/malformed profile inputs are rejected in 100% of tested cases; privileged fields remain non-editable.
-- **SC-C6**: The security-header baseline is present on responses (app or edge), verified by an automated or documented check.
+- **SC-C6**: The security-header baseline is present on responses, set by repo-controlled application middleware and verified by an automated test.
 
 ## Assumptions
 
 - The redaction field set is the one already defined and tested in the codebase; this sub-spec wires it in rather than redefining it.
 - "Deployed non-local environment" includes the internet-reachable Dev environment; local developer machines may still see full exception detail.
-- Where headers are chosen to live at the edge rather than in the app, a documented verification of the edge configuration satisfies FR-C7.
+- Per the 2026-07-02 clarification, the security-header baseline is set by repo-controlled application middleware and asserted in tests; any edge-added headers are supplementary, not the source of truth.
 - The owner email-change verification path is coordinated with Sub-Spec A's identity handling.

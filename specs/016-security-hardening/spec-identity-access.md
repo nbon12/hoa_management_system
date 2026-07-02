@@ -75,7 +75,7 @@ Access tokens are validated against a pinned signing algorithm with tight clock 
 
 ### Edge Cases
 
-- A legitimate resident who genuinely cannot receive the out-of-band proof (e.g., no mailing address on file) needs a defined fallback (e.g., manual administrator approval) so the anti-takeover control does not lock out real owners.
+- A legitimate resident who has no deliverable contact channel on file cannot complete a self-service claim (claim-code delivery has no target). This is resolved operationally by ensuring owner contact data exists at onboarding, treated as a data-quality precondition — **not** by an in-app administrator-approval bypass (which was considered and rejected in clarification, to avoid a second, weaker claim path).
 - Lockout must not become a denial-of-service against a victim: define whether lockout is per-account, and how a locked-out legitimate user recovers.
 - Property-switch must not leave a previously issued token usable against the prior property beyond the platform's accepted revocation window.
 
@@ -83,7 +83,7 @@ Access tokens are validated against a pinned signing algorithm with tight clock 
 
 ### Functional Requirements
 
-- **FR-A1**: The system MUST require out-of-band proof of entitlement (e.g., a mailed/emailed one-time claim code, or administrator approval) before binding a user identity to a property. Possession of an account number MUST NOT by itself be sufficient to claim a property.
+- **FR-A1**: The system MUST require a **one-time claim code**, delivered out-of-band to the property owner's contact channel on file (email/SMS/mail), before binding a user identity to a property. Possession of an account number MUST NOT by itself be sufficient to claim a property. *(Clarified 2026-07-02: claim-code only; there is no administrator-approval claim path. A deliverable contact channel on file is a precondition for self-service claim — see Edge Cases.)* The claim code MUST be single-use and time-limited.
 - **FR-A2**: The registration/claim endpoint MUST be rate-limited per client, with the client identity resolved by the same trusted-edge mechanism used by the login limiter (so limiting is effective behind the edge proxy).
 - **FR-A3**: The registration/claim endpoint MUST return responses that do not distinguish "account exists and is claimable", "account already claimed", and "account does not exist" to an unauthenticated caller.
 - **FR-A4**: Login MUST enforce per-account lockout after a configurable number of failed attempts, independent of source IP, using the lockout-aware authentication path.
@@ -97,7 +97,7 @@ Access tokens are validated against a pinned signing algorithm with tight clock 
 ### Key Entities
 
 - **Property claim**: The binding between a user identity and a property, now requiring proof of entitlement.
-- **Claim proof**: An out-of-band, single-use credential (or administrator approval) that authorizes a claim.
+- **Claim code**: An out-of-band, single-use, time-limited credential delivered to the owner's contact on file that authorizes a property claim.
 - **Failed-login counter**: Per-account state driving lockout.
 - **Signing key / algorithm policy**: The pinned algorithm set and key source used to validate tokens.
 
@@ -119,7 +119,7 @@ Access tokens are validated against a pinned signing algorithm with tight clock 
 
 ## Assumptions
 
-- An out-of-band channel exists to deliver a claim proof (the platform already sends email/SMS notifications), or an administrator-approval fallback is acceptable.
+- An out-of-band channel exists to deliver the one-time claim code (the platform already sends email/SMS notifications). Per the 2026-07-02 clarification, claim-code delivery is the **only** claim mechanism; there is no administrator-approval fallback, so owner contact data must be present as a precondition.
 - The existing trusted-edge client-identity resolution is reused for the new rate limits rather than inventing a new mechanism.
 - The 15-minute access-token lifetime is the current baseline; whether it must shrink depends on the revocation window chosen in FR-A10.
 - Data-access authorization (tenant/property scoping by token claims) is already correct and is out of scope for this sub-spec except for the defensive claim-read hardening (FR-A8).

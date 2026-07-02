@@ -59,7 +59,7 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 
 ### Edge Cases
 
-- Moving the refresh token out of script-readable storage requires backend cooperation (an HttpOnly cookie set by the backend); the end state must define the silent-refresh-on-startup behavior so users are not logged out on reload.
+- The HttpOnly-cookie end-state requires backend cooperation (a cookie-setting login/refresh response and a silent-refresh endpoint); this backend work is in scope, and the silent-refresh-on-startup behavior must be defined so users are not logged out on reload.
 - The CSP must allow the payment provider's script and frame origins and the API connect origin, or payments and API calls break.
 - Invalidating the committed refresh token must not disrupt legitimate CI e2e runs that regenerate their own auth state at runtime.
 
@@ -67,8 +67,8 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 
 ### Functional Requirements
 
-- **FR-D1**: The long-lived refresh token MUST NOT be stored in script-readable browser storage; it MUST be held in a mechanism inaccessible to page scripts (e.g., an HttpOnly, Secure, SameSite cookie set by the backend), with session re-hydration via silent refresh on startup.
-- **FR-D2**: The deployed frontend MUST serve a Content-Security-Policy that restricts script, connect, and frame sources to the approved origins (self, API origin, payment provider), plus the other headers defined in the shared baseline.
+- **FR-D1**: The long-lived refresh token MUST NOT be stored in script-readable browser storage. The target end-state is: the refresh token is set by the backend in an **HttpOnly, Secure, SameSite cookie**; the access token is held in memory only; and the session is re-hydrated via a silent refresh on startup. *(Clarified 2026-07-02: the full HttpOnly-cookie end-state is required — not an interim "stop persisting" or frontend-only stopgap. Backend endpoint work to set the cookie and serve silent refresh is in scope.)*
+- **FR-D2**: The deployed frontend MUST serve a Content-Security-Policy that restricts script, connect, and frame sources to the approved origins (self, API origin, payment provider), plus the other headers defined in the shared baseline. *(Clarified 2026-07-02: the CSP MUST be delivered via a repo-controlled build-output headers file and asserted by an automated test — not configured only in the host dashboard.)*
 - **FR-D3**: No real authentication or refresh token MUST be tracked in the repository; the committed test auth-state file MUST be removed from tracking and ignored, and any previously committed refresh token MUST be invalidated.
 - **FR-D4**: The auth interceptor MUST attach the bearer token only to requests whose target is the configured API origin.
 - **FR-D5**: The session-refresh flow MUST use a single-flight mechanism so concurrent unauthorized responses trigger one refresh rather than parallel refreshes reusing the same token.
@@ -100,7 +100,7 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 
 ## Assumptions
 
-- Backend support for an HttpOnly refresh-token cookie and a silent-refresh endpoint is available or in scope (coordinated with backend work); if backend changes lag, an interim step is to stop persisting the refresh token while keeping the access token in memory.
-- The frontend is deployed on a static host where response headers are configured via a build-output headers file or the host dashboard; the CSP is delivered there and verified.
+- Backend support for an HttpOnly refresh-token cookie and a silent-refresh endpoint is in scope for this program (per the 2026-07-02 clarification the full cookie end-state is required, not an interim stopgap).
+- The frontend is deployed on a static host where response headers are configured via a **repo-controlled build-output headers file**; the CSP is delivered there and asserted by an automated test (per the 2026-07-02 clarification, not the host dashboard).
 - The CI e2e suite regenerates its own auth state at runtime, so removing the committed file does not break it.
 - The Stripe/publishable-key posture is already correct and is preserved, not changed.

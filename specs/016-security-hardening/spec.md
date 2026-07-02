@@ -22,6 +22,15 @@ This umbrella spec deliberately contains **no implementation detail**. Each sub-
 | E | [`spec-cicd-infra-least-privilege.md`](./spec-cicd-infra-least-privilege.md) | CI credential blast radius, PR-triggered secret exposure, action pinning, container hardening, branch protection | Critical |
 | F | [`spec-ai-supply-chain.md`](./spec-ai-supply-chain.md) | Autonomous merge agent, prompt-injection surfaces, agent tool-permission model, unpinned agent tooling | Critical |
 
+## Clarifications
+
+### Session 2026-07-02
+
+- Q: Property-claim proof-of-entitlement mechanism (Sub-spec A)? → A: One-time claim code only (mailed/emailed to the owner's contact on file); no administrator-approval path. A deliverable contact channel on file is a precondition for self-service claim.
+- Q: Refresh-token storage target end-state (Sub-spec D)? → A: Full fix — backend-set HttpOnly/Secure/SameSite cookie, access token in memory, silent refresh on startup. No interim-only or frontend-only end-state.
+- Q: Autonomous dependency-merge agent end-state (Sub-spec F)? → A: Keep the AI agent but drive its decisions only from structured metadata (bot author, labels, update type, check status) and gate every merge behind branch protection; never decide from free-text PR/changelog content.
+- Q: Security-header / CSP delivery location (Sub-specs C and D)? → A: Repo-controlled — application middleware (API) plus a frontend build-output headers file (CSP) — asserted by automated tests; not the edge/dashboard.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Eliminate the paths that grant an attacker real-world control (Priority: P1)

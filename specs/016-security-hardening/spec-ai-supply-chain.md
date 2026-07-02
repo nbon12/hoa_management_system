@@ -139,7 +139,7 @@ The channel through which the local agent's prompts and completions flow is a kn
 ## Assumptions
 
 - The scheduled merge agent's configuration lives outside the repository (in the cloud agent/routines dashboard); this sub-spec captures its required end state, and the change is actioned there while the branch-protection gate is enforced in the repository/platform.
-- Native platform auto-merge behind branch protection is preferred over an agent making the merge decision from free-text content.
+- Per the 2026-07-02 clarification, the AI merge agent is **retained** but constrained: its decisions are driven only by structured metadata (bot author, labels, update type, check status) — never free-text PR/changelog content — and every merge is gated behind branch protection (required status checks + review, per Sub-Spec E). The agent is never the sole approver.
 - The read-only helper commands the allow-list intends to permit remain available after the passthrough entry is removed.
 - The update tooling that keeps pins current can advance the agent-tooling installer pin over time.
 - CI has no in-pipeline AI today; this sub-spec's job is to keep it that way and to constrain the out-of-pipeline agents that do hold privilege.
