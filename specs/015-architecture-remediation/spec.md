@@ -7,6 +7,17 @@
 
 **Source findings**: `docs/architecture-smells-analysis.md` (architecture smells analysis of 2026-07-01, 20 findings ranked by severity). This specification turns those findings into a target architecture and a prioritized, independently deliverable remediation program. Finding numbers referenced below (F1–F20) are the numbered findings in that report.
 
+## Clarifications
+
+### Session 2026-07-02
+
+> Interactive clarification was unavailable in this session (question tool could not reach the user), so the recommended default was adopted for each item below and integrated into the spec. Any of these can be overridden by answering differently and re-running `/speckit.clarify`.
+
+- Q: What delivery scope is committed? → A: The full P1–P6 program, delivered as staged vertical slices in priority order; descoping P5/P6 requires an explicit later decision that amends this spec.
+- Q: Is the payment-provider SDK leak into feature code (report finding F11 — raw provider event types consumed by webhook/reconciliation logic) in scope? → A: Yes — in scope under P5 as a layering rule: provider-SDK types are confined to the gateway adapter, and inbound events get a gateway-neutral representation (new FR-021).
+- Q: Does client contract generation produce types only, or a full generated API client? → A: Types only. Request/response shapes are generated from the server's API description; the hand-written client services and their mapping/anti-corruption code remain, now consuming generated types (FR-011).
+- Q: How is historical status/ledger inconsistency detection (FR-005) operated? → A: Report-only detection runs once at cutover and then recurringly on the existing reconciliation cadence, surfacing findings through logs/alerts; no automated correction.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Payment records are always correct, even when processing is interrupted (Priority: P1)
@@ -79,7 +90,7 @@ A developer changes or adds an API response shape on the server. The web client'
 
 A developer opening the codebase finds the dependency arrows pointing the intended way: the domain layer owns shared business concepts (including the business-error type), infrastructure depends only on domain/shared abstractions (never on feature slices), feature slices do not import other features' internals, and cross-cutting policies (identity parsing, money rounding/currency, scheduled-job authentication) exist in exactly one place. Dead artifacts (unused build files, empty scaffolding directories) are gone.
 
-**Why this priority**: These violations (F2, F3, F8, F12, F15) don't change today's runtime behavior, but every future feature pays their tax; fixing them is what makes the P1–P4 guarantees durable.
+**Why this priority**: These violations (F2, F3, F8, F11, F12, F15) don't change today's runtime behavior, but every future feature pays their tax; fixing them is what makes the P1–P4 guarantees durable.
 
 **Independent Test**: Can be tested by automated dependency checks: no infrastructure module references a feature module; no feature imports another feature purely for shared kernel types; each named cross-cutting policy has a single definition site.
 
@@ -89,6 +100,7 @@ A developer opening the codebase finds the dependency arrows pointing the intend
 2. **Given** the business-error type, **When** its location and importers are inspected, **Then** it lives in the domain layer and no feature imports the authentication feature solely to use it (today: 11+ files).
 3. **Given** the repository, **When** inspected, **Then** the orphaned root container build file and the empty UI-scaffold directory are removed, and exactly one authoritative container build definition remains (F15, F8).
 4. **Given** monetary conversions and rounding, **When** searched, **Then** the minor-unit conversion, rounding policy, and currency designation each have one shared definition (F12).
+5. **Given** the payment-provider integration, **When** dependencies are analyzed, **Then** provider-SDK types appear only inside the gateway adapter (today: 3 feature files consume raw provider event types), and event handlers are unit-testable against the gateway-neutral event representation (F11).
 
 ---
 
@@ -128,7 +140,7 @@ A developer can run the pure unit-test tier in seconds without any containers or
 - **FR-002**: Re-processing any payment-provider event (retry, redelivery, reconciliation) MUST be idempotent: the guard that decides whether work is needed and the work itself MUST commit together.
 - **FR-003**: All flows that record a settled payment (one-time checkout, recurring draft, provider-event settlement) MUST use one shared recording path so atomicity and idempotency guarantees cannot diverge per flow.
 - **FR-004**: Balance recomputation MUST participate in the same per-property serialization as ledger appends so concurrent writes cannot produce inconsistent running balances.
-- **FR-005**: The system MUST provide a means to detect and report historical payment records whose status disagrees with their ledger effects, without silently altering them.
+- **FR-005**: The system MUST provide a means to detect and report historical payment records whose status disagrees with their ledger effects, without silently altering them. Detection runs once at cutover and then recurringly on the existing reconciliation cadence, surfacing findings through logs/alerts (report-only; no automated correction).
 
 **Uniform error behavior (P2 — F2, F5)**
 
@@ -143,15 +155,16 @@ A developer can run the pure unit-test tier in seconds without any containers or
 
 **Contract integrity (P4 — F4, F13, F16)**
 
-- **FR-011**: Client contract types MUST be generated from the server's published API description, with regeneration runnable on demand and drift detected by the delivery pipeline (a mismatch fails verification).
+- **FR-011**: Client contract types (request/response shapes) MUST be generated from the server's published API description, with regeneration runnable on demand and drift detected by the delivery pipeline (a mismatch fails verification). Generation covers types only: hand-written client services and their mapping code remain and consume the generated types.
 - **FR-012**: Each API contract concept MUST have exactly one client-side type definition; identified dead/duplicate definitions MUST be removed and story/test fixtures MUST reference the canonical types.
 
-**Layering and single-definition policies (P5 — F2, F3, F8, F12, F15)**
+**Layering and single-definition policies (P5 — F2, F3, F8, F11, F12, F15)**
 
 - **FR-013**: Infrastructure modules MUST NOT depend on feature modules; shared configuration/option types MUST live in a location both can reference.
 - **FR-014**: Feature slices MUST NOT import other features' internals for shared concepts; shared kernel concepts MUST live in the domain/shared layer.
 - **FR-015**: Monetary policies (major↔minor unit conversion, rounding mode, currency designation) and the scheduled-job authentication check MUST each have a single shared definition.
 - **FR-016**: Dead artifacts MUST be removed: the orphaned root container build file and the vestigial UI-scaffold directory; exactly one authoritative container build definition remains.
+- **FR-021**: Payment-provider SDK types MUST be confined to the provider gateway adapter; inbound provider events MUST be exposed to feature logic through a gateway-neutral representation so event handlers are testable without constructing provider-SDK objects (F11).
 
 **Developer feedback and delivery structure (P6 — F7, F13, F14, F17–F20)**
 
@@ -193,14 +206,14 @@ A developer can run the pure unit-test tier in seconds without any containers or
 - **SC-002**: 100% of documented business-error conditions return the uniform error envelope through the central mapping; hand-written per-endpoint business-error translations drop from 12 to 0 and inline identity-claim parses from 24 to 0.
 - **SC-003**: With production environment identity, test-support machinery is inert in 100% of startup configurations — including those with every enabling flag set — and production artifacts contain 0 test/sample data files.
 - **SC-004**: 100% of client contract types are generated from the server's API description; a deliberately introduced contract mismatch is caught by verification before release; duplicate or dead contract-type definitions in the client drop to 0 (today: 2 dead types plus 3 parallel payment-shape copies).
-- **SC-005**: Automated dependency checks report 0 infrastructure-to-feature references (today: 8 files) and 0 cross-feature imports for shared kernel types (today: 11+ files), and stay at 0 thereafter.
+- **SC-005**: Automated dependency checks report 0 infrastructure-to-feature references (today: 8 files), 0 cross-feature imports for shared kernel types (today: 11+ files), and 0 provider-SDK type references outside the gateway adapter (today: 3 files), and stay at 0 thereafter.
 - **SC-006**: The unit-test tier completes on a machine with no container tooling in under 60 seconds; pull-request verification and release are independently runnable pipelines; the duplicated environment-infrastructure definitions (~350 divergent lines across two modules today) are replaced by one shared core.
 - **SC-007**: No behavior regression: the full existing automated test suite (backend and frontend) passes after every remediation stage, and payment end-to-end flows remain green throughout.
 
 ## Assumptions
 
 - The findings report `docs/architecture-smells-analysis.md` (commit `19ac12a`) is the agreed factual basis; no re-audit is in scope.
-- Scope is the full remediation program, staged by the priorities above. Each user story is independently deliverable and P1 alone is a viable first release; the team may descope P5/P6 stories without invalidating this spec.
+- Scope is the full remediation program (P1–P6), staged by the priorities above and committed in full (see Clarifications). Each user story is independently deliverable and P1 alone is a viable first release; descoping P5/P6 requires an explicit decision that amends this spec.
 - Behavior preservation is the default: apart from the deliberate changes named here (uniform error envelope, environment backstop for test machinery), user-visible behavior does not change — this is structural remediation, not feature work.
 - The anemic-domain finding is accepted as a deliberate style for now: business invariants remain in services. This spec centralizes cross-cutting *policies* (money, errors, identity) without mandating a rich-domain rewrite.
 - Historical data reconciliation (FR-005) is detection-and-report only; correcting past double-posts (if found) is a separate, human-approved operation.
