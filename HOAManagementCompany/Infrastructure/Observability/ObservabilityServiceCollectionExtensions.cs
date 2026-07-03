@@ -36,6 +36,12 @@ public static class ObservabilityServiceCollectionExtensions
         builder.Services.AddSingleton(sp => new ScrubbingPolicy(
             sp.GetRequiredService<ObservabilityOptions>().ScrubbedKeys));
 
+        // 019-C FR-C1: register the Serilog-side scrubbing enricher so `ReadFrom.Services` composes
+        // it. The processor below scrubs OTel spans; without this, the Serilog → OTLP log path
+        // shipped sensitive fields (e.g. {Email}) un-redacted.
+        builder.Services.AddSingleton<Serilog.Core.ILogEventEnricher>(sp =>
+            new TelemetryScrubbingEnricher(sp.GetRequiredService<ScrubbingPolicy>()));
+
         var exportToOtlp = !builder.Environment.IsEnvironment("Test");
 
         builder.Services.AddOpenTelemetry()
