@@ -138,6 +138,10 @@ builder.Services.AddIdentityCore<ApplicationUser>(o =>
     o.Password.RequireNonAlphanumeric = true;
     o.Password.RequiredLength = 8;
     o.User.RequireUniqueEmail = true;
+    // 016-A FR-A4: per-account lockout (10 failed attempts → 30-minute lock, config-driven).
+    o.Lockout.AllowedForNewUsers = true;
+    o.Lockout.MaxFailedAccessAttempts = builder.Configuration.GetValue("Identity:Lockout:MaxFailedAttempts", 10);
+    o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(builder.Configuration.GetValue("Identity:Lockout:LockoutMinutes", 30));
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
@@ -158,6 +162,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            // 016-A FR-A7: pin the signing algorithm (symmetric HS256) and tighten clock skew.
+            ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+            ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = ClaimTypes.NameIdentifier
         };
     });
