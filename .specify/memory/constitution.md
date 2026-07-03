@@ -1,6 +1,27 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 2.2.0 -> 3.0.0
+Modified principles:
+  Technology Stack (section 2) — REMOVED the Auth0 mandate. Authentication/authorization is now
+    provider-agnostic. The current, compliant implementation is in-application: ASP.NET Core
+    Identity for credential storage/password hashing + JWT bearer access tokens with rotating,
+    single-use, hashed refresh tokens. A specific third-party identity-provider vendor is NOT
+    mandated (a managed IdP MAY be adopted later via amendment if it meets section 7).
+  Security & Authentication (section 7) — replaced Auth0-specific identity/token-validation
+    mandates with provider-agnostic strong-authentication + server-side HOA-scoped authorization
+    requirements. The security bar is unchanged; only the vendor lock-in is removed.
+  Infrastructure & Environments (section 10) — "separate Auth0 configuration" generalized to
+    "separate authentication configuration/secrets".
+Templates requiring updates:
+  .specify/templates/plan-template.md ✅ updated (Auth0 removed from Constitution Check)
+  .specify/templates/tasks-template.md ✅ updated (foundational auth task made provider-agnostic)
+  .specify/templates/spec-template.md ✅ no Auth0 reference (n/a)
+Version bump rationale (MAJOR): removal/redefinition of a non-negotiable technology mandate
+  (Auth0) within governed principle sections 2 and 7.
+Follow-up TODOs: None
+
+----- prior amendment -----
 Version change: 2.1.0 -> 2.2.0
 Modified principles:
   Added new section "Executable & Living Specifications" (now section 11) enforcing that
@@ -60,7 +81,7 @@ Follow-up TODOs: None
 
 # HOA Management Company Constitution
 
-**Version**: 2.2.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-06-13
+**Version**: 3.0.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-07-03
 **Authors**: Project maintainers
 
 ## 1. Project Purpose
@@ -90,8 +111,11 @@ All implementations MUST conform to the following:
   database silos unless explicitly amended).
 - **Database hosting**: **Neon** PostgreSQL with **scale-to-zero** in non-production and
   production as configured; separate Neon databases per environment (see section 10).
-- **Authentication / authorization**: **Auth0** (all user types and roles; replaces any prior
-  Okta assumptions).
+- **Authentication / authorization**: Implemented **in-application** using **ASP.NET Core
+  Identity** (credential storage and password hashing) and **JWT bearer tokens** for API access,
+  with **rotating, single-use, hashed refresh tokens**. A specific third-party identity provider
+  is **NOT** mandated; a managed IdP MAY be adopted later via a constitution amendment provided it
+  meets the Security & Authentication requirements in section 7.
 - **Containers**: **All backend services MUST be Dockerized**. Images MUST be published to
   **Docker Hub** (organization/repo naming per project standards).
 - **Backend runtime**: Containers deployed to **Google Cloud Run**, configured to **scale to
@@ -218,8 +242,13 @@ The UI MUST function and render correctly at:
 
 ## 7. Security & Authentication
 
-- Auth0 provides identity and token validation.
-- All protected endpoints and UI actions MUST enforce **Auth0** authentication.
+- Identity and token issuance/validation are handled by the application's own authentication
+  system (currently ASP.NET Core Identity for credentials and JWT bearer tokens for API access);
+  no specific third-party identity-provider vendor is mandated.
+- All protected endpoints and UI actions MUST enforce authentication; access to protected
+  resources by unauthenticated callers MUST be denied.
+- Access tokens MUST be validated against a pinned signing algorithm; refresh tokens MUST be
+  rotating, single-use, and persisted only as hashes (never in plaintext).
 - Application authorization is enforced server-side based on the authenticated user,
   HOA membership, and role in the target HOA.
 - Authorization MUST always check both the authenticated user and their membership/role
@@ -321,7 +350,7 @@ The UI MUST function and render correctly at:
 ## 10. Infrastructure & Environments
 
 - **Dev**, **Staging**, and **Prod** MUST use **separate** PostgreSQL databases and
-  **separate** Cloud Run services (and separate Auth0 configuration as applicable).
+  **separate** Cloud Run services (and separate authentication configuration/secrets as applicable).
 - **Cloudflare** configuration MUST align per environment (Pages for frontend; edge rules for
   API protection and caching in front of backend endpoints).
 - **Local development**: `docker-compose` (or successor) MUST bring up dependencies so that

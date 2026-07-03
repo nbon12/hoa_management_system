@@ -1,0 +1,49 @@
+# Specification Quality Checklist: Security Hardening Program
+
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2026-07-01
+**Feature**: [Link to spec.md](../spec.md)
+**Scope**: Umbrella `spec.md` and sub-specs A–F
+
+## Content Quality
+
+- [x] No implementation details (languages, frameworks, APIs)
+- [x] Focused on user value and business needs
+- [x] Written for non-technical stakeholders
+- [x] All mandatory sections completed
+
+## Requirement Completeness
+
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
+- [x] Success criteria are measurable
+- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] All acceptance scenarios are defined
+- [x] Edge cases are identified
+- [x] Scope is clearly bounded
+- [x] Dependencies and assumptions identified
+
+## Feature Readiness
+
+- [x] All functional requirements have clear acceptance criteria
+- [x] User scenarios cover primary flows
+- [x] Feature meets measurable outcomes defined in Success Criteria
+- [x] No implementation details leak into specification
+
+## Coverage — every review finding is assigned to exactly one owning sub-spec
+
+- [x] **A — Identity & Access**: property-claim takeover (High); login lockout; registration enumeration; anonymous e2e-cleanup destructive endpoint; JWT algorithm pinning + clock skew; committed dev/test signing secrets; access-token revocation window; defensive claim reads
+- [x] **B — Payments Integrity**: non-atomic ACH settlement / double-credit (Med–High); per-tenant idempotency-key isolation; settlement amount cross-check; payment-endpoint defensive claim reads
+- [x] **C — Platform & Data Protection**: unregistered PII-scrubbing log enricher (High); pagination clamping; telemetry-proxy rate-limit behind edge; global rate-limit coverage; exception-detail exposure on deployed Dev; profile input length/format validation + verified email change; security headers/HSTS/nosniff; over-posting protection preserved
+- [x] **D — Frontend Security**: tokens/refresh token in script-readable storage (High); missing CSP/security headers; committed Playwright auth-state with real refresh token; interceptor origin scoping + single-flight refresh; opener/link hardening; URL-safe token parsing; dead template cruft; publishable-key posture preserved
+- [x] **E — CI/CD & Infra Least Privilege**: deployer identity project-Owner + repo-scoped WIF (Critical); PR-triggered plan with operator secrets; job-scoped secrets to PR-authored install/e2e; mutable-tag action pinning; branch protection + code ownership; container non-root + digest pinning; compose LAN binding; shared per-PR DB password; branch-name→scanner-arg; broken branch-lock workflow; fork-PR boundary preserved
+- [x] **F — AI Supply Chain**: autonomous merge agent steerable by changelog/PR text (Critical); command-passthrough allow-list bypass; unpinned `curl|sh` installer; command-rewrite hook trust; "trust and act" on indexed content; agent-config review gating; local model-channel/plugin verification; CI confirmed AI-free
+
+## Notes
+
+- All six sub-specs plus the umbrella use informed defaults documented in each Assumptions section; no [NEEDS CLARIFICATION] markers were required. The finding inventory is the multi-agent review of 2026-07-01.
+- Cross-cutting findings are single-owned to avoid duplicate/conflicting requirements: defensive claim-reads owned by A (with B owning its payment-endpoint instance); container hardening and branch protection owned by E; the merge-agent gate is enforced in E (branch protection) and behavior-constrained in F.
+- Accepted-risk items are flagged in-spec rather than dropped. Current accepted risks: E public API ingress; A 15-minute stateless access-token window (FR-A10); A 3-month claim-code validity (FR-A1, offset by single-use + email-verification gate); **E/F status-checks-only merge policy (FR-E7a) — the constrained agent may merge in-scope PRs on green without human review**; B forward-only scope (FR-B0 — existing duplicate ledger credits, if any, are not auto-remediated here).
+- Clarifications resolved in Session 2026-07-02 (19 total across two rounds): claim mechanism, refresh-token end-state, merge-agent posture, header location, lockout policy, token revocation, enumeration gate, claim-code TTL, historical-remediation scope, amount-mismatch handling, email-change flow, Dev error detail, CSP rollout, deployer-SA split, merge policy, per-PR credentials, agent tooling, model channel, deny-list aggressiveness. Per-decision Q→A log lives in `spec.md` → Clarifications.
+- Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`.
+- **Analyze remediation (2026-07-03)**: `/speckit.analyze` findings folded in. Resolved: X1 (Auth0 mandate removed, constitution v3.0.0), X2 (pagination now `limit`/`offset` with `Page`/`PageSize` aliases, T095), G1 (claim-code issuance/delivery FR-A1a + T091), G3 (transition FR-A1b + T092), G2 (defensive claim reads FR-A8/B6 + T093/T094), M1 (SameSite=Strict + CORS creds + CSRF origin check, T096), M2 (required checks = PR-runnable only, T016), G4 (dead-cruft removal T097), G5 (headroom pin in T026), T1 (tenancy note in data-model). Task count 90 → 97.
