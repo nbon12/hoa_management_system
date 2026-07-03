@@ -25,7 +25,7 @@ Remediate the findings from the 2026-07-02 multi-agent security review across si
 
 - **Technology fit**: PASS — changes stay within the mandated stack (FastEndpoints, EF Core/Neon, Angular/Cloudflare Pages, Cloud Run, GitHub Actions, Serilog, OpenTelemetry). No new frameworks.
 - **HOA tenancy**: PASS — new tables carry the tenant boundary (`PropertyClaimCodes.PropertyId`, `SettlementReviewQueue.PropertyId`); the idempotency index becomes tenant-scoped `(PropertyId, IdempotencyKey)`, strengthening isolation. Property-claim binding is hardened, not loosened.
-- **API contracts**: PARTIAL (documented deviation) — new/changed endpoints (auth-session cookie, email-verification, claim redemption, verified email change) are documented in `contracts/`. **Deviation**: constitution mandates `limit`/`offset`; existing list endpoints use `Page`/`PageSize`. This feature clamps the existing params rather than renaming them (a breaking contract change out of scope for hardening). Tracked in Complexity Tracking.
+- **API contracts**: PASS — new/changed endpoints (auth-session cookie, email-verification, claim redemption, verified email change) are documented in `contracts/`. Collections now expose `limit`/`offset` (constitution §4/§5) with `Page`/`PageSize` retained as deprecated aliases (task T095), so the pagination contract is compliant and backward-compatible.
 - **Security and operations**: PASS/strengthened — PII scrubbing wired into Serilog; production/Dev error detail generic + correlation ID; rate limiting extended to registration + fixed telemetry partitioning; security-sensitive events (claim, lockout, email change) logged; secrets externalized and committed secrets removed.
 - **Auth provider**: PASS (resolved) — constitution **v3.0.0** (2026-07-03) removed the Auth0 mandate and made authentication provider-agnostic; the codebase's **custom ASP.NET Identity + JWT** (with the hardening added here: lockout, algorithm pinning, rotating hashed refresh tokens) is now explicitly compliant. No longer a deviation.
 - **File storage**: N/A — no blob-storage changes (document storage unchanged).
@@ -155,7 +155,7 @@ Each slice PR refreshes Repowise marker regions for the files it touches (no-op 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | ~~Custom ASP.NET Identity + JWT instead of Auth0~~ — **RESOLVED** by constitution v3.0.0 (2026-07-03) | Auth0 mandate removed; auth is now provider-agnostic and the custom implementation is compliant | No longer a deviation; row retained for history. |
-| List endpoints use `Page`/`PageSize` not `limit`/`offset` (constitution §4/§5) | The finding is unbounded pagination; clamping the existing params fixes the vulnerability without a breaking contract rename | Renaming to `limit`/`offset` is a breaking API/contract change affecting the frontend, out of scope for a hardening fix; tracked for a contract-alignment feature. |
+| ~~List endpoints use `Page`/`PageSize` not `limit`/`offset`~~ — **RESOLVED** (T095) | Added `limit`/`offset` as the compliant contract with `Page`/`PageSize` as deprecated aliases | No longer a deviation; backward-compatible for the existing frontend. |
 | Branch protection = status-checks-only, no mandated human review (FR-E7a) | User decision (2026-07-02); balances automation toil | Requiring review was the stronger option but was explicitly declined; residual risk accepted and offset by F's metadata-only/scope/notify/deny controls. |
 
 ## Phase status

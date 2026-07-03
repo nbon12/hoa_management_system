@@ -58,7 +58,7 @@
 - [ ] T013 [P] [US1] SHA-pin all mutable-tag actions in `.github/workflows/infra-apply.yml`, `pr-env.yml`, `pr-env-teardown.yml`, `pr-env-sweep.yml`, `repowise.yml`, and `.github/actions/pr-env-tofu-init/action.yml`.
 - [ ] T014 [P] [US1] Extend `.github/dependabot.yml` github-actions ecosystem to keep the new digest pins current.
 - [ ] T015 [US1] Fix `.github/workflows/lock-merged-branch.yml`: remove the invalid `administration: write` permission; either use an appropriately-scoped credential or remove in favor of native branch protection (T016).
-- [ ] T016 [US1] Configure `main` branch protection to require the defined status checks (test/frontend/integration/docker/sonar) with **no** mandated human review (FR-E7a accepted risk); record as-code where supported or document the dashboard config in `infra/` or `docs/`.
+- [ ] T016 [US1] Configure `main` branch protection to require the **PR-runnable** status checks only (test, frontend, integration-sandbox, sonar, codecov — NOT the post-merge `docker-push`/`deploy-dev` jobs) with **no** mandated human review (FR-E7a accepted risk); record as-code where supported or document the dashboard config in `infra/` or `docs/`.
 - [ ] T017 [P] [US1] Add advisory `CODEOWNERS` at repo root routing `.claude/**`, `infra/**`, `.github/**` reviews (advisory only under status-checks-only).
 - [ ] T018 [P] [US1] Add non-root `USER` and digest-pinned base images to `Dockerfile`, `HOAManagementCompany/Dockerfile`, `neko-hoa/Dockerfile`; digest-pin images in `docker-compose.yaml` and bind management/data services to loopback.
 - [ ] T019 [P] [US1] Make per-PR DB credentials distinct in `infra/modules/pr-environment/` (per-PR Neon role/password rather than a shared `neon_role_password`); update `pr-env.yml` accordingly.
@@ -84,7 +84,7 @@
 ### Implementation for US2
 - [ ] T024 [US2] Remove `Bash(rtk proxy *)` from `.claude/settings.local.json` allow list (and the global `~/.claude/settings.json` if present in-repo scope); document the removal.
 - [ ] T025 [US2] Add a minimal targeted deny list to `.claude/settings.local.json` (deny arbitrary passthrough and writes to `.claude/**`); confirm deny precedence.
-- [ ] T026 [US2] Pin `.claude/hooks/rtk-install.sh` to an immutable rtk version + verify a published checksum/signature before executing; replace the `curl … master | sh` pattern; fail closed on mismatch.
+- [ ] T026 [US2] Pin `.claude/hooks/rtk-install.sh` to an immutable rtk version + verify a published checksum/signature before executing; replace the `curl … master | sh` pattern; fail closed on mismatch. Apply the same pin+verify to the third-party `headroom` plugin/binary in the command path (FR-F11).
 - [ ] T027 [P] [US2] Constrain `.claude/hooks/rtk-hook.sh` so the rewrite output is limited to known-safe wrapper prefixes (or surfaced for inspection) rather than executed as opaque trusted output.
 - [ ] T028 [P] [US2] Reword `.claude/CLAUDE.md`: elevate "always verify against actual source before making changes"; remove the "trust the response and act on it" instruction for Repowise/tool/indexed content.
 - [ ] T029 [P] [US2] Confirm ownership of `ANTHROPIC_BASE_URL` `127.0.0.1:8787`, restrict access, and document it (as dev-only) in `.claude/` or `docs/`; keep the proxy per clarification.
@@ -120,6 +120,9 @@
 - [ ] T045 [P] [US3] Remove committed dev/test JWT secrets from `appsettings.Development.json`/`appsettings.Test.json` in favor of user-secrets/env; keep production sourcing from the secret store.
 - [ ] T046 [US3] Add scrubbed security-event logging for claim attempts, verification, and lockout (coordinate with US4 enricher).
 - [ ] T047 [US3] Refresh Repowise markers for changed auth files.
+- [ ] T091 [US3] Implement claim-code **issuance & delivery** (FR-A1a): generate per-property single-use 90-day codes and deliver to the owner's contact on file via the existing SendGrid/Twilio/mail path, in `Features/Auth/` (service + admin/seeder trigger). Test: an issued code redeems; a non-issued property has none.
+- [ ] T092 [US3] Backfill/transition (FR-A1b): issue claim codes for existing **unclaimed** properties; confirm existing `UserProperty` links remain valid (no re-claim); remove the legacy account-number-only claim path once live. Strict migration/seeder + test.
+- [ ] T093 [P] [US3] Harden defensive claim reads (FR-A8): replace null-forgiving `User.FindFirst(...)!` reads with safe reads returning 401/403 (not 500) across auth/property/community endpoints; test with a valid-signature token missing a required claim.
 
 **Checkpoint**: US3 independently testable and deliverable.
 
@@ -147,6 +150,7 @@
 - [ ] T058 [P] [US4] Add MaximumLength + E.164 phone validation to the owner-patch DTO validator; keep privileged fields non-editable.
 - [ ] T059 [P] [US4] Add security-headers middleware to the `Program.cs` pipeline (nosniff, frame options, HSTS where applicable).
 - [ ] T060 [US4] Refresh Repowise markers for changed platform files.
+- [ ] T095 [P] [US4] Accept `limit`/`offset` as the collection pagination contract (constitution §4/§5) with documented default+max (`1 ≤ limit ≤ 100`, `offset ≥ 0`); retain `Page`/`PageSize` as deprecated aliases mapped to limit/offset, clamped identically — `Features/Community/Models/CommunityModels.cs` + `contracts/owner-profile-and-platform.md`. Resolves the pagination constitution deviation (X2).
 
 **Checkpoint**: US4 independently testable and deliverable.
 
@@ -176,6 +180,8 @@
 - [ ] T071 [P] [US5] `git rm --cached neko-hoa/e2e/.auth/state.json`; add `e2e/.auth/` to `neko-hoa/.gitignore`; invalidate the committed dev refresh token; confirm `e2e/global-setup.ts` regenerates state.
 - [ ] T072 [P] [US5] Fix opener ordering in `neko-hoa/src/app/features/community/documents/documents.component.ts` (use `window.open(url,'_blank','noopener,noreferrer')`).
 - [ ] T073 [US5] Refresh Repowise markers for changed frontend/auth files.
+- [ ] T096 [P] [US5] Finalize refresh-cookie cross-origin behavior (M1): set `SameSite=Strict` (valid — the app and API share the `nekohoa.com` registrable domain, so `/auth` requests are same-site); enable CORS `Access-Control-Allow-Credentials` for the exact app origin; send `withCredentials` on frontend `/auth` calls; add an `Origin`/`Referer` check on `/auth/refresh` as CSRF defense-in-depth. Update `contracts/auth-session.md`.
+- [ ] T097 [P] [US5] Remove dead starter-template content and the non-functional "Continue with Google" button (FR-D7) from `neko-hoa/src/app/app.component.html` and the login page.
 
 **Checkpoint**: US5 independently testable and deliverable.
 
@@ -201,6 +207,7 @@
 - [ ] T082 [P] [US6] Add `SettlementReviewQueue` entity + config + strict migration (fields per data-model.md).
 - [ ] T083 [US6] Add the provider-vs-expected amount cross-check on settlement; on mismatch block the credit and enqueue a `SettlementReviewQueue` row.
 - [ ] T084 [US6] Refresh Repowise markers for changed payments files.
+- [ ] T094 [P] [US6] Harden defensive claim reads on payment endpoints (FR-B6): safe `propertyId` claim reads returning 401/403 (not 500) across `Features/Payments/**`; add a test.
 
 **Checkpoint**: US6 independently testable and deliverable.
 

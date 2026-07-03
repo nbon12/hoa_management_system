@@ -8,8 +8,8 @@
 - **Errors**: consistent documented error shape.
 
 ## Pagination (all collection endpoints — C FR-C2)
-- Existing `Page`/`PageSize` params are **clamped**: `Page ≥ 1`, `1 ≤ PageSize ≤ 100` (documented default + max). Out-of-range values are clamped or rejected with a validation error — never a server error, never a full-table scan.
-- *(Contract deviation, tracked in plan Complexity Tracking: constitution mandates `limit`/`offset`; this feature clamps existing params rather than renaming.)*
+- Collections accept `limit`/`offset` (constitution §4/§5) with a documented default and max: `1 ≤ limit ≤ 100`, `offset ≥ 0`. `Page`/`PageSize` are retained as **deprecated aliases** (mapped to limit/offset) for the existing frontend and are clamped identically.
+- Out-of-range values are clamped or rejected with a validation error — never a server error, never a full-table scan.
 
 ## Error shape (deployed non-local — C FR-C5)
 - Deployed non-local environments (incl. Dev) return `{ error: <generic message>, correlationId }` with no type/stack/internals. Full detail only in local `Development` and server-side logs keyed by `correlationId`. Production unchanged.

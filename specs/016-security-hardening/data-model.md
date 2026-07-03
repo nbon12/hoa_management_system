@@ -38,6 +38,8 @@ Authorizes binding a user to a property (FR-A1). Single-use, 90-day validity, de
 
 Indexes: `PropertyId`; unique partial on `(PropertyId)` where `RedeemedAt IS NULL` to prevent multiple live codes per property (validate against seeding).
 
+> **Tenancy (Constitution §3)**: `PropertyId` is the tenant-boundary equivalent — a Property belongs to a community/HOA, matching the existing `communityId`/`propertyId` scoping — and applies equally to `SettlementReviewQueue.PropertyId`. `EmailVerification` is **identity-scoped** (tied to an email/user, used pre-registration and for email-change), so it carries no HOA boundary by design.
+
 ### Changed: Identity lockout (no new table)
 Uses existing `AspNetUsers` lockout columns (`LockoutEnabled`, `LockoutEnd`, `AccessFailedCount`). Config: `MaxFailedAccessAttempts=10`, `DefaultLockoutTimeSpan=30 min` (FluentValidation-validated options).
 

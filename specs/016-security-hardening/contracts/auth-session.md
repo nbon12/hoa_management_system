@@ -20,7 +20,7 @@ Changes the token-transport contract so the refresh token lives in an `HttpOnly`
 - **Effect**: revoke the refresh token (existing behavior) **and** clear the cookie (`Set-Cookie: neko_refresh=; Max-Age=0`).
 
 ## Cookie / CORS notes
-- `SameSite`: use `Strict` when SPA and API are same-site behind the edge; if the API origin is cross-site to the app, use `None; Secure` and add CSRF protection (double-submit or origin check on `/auth/refresh`). Resolve concretely against `environment.apiBaseUrl` at implementation.
+- `SameSite=Strict` (resolved): valid here because the app and API share the `nekohoa.com` registrable domain — `SameSite` is computed on the registrable domain, not the full origin — so app→API `/auth` requests are same-site and the cookie is sent. This requires CORS `Access-Control-Allow-Credentials: true` for the exact app origin and `withCredentials: true` on the frontend `/auth` calls. As CSRF defense-in-depth, `/auth/refresh` MUST also verify the request `Origin`/`Referer` matches the allowed app origin.
 - `Path=/auth` limits cookie transmission to the auth endpoints.
 - Frontend: access token in memory only; silent refresh on bootstrap (`APP_INITIALIZER`) calls `/auth/refresh` using the cookie.
 - Contract doc must state auth requirements, error shape, and that these responses are **never** edge-cached.
