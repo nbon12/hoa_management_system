@@ -20,7 +20,9 @@ public class AuthService(
     UserManager<ApplicationUser> userManager,
     ApplicationDbContext db,
     IConfiguration config,
-    ILogger<AuthService> logger)
+    ILogger<AuthService> logger,
+    EmailVerificationService emailVerification,
+    ClaimCodeService claimCodes)
 {
     private int AccessTokenExpiryMinutes => config.GetValue("Jwt:AccessTokenExpiryMinutes", 15);
     private int RefreshTokenExpiryDays => config.GetValue("Jwt:RefreshTokenExpiryDays", 30);
@@ -28,21 +30,28 @@ public class AuthService(
     private string JwtIssuer => config["Jwt:Issuer"]!;
     private string JwtAudience => config["Jwt:Audience"]!;
 
+    // 016-A FR-A1/A3/A5: bind a user to a property only after (1) an email-verification proof and
+    // (2) a valid single-use claim code. All failures are generic to avoid an enumeration oracle.
+    private const string RegistrationFailed = "REGISTRATION_FAILED";
+
     public async Task<AuthResponse> RegisterAsync(RegisterRequest req, CancellationToken ct = default)
     {
-        if (await userManager.FindByEmailAsync(req.Email) is not null)
-            throw new DomainException("EMAIL_TAKEN", "Email address is already registered.", 409);
+        var verification = await emailVerification.ResolveProofAsync(
+                req.VerificationToken, EmailVerificationService.PurposeRegistration, ct)
+            ?? throw new DomainException(RegistrationFailed, "Registration could not be completed.", 422);
+        var email = verification.Email;
 
-        var property = await db.Properties.FirstOrDefaultAsync(p => p.AccountNumber == req.AccountNumber, ct)
-            ?? throw new DomainException("ACCOUNT_NOT_FOUND", "No property found with that account number.", 422);
+        var claimCode = await claimCodes.FindActiveAsync(req.ClaimCode, ct)
+            ?? throw new DomainException(RegistrationFailed, "Registration could not be completed.", 422);
 
-        if (await db.UserProperties.AnyAsync(up => up.PropertyId == property.Id, ct))
-            throw new DomainException("ACCOUNT_ALREADY_CLAIMED", "This account has already been claimed.", 422);
+        if (await userManager.FindByEmailAsync(email) is not null
+            || await db.UserProperties.AnyAsync(up => up.PropertyId == claimCode.PropertyId, ct))
+            throw new DomainException(RegistrationFailed, "Registration could not be completed.", 422);
 
         var user = new ApplicationUser
         {
-            Email = req.Email,
-            UserName = req.Email,
+            Email = email,
+            UserName = email,
             FirstName = req.FirstName,
             LastName = req.LastName,
             EmailConfirmed = true,
@@ -54,10 +63,14 @@ public class AuthService(
         if (!result.Succeeded)
             throw new DomainException("VALIDATION_ERROR", string.Join("; ", result.Errors.Select(e => e.Description)), 422);
 
-        db.UserProperties.Add(new UserProperty { UserId = user.Id, PropertyId = property.Id });
+        db.UserProperties.Add(new UserProperty { UserId = user.Id, PropertyId = claimCode.PropertyId });
+        claimCode.RedeemedAt = DateTimeOffset.UtcNow;
+        claimCode.RedeemedByUserId = user.Id;
+        verification.ConsumedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("User registered: {Email} linked to property {PropertyId}", req.Email, property.Id);
+        var property = await db.Properties.FirstAsync(p => p.Id == claimCode.PropertyId, ct);
+        logger.LogInformation("User registered and claimed property {PropertyId}", claimCode.PropertyId);
         return await CreateTokenPairAsync(user, property, ct);
     }
 

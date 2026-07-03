@@ -330,6 +330,9 @@ if (startupOptions.EnableSwagger)
 
 // ── Feature Services ───────────────────────────────────────────────────────
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.AuthService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.EmailVerificationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.ClaimCodeService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.IAuthNotifier, HOAManagementCompany.Features.Auth.LoggingAuthNotifier>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.PaymentService>();
 // Stripe payments (006-stripe-payments). Gateway is the network adapter; the rest is testable logic.
