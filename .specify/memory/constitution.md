@@ -1,6 +1,23 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 2.2.0 -> 2.3.0
+Modified principles:
+  Technology Stack ("API documentation") and Backend Principles ("Swagger and OpenAPI") —
+    replaced the Swashbuckle mandate with **FastEndpoints.Swagger (NSwag)**, matching the
+    toolchain the codebase has used since spec 006 and that spec 015 (types-only client
+    codegen + drift gate) builds on. Behavior requirements are unchanged: OpenAPI + Swagger UI
+    generated from implemented endpoints, available at /swagger in development, disabled
+    entirely in production. Rationale: resolve the standing constitution-vs-reality conflict
+    flagged by /speckit.analyze (finding C2) for feature 015-architecture-remediation.
+Templates requiring updates:
+  .specify/templates/plan-template.md updated (technology fit gate wording)
+  .specify/templates/spec-template.md updated (Constitution Requirements wording)
+  .specify/templates/tasks-template.md updated (sample task wording)
+Follow-up TODOs: Auth0-vs-ASP.NET-Identity conflict (analyze finding C1) is being resolved
+  by a separate constitution amendment PR; intentionally not addressed here.
+
+----- prior amendment -----
 Version change: 2.1.0 -> 2.2.0
 Modified principles:
   Added new section "Executable & Living Specifications" (now section 11) enforcing that
@@ -60,7 +77,7 @@ Follow-up TODOs: None
 
 # HOA Management Company Constitution
 
-**Version**: 2.2.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-06-13
+**Version**: 2.3.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-07-03
 **Authors**: Project maintainers
 
 ## 1. Project Purpose
@@ -105,8 +122,8 @@ All implementations MUST conform to the following:
   Constitution below.
 - **Observability**: **Sentry** MUST be used for error tracking, performance visibility, and
   trace context across frontend and backend services.
-- **API documentation**: **Swashbuckle** MUST generate OpenAPI and Swagger UI for .NET APIs
-  in development only.
+- **API documentation**: **FastEndpoints.Swagger (NSwag)** MUST generate OpenAPI and Swagger
+  UI for .NET APIs in development only.
 - **Repository intelligence docs**: **Repowise** indexes the codebase and emits documentation
   in repository-defined marker regions (per project Repowise/MCP configuration). Pull requests
   MUST include regenerated or updated Repowise outputs in those regions so indexed
@@ -155,8 +172,8 @@ All implementations MUST conform to the following:
 
 ### Swagger and OpenAPI
 
-- **Swashbuckle** MUST generate OpenAPI documentation and Swagger UI for the .NET API in
-  development environments.
+- **FastEndpoints.Swagger (NSwag)** MUST generate OpenAPI documentation and Swagger UI for
+  the .NET API in development environments.
 - Swagger UI MUST be available at `/swagger` in development to support debugging, auth-flow
   trials, bug reproduction, and shareable diagnostic links.
 - Swagger and its OpenAPI endpoint MUST be disabled entirely in production.

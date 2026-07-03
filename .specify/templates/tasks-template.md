@@ -81,7 +81,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T018 [P] Configure edge/rate-limit/cache policy defaults for Cloudflare-fronted API routes
 - [ ] T019 [P] Configure GitHub Actions Sonar scan required for pull requests
 - [ ] T020 [P] Configure GitHub Actions Codecov reporting and 95% relevant-file coverage gate
-- [ ] T021 [P] Configure Swashbuckle OpenAPI and Swagger UI at `/swagger` for development only
+- [ ] T021 [P] Configure FastEndpoints.Swagger (NSwag) OpenAPI and Swagger UI at `/swagger` for development only
 - [ ] T022 [P] Configure idempotent Cloud Run startup migrations
 - [ ] T023 [P] Configure Neon connection limits, pooling, and short-lived DbContext lifetime
 - [ ] T024 [P] Configure xUnit and .NET Testcontainers for backend integration tests
@@ -118,7 +118,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T037 [US1] Implement FastEndpoint for [endpoint/feature] in backend/src/[path]/[Endpoint].cs
 - [ ] T038 [US1] Add validation, error handling, and consistent response shape
 - [ ] T039 [US1] Add Serilog structured logging/audit events for sensitive operations
-- [ ] T040 [US1] Verify Swashbuckle documents the endpoint in development Swagger UI
+- [ ] T040 [US1] Verify FastEndpoints.Swagger (NSwag) documents the endpoint in development Swagger UI
 - [ ] T041 [US1] Verify Sentry captures errors/performance spans with trace context and without sensitive payloads
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently

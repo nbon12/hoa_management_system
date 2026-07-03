@@ -9,7 +9,7 @@ IStripeGateway.ParseEvent(json: string, signatureHeader: string) : PaymentProvid
 ```
 
 - Verifies the provider signature (unchanged behavior; throws on invalid signature → webhook endpoint returns 400).
-- Maps the raw provider event to `PaymentProviderEvent` (see data-model.md for fields).
+- Maps the raw provider event to `PaymentProviderEvent` (see data-model.md for fields) via `StripeEventTranslator` — a coverable pure translator in `Infrastructure/Payments` (not coverage-excluded; only the gateway's SDK-I/O methods keep `[ExcludeFromCodeCoverage]`).
 - All provider-SDK types (`Stripe.*`) remain inside `Infrastructure/Payments`; enforced by architecture test (SC-005: 0 references outside the gateway adapter; today 3).
 
 ## Event kind mapping (exhaustive)
@@ -31,5 +31,5 @@ IStripeGateway.ParseEvent(json: string, signatureHeader: string) : PaymentProvid
 
 ## Verification
 
-- Unit tests (container-free project): kind mapping table as a Theory; handler behavior per kind against hand-built `PaymentProviderEvent` values.
+- Unit tests (container-free project): kind mapping table as a Theory against `StripeEventTranslator`; handler behavior per kind against hand-built `PaymentProviderEvent` values.
 - Architecture test: `Stripe` namespace usage confined to `Infrastructure.Payments`.
