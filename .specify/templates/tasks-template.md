@@ -70,7 +70,7 @@ where the testing constitution applies.
 Examples of foundational tasks (adjust based on your project):
 
 - [ ] T009 Setup strict database migrations framework (PostgreSQL; Neon per env; no manual DB edits)
-- [ ] T010 [P] Implement Auth0 authentication/authorization
+- [ ] T010 [P] Implement authentication/authorization (in-application ASP.NET Core Identity + JWT bearer; server-side, HOA-scoped)
 - [ ] T011 [P] Setup FastEndpoints routing, global exception handler, and consistent error responses
 - [ ] T012 Create base models/entities that all stories depend on (shared tables; multi-HOA membership)
 - [ ] T013 Configure Docker/Docker Compose for local parity (Postgres service for dev/tests; MinIO if file storage is used)
