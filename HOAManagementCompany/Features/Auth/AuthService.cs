@@ -45,7 +45,9 @@ public class AuthService(
             UserName = req.Email,
             FirstName = req.FirstName,
             LastName = req.LastName,
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            // 016-A FR-A4: enable per-account lockout for new users.
+            LockoutEnabled = true
         };
 
         var result = await userManager.CreateAsync(user, req.Password);
@@ -62,12 +64,27 @@ public class AuthService(
     public async Task<AuthResponse> LoginAsync(LoginRequest req, CancellationToken ct = default)
     {
         var user = await userManager.FindByEmailAsync(req.Email);
-        if (user is null || !await userManager.CheckPasswordAsync(user, req.Password))
+        // 016-A FR-A4: lockout-aware login. Responses stay generic so lock state is not an oracle.
+        if (user is null)
         {
             logger.LogWarning("Failed login attempt for {Email}", req.Email);
             throw new DomainException("INVALID_CREDENTIALS", "Invalid email or password.", 401);
         }
 
+        if (await userManager.IsLockedOutAsync(user))
+        {
+            logger.LogWarning("Login attempt on locked-out account {Email}", req.Email);
+            throw new DomainException("INVALID_CREDENTIALS", "Invalid email or password.", 401);
+        }
+
+        if (!await userManager.CheckPasswordAsync(user, req.Password))
+        {
+            await userManager.AccessFailedAsync(user);
+            logger.LogWarning("Failed login attempt for {Email}", req.Email);
+            throw new DomainException("INVALID_CREDENTIALS", "Invalid email or password.", 401);
+        }
+
+        await userManager.ResetAccessFailedCountAsync(user);
         var property = await GetActivePropertyAsync(user.Id, ct);
         logger.LogInformation("User logged in: {Email}", req.Email);
         return await CreateTokenPairAsync(user, property, ct);
