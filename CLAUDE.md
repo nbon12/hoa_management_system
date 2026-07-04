@@ -110,4 +110,19 @@ If more work is needed after a merge:
 
 Merged branches exist only as historical artifacts. Treat them as read-only.
 
+## Don't ask about work order — just pick and start
+
+Per the constitution's Spec Independence & Parallelism principle (section 12), specs and
+sub-specs are designed to be individually completable and, where split from a larger effort,
+parallelizable. Because of this:
+
+- Do **not** ask the user "which should come first," "what should I work on first," or any
+  other question about ordering across independent specs or sub-specs.
+- These questions are low-value and only delay the workflow — if specs are truly independent,
+  order does not matter to the outcome.
+- Instead, **pick one and start.** Use any reasonable tie-breaker (priority label if present,
+  numeric spec order, or simple judgment) and proceed without waiting for confirmation.
+- This does not apply to genuine hard dependencies that are explicitly documented (see
+  constitution section 12) — those must still be sequenced correctly.
+
 <!-- MANUAL ADDITIONS END -->

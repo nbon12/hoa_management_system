@@ -62,6 +62,11 @@ Confirm the plan satisfies the active HOA Management Company Constitution:
   feature's `spec.md` and `tasks.md` are slated to be updated before the PR (older specs only
   need their `spec.md` kept current; `tasks.md`/`plan.md`/`research.md` are not refreshed); and
   any contradiction with a former spec is reconciled so the spec corpus stays consistent.
+- **Spec independence & parallelism**: This spec is individually completable without requiring
+  another spec to land first. Any hard dependency on a sibling spec (schema, contract, or
+  shared component it must land after) is explicitly documented here and minimized; where this
+  feature was split from a larger effort, the split is designed so sibling specs can be worked
+  on in parallel.
 
 ## Project Structure
 
