@@ -35,7 +35,7 @@ _None — all in-repo work complete as of 2026-07-04._
 
 ## HUMAN-NEEDED (leave for last; cannot be done in-repo)
 1. **Merge coordination**: this PR changes the `/auth/register` contract → the frontend signup (sub-spec D, PR #103) must land together, or A must not merge to a shared environment first.
-2. **Deployed-Dev smoke gate**: `/e2e/cleanup` now requires `X-Scheduler-Secret` — update the Playwright smoke CI step to send it, or the deployed-Dev gate breaks.
+2. ~~**Deployed-Dev smoke gate**~~ RESOLVED in-repo (4926e13): both smoke flows (`test.yml` deploy-dev gate, `pr-env.yml` per-PR e2e) fetch `dev-scheduler-secret` from Secret Manager via the deployer identity and pass it to Playwright; `global-setup.ts` sends the header and warns on non-2xx.
 3. **Secret rotation**: invalidate the previously-committed dev JWT secret in any dev DB / environment that reused it.
 
 ## Key design notes
