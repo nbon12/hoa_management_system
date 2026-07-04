@@ -231,6 +231,14 @@ Examples of foundational tasks (adjust based on your project):
 - **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
 - **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
 
+### Cross-Spec Dependencies
+
+- Per the constitution's Spec Independence & Parallelism principle, this spec MUST NOT
+  assume another spec/sub-spec has already been implemented unless that dependency is
+  explicitly documented in this spec's `plan.md`. Where this spec was split from a larger
+  effort, prefer a split that lets sibling specs proceed in parallel over one that
+  sequences them.
+
 ### Within Each User Story
 
 - Tests (if included) MUST be written and FAIL before implementation
