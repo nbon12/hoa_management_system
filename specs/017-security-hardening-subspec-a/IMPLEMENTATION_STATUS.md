@@ -28,8 +28,10 @@
 - **Tests**: `HOAManagementCompany.Tests/Integration/Auth/AuthSecurityTests.cs` (5): uniform verify-email, generic verify-confirm failure, generic register refusal, register validation, 10-attempt lockout. (Old `RegisterTests.cs` removed.)
 
 ## REMAINING (in-repo)
-- **FR-A8** defensive claim reads (Low, non-exploitable 500→403): replace `User.FindFirst("propertyId")!` / `"communityId")!` with safe reads returning 401/403. A's scope = `Features/Property/*` + `Features/Dashboard/*` (payment endpoints are sub-spec B's FR-B6). Suggested: add a `ClaimsPrincipalExtensions.RequirePropertyId()/RequireCommunityId()` helper throwing `DomainException(401)`, apply across those endpoints, add a test with a valid-signature token missing a claim.
-- **Email delivery adapter**: `LoggingAuthNotifier` only logs. Wire an `IAuthNotifier` impl backed by the SendGrid `IAlertProvider` (channel "email") so verification/claim codes are actually delivered.
+_None — all in-repo work complete as of 2026-07-04._
+
+- **FR-A8** done: `Features/Common/ClaimsPrincipalExtensions.cs` (`RequirePropertyId()`/`RequireCommunityId()` → `DomainException(401)`, generic message); `GlobalExceptionHandler` now maps `DomainException` to its status/code instead of 500; applied across `Features/Property/*` + `Features/Dashboard/*`. Tests: `Integration/Auth/ClaimHardeningTests.cs` (6: valid-signature token missing propertyId on 5 routes + missing communityId on dashboard → 401).
+- **Email delivery adapter** done: `EmailAuthNotifier` in `Features/Auth/AuthNotifier.cs` (SendGrid `IAlertProvider` channel "email"; delivery failures logged with code withheld and swallowed to keep FR-A1 uniform responses). `Program.cs` DI picks `EmailAuthNotifier` when the email provider `IsConfigured`, else falls back to `LoggingAuthNotifier` (local dev/CI). Tests: `Unit/Auth/EmailAuthNotifierTests.cs` (3).
 
 ## HUMAN-NEEDED (leave for last; cannot be done in-repo)
 1. **Merge coordination**: this PR changes the `/auth/register` contract → the frontend signup (sub-spec D, PR #103) must land together, or A must not merge to a shared environment first.
