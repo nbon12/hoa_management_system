@@ -9,6 +9,15 @@
 
 The Angular frontend has a clean XSS posture (no unsafe HTML sinks) and a textbook-correct Stripe integration (card data only ever entered into the provider's hosted element; only publishable keys in the repo). The findings concern **session-credential exposure and content-security containment**: access and refresh tokens plus user PII are persisted in browser storage readable by any script; there is no Content-Security-Policy to contain a compromised/injected script; a test authentication-state file containing a real refresh token is committed to the repository; and the auth request interceptor attaches the bearer token to every request without scoping it to the API origin.
 
+## Clarifications
+
+### Session 2026-07-04
+
+- Q: On app startup/reload, how should the frontend re-hydrate the session from the HttpOnly refresh cookie? → A: Hinted refresh — attempt silent refresh at startup only when a non-sensitive "has-session" hint (readable marker cookie or localStorage flag, no credential material) is present; anonymous visitors skip the call; returning users re-hydrate before protected routes render.
+- Q: How should concurrent refresh across multiple tabs be handled, given strict one-time-use refresh-token rotation? → A: Cross-tab lock — the frontend coordinates refreshes across tabs (Web Locks / BroadcastChannel) so only one tab refreshes and shares the result; backend rotation semantics stay strict (no grace window).
+- Q: Should the refresh-token cookie persist across browser restarts, and for how long? → A: Persistent cookie, Max-Age = existing 30-day refresh-token lifetime — preserves current "stay signed in" UX; no remember-me UI in this slice.
+- Q: How should the enforced CSP handle per-environment API origins (Dev vs per-PR envs)? → A: Per-build injection — the pipeline stamps each deployment's exact API origin into the headers file; no wildcards; PR previews keep the same enforcing posture as Dev.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Contain credential theft from script compromise (Priority: P1)
@@ -59,7 +68,7 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 
 ### Edge Cases
 
-- The HttpOnly-cookie end-state requires backend cooperation (a cookie-setting login/refresh response and a silent-refresh endpoint); this backend work is in scope, and the silent-refresh-on-startup behavior must be defined so users are not logged out on reload.
+- The HttpOnly-cookie end-state requires backend cooperation (a cookie-setting login/refresh response and a silent-refresh endpoint); this backend work is in scope. Startup re-hydration is **hint-gated** (clarified 2026-07-04): a non-sensitive "has-session" marker (readable cookie or localStorage flag containing no credential material) gates the silent-refresh call — present → refresh before protected routes render; absent → no call, user is anonymous. Users are therefore not logged out on reload, and anonymous visits make no doomed refresh call.
 - The CSP must allow the payment provider's script and frame origins and the API connect origin, or payments and API calls break.
 - Invalidating the committed refresh token must not disrupt legitimate CI e2e runs that regenerate their own auth state at runtime.
 
@@ -67,11 +76,11 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 
 ### Functional Requirements
 
-- **FR-D1**: The long-lived refresh token MUST NOT be stored in script-readable browser storage. The target end-state is: the refresh token is set by the backend in an **HttpOnly, Secure, SameSite cookie**; the access token is held in memory only; and the session is re-hydrated via a silent refresh on startup. *(Clarified 2026-07-02: the full HttpOnly-cookie end-state is required — not an interim "stop persisting" or frontend-only stopgap. Backend endpoint work to set the cookie and serve silent refresh is in scope.)*
-- **FR-D2**: The deployed frontend MUST serve a Content-Security-Policy that restricts script, connect, and frame sources to the approved origins (self, API origin, payment provider), plus the other headers defined in the shared baseline. *(Clarified 2026-07-02: the CSP MUST be delivered via a repo-controlled build-output headers file and asserted by an automated test — not configured only in the host dashboard. It ships in **enforcing** mode from day one — no report-only phase — given the app has no unsafe HTML sinks and a known origin set.)*
+- **FR-D1**: The long-lived refresh token MUST NOT be stored in script-readable browser storage. The target end-state is: the refresh token is set by the backend in an **HttpOnly, Secure, SameSite cookie**; the access token is held in memory only; and the session is re-hydrated via a silent refresh on startup. *(Clarified 2026-07-02: the full HttpOnly-cookie end-state is required — not an interim "stop persisting" or frontend-only stopgap. Backend endpoint work to set the cookie and serve silent refresh is in scope.)* *(Clarified 2026-07-04: the cookie is persistent with Max-Age matching the existing 30-day refresh-token lifetime — preserving current "stay signed in" behavior; startup re-hydration is hint-gated per the Clarifications session.)*
+- **FR-D2**: The deployed frontend MUST serve a Content-Security-Policy that restricts script, connect, and frame sources to the approved origins (self, API origin, payment provider), plus the other headers defined in the shared baseline. *(Clarified 2026-07-02: the CSP MUST be delivered via a repo-controlled build-output headers file and asserted by an automated test — not configured only in the host dashboard. It ships in **enforcing** mode from day one — no report-only phase — given the app has no unsafe HTML sinks and a known origin set.)* *(Clarified 2026-07-04: the API origin in `connect-src` is stamped per build — each deployment (Dev, Pages preview, per-PR env) gets its exact API origin injected into the headers file by the build pipeline, mirroring the existing environment-file injection; no wildcard origins, and PR previews carry the same enforcing posture as Dev.)*
 - **FR-D3**: No real authentication or refresh token MUST be tracked in the repository; the committed test auth-state file MUST be removed from tracking and ignored, and any previously committed refresh token MUST be invalidated.
 - **FR-D4**: The auth interceptor MUST attach the bearer token only to requests whose target is the configured API origin.
-- **FR-D5**: The session-refresh flow MUST use a single-flight mechanism so concurrent unauthorized responses trigger one refresh rather than parallel refreshes reusing the same token.
+- **FR-D5**: The session-refresh flow MUST use a single-flight mechanism so concurrent unauthorized responses trigger one refresh rather than parallel refreshes reusing the same token. *(Clarified 2026-07-04: single-flight is cross-tab, not just per-tab — the client coordinates across browser tabs (e.g. Web Locks / BroadcastChannel) so only one tab performs the refresh and shares the outcome. The backend's strict one-time-use rotation is unchanged; no reuse grace window is introduced.)*
 - **FR-D6**: Document-open and outbound-link flows MUST use safe opener handling and no-opener/no-referrer attributes; token-expiry parsing MUST correctly handle URL-safe token encodings.
 - **FR-D7**: Dead starter-template content and non-functional authentication controls MUST be removed from shipped bundles.
 - **FR-D8**: Only publishable payment-provider keys may appear in frontend configuration; the existing boot-time guard that refuses to start without the production publishable key MUST be preserved.
