@@ -338,11 +338,26 @@ jobs:
       #    against the live Dev preview — "is this deployment healthy?", NOT the full local
       #    regression suite. Runs after Cypress passes. Failure blocks promotion. The full
       #    Playwright suite stays runnable locally/PR via `npm run e2e`. ──
+      # global-setup resets e2e seed state via DELETE /e2e/cleanup, which requires the
+      # environment's scheduler shared secret (017-A FR-A6). Fetched from Secret Manager with
+      # the already-authenticated deployer identity — no secret literal in the workflow.
+      - name: Fetch scheduler secret for e2e cleanup
+        id: sched
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+        run: |
+          set -euo pipefail
+          v="$(gcloud secrets versions access latest --secret="${PREFIX}-scheduler-secret" --project="$PROJECT")"
+          echo "::add-mask::$v"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+
       - name: Playwright smoke gate (vs Dev preview)
         working-directory: neko-hoa
         env:
           PLAYWRIGHT_BASE_URL: ${{ steps.pages.outputs.deployment-url }}
           PLAYWRIGHT_API_URL: ${{ steps.candidate.outputs.url }}
+          PLAYWRIGHT_SCHEDULER_SECRET: ${{ steps.sched.outputs.value }}
         run: |
           npx playwright install --with-deps chromium
           npm run e2e:playwright-smoke
