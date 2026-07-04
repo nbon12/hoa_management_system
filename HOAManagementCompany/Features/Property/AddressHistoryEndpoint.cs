@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Property.Models;
 
 namespace HOAManagementCompany.Features.Property;
@@ -13,7 +14,7 @@ public class AddressHistoryEndpoint(PropertyService propertyService) : EndpointW
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.RequirePropertyId();
         await SendOkAsync(await propertyService.GetAddressHistoryAsync(propertyId, ct), ct);
     }
 }

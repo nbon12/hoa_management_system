@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Property.Models;
 
@@ -20,7 +21,7 @@ public class DirectoryFieldPatchEndpoint(PropertyService propertyService) : Endp
 
     public override async Task HandleAsync(DirectoryFieldPatchRequest2 req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.RequirePropertyId();
         var key = Route<string>("key")!;
         try
         {
