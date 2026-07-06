@@ -142,7 +142,7 @@ jobs:
           echo "::error::PR API never became healthy"; exit 1
 
       # 7. Frontend: inject the PR API origin into the pr-preview env, build, deploy to the Pages branch.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Build + deploy frontend (Pages branch pr-${{ env.PRN }})
