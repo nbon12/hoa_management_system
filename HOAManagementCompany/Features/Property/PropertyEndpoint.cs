@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Property.Models;
@@ -14,9 +15,7 @@ public class PropertyEndpoint(PropertyService propertyService) : EndpointWithout
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
-        try { await SendOkAsync(await propertyService.GetPropertyAsync(propertyId, ct), ct); }
-        catch (DomainException ex) { HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct); }
+        var propertyId = User.GetPropertyId();
+        await SendOkAsync(await propertyService.GetPropertyAsync(propertyId, ct), ct);
     }
 }

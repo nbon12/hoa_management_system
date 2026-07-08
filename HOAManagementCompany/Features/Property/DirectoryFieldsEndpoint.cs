@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Property.Models;
 
@@ -13,7 +14,7 @@ public class DirectoryFieldsEndpoint(PropertyService propertyService) : Endpoint
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         await SendOkAsync(await propertyService.GetDirectoryFieldsAsync(propertyId, ct), ct);
     }
 }

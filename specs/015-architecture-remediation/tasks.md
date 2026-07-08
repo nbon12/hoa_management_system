@@ -73,15 +73,15 @@ Existing monorepo layout: backend `HOAManagementCompany/`, backend tests `HOAMan
 
 ### Tests for User Story 2 (write FIRST) ⚠️
 
-- [ ] T014 [P] [US2] Error-contract tests in `HOAManagementCompany.Tests/Integration/Common/ErrorContractTests.cs`: xUnit Theory over documented codes (`EMAIL_TAKEN`, `PROPERTY_ACCESS_DENIED`, `INVALID_CREDENTIALS`, poll double-vote, document access denied, …) asserting envelope shape + intended status via HTTP, including one endpoint with no local error handling (fail-safe scenario — red today for uncaught cases returning 500)
-- [ ] T015 [P] [US2] Missing-claim tests in `HOAManagementCompany.Tests/Integration/Common/MissingClaimTests.cs`: authenticated request without `propertyId` claim to representative endpoints → 403 with `code=MISSING_CLAIM` (red today: NRE→500)
+- [X] T014 [P] [US2] Error-contract tests in `HOAManagementCompany.Tests/Integration/Common/ErrorContractTests.cs`: xUnit Theory over documented codes (`EMAIL_TAKEN`, `PROPERTY_ACCESS_DENIED`, `INVALID_CREDENTIALS`, poll double-vote, document access denied, …) asserting envelope shape + intended status via HTTP, including one endpoint with no local error handling (fail-safe scenario — red today for uncaught cases returning 500)
+- [X] T015 [P] [US2] Missing-claim tests in `HOAManagementCompany.Tests/Integration/Common/MissingClaimTests.cs`: authenticated request without `propertyId` claim to representative endpoints → 403 with `code=MISSING_CLAIM` (red today: NRE→500)
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Extend `HOAManagementCompany/Features/Common/GlobalExceptionHandler.cs` with a `DomainException` branch writing `{ code, message }` at `ex.StatusCode` (production leak rules unchanged for non-domain exceptions; Sentry capture preserved)
-- [ ] T017 [P] [US2] Create `HOAManagementCompany/Features/Common/ClaimsPrincipalExtensions.cs` with `GetPropertyId()`/`GetUserId()` throwing `DomainException("MISSING_CLAIM", …, 403)` when absent/invalid
-- [ ] T018 [US2] Remove all 12 per-endpoint `catch (DomainException)` blocks (Auth Login/Register/Refresh endpoints, `Features/Property/PropertyEndpoint.cs:19-20` and sibling property endpoints, Community endpoints, Payments endpoints) so the central mapping is the single path; T014 green
-- [ ] T019 [US2] Replace all 24 inline `Guid.Parse(User.FindFirst("propertyId")!.Value)` sites across 23 files (e.g. `Features/Property/PropertyEndpoint.cs:17`, `Features/Dashboard/DashboardEndpoint.cs:16-17`, Payments/Community/Statements endpoints) with the T017 accessor; T015 green; SC-002 counts = 0
+- [X] T016 [US2] Extend `HOAManagementCompany/Features/Common/GlobalExceptionHandler.cs` with a `DomainException` branch writing `{ code, message }` at `ex.StatusCode` (production leak rules unchanged for non-domain exceptions; Sentry capture preserved)
+- [X] T017 [P] [US2] Create `HOAManagementCompany/Features/Common/ClaimsPrincipalExtensions.cs` with `GetPropertyId()`/`GetUserId()` throwing `DomainException("MISSING_CLAIM", …, 403)` when absent/invalid
+- [X] T018 [US2] Remove all 12 per-endpoint `catch (DomainException)` blocks (Auth Login/Register/Refresh endpoints, `Features/Property/PropertyEndpoint.cs:19-20` and sibling property endpoints, Community endpoints, Payments endpoints) so the central mapping is the single path; T014 green
+- [X] T019 [US2] Replace all 24 inline `Guid.Parse(User.FindFirst("propertyId")!.Value)` sites across 23 files (e.g. `Features/Property/PropertyEndpoint.cs:17`, `Features/Dashboard/DashboardEndpoint.cs:16-17`, Payments/Community/Statements endpoints) with the T017 accessor; T015 green; SC-002 counts = 0
 
 **Checkpoint**: US1 + US2 independently deliverable; error envelope contract live.
 

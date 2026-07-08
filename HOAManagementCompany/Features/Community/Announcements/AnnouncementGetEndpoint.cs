@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Community.Models;
@@ -14,10 +15,8 @@ public class AnnouncementGetEndpoint(CommunityService communityService) : Endpoi
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.GetCommunityId();
         var id = Route<Guid>("id");
-        try { await SendOkAsync(await communityService.GetAnnouncementAsync(communityId, id, ct), ct); }
-        catch (DomainException ex) { HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct); }
+        await SendOkAsync(await communityService.GetAnnouncementAsync(communityId, id, ct), ct);
     }
 }

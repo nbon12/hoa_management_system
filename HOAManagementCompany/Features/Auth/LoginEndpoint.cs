@@ -16,16 +16,8 @@ public class LoginEndpoint(AuthService authService) : Endpoint<LoginRequest, Aut
 
     public override async Task HandleAsync(LoginRequest req, CancellationToken ct)
     {
-        try
-        {
-            var response = await authService.LoginAsync(req, ct);
-            await SendOkAsync(response, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+        var response = await authService.LoginAsync(req, ct);
+        await SendOkAsync(response, ct);
     }
 }
 

@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Community.Models;
@@ -14,18 +15,11 @@ public class EventRsvpEndpoint(CommunityService communityService) : Endpoint<Eve
 
     public override async Task HandleAsync(EventRsvpRequest req, CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? string.Empty;
+        var communityId = User.GetCommunityId();
+        var userId = User.GetUserId();
         var eventId = Route<Guid>("id");
 
-        try
-        {
-            await communityService.RsvpEventAsync(communityId, eventId, userId, req.Attending, ct);
-            await SendNoContentAsync(ct);
-        }
-        catch (DomainException ex)
-        {
-            await SendAsync(new { code = ex.Code, message = ex.Message }, ex.StatusCode, ct);
-        }
+        await communityService.RsvpEventAsync(communityId, eventId, userId, req.Attending, ct);
+        await SendNoContentAsync(ct);
     }
 }

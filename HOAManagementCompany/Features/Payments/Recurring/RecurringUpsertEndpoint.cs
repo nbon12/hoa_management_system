@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Payments.Models;
@@ -15,7 +16,7 @@ public class RecurringUpsertEndpoint(PaymentService paymentService) : Endpoint<R
 
     public override async Task HandleAsync(RecurringPaymentRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.FirstOrDefault();
         var result = await paymentService.UpsertRecurringAsync(propertyId, req, ip, userAgent, ct);

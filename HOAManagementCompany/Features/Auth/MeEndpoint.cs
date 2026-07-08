@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Auth.Models;
 
@@ -13,9 +14,7 @@ public class MeEndpoint(AuthService authService) : EndpointWithoutRequest<Curren
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? string.Empty;
+        var userId = User.GetUserId();
 
         var user = await authService.GetCurrentUserAsync(userId, ct);
         await SendOkAsync(user, ct);

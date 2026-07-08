@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using System.Globalization;
 using FastEndpoints;
 using FluentValidation;
@@ -33,7 +34,7 @@ public class ConfirmPaymentEndpoint(
 
     public override async Task HandleAsync(ConfirmPaymentRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var idempotencyKey = HttpContext.Request.Headers[IdempotencyService.HeaderName].FirstOrDefault();
 
         // Replay collapse (FR-007a/FR-035): a re-submitted confirm — keyed by the client idempotency

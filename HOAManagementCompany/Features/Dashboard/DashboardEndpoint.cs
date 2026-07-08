@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Dashboard.Models;
 
@@ -13,8 +14,8 @@ public class DashboardEndpoint(DashboardService dashboardService) : EndpointWith
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
-        var communityId = User.FindFirst("communityId")!.Value;
+        var propertyId = User.GetPropertyId();
+        var communityId = User.GetCommunityId();
 
         var result = await dashboardService.GetDashboardAsync(propertyId, communityId, ct);
         await SendOkAsync(result, ct);

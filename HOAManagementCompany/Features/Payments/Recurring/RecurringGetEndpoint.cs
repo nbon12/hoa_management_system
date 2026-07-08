@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Models;
 
@@ -13,7 +14,7 @@ public class RecurringGetEndpoint(PaymentService paymentService) : EndpointWitho
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var result = await paymentService.GetRecurringAsync(propertyId, ct);
 
         if (result is null)

@@ -16,16 +16,8 @@ public class RegisterEndpoint(AuthService authService) : Endpoint<RegisterReques
 
     public override async Task HandleAsync(RegisterRequest req, CancellationToken ct)
     {
-        try
-        {
-            var response = await authService.RegisterAsync(req, ct);
-            await SendAsync(response, 201, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+        var response = await authService.RegisterAsync(req, ct);
+        await SendAsync(response, 201, ct);
     }
 }
 

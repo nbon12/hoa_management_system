@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Property.Models;
@@ -20,17 +21,9 @@ public class DirectoryFieldPatchEndpoint(PropertyService propertyService) : Endp
 
     public override async Task HandleAsync(DirectoryFieldPatchRequest2 req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var key = Route<string>("key")!;
-        try
-        {
-            var result = await propertyService.PatchDirectoryFieldAsync(propertyId, key, new DirectoryFieldPatchRequest(req.Shared), ct);
-            await SendOkAsync(result, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+        var result = await propertyService.PatchDirectoryFieldAsync(propertyId, key, new DirectoryFieldPatchRequest(req.Shared), ct);
+        await SendOkAsync(result, ct);
     }
 }

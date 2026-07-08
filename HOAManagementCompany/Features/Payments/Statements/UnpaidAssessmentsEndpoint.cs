@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Models;
 
@@ -19,7 +20,7 @@ public class UnpaidAssessmentsEndpoint(StatementService statementService)
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var result = await statementService.GetUnpaidAssessmentsAsync(propertyId, ct);
         await SendOkAsync(result, ct);
     }

@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using System.Text.RegularExpressions;
 using FastEndpoints;
 using FluentValidation;
@@ -27,7 +28,7 @@ public class GetAlertPreferencesEndpoint(ApplicationDbContext db) : EndpointWith
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct);
         if (owner is null) { await SendNotFoundAsync(ct); return; }
 
@@ -55,7 +56,7 @@ public class UpdateAlertPreferencesEndpoint(ApplicationDbContext db)
 
     public override async Task HandleAsync(UpdateAlertPreferencesRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct);
         if (owner is null) { await SendNotFoundAsync(ct); return; }
 

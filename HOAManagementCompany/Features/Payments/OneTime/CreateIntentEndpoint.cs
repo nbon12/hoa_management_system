@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using System.Globalization;
 using FastEndpoints;
 using FluentValidation;
@@ -24,7 +25,7 @@ public class CreateIntentEndpoint(IStripeGateway gateway, FeeCalculator feeCalcu
 
     public override async Task HandleAsync(CreateIntentRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var method = req.Method.Equals("card", StringComparison.OrdinalIgnoreCase) ? PaymentMethod.Card : PaymentMethod.Ach;
 
         var cfg = await config.GetForPropertyAsync(propertyId, ct);
