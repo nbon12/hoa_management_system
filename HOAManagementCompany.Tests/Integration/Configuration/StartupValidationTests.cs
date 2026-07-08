@@ -101,6 +101,8 @@ public class StartupValidationTests
     [InlineData("Stripe:SecretKey", "")]                    // required secret unset
     [InlineData("Stripe:WebhookToleranceSeconds", "0")]     // must be > 0
     [InlineData("Jobs:SchedulerSharedSecret", "")]          // required secret unset
+    [InlineData("Auth:RefreshCookie:SameSite", "sneaky")]   // unknown SameSite value (020-D)
+    [InlineData("Auth:RefreshCookie:SameSite", "")]         // SameSite must be explicit (020-D)
     [InlineData("Storage:AccessKey", "")]                   // required field unset (FR-011)
     [InlineData("Payments:ReconcilePendingAchAfterHours", "0")] // must be > 0
     [InlineData("Payments:DefaultFee:CardFeeType", "Bogus")]    // unknown enum value

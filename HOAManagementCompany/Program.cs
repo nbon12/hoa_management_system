@@ -184,6 +184,8 @@ builder.Services.AddValidatedOptions<PaymentsOptions, PaymentsOptionsValidator>(
     builder.Configuration, PaymentsOptions.SectionName);
 builder.Services.AddValidatedOptions<JobsOptions, JobsOptionsValidator>(
     builder.Configuration, JobsOptions.SectionName);
+builder.Services.AddValidatedOptions<RefreshCookieOptions, RefreshCookieOptionsValidator>(
+    builder.Configuration, RefreshCookieOptions.SectionName);
 builder.Services.AddValidatedOptions<TwilioOptions, TwilioOptionsValidator>(
     builder.Configuration, TwilioOptions.SectionName);
 builder.Services.AddValidatedOptions<SendGridOptions, SendGridOptionsValidator>(
