@@ -55,6 +55,16 @@ public sealed class StartupOptions
         if (environment.IsProduction())
             options.EnableSwagger = false;
 
+        // 015 US3 (FR-009): seeding is test machinery. It may only run in explicitly known
+        // non-production environments; Production — or an ambiguous/unknown environment name,
+        // which must default to "test machinery disabled" — fails fast at boot instead of
+        // silently honoring the flag. This runs before any database access (unlike the
+        // ValidateOnStart pipeline, which fires at host start, after startup tasks).
+        string[] seedableEnvironments = ["Development", DevEnvironmentName, "Test", "Staging"];
+        if (options.SeedData && !seedableEnvironments.Contains(environment.EnvironmentName, StringComparer.Ordinal))
+            throw new InvalidOperationException(
+                $"Startup:SeedData cannot be enabled in environment '{environment.EnvironmentName}' — test machinery is disabled by an environment backstop (015 US3).");
+
         return options;
     }
 }
