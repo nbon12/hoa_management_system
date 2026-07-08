@@ -1,5 +1,5 @@
 using FastEndpoints;
-using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Community.Models;
 
 namespace HOAManagementCompany.Features.Community.Events;

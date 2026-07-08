@@ -38,9 +38,11 @@ public class ReconcileEndpoint(
         var resolvedAch = await reconciliation.ResolvePendingAchAsync(ct);
         var retriedWebhooks = await reconciliation.RetryPendingWebhooksAsync(ct);
         var dispatchedAlerts = await dispatcher.DispatchPendingAsync(ct);
+        // Report-only status/ledger consistency scan (015 FR-005) — findings go to logs/Sentry.
+        var inconsistencies = await reconciliation.DetectLedgerInconsistenciesAsync(ct);
 
-        await SendOkAsync(new ReconcileResponse(resolvedAch, retriedWebhooks, dispatchedAlerts), ct);
+        await SendOkAsync(new ReconcileResponse(resolvedAch, retriedWebhooks, dispatchedAlerts, inconsistencies.Count), ct);
     }
 }
 
-public record ReconcileResponse(int ResolvedAchTransactions, int RetriedWebhooks, int DispatchedAlerts);
+public record ReconcileResponse(int ResolvedAchTransactions, int RetriedWebhooks, int DispatchedAlerts, int LedgerInconsistencies);

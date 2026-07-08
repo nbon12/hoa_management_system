@@ -1,3 +1,4 @@
+using HOAManagementCompany.Domain;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth.Models;

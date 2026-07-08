@@ -1,3 +1,4 @@
+using HOAManagementCompany.Domain;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Dashboard.Models;
 using HOAManagementCompany.Infrastructure.Persistence;
@@ -14,7 +15,7 @@ public class DashboardService(ApplicationDbContext db)
     public async Task<DashboardResponse> GetDashboardAsync(Guid propertyId, string communityId, CancellationToken ct = default)
     {
         var property = await db.Properties.FindAsync([propertyId], ct)
-            ?? throw new Features.Auth.DomainException("NOT_FOUND", "Property not found.", 404);
+            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
 
         var latestEntry = await db.LedgerEntries
             .Where(e => e.PropertyId == propertyId)

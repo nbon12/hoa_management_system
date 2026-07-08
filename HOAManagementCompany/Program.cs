@@ -333,6 +333,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.Idemp
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.PaymentConfigService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.LedgerService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.AllocationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.PaymentRecorder>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Webhooks.WebhookProcessor>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Jobs.ReconciliationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Recurring.RecurringDraftService>();

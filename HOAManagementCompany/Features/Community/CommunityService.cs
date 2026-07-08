@@ -1,5 +1,5 @@
 using HOAManagementCompany.Domain.Enums;
-using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Community.Models;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Infrastructure.Storage;

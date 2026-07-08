@@ -33,6 +33,7 @@ public sealed class RecurringDraftService(
     FeeCalculator feeCalculator,
     PaymentConfigService configService,
     LedgerService ledger,
+    PaymentRecorder recorder,
     ILogger<RecurringDraftService> logger)
 {
     /// <summary>
@@ -181,21 +182,17 @@ public sealed class RecurringDraftService(
                 TransactionId = txn.Id,
             };
 
-            var strategy = db.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            // One atomic unit per mandate via the shared recorder (015 FR-003) — a failed mandate
+            // never rolls back the others, and txn + draft + ledger commit together.
+            await recorder.RecordNewAsync(txn, async innerCt =>
             {
-                await using var tx = await db.Database.BeginTransactionAsync(ct);
-                db.PaymentTransactions.Add(txn);
                 db.DraftEntries.Add(draft);
-                await db.SaveChangesAsync(ct);
 
                 if (succeeded)
                     await ledger.AddPaymentAsync(r.PropertyId, txn.Id, fee.Gross,
                         $"Auto-Pay – {(r.Method == PaymentMethod.Card ? "Card" : "ACH")} – {txn.StripeChargeId}",
-                        entryDate: asOf, ct: ct);
-
-                await tx.CommitAsync(ct);
-            });
+                        entryDate: asOf, ct: innerCt);
+            }, ct);
 
             if (succeeded) charged++; else failed++;
         }
