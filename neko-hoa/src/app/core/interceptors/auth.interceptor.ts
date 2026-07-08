@@ -1,43 +1,37 @@
 import {
-  HttpInterceptorFn, HttpRequest, HttpHandlerFn,
-  HttpErrorResponse, HttpClient
+  HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpErrorResponse
 } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, switchMap, throwError } from 'rxjs';
+import { catchError, from, switchMap, throwError } from 'rxjs';
 import { TokenService } from '../services/token.service';
+import { SessionRefreshService } from '../services/session-refresh';
 import { environment } from '../../../environments/environment';
 
+// <!-- REPOWISE:START domain=frontend-session -->
+// 020-D FR-D4/FR-D5: the bearer token is attached ONLY to API-origin requests — a request to any
+// other origin (third-party scripts' fetches, absolute URLs in content) never carries it. 401s on
+// API requests route through SessionRefreshService: single-flight in-tab and cross-tab
+// (Web Locks), honoring the backend's strict one-time-use refresh rotation.
+// <!-- REPOWISE:END -->
 export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
   const tokens = inject(TokenService);
-  const http   = inject(HttpClient);
+  const session = inject(SessionRefreshService);
+
+  const isApiRequest = req.url.startsWith(environment.apiBaseUrl);
 
   const addBearer = (r: HttpRequest<unknown>, token: string) =>
     r.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
 
   const token = tokens.getAccessToken();
-  const outReq = token ? addBearer(req, token) : req;
+  const outReq = isApiRequest && token ? addBearer(req, token) : req;
 
   return next(outReq).pipe(
     catchError((err: HttpErrorResponse) => {
-      // Attempt silent refresh only on 401 from non-auth endpoints
-      if (err.status === 401 && !req.url.includes('/auth/')) {
-        const refresh = tokens.getRefreshToken();
-        if (refresh) {
-          return http.post<{ token: string; refreshToken: string }>(
-            `${environment.apiBaseUrl}/auth/refresh`,
-            { refreshToken: refresh }
-          ).pipe(
-            switchMap(res => {
-              tokens.setTokens(res.token, res.refreshToken);
-              return next(addBearer(req, res.token));
-            }),
-            catchError(refreshErr => {
-              tokens.clearTokens();
-              return throwError(() => refreshErr);
-            })
-          );
-        }
-        tokens.clearTokens();
+      if (err.status === 401 && isApiRequest && !req.url.includes('/auth/')) {
+        return from(session.refresh()).pipe(
+          switchMap(newToken =>
+            newToken ? next(addBearer(req, newToken)) : throwError(() => err))
+        );
       }
       return throwError(() => err);
     })
