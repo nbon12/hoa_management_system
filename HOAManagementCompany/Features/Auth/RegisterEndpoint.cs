@@ -1,10 +1,15 @@
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth.Models;
+using HOAManagementCompany.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Features.Auth;
 
-public class RegisterEndpoint(AuthService authService) : Endpoint<RegisterRequest, AuthResponse>
+public class RegisterEndpoint(
+    AuthService authService,
+    IOptions<RefreshCookieOptions> cookieOptions,
+    IConfiguration config) : Endpoint<RegisterRequest, AuthResponse>
 {
     public override void Configure()
     {
@@ -18,8 +23,10 @@ public class RegisterEndpoint(AuthService authService) : Endpoint<RegisterReques
     {
         try
         {
-            var response = await authService.RegisterAsync(req, ct);
-            await SendAsync(response, 201, ct);
+            var result = await authService.RegisterAsync(req, ct);
+            RefreshCookie.Append(HttpContext, result.RefreshToken, cookieOptions.Value,
+                config.GetValue("Jwt:RefreshTokenExpiryDays", 30));
+            await SendAsync(result.Response, 201, ct);
         }
         catch (DomainException ex)
         {

@@ -34,7 +34,7 @@ public class AuthService(
     // (2) a valid single-use claim code. All failures are generic to avoid an enumeration oracle.
     private const string RegistrationFailed = "REGISTRATION_FAILED";
 
-    public async Task<AuthResponse> RegisterAsync(RegisterRequest req, CancellationToken ct = default)
+    public async Task<AuthResult> RegisterAsync(RegisterRequest req, CancellationToken ct = default)
     {
         var verification = await emailVerification.ResolveProofAsync(
                 req.VerificationToken, EmailVerificationService.PurposeRegistration, ct)
@@ -74,7 +74,7 @@ public class AuthService(
         return await CreateTokenPairAsync(user, property, ct);
     }
 
-    public async Task<AuthResponse> LoginAsync(LoginRequest req, CancellationToken ct = default)
+    public async Task<AuthResult> LoginAsync(LoginRequest req, CancellationToken ct = default)
     {
         var user = await userManager.FindByEmailAsync(req.Email);
         // 016-A FR-A4: lockout-aware login. Responses stay generic so lock state is not an oracle.
@@ -111,7 +111,7 @@ public class AuthService(
         logger.LogInformation("User logged out: {UserId}", userId);
     }
 
-    public async Task<AuthResponse> RefreshAsync(string rawToken, CancellationToken ct = default)
+    public async Task<AuthResult> RefreshAsync(string rawToken, CancellationToken ct = default)
     {
         var hash = HashToken(rawToken);
         var stored = await db.RefreshTokens
@@ -128,7 +128,7 @@ public class AuthService(
         return await CreateTokenPairAsync(stored.User, property, ct);
     }
 
-    public async Task<AuthResponse> SwitchPropertyAsync(string userId, Guid propertyId, CancellationToken ct = default)
+    public async Task<AuthResult> SwitchPropertyAsync(string userId, Guid propertyId, CancellationToken ct = default)
     {
         var link = await db.UserProperties
             .Include(up => up.Property)
@@ -177,7 +177,7 @@ public class AuthService(
             ?? throw new DomainException("NO_PROPERTY", "User has no linked property.", 422);
     }
 
-    private async Task<AuthResponse> CreateTokenPairAsync(ApplicationUser user, Domain.Entities.Property property, CancellationToken ct)
+    private async Task<AuthResult> CreateTokenPairAsync(ApplicationUser user, Domain.Entities.Property property, CancellationToken ct)
     {
         var expiry = DateTimeOffset.UtcNow.AddMinutes(AccessTokenExpiryMinutes);
         var claims = new[]
@@ -223,7 +223,7 @@ public class AuthService(
             $"{user.FirstName[0]}{user.LastName[0]}",
             properties);
 
-        return new AuthResponse(accessToken, rawRefresh, expiry, currentUser);
+        return new AuthResult(new AuthResponse(accessToken, expiry, currentUser), rawRefresh);
     }
 
     private static string HashToken(string rawToken)

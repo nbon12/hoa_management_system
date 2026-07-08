@@ -1,10 +1,15 @@
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth.Models;
+using HOAManagementCompany.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Features.Auth;
 
-public class SwitchPropertyEndpoint(AuthService authService) : Endpoint<SwitchPropertyRequest, AuthResponse>
+public class SwitchPropertyEndpoint(
+    AuthService authService,
+    IOptions<RefreshCookieOptions> cookieOptions,
+    IConfiguration config) : Endpoint<SwitchPropertyRequest, AuthResponse>
 {
     public override void Configure()
     {
@@ -20,8 +25,10 @@ public class SwitchPropertyEndpoint(AuthService authService) : Endpoint<SwitchPr
 
         try
         {
-            var response = await authService.SwitchPropertyAsync(userId, req.PropertyId, ct);
-            await SendOkAsync(response, ct);
+            var result = await authService.SwitchPropertyAsync(userId, req.PropertyId, ct);
+            RefreshCookie.Append(HttpContext, result.RefreshToken, cookieOptions.Value,
+                config.GetValue("Jwt:RefreshTokenExpiryDays", 30));
+            await SendOkAsync(result.Response, ct);
         }
         catch (DomainException ex)
         {
