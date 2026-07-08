@@ -35,8 +35,8 @@
 - [ ] T010 [US1] `neko-hoa/src/app/core/services/auth.service.ts`: login/logout use cookie flows (`withCredentials` on `/api/v1/auth/*`), populate in-memory user from responses; drop storage restoration.
 - [ ] T011 [US1] NEW `neko-hoa/src/app/core/services/session-refresh.ts`: refresh coordinator (shared observable; Web Locks `neko-refresh` + `BroadcastChannel('neko-auth')` per research D-R3, graceful per-tab fallback) + hint-gated `APP_INITIALIZER` factory; register in `neko-hoa/src/app/app.config.ts` after the config guard.
 - [ ] T012 [P] [US1] NEW `neko-hoa/src/assets/_headers` (enforcing CSP + baseline headers per research D-R4, `__API_ORIGIN__` placeholder) and NEW `neko-hoa/scripts/stamp-headers.mjs` (stamps origin into `dist/neko-hoa/browser/_headers`, exits non-zero if placeholder remains); verify the `src/assets` rule in `neko-hoa/angular.json` copies it.
-- [ ] T013 [US1] CI: run `stamp-headers.mjs` with the deployment's API origin in `.github/workflows/test.yml` (deploy-dev job, before Pages deploy — Dev API origin) and `.github/workflows/pr-env.yml` (step 7, alongside the existing environment sed — the PR's API origin).
-- [ ] T014 [US1] Update `specs/016-security-hardening/contracts/auth-session.md` cookie note + T096 to point at this feature's contract (supersession per constitution §11 corpus consistency).
+- [ ] T013 [US1] CI: run `stamp-headers.mjs` with the deployment's API origin in `.github/workflows/test.yml` (deploy-dev job, before Pages deploy — Dev API origin) and `.github/workflows/pr-env.yml` (step 7, alongside the existing environment sed — the PR's API origin). Add a `@smoke`-tagged Playwright assertion (`neko-hoa/e2e/` smoke spec) that the served frontend response carries the enforcing `Content-Security-Policy` header with the stamped API origin — executable backing for SC-D2 / US1 acceptance scenario 2 (analysis C1).
+- [ ] T014 [US1] Update `specs/016-security-hardening/contracts/auth-session.md` cookie note + T096 to point at this feature's contract, and mark the umbrella `tasks.md` US5 phase (T061–T097) as superseded by `specs/020-security-hardening-subspec-d/tasks.md` (supersession per constitution §11 corpus consistency; analysis I1/I2).
 
 **Checkpoint**: US1 independently deliverable — cookie transport + CSP live, all US1 tests green.
 
@@ -53,7 +53,7 @@
 ### Implementation
 
 - [ ] T016 [US2] `neko-hoa/src/app/core/interceptors/auth.interceptor.ts`: origin-scope bearer attachment; route 401 retry through the `session-refresh` coordinator (in-tab shared observable + cross-tab lock from T011); remove body-based refresh call.
-- [ ] T017 [P] [US2] `git rm --cached neko-hoa/e2e/.auth/state.json`; add `e2e/.auth/` to `neko-hoa/.gitignore`; confirm `neko-hoa/e2e/global-setup.ts` regeneration keeps Playwright green.
+- [ ] T017 [P] [US2] `git rm --cached neko-hoa/e2e/.auth/state.json`; add `e2e/.auth/` to `neko-hoa/.gitignore`; confirm `neko-hoa/e2e/global-setup.ts` regeneration keeps Playwright green. Add an executable scan assertion backing SC-D3 (analysis C2): a check (unit/e2e or CI step alongside T007's headers check) that `git ls-files neko-hoa/e2e/.auth/` returns nothing.
 - [ ] T018 [US2] Ops (human/one-time, after merge to Dev): revoke the exposed seed-user refresh tokens in the Dev DB per the SQL in `quickstart.md`; record completion in this file.
 
 **Checkpoint**: US2 independently deliverable.
@@ -73,14 +73,14 @@
 
 - [ ] T021 [US3] `token.service.ts`: base64url-normalize (`-`→`+`, `_`→`/`, pad) before `atob` in `isTokenExpired`.
 - [ ] T022 [P] [US3] `neko-hoa/src/app/features/community/documents/documents.component.ts`: set `tab.opener = null` before `tab.location.href = url`.
-- [ ] T023 [P] [US3] Remove Angular starter-template markup from `neko-hoa/src/app/app.component.html` (keep `<router-outlet/>`) and the non-functional "Continue with Google" button from the login component (template + any handler); update affected component specs.
+- [ ] T023 [P] [US3] Remove Angular starter-template markup from `neko-hoa/src/app/app.component.html` (keep `<router-outlet/>`) and the non-functional "Continue with Google" button from the login component (template + any handler); update affected component specs. Then sweep for remaining unsafe outbound links (analysis A1): `grep -rn 'target="_blank"' neko-hoa/src --include='*.html'` — every hit must carry `rel="noopener noreferrer"` (fix any that don't; FR-D6).
 
 **Checkpoint**: US3 independently deliverable.
 
 ## Phase 6: Polish & Cross-Cutting
 
 - [ ] T024 [P] Refresh Repowise marker regions for changed auth/session files (`RefreshEndpoint.cs`, `auth.interceptor.ts`, CSP doc) per plan.md Repowise table.
-- [ ] T025 Full verification: `dotnet test` (Category!=Sandbox), `npm run test:ci`, `npm run build` + stamped-headers check, `npm run e2e:ci`; confirm deployed smoke expectations unchanged.
+- [ ] T025 Full verification: `dotnet test` (Category!=Sandbox), `npm run test:ci`, `npm run build` + stamped-headers check, `npm run e2e:ci`; confirm deployed smoke expectations unchanged. Explicitly confirm the existing boot-time config-guard specs stay green — `neko-hoa/src/app/core/config/runtime-config.validator.spec.ts` (FR-D8 preservation; analysis C3).
 - [ ] T026 Pre-PR freshness gate (constitution §11): update this feature's `spec.md` + `tasks.md` to match work actually performed; verify no older spec.md drifted (016 umbrella contract supersession noted in T014).
 
 ## Dependencies & Execution Order
