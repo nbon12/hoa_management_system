@@ -7,6 +7,7 @@
 // never leak stack traces or internal paths (FR-009/SC-007).
 // <!-- REPOWISE:END -->
 
+using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,20 @@ public class GlobalExceptionHandler(
         Exception exception,
         CancellationToken ct)
     {
+        // 017-A FR-A8: DomainException carries a deliberate, client-safe status/code — surface it
+        // instead of converting it to a 500. Endpoints that catch it locally are unaffected.
+        if (exception is DomainException domainEx)
+        {
+            logger.LogWarning("Domain error {Code} ({StatusCode}): {Message}",
+                domainEx.Code, domainEx.StatusCode, domainEx.Message);
+
+            context.Response.StatusCode = domainEx.StatusCode;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(
+                new { code = domainEx.Code, message = domainEx.Message }, ct);
+            return true;
+        }
+
         logger.LogError(exception, "Unhandled exception: {Message}", exception.Message);
 
         var problem = new ProblemDetails

@@ -26,7 +26,8 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             UserName = PrimaryEmail,
             FirstName = "Jane",
             LastName = "Resident",
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            LockoutEnabled = true
         };
         await userManager.CreateAsync(primaryUser, Password);
 
@@ -36,7 +37,8 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             UserName = SecondaryEmail,
             FirstName = "John",
             LastName = "Resident",
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            LockoutEnabled = true
         };
         await userManager.CreateAsync(secondaryUser, Password);
 
@@ -86,13 +88,40 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             FinanceChargeRate = 0.015m
         };
 
-        db.Properties.AddRange(primaryProperty, secondaryProperty);
+        // 016-A FR-A1a/A1b transition: an unclaimed property so the new claim-code registration flow
+        // can be exercised. Existing user↔property links below remain valid (no re-claim needed).
+        var unclaimedProperty = new Property
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "SAKURA-003",
+            CommunityId = primaryProperty.CommunityId,
+            CommunityName = primaryProperty.CommunityName,
+            Address = "3 Sakura Drive",
+            City = primaryProperty.City,
+            State = primaryProperty.State,
+            Zip = primaryProperty.Zip,
+            Status = primaryProperty.Status,
+            MonthlyAssessment = primaryProperty.MonthlyAssessment,
+            AnnualAssessment = primaryProperty.AnnualAssessment,
+            AssessmentDueDay = primaryProperty.AssessmentDueDay,
+            LateFeeAmount = primaryProperty.LateFeeAmount,
+            LateFeeGraceDays = primaryProperty.LateFeeGraceDays,
+            FinanceChargeRate = primaryProperty.FinanceChargeRate
+        };
+
+        db.Properties.AddRange(primaryProperty, secondaryProperty, unclaimedProperty);
         await db.SaveChangesAsync(ct);
 
         db.UserProperties.AddRange(
             new UserProperty { UserId = primaryUser.Id, PropertyId = primaryProperty.Id },
             new UserProperty { UserId = secondaryUser.Id, PropertyId = secondaryProperty.Id });
         await db.SaveChangesAsync(ct);
+
+        var claimCodes = new Features.Auth.ClaimCodeService(
+            db,
+            services.GetRequiredService<Features.Auth.IAuthNotifier>(),
+            services.GetRequiredService<ILogger<Features.Auth.ClaimCodeService>>());
+        await claimCodes.IssueAsync(unclaimedProperty.Id, "owner-of-sakura-003@seed.local", ct);
 
         return new SeedResult(primaryUser.Id, secondaryUser.Id, primaryProperty.Id, secondaryProperty.Id, CommunityId);
     }

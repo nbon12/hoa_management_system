@@ -188,7 +188,14 @@ jobs:
           # registration test. Point it at this PR's API.
           PLAYWRIGHT_API_URL: ${{ steps.tf.outputs.api_url }}
           DEV_API_BASE_URL: ${{ steps.tf.outputs.api_url }}/api/v1
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
         run: |
+          # /e2e/cleanup requires the shared scheduler secret (017-A FR-A6); PR envs reuse the
+          # shared dev-scheduler-secret. Fetched with the already-authenticated deployer identity.
+          PLAYWRIGHT_SCHEDULER_SECRET="$(gcloud secrets versions access latest --secret="${PREFIX}-scheduler-secret" --project="$PROJECT")"
+          echo "::add-mask::$PLAYWRIGHT_SCHEDULER_SECRET"
+          export PLAYWRIGHT_SCHEDULER_SECRET
           npm run e2e:dev
           npx playwright install --with-deps chromium
           npm run e2e:playwright-dev

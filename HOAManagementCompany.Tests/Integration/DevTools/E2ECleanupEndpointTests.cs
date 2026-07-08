@@ -17,11 +17,35 @@ public class E2ECleanupEnabledTests(TestDatabaseFixture fixture) : IntegrationTe
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
         new Dictionary<string, string?> { ["DevTools:E2ECleanupEnabled"] = "true" };
 
-    [Fact]
-    public async Task Returns_ok_when_enabled()
+    // 017-A FR-A6: the endpoint additionally requires the scheduler shared secret.
+    private const string TestSchedulerSecret = "test-scheduler-shared-secret-placeholder";
+
+    private static HttpRequestMessage CleanupRequest(string? secret)
     {
-        var resp = await Client.DeleteAsync("/api/v1/e2e/cleanup");
+        var req = new HttpRequestMessage(HttpMethod.Delete, "/api/v1/e2e/cleanup");
+        if (secret is not null) req.Headers.Add("X-Scheduler-Secret", secret);
+        return req;
+    }
+
+    [Fact]
+    public async Task Returns_ok_when_enabled_with_valid_secret()
+    {
+        var resp = await Client.SendAsync(CleanupRequest(TestSchedulerSecret));
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Returns_unauthorized_without_secret_even_when_enabled()
+    {
+        var resp = await Client.SendAsync(CleanupRequest(secret: null));
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Returns_unauthorized_with_wrong_secret_even_when_enabled()
+    {
+        var resp = await Client.SendAsync(CleanupRequest("wrong-secret"));
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 }
 

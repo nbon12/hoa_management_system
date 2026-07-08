@@ -14,6 +14,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
     public DbSet<UserProperty> UserProperties => Set<UserProperty>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<EmailVerification> EmailVerifications => Set<EmailVerification>();
+    public DbSet<PropertyClaimCode> PropertyClaimCodes => Set<PropertyClaimCode>();
     public DbSet<Property> Properties => Set<Property>();
     public DbSet<Owner> Owners => Set<Owner>();
     public DbSet<AddressHistory> AddressHistories => Set<AddressHistory>();
@@ -62,6 +64,27 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(x => x.TokenHash).HasMaxLength(64);
             e.HasOne(x => x.User).WithMany(u => u.RefreshTokens)
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 016-A FR-A3: email-verification gate.
+        builder.Entity<EmailVerification>(e =>
+        {
+            e.HasIndex(x => new { x.Email, x.Purpose });
+            e.HasIndex(x => x.ProofHash);
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.Property(x => x.Purpose).HasMaxLength(32);
+            e.Property(x => x.CodeHash).HasMaxLength(64);
+            e.Property(x => x.ProofHash).HasMaxLength(64);
+        });
+
+        // 016-A FR-A1/A1a: one live (unredeemed) claim code per property.
+        builder.Entity<PropertyClaimCode>(e =>
+        {
+            e.HasIndex(x => x.PropertyId).IsUnique().HasFilter("\"RedeemedAt\" IS NULL");
+            e.Property(x => x.CodeHash).HasMaxLength(64);
+            e.Property(x => x.DeliveredToContact).HasMaxLength(256);
+            e.HasOne(x => x.Property).WithMany()
+                .HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<Property>(e =>

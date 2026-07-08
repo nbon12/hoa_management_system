@@ -138,6 +138,10 @@ builder.Services.AddIdentityCore<ApplicationUser>(o =>
     o.Password.RequireNonAlphanumeric = true;
     o.Password.RequiredLength = 8;
     o.User.RequireUniqueEmail = true;
+    // 016-A FR-A4: per-account lockout (10 failed attempts → 30-minute lock, config-driven).
+    o.Lockout.AllowedForNewUsers = true;
+    o.Lockout.MaxFailedAccessAttempts = builder.Configuration.GetValue("Identity:Lockout:MaxFailedAttempts", 10);
+    o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(builder.Configuration.GetValue("Identity:Lockout:LockoutMinutes", 30));
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
@@ -158,6 +162,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            // 016-A FR-A7: pin the signing algorithm (symmetric HS256) and tighten clock skew.
+            ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+            ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = ClaimTypes.NameIdentifier
         };
     });
@@ -323,6 +330,21 @@ if (startupOptions.EnableSwagger)
 
 // ── Feature Services ───────────────────────────────────────────────────────
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.AuthService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.EmailVerificationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.ClaimCodeService>();
+// Verification/claim-code delivery: SendGrid email when configured, otherwise audit-log only
+// (local dev / CI, where no SendGrid credentials exist).
+builder.Services.AddScoped<HOAManagementCompany.Features.Auth.IAuthNotifier>(sp =>
+{
+    var emailProvider = sp.GetServices<HOAManagementCompany.Infrastructure.Payments.Alerts.IAlertProvider>()
+        .FirstOrDefault(p => p.Channel == "email");
+    return emailProvider is { IsConfigured: true }
+        ? new HOAManagementCompany.Features.Auth.EmailAuthNotifier(
+            emailProvider,
+            sp.GetRequiredService<ILogger<HOAManagementCompany.Features.Auth.EmailAuthNotifier>>())
+        : new HOAManagementCompany.Features.Auth.LoggingAuthNotifier(
+            sp.GetRequiredService<ILogger<HOAManagementCompany.Features.Auth.LoggingAuthNotifier>>());
+});
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.PaymentService>();
 // Stripe payments (006-stripe-payments). Gateway is the network adapter; the rest is testable logic.
