@@ -14,9 +14,13 @@ export async function establishSession(
   password = SEED_PASSWORD,
 ): Promise<void> {
   const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
-  const res = await page.request.post(`${apiBase}/api/v1/auth/login`, {
-    data: { email, password },
-  });
+  // Parallel workers can burst past the per-IP auth rate limit (fixed 1-minute window);
+  // back off briefly on 429 instead of flaking the test.
+  let res = await page.request.post(`${apiBase}/api/v1/auth/login`, { data: { email, password } });
+  for (let attempt = 0; res.status() === 429 && attempt < 3; attempt++) {
+    await new Promise(r => setTimeout(r, 15_000 * (attempt + 1)));
+    res = await page.request.post(`${apiBase}/api/v1/auth/login`, { data: { email, password } });
+  }
   if (!res.ok()) {
     throw new Error(`establishSession: login failed with ${res.status()}`);
   }

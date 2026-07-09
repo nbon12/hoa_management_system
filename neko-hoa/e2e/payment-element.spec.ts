@@ -1,4 +1,5 @@
 import { test, expect, FrameLocator, Page } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 /**
  * T093 — Stripe Payment Element iframe interaction (constitution §9).

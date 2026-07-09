@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page, type APIRequestContext } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 // ─── Announcements + Poll vote ────────────────────────────────────────────────
 
