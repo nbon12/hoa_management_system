@@ -128,6 +128,22 @@ neko-hoa/
 3. **CSP breakage**: mitigated by exact-origin stamping + Cypress payment flow under the served policy in CI before deploy.
 4. **PR-preview cookies**: `SameSite=None` required there; covered by config-driven attribute + existing per-PR Playwright login smoke as the live proof.
 
+## Amendment 2026-07-08 — US4: signup UI for the reworked register contract
+
+Closes the flagged program gap (Risks §2). Design:
+
+- **Frontend**: `register.component.ts` rebuilt as the real 3-step flow — (1) email → `POST /auth/verify-email/request`; (2) 6-digit code → `POST /auth/verify-email/confirm` → proof token held in memory; (3) names + password + claim code → `POST /auth/register` (cookie session via US1 plumbing) → dashboard. Account-number lookup and the mocked "find property" panel are removed (FR-D9). All failures render one generic message (FR-D10). `AuthService.register` signature becomes `(verificationToken, password, firstName, lastName, claimCode)`.
+- **Backend test seams (FR-D11)**: raw codes exist only inside the notifier call (stored hashed), so: `AuthCodeVault` (in-memory singleton) + `VaultingAuthNotifier` decorator registered **only when `DevTools:E2ECleanupEnabled`**; `GET /e2e/auth-codes?contact=` returns the vaulted verification/claim codes for a contact; `POST /e2e/claim-code` issues a fresh code for the seed property (SAKURA-003) via the existing `ClaimCodeService.IssueAsync` (which supersedes prior codes) and returns the raw. Both endpoints copy `E2ECleanupEndpoint`'s gates verbatim: Production/Staging hard block → config flag → constant-time `X-Scheduler-Secret`.
+- **Tests**: backend integration (gates + vault + issue round-trip); Karma (`auth.service.spec` register contract); Cypress `registration.cy.ts` (mocked 3-step happy path + generic failure); Playwright `auth.spec.ts` register test rewritten to drive the real flow using the gated seams (secret already plumbed as `PLAYWRIGHT_SCHEDULER_SECRET`). Registration stays out of `@smoke` (mutating; smoke curation rules).
+
+### Test Map additions
+
+| FR | Test |
+|----|------|
+| FR-D9 | Cypress `registration.cy.ts` happy path; Playwright `auth.spec.ts` deployed flow; `auth.service.spec` contract |
+| FR-D10 | Cypress generic-failure case |
+| FR-D11 | `E2EAuthSupportTests` (404 in prod-like/flag-off, 401 without secret, codes returned with secret) |
+
 ## Complexity Tracking
 
 No constitution violations — table not required.

@@ -83,6 +83,27 @@
 - [X] T025 Full verification: `dotnet test` (Category!=Sandbox), `npm run test:ci`, `npm run build` + stamped-headers check, `npm run e2e:ci`; confirm deployed smoke expectations unchanged. Explicitly confirm the existing boot-time config-guard specs stay green — `neko-hoa/src/app/core/config/runtime-config.validator.spec.ts` (FR-D8 preservation; analysis C3).
 - [X] T026 Pre-PR freshness gate (constitution §11): update this feature's `spec.md` + `tasks.md` to match work actually performed; verify no older spec.md drifted (016 umbrella contract supersession noted in T014).
 
+## Phase 7: User Story 4 — Register with verified email and claim code (P2, amended 2026-07-08)
+
+**Goal**: Real signup UI for A's register contract + gated e2e code seams (FR-D9/D10/D11).
+
+**Independent test**: UI completes verification → claim-code registration end-to-end; invalid inputs render one generic message; e2e seams answer only behind the cleanup-style gates.
+
+### Tests (write first — must fail)
+
+- [ ] T027 [P] [US4] Backend integration test `HOAManagementCompany.Tests/Integration/DevTools/E2EAuthSupportTests.cs`: `GET /e2e/auth-codes` and `POST /e2e/claim-code` return 404 when flag off, 401 without/with wrong secret; with secret: claim-code issue returns a raw code redeemable via registration, auth-codes returns the verification code delivered for a contact (vault). Gate parity with `E2ECleanupEndpointTests`.
+- [ ] T028 [P] [US4] Cypress e2e `neko-hoa/cypress/e2e/registration.cy.ts`: mocked 3-step flow — request code → confirm → register (cookie-session response) → dashboard; wrong-code and failed-register cases render the same generic message (FR-D10); no account-number field anywhere (FR-D9).
+
+### Implementation
+
+- [ ] T029 [US4] Backend seams: `Features/DevTools/AuthCodeVault.cs` (singleton) + `VaultingAuthNotifier` decorator (registered only when `DevTools:E2ECleanupEnabled`) in `HOAManagementCompany/Program.cs`; `Features/DevTools/E2EAuthCodesEndpoint.cs` (`GET /e2e/auth-codes?contact=`) and `E2EClaimCodeEndpoint.cs` (`POST /e2e/claim-code`, issues via `ClaimCodeService.IssueAsync` for the seed property) with `E2ECleanupEndpoint`-identical gating (FR-D11).
+- [ ] T030 [US4] `neko-hoa/src/app/core/services/auth.service.ts`: `register(verificationToken, password, firstName, lastName, claimCode)` + `requestEmailVerification(email)` + `confirmEmailVerification(email, code)`; update `auth.service.spec.ts` accordingly.
+- [ ] T031 [US4] Rebuild `neko-hoa/src/app/features/auth/register.component.ts` as the 3-step verified flow (FR-D9, generic errors FR-D10); remove account-number/mock-lookup content.
+- [ ] T032 [US4] Rewrite the Playwright register test in `neko-hoa/e2e/auth.spec.ts` to drive the real flow: fetch claim code via `POST /e2e/claim-code`, request verification in UI, fetch delivered code via `GET /e2e/auth-codes`, complete registration; uses `PLAYWRIGHT_SCHEDULER_SECRET` (already plumbed). Not `@smoke` (mutating).
+- [ ] T033 [US4] Verification + freshness: backend suite (Category!=Sandbox), `npm run test:ci`, `npm run e2e:ci` green; spec/tasks ledger updated.
+
+**Checkpoint**: US4 independently deliverable — A+D merge-blocking gap closed.
+
 ## Dependencies & Execution Order
 
 - **Phase 1 → 2 → 3**: T001 (branch sync) before backend tasks; T002 before T003/T008.
@@ -117,4 +138,5 @@ T001 → T002 → { T003..T007 (P) } → T008..T014 → US1 ✓
 | US2 (P2) | 4 (1 test, 3 impl/ops) |
 | US3 (P3) | 5 (2 tests, 3 impl) |
 | Polish | 3 |
-| **Total** | **26** |
+| US4 (P2, amended) | 7 (2 tests, 5 impl) |
+| **Total** | **33** |

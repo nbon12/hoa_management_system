@@ -18,6 +18,10 @@ The Angular frontend has a clean XSS posture (no unsafe HTML sinks) and a textbo
 - Q: Should the refresh-token cookie persist across browser restarts, and for how long? → A: Persistent cookie, Max-Age = existing 30-day refresh-token lifetime — preserves current "stay signed in" UX; no remember-me UI in this slice.
 - Q: How should the enforced CSP handle per-environment API origins (Dev vs per-PR envs)? → A: Per-build injection — the pipeline stamps each deployment's exact API origin into the headers file; no wildcards; PR previews keep the same enforcing posture as Dev.
 
+### Session 2026-07-08
+
+- Q: Where does the signup UI consuming sub-spec A's reworked `/auth/register` contract (verification proof + claim code) live? It was specced nowhere — a program gap found during /speckit.analyze and A/D merge planning. → A: Amended into this sub-spec as User Story 4: the registration flow is frontend session security surface, and A+D must land together anyway. Includes the non-production, secret-gated e2e code-retrieval seams needed to keep the deployed registration e2e alive (codes are stored hashed and are otherwise irretrievable).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Contain credential theft from script compromise (Priority: P1)
@@ -72,6 +76,20 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 - The CSP must allow the payment provider's script and frame origins and the API connect origin, or payments and API calls break.
 - Invalidating the committed refresh token must not disrupt legitimate CI e2e runs that regenerate their own auth state at runtime.
 
+### User Story 4 - Register with verified email and claim code (Priority: P2, amended 2026-07-08)
+
+As a new resident, I complete registration by proving control of my email address and presenting the claim code the HOA delivered to the owner contact on file, so that property claiming is entitled rather than guessable (sub-spec A's FR-A1 contract) and I land signed in.
+
+**Why this priority**: Sub-spec A removed account-number-only claiming from the backend; without this story the shipped signup UI posts a contract the backend rejects — A+D cannot reach a shared environment.
+
+**Independent Test**: Through the UI: request a code for an email, enter the delivered code, submit names/password/claim code — account is created, session established (cookie), dashboard renders. Wrong or missing codes produce only generic failures.
+
+**Acceptance Scenarios**:
+
+1. **Given** an unclaimed property with an issued claim code, **When** a user completes email verification and submits valid registration details with that claim code, **Then** the account is created, the session is established via the HttpOnly-cookie flow, and the dashboard renders.
+2. **Given** any invalid input (wrong verification code, expired proof, wrong/used claim code), **When** the user submits, **Then** the UI shows a generic failure with no hint distinguishing which element failed.
+3. **Given** the deployed Dev/PR e2e suite, **When** the registration test runs, **Then** it obtains its codes only through non-production, secret-gated test-support endpoints (never from production surfaces or logs).
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -84,6 +102,9 @@ Document-open and outbound-link flows follow safe ordering/attributes, token par
 - **FR-D6**: Document-open and outbound-link flows MUST use safe opener handling and no-opener/no-referrer attributes; token-expiry parsing MUST correctly handle URL-safe token encodings.
 - **FR-D7**: Dead starter-template content and non-functional authentication controls MUST be removed from shipped bundles.
 - **FR-D8**: Only publishable payment-provider keys may appear in frontend configuration; the existing boot-time guard that refuses to start without the production publishable key MUST be preserved.
+- **FR-D9**: The registration UI MUST implement the multi-step flow of the reworked register contract — request email verification, confirm the delivered code (yielding a proof), then submit registration details including the claim code — and MUST NOT offer an account-number-only claiming path. *(Amended 2026-07-08 — closes the A/D signup gap.)*
+- **FR-D10**: Registration failure messaging in the UI MUST stay generic (mirroring the backend's uniform responses) — no message may distinguish whether the email, verification code, or claim code was at fault.
+- **FR-D11**: E2E test support for registration (retrieving a claim code or delivered verification code) MUST be available only via endpoints gated exactly like the e2e cleanup endpoint (config flag + shared secret + hard-blocked in Production/Staging); raw codes MUST NOT be exposed through any production surface or log.
 
 ### Key Entities
 
