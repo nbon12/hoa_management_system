@@ -1,0 +1,14 @@
+# 020-D FR-D2 — enforcing CSP + security-header baseline for Cloudflare Pages.
+# <!-- REPOWISE:START section=csp -->
+# Origins: 'self' (app), __API_ORIGIN__ (stamped per deployment by scripts/stamp-headers.mjs —
+# Dev, Pages previews, and per-PR envs each get their exact API origin; telemetry rides the API
+# origin), js.stripe.com (Stripe.js + Elements frames), hooks.stripe.com (3DS/redirect frames),
+# api.stripe.com (Stripe.js XHR). style-src allows inline because Angular injects component
+# styles as <style> tags. The placeholder is fail-closed: left unstamped, connect-src matches
+# nothing and the deployed smoke fails loudly rather than shipping an open policy.
+# <!-- REPOWISE:END -->
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://js.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; connect-src 'self' __API_ORIGIN__ https://api.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

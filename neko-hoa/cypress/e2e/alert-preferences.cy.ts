@@ -26,16 +26,25 @@ function fakeStripe() {
   };
 }
 
+const REFRESH_SESSION = {
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.fake',
+  expiresAt: '2099-01-01T00:00:00Z',
+  user: {
+    id: 'u1', firstName: 'Nico', lastName: 'Tester', email: 'nico@example.com',
+    initials: 'NT', properties: [],
+  },
+};
+
 function seedAuthAndStripe(win: Window) {
-  win.localStorage.setItem('neko_user', JSON.stringify({
-    id: 'u1', firstName: 'Nico', lastName: 'Tester', email: 'nico@example.com', initials: 'NT',
-  }));
-  win.localStorage.setItem('neko_refresh', 'fake-refresh-token');
+  // 020-D FR-D1: sessions re-hydrate via the hint-gated silent refresh — the hint below
+  // makes APP_INITIALIZER call /auth/refresh, which the intercept in beforeEach answers.
+  win.localStorage.setItem('neko_has_session', '1');
   (win as unknown as { Stripe: () => unknown }).Stripe = () => fakeStripe();
 }
 
 describe('Payment alert preferences (opt-in / opt-out)', () => {
   beforeEach(() => {
+    cy.intercept('POST', '**/auth/refresh', { statusCode: 200, body: REFRESH_SESSION }).as('refresh');
     // Auto-pay page scaffolding (not under test here) — keep it quiet.
     cy.intercept('GET', '**/api/*/payments/recurring', { statusCode: 204, body: '' }).as('getRecurring');
     cy.intercept('GET', '**/api/*/payments/drafts*',

@@ -155,6 +155,9 @@ jobs:
           sed -i "s#https://pr-env-api-origin.invalid#${API_URL}#" src/environments/environment.pr-preview.ts
           npm ci
           npm run build -- --configuration pr-preview
+          # 020-D FR-D2: stamp the enforcing CSP with this PR's API origin (same posture as Dev).
+          node scripts/stamp-headers.mjs "${API_URL}"
+          node scripts/stamp-headers.test.mjs dist/neko-hoa/browser/_headers
           npx wrangler pages deploy dist/neko-hoa/browser --project-name=nekohoa-dev --branch="pr-${PRN}"
 
       # 8. US1 real-resource proof: confirm the PR's checks ran against the REAL per-PR Neon branch + R2

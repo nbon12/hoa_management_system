@@ -129,6 +129,9 @@ jobs:
       - name: Unit tests (headless)
         run: npm run test:ci
 
+      - name: CSP headers template check (020-D FR-D2)
+        run: npm run test:headers
+
       - name: Build
         run: npm run build
 
@@ -315,6 +318,9 @@ jobs:
         run: |
           npm ci
           npm run build -- --configuration=dev
+          # 020-D FR-D2: stamp the enforcing CSP with Dev's API origin (matches environment.dev.ts).
+          node scripts/stamp-headers.mjs https://api-dev.nekohoa.com
+          node scripts/stamp-headers.test.mjs dist/neko-hoa/browser/_headers
 
       - name: Deploy frontend preview (Cloudflare Pages)
         id: pages

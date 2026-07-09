@@ -156,6 +156,10 @@
 
 ---
 
+> **SUPERSEDED (2026-07-08)**: US5 (sub-spec D) is now planned and tracked in
+> `specs/020-security-hardening-subspec-d/tasks.md` (T001–T026). The tasks below are retained
+> for historical context only — do not execute from this list.
+
 ## Phase 7: User Story 5 — D: Frontend Session & Content Security (High)
 
 **Goal**: Move the refresh token to an HttpOnly cookie (full end-state), enforce a repo-controlled CSP, scope the interceptor + single-flight refresh, remove committed auth-state.

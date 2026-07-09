@@ -20,15 +20,24 @@ const TRANSACTIONS = {
   totalCount: 2, limit: 20, offset: 0,
 };
 
+const REFRESH_SESSION = {
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.fake',
+  expiresAt: '2099-01-01T00:00:00Z',
+  user: {
+    id: 'u1', firstName: 'Nico', lastName: 'Tester', email: 'nico@example.com',
+    initials: 'NT', properties: [],
+  },
+};
+
 function seedAuth(win: Window) {
-  win.localStorage.setItem('neko_user', JSON.stringify({
-    id: 'u1', firstName: 'Nico', lastName: 'Tester', email: 'nico@example.com', initials: 'NT',
-  }));
-  win.localStorage.setItem('neko_refresh', 'fake-refresh-token');
+  // 020-D FR-D1: sessions re-hydrate via the hint-gated silent refresh — the hint below
+  // makes APP_INITIALIZER call /auth/refresh, which the intercept in beforeEach answers.
+  win.localStorage.setItem('neko_has_session', '1');
 }
 
 describe('Payment history (statement Payments tab)', () => {
   beforeEach(() => {
+    cy.intercept('POST', '**/auth/refresh', { statusCode: 200, body: REFRESH_SESSION }).as('refresh');
     // Scope intercepts to the API host so they never hijack the SPA navigation URL.
     cy.intercept('GET', '**/api/*/payments/ledger*', { statusCode: 200, body: LEDGER_PAGE }).as('getLedger');
     cy.intercept('POST', '**/telemetry', { statusCode: 200, body: {} });
