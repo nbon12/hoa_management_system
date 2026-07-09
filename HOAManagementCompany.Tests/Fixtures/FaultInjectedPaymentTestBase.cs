@@ -1,4 +1,3 @@
-using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
@@ -6,8 +5,8 @@ using HOAManagementCompany.Tests.Factories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using HOAManagementCompany.Infrastructure.Payments;
 using Npgsql;
-using Stripe;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
 
 namespace HOAManagementCompany.Tests.Fixtures;
@@ -83,42 +82,31 @@ public abstract class FaultInjectedPaymentTestBase(TestDatabaseFixture fixture) 
         return txn;
     }
 
-    // ── Stripe event builders (mirrors WebhookProcessorTests conventions) ─────────────────
+    // ── Neutral provider-event builders (015 FR-021: handlers are testable without SDK types) ──
 
-    protected static Event Evt(string type, object dataObject) => EventUtility.ParseEvent(
-        JsonSerializer.Serialize(new
-        {
-            id = $"evt_{Guid.NewGuid():N}",
-            @object = "event",
-            type,
-            api_version = StripeConfiguration.ApiVersion,
-            request = (string?)null,
-            data = new { @object = dataObject },
-        }));
+    protected static PaymentProviderEvent SucceededEvent(string intentId, string chargeId) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.PaymentSucceeded, "payment_intent.succeeded",
+        PaymentIntentId: intentId, LatestChargeId: chargeId);
 
-    protected static Event SucceededEvent(string intentId, string chargeId) => Evt(
-        "payment_intent.succeeded",
-        new { id = intentId, @object = "payment_intent", latest_charge = chargeId });
+    protected static PaymentProviderEvent AchReturnEvent(string intentId) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.PaymentFailed, "payment_intent.payment_failed",
+        PaymentIntentId: intentId, FailureCode: "R01", FailureMessage: "insufficient funds");
 
-    protected static Event AchReturnEvent(string intentId) => Evt(
-        "payment_intent.payment_failed",
-        new { id = intentId, @object = "payment_intent", last_payment_error = new { code = "R01", message = "insufficient funds" } });
+    protected static PaymentProviderEvent RefundEvent(string chargeId, long amountRefundedCents) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.Refunded, "charge.refunded",
+        ChargeId: chargeId, AmountRefunded: amountRefundedCents / 100m);
 
-    protected static Event RefundEvent(string chargeId, long amountRefundedCents) => Evt(
-        "charge.refunded",
-        new { id = chargeId, @object = "charge", amount_refunded = amountRefundedCents });
+    protected static PaymentProviderEvent DisputeCreatedEvent(string chargeId) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.DisputeCreated, "charge.dispute.created",
+        ChargeId: chargeId, DisputeId: $"dp_{Guid.NewGuid():N}", DisputeStatus: "warning_needs_response");
 
-    protected static Event DisputeCreatedEvent(string chargeId) => Evt(
-        "charge.dispute.created",
-        new { id = $"dp_{Guid.NewGuid():N}", @object = "dispute", charge = chargeId, status = "warning_needs_response" });
-
-    protected static Event DisputeClosedEvent(string chargeId, string status) => Evt(
-        "charge.dispute.closed",
-        new { id = $"dp_{Guid.NewGuid():N}", @object = "dispute", charge = chargeId, status });
+    protected static PaymentProviderEvent DisputeClosedEvent(string chargeId, string status) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.DisputeClosed, "charge.dispute.closed",
+        ChargeId: chargeId, DisputeId: $"dp_{Guid.NewGuid():N}", DisputeStatus: status);
 
     /// <summary>Runs one webhook delivery in its own DI scope — a fresh DbContext, exactly like
     /// a real delivery or reconcile retry. Returns the thrown exception, if any.</summary>
-    protected async Task<Exception?> DeliverAsync(Event evt)
+    protected async Task<Exception?> DeliverAsync(PaymentProviderEvent evt)
     {
         using var scope = Services.CreateScope();
         var processor = scope.ServiceProvider

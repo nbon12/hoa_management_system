@@ -7,7 +7,6 @@ using HOAManagementCompany.Infrastructure.Observability;
 using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Stripe;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
 
 namespace HOAManagementCompany.Features.Payments.Webhooks;
@@ -38,37 +37,36 @@ public sealed class WebhookProcessor(
     PaymentMetrics metrics,
     ILogger<WebhookProcessor> logger)
 {
-    public async Task ProcessAsync(Event evt, CancellationToken ct = default)
+    public async Task ProcessAsync(PaymentProviderEvent evt, CancellationToken ct = default)
     {
-        switch (evt.Type)
+        switch (evt.Kind)
         {
-            case "payment_intent.succeeded":
-                await HandleSucceededAsync((PaymentIntent)evt.Data.Object, ct);
+            case PaymentProviderEventKind.PaymentSucceeded:
+                await HandleSucceededAsync(evt, ct);
                 break;
-            case "payment_intent.payment_failed":
-                await HandleFailedAsync((PaymentIntent)evt.Data.Object, ct);
+            case PaymentProviderEventKind.PaymentFailed:
+                await HandleFailedAsync(evt, ct);
                 break;
-            case "charge.refunded":
-            case "charge.refund.updated":
-                await HandleRefundAsync((Charge)evt.Data.Object, ct);
+            case PaymentProviderEventKind.Refunded:
+                await HandleRefundAsync(evt, ct);
                 break;
-            case "charge.dispute.created":
-                await HandleDisputeCreatedAsync((Dispute)evt.Data.Object, ct);
+            case PaymentProviderEventKind.DisputeCreated:
+                await HandleDisputeCreatedAsync(evt, ct);
                 break;
-            case "charge.dispute.closed":
-                await HandleDisputeClosedAsync((Dispute)evt.Data.Object, ct);
+            case PaymentProviderEventKind.DisputeClosed:
+                await HandleDisputeClosedAsync(evt, ct);
                 break;
             default:
-                logger.LogInformation("Unhandled Stripe event type {EventType} ({EventId})", evt.Type, evt.Id);
+                logger.LogInformation("Unhandled provider event type {EventType} ({EventId})", evt.RawType, evt.EventId);
                 break;
         }
     }
 
-    private async Task HandleSucceededAsync(PaymentIntent pi, CancellationToken ct)
+    private async Task HandleSucceededAsync(PaymentProviderEvent evt, CancellationToken ct)
     {
-        var txn = await FindByIntentAsync(pi.Id, ct);
-        if (txn is null) { LogUnknown("payment_intent.succeeded", pi.Id); return; }
-        await SettleSucceededAsync(txn, pi.LatestChargeId, ct);
+        var txn = await FindByIntentAsync(evt.PaymentIntentId!, ct);
+        if (txn is null) { LogUnknown(evt.RawType, evt.PaymentIntentId!); return; }
+        await SettleSucceededAsync(txn, evt.LatestChargeId, ct);
     }
 
     /// <summary>
@@ -110,12 +108,10 @@ public sealed class WebhookProcessor(
         if (settled) metrics.RecordPaymentProcessed("succeeded");
     }
 
-    private async Task HandleFailedAsync(PaymentIntent pi, CancellationToken ct)
+    private async Task HandleFailedAsync(PaymentProviderEvent evt, CancellationToken ct)
     {
-        var txn = await FindByIntentAsync(pi.Id, ct);
-        if (txn is null) { LogUnknown("payment_intent.payment_failed", pi.Id); return; }
-
-        var error = pi.LastPaymentError;
+        var txn = await FindByIntentAsync(evt.PaymentIntentId!, ct);
+        if (txn is null) { LogUnknown(evt.RawType, evt.PaymentIntentId!); return; }
         string? outcome = null;
         await recorder.ApplyAsync(txn.Id, async (t, innerCt) =>
         {
@@ -125,7 +121,7 @@ public sealed class WebhookProcessor(
                 // A previously-settled ACH debit was returned (e.g. R01 insufficient funds) — FR-014c.
                 // Reversal + NSF fee + alert + status commit together (015 FR-001).
                 t.Status = TransactionStatus.Returned;
-                t.ReturnCode = error?.Code;
+                t.ReturnCode = evt.FailureCode;
                 await ledger.AddCompensatingChargeAsync(t.PropertyId, t.Id, t.GrossAmount,
                     LedgerEntryType.Reversal, $"ACH return – {t.ReturnCode ?? "unknown"}", ct: innerCt);
                 await ApplyNsfFeeAsync(t, innerCt);
@@ -136,8 +132,8 @@ public sealed class WebhookProcessor(
             else if (t.Status is TransactionStatus.Pending or TransactionStatus.Succeeded)
             {
                 t.Status = TransactionStatus.Failed;
-                t.FailureCode = error?.Code;
-                t.FailureMessage = Scrub(error?.Message);
+                t.FailureCode = evt.FailureCode;
+                t.FailureMessage = Scrub(evt.FailureMessage);
                 // Only recurring (off-session) failures alert; a one-time failure is shown inline (FR-015).
                 if (t.IsRecurring)
                     await alerts.EnqueueFailureAlertAsync(t, t.FailureCode, innerCt);
@@ -147,16 +143,16 @@ public sealed class WebhookProcessor(
         if (outcome is not null) metrics.RecordPaymentProcessed(outcome);
     }
 
-    private async Task HandleRefundAsync(Charge charge, CancellationToken ct)
+    private async Task HandleRefundAsync(PaymentProviderEvent evt, CancellationToken ct)
     {
-        var txn = await FindByChargeAsync(charge.Id, ct);
-        if (txn is null) { LogUnknown("charge.refunded", charge.Id); return; }
+        var txn = await FindByChargeAsync(evt.ChargeId!, ct);
+        if (txn is null) { LogUnknown(evt.RawType, evt.ChargeId!); return; }
 
         string? outcome = null;
         await recorder.ApplyAsync(txn.Id, async (t, innerCt) =>
         {
             outcome = null;
-            var cumulative = charge.AmountRefunded / 100m;    // Stripe's cumulative source of truth (FR-014b).
+            var cumulative = evt.AmountRefunded ?? 0m;   // provider's cumulative source of truth (FR-014b), major units.
             var delta = cumulative - t.CumulativeRefundedAmount;
             if (delta <= 0m) return;                          // Idempotent: guard holds the row lock.
 
@@ -164,16 +160,16 @@ public sealed class WebhookProcessor(
             t.Status = cumulative >= t.Total ? TransactionStatus.Refunded : TransactionStatus.PartiallyRefunded;
             // Fee is retained on refund (mirrors Stripe keeping its processing fee, FR-004d).
             await ledger.AddCompensatingChargeAsync(t.PropertyId, t.Id, delta,
-                LedgerEntryType.Refund, $"Refund – {charge.Id}", ct: innerCt);
+                LedgerEntryType.Refund, $"Refund – {evt.ChargeId}", ct: innerCt);
             outcome = t.Status == TransactionStatus.Refunded ? "refunded" : "partially_refunded";
         }, ct);
         if (outcome is not null) metrics.RecordPaymentProcessed(outcome);
     }
 
-    private async Task HandleDisputeCreatedAsync(Dispute dispute, CancellationToken ct)
+    private async Task HandleDisputeCreatedAsync(PaymentProviderEvent evt, CancellationToken ct)
     {
-        var txn = await FindByChargeAsync(dispute.ChargeId, ct);
-        if (txn is null) { LogUnknown("charge.dispute.created", dispute.ChargeId); return; }
+        var txn = await FindByChargeAsync(evt.ChargeId!, ct);
+        if (txn is null) { LogUnknown(evt.RawType, evt.ChargeId!); return; }
 
         var applied = false;
         await recorder.ApplyAsync(txn.Id, async (t, innerCt) =>
@@ -182,30 +178,30 @@ public sealed class WebhookProcessor(
             if (t.Status == TransactionStatus.Disputed) return;
             t.Status = TransactionStatus.Disputed;
             await ledger.AddCompensatingChargeAsync(t.PropertyId, t.Id, t.GrossAmount,
-                LedgerEntryType.Chargeback, $"Dispute opened – {dispute.Id}", ct: innerCt);
+                LedgerEntryType.Chargeback, $"Dispute opened – {evt.DisputeId}", ct: innerCt);
             applied = true;
         }, ct);
         if (applied) metrics.RecordPaymentProcessed("disputed");
     }
 
-    private async Task HandleDisputeClosedAsync(Dispute dispute, CancellationToken ct)
+    private async Task HandleDisputeClosedAsync(PaymentProviderEvent evt, CancellationToken ct)
     {
-        var txn = await FindByChargeAsync(dispute.ChargeId, ct);
-        if (txn is null) { LogUnknown("charge.dispute.closed", dispute.ChargeId); return; }
+        var txn = await FindByChargeAsync(evt.ChargeId!, ct);
+        if (txn is null) { LogUnknown(evt.RawType, evt.ChargeId!); return; }
 
         string? outcome = null;
         await recorder.ApplyAsync(txn.Id, async (t, innerCt) =>
         {
             outcome = null;
-            if (dispute.Status == "won" && t.Status == TransactionStatus.Disputed)
+            if (evt.DisputeStatus == "won" && t.Status == TransactionStatus.Disputed)
             {
                 // Funds restored — undo the chargeback reversal and return to Succeeded.
                 t.Status = TransactionStatus.Succeeded;
                 await ledger.AddPaymentAsync(t.PropertyId, t.Id, t.GrossAmount,
-                    $"Dispute won – funds restored – {dispute.Id}", ct: innerCt);
+                    $"Dispute won – funds restored – {evt.DisputeId}", ct: innerCt);
                 outcome = "dispute_won";
             }
-            else if (dispute.Status == "lost" && t.Status == TransactionStatus.Disputed)
+            else if (evt.DisputeStatus == "lost" && t.Status == TransactionStatus.Disputed)
             {
                 t.Status = TransactionStatus.DisputeLost;   // Reversal already stands from creation.
                 await ApplyNsfFeeAsync(t, innerCt);

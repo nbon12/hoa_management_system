@@ -1,3 +1,4 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Models;

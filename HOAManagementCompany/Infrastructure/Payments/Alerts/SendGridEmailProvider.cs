@@ -1,5 +1,5 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using System.Diagnostics.CodeAnalysis;
-using HOAManagementCompany.Features.Payments;
 using Microsoft.Extensions.Options;
 using SendGrid;
 using SendGrid.Helpers.Mail;

@@ -1,5 +1,5 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using System.Diagnostics.CodeAnalysis;
-using HOAManagementCompany.Features.Payments;
 using Microsoft.Extensions.Options;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;

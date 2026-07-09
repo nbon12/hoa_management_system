@@ -1,12 +1,11 @@
-using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Payments.Webhooks;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using HOAManagementCompany.Infrastructure.Payments;
 using Microsoft.Extensions.DependencyInjection;
-using Stripe;
 using Xunit;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
 
@@ -44,39 +43,27 @@ public class WebhookProcessorTests(TestDatabaseFixture fixture) : PaymentTestBas
         return txn;
     }
 
-    // Build events by serialising anonymous objects — avoids brace-counting hazards of raw-string JSON.
-    private static Event Evt(string type, object dataObject) => EventUtility.ParseEvent(
-        JsonSerializer.Serialize(new
-        {
-            id = $"evt_{Guid.NewGuid():N}",
-            @object = "event",
-            type,
-            // Match the SDK's pinned API version so ParseEvent's compatibility check passes, and include
-            // `request` (null is fine) — Stripe's EventConverter dereferences both unconditionally.
-            api_version = StripeConfiguration.ApiVersion,
-            request = (string?)null,
-            data = new { @object = dataObject },
-        }));
+    // Neutral provider events (015 FR-021): handlers are exercised without any SDK types —
+    // Stripe→neutral mapping itself is covered by ProviderEventMappingTests in the unit tier.
+    private static PaymentProviderEvent SucceededEvent(string intentId, string chargeId) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.PaymentSucceeded, "payment_intent.succeeded",
+        PaymentIntentId: intentId, LatestChargeId: chargeId);
 
-    private static Event SucceededEvent(string intentId, string chargeId) => Evt(
-        "payment_intent.succeeded",
-        new { id = intentId, @object = "payment_intent", latest_charge = chargeId });
+    private static PaymentProviderEvent FailedEvent(string intentId, string code) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.PaymentFailed, "payment_intent.payment_failed",
+        PaymentIntentId: intentId, FailureCode: code, FailureMessage: "declined");
 
-    private static Event FailedEvent(string intentId, string code) => Evt(
-        "payment_intent.payment_failed",
-        new { id = intentId, @object = "payment_intent", last_payment_error = new { code, message = "declined" } });
+    private static PaymentProviderEvent RefundEvent(string chargeId, long amountRefundedCents) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.Refunded, "charge.refunded",
+        ChargeId: chargeId, AmountRefunded: amountRefundedCents / 100m);
 
-    private static Event RefundEvent(string chargeId, long amountRefundedCents) => Evt(
-        "charge.refunded",
-        new { id = chargeId, @object = "charge", amount_refunded = amountRefundedCents });
+    private static PaymentProviderEvent DisputeCreatedEvent(string chargeId) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.DisputeCreated, "charge.dispute.created",
+        ChargeId: chargeId, DisputeId: $"dp_{Guid.NewGuid():N}", DisputeStatus: "warning_needs_response");
 
-    private static Event DisputeCreatedEvent(string chargeId) => Evt(
-        "charge.dispute.created",
-        new { id = $"dp_{Guid.NewGuid():N}", @object = "dispute", charge = chargeId, status = "warning_needs_response" });
-
-    private static Event DisputeClosedEvent(string chargeId, string status) => Evt(
-        "charge.dispute.closed",
-        new { id = $"dp_{Guid.NewGuid():N}", @object = "dispute", charge = chargeId, status });
+    private static PaymentProviderEvent DisputeClosedEvent(string chargeId, string status) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.DisputeClosed, "charge.dispute.closed",
+        ChargeId: chargeId, DisputeId: $"dp_{Guid.NewGuid():N}", DisputeStatus: status);
 
     [Fact]
     public async Task PaymentIntentSucceeded_PendingAch_SettlesWithLedgerAndReceipt()
@@ -206,7 +193,7 @@ public class WebhookProcessorTests(TestDatabaseFixture fixture) : PaymentTestBas
     {
         using var scope = Services.CreateScope();
         var processor = scope.ServiceProvider.GetRequiredService<WebhookProcessor>();
-        var evt = Evt("customer.created", new { id = "cus_x", @object = "customer" });
+        var evt = new PaymentProviderEvent($"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.Ignored, "customer.created");
         await processor.ProcessAsync(evt);   // must not throw
     }
 

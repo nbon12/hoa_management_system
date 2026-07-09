@@ -1,3 +1,4 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Payments.Webhooks;
 using HOAManagementCompany.Infrastructure.Payments;
@@ -5,7 +6,6 @@ using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Sentry;
-using Stripe;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
 
 namespace HOAManagementCompany.Features.Payments.Jobs;
@@ -101,7 +101,7 @@ public sealed class ReconciliationService(
             inbox.Attempts++;
             try
             {
-                var evt = EventUtility.ParseEvent(inbox.Payload);
+                var evt = gateway.ParseStoredEvent(inbox.Payload);
                 await processor.ProcessAsync(evt, ct);
                 inbox.Status = WebhookProcessingStatus.Processed;
                 inbox.ProcessedAt = DateTimeOffset.UtcNow;

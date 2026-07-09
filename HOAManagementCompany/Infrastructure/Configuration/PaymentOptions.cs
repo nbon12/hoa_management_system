@@ -1,7 +1,8 @@
-namespace HOAManagementCompany.Features.Payments;
+namespace HOAManagementCompany.Infrastructure.Configuration;
 
 /// <summary>
-/// Strongly-typed configuration for the payments feature (006-stripe-payments).
+/// Strongly-typed configuration for the payments integrations (006-stripe-payments; moved out of
+/// the feature slice in 015 US5 so Infrastructure adapters/validators never depend on Features).
 /// Bound from the <c>Stripe</c>, <c>Payments</c>, <c>Jobs</c>, <c>Twilio</c>, and
 /// <c>SendGrid</c> config sections. Secrets live in appsettings.Secrets.json (local) or
 /// environment variables (deployed); appsettings.json carries only non-secret defaults.

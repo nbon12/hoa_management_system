@@ -1,5 +1,6 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Domain.Payments;
 using HOAManagementCompany.Features.Payments.Ledger;
 using HOAManagementCompany.Features.Payments.Models;
 using HOAManagementCompany.Features.Payments.Services;
@@ -132,13 +133,13 @@ public sealed class RecurringDraftService(
 
             var config = await configService.GetForPropertyAsync(r.PropertyId, ct);
             var fee = feeCalculator.Calculate(gross, r.Method, r.MethodFunding, config);
-            var amountCents = (long)Math.Round(fee.Total * 100m, MidpointRounding.AwayFromZero);
+            var amountCents = MoneyPolicy.ToCents(fee.Total);
 
             var result = await gateway.ChargeOffSessionAsync(new CreateOffSessionChargeRequest(
                 owner.StripeCustomerId!,
                 r.VaultedPaymentMethodId!,
                 amountCents,
-                "usd",
+                MoneyPolicy.Currency,
                 new Dictionary<string, string>
                 {
                     ["propertyId"] = r.PropertyId.ToString(),

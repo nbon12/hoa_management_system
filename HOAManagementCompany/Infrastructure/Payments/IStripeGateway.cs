@@ -1,5 +1,4 @@
 using HOAManagementCompany.Domain.Enums;
-using Stripe;
 
 namespace HOAManagementCompany.Infrastructure.Payments;
 
@@ -78,8 +77,17 @@ public interface IStripeGateway
     /// <summary>Fetches settlement detail for a charge (balance transaction, processor fee, payout).</summary>
     Task<StripeChargeResult?> GetChargeAsync(string chargeId, CancellationToken ct = default);
 
-    /// <summary>Verifies the webhook signature and returns the parsed event, or throws on failure.</summary>
-    Event ConstructEvent(string json, string signatureHeader);
+    /// <summary>
+    /// Verifies the webhook signature and returns the gateway-neutral event (015 FR-021).
+    /// Throws <see cref="ProviderSignatureVerificationException"/> on an invalid signature.
+    /// </summary>
+    PaymentProviderEvent ParseEvent(string json, string signatureHeader);
+
+    /// <summary>
+    /// Parses a durably-stored inbox payload (already signature-verified at ingress) into the
+    /// gateway-neutral event — the reconcile retry path (FR-033).
+    /// </summary>
+    PaymentProviderEvent ParseStoredEvent(string json);
 
     /// <summary>
     /// Returns the Stripe customer id for a resident, creating one if <paramref name="existingCustomerId"/>

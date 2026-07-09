@@ -43,7 +43,7 @@ Gateway-neutral inbound event, produced by `StripeGateway.ParseEvent`, consumed 
 | Field | Type | Notes |
 |-------|------|-------|
 | `EventId` | string | provider event id (inbox dedupe key) |
-| `Kind` | enum `PaymentProviderEventKind` | `PaymentSucceeded`, `PaymentFailed`, `AchReturned`, `Refunded`, `DisputeUpdated` |
+| `Kind` | enum `PaymentProviderEventKind` | `PaymentSucceeded`, `PaymentFailed`, `Refunded`, `DisputeCreated`, `DisputeClosed`, `Ignored` |
 | `PaymentIntentId` | string? | correlation to `PaymentTransaction` |
 | `ChargeId` | string? | |
 | `Amount` / `AmountRefunded` | decimal? | major units (converted at the gateway; `/100m` lives only in `StripeGateway`) |
@@ -51,7 +51,7 @@ Gateway-neutral inbound event, produced by `StripeGateway.ParseEvent`, consumed 
 | `DisputeStatus` | string? | |
 | `RawType` | string | original provider event type, for logging only |
 
-Validation: `Kind` mapping is exhaustive at the gateway; unknown provider event types are not emitted (inbox row still recorded, marked processed-as-ignored — current behavior preserved).
+Validation: `Kind` mapping is exhaustive at the gateway (`StripeEventTranslator`); unknown provider event types map to `Ignored` (inbox row still recorded, marked processed-as-ignored — current behavior preserved). Note: it lives in `Infrastructure/Payments` beside the other gateway-neutral DTOs (not in Features) so returning it from the gateway cannot invert the Infrastructure↛Features rule.
 
 ### DomainException (MOVED, FR-007)
 

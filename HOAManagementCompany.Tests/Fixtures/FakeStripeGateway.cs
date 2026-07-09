@@ -80,11 +80,15 @@ public sealed class FakeStripeGateway : IStripeGateway
     /// signature check (the real adapter throws <see cref="StripeException"/>); otherwise the raw
     /// JSON is parsed without signature verification.
     /// </summary>
-    public Event ConstructEvent(string json, string signatureHeader)
+    public PaymentProviderEvent ParseEvent(string json, string signatureHeader)
     {
-        if (signatureHeader == "invalid") throw new StripeException("Invalid signature");
-        return EventUtility.ParseEvent(json);
+        if (signatureHeader == "invalid")
+            throw new ProviderSignatureVerificationException("Invalid signature");
+        return StripeEventTranslator.Translate(EventUtility.ParseEvent(json));
     }
+
+    public PaymentProviderEvent ParseStoredEvent(string json) =>
+        StripeEventTranslator.Translate(EventUtility.ParseEvent(json));
 
     public Task<string> EnsureCustomerAsync(string? existingCustomerId, string email, string? name, CancellationToken ct = default) =>
         Task.FromResult(string.IsNullOrWhiteSpace(existingCustomerId) ? $"cus_test_{Guid.NewGuid():N}" : existingCustomerId);

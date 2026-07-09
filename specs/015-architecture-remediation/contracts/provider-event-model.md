@@ -17,11 +17,11 @@ IStripeGateway.ParseEvent(json: string, signatureHeader: string) : PaymentProvid
 | Provider event type | `Kind` |
 |---------------------|--------|
 | `payment_intent.succeeded` | `PaymentSucceeded` |
-| `payment_intent.payment_failed` | `PaymentFailed` |
-| `charge.refunded` | `Refunded` |
-| ACH return (failed charge with return code) | `AchReturned` |
-| `charge.dispute.*` | `DisputeUpdated` |
-| anything else | not emitted — inbox row recorded and marked processed-as-ignored (current behavior preserved) |
+| `payment_intent.payment_failed` | `PaymentFailed` (an ACH return is decided locally from the transaction's state — settled ACH + failure ⇒ return; the provider event carries no distinct type) |
+| `charge.refunded` / `charge.refund.updated` | `Refunded` |
+| `charge.dispute.created` | `DisputeCreated` |
+| `charge.dispute.closed` | `DisputeClosed` |
+| anything else | `Ignored` — inbox row recorded and marked processed-as-ignored (current behavior preserved) |
 
 ## Consumer guarantees
 

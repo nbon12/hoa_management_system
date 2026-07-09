@@ -1,3 +1,4 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Features.Payments.Services;

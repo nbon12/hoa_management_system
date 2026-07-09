@@ -1,3 +1,4 @@
+using HOAManagementCompany.Domain.Payments;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 
@@ -55,7 +56,7 @@ public sealed class FeeCalculator
                 : 0m;
         }
 
-        fee = Math.Round(fee, 2, MidpointRounding.AwayFromZero);
+        fee = Math.Round(fee, 2, MoneyPolicy.Rounding);
         return new FeeResult(gross, fee, gross + fee);
     }
 }

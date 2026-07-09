@@ -3,6 +3,7 @@ using System.Globalization;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Domain.Payments;
 using HOAManagementCompany.Features.Payments.Services;
 using HOAManagementCompany.Infrastructure.Payments;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
@@ -33,7 +34,7 @@ public class CreateIntentEndpoint(IStripeGateway gateway, FeeCalculator feeCalcu
         var funding = method == PaymentMethod.Card ? CardFunding.Credit : (CardFunding?)null;
         var fee = feeCalculator.Calculate(req.Amount, method, funding, cfg);
 
-        var amountCents = (long)Math.Round(fee.Total * 100m, MidpointRounding.AwayFromZero);
+        var amountCents = MoneyPolicy.ToCents(fee.Total);
         var idempotencyKey = HttpContext.Request.Headers[IdempotencyService.HeaderName].FirstOrDefault();
         var metadata = new Dictionary<string, string>
         {
@@ -44,7 +45,7 @@ public class CreateIntentEndpoint(IStripeGateway gateway, FeeCalculator feeCalcu
         };
 
         var pi = await gateway.CreatePaymentIntentAsync(
-            new CreatePaymentIntentRequest(amountCents, "usd", metadata, idempotencyKey), ct);
+            new CreatePaymentIntentRequest(amountCents, MoneyPolicy.Currency, metadata, idempotencyKey), ct);
 
         await SendOkAsync(new CreateIntentResponse(pi.Id, pi.ClientSecret, fee.Gross, fee.Fee, fee.Total), ct);
     }

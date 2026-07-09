@@ -1,3 +1,4 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Features.Payments;
 using Xunit;
 

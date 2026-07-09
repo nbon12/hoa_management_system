@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using HOAManagementCompany.Infrastructure.Configuration;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Features.Payments.Models;
@@ -32,11 +31,7 @@ public class RunDraftsEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var expected = options.Value.SchedulerSharedSecret;
-        var provided = HttpContext.Request.Headers["X-Scheduler-Secret"].FirstOrDefault();
-        if (string.IsNullOrEmpty(expected) || !CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(expected),
-                Encoding.UTF8.GetBytes(provided ?? string.Empty)))
+        if (!SchedulerAuth.IsAuthorized(HttpContext, options))
         {
             await SendUnauthorizedAsync(ct);
             return;

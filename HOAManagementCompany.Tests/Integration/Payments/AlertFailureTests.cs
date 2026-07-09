@@ -1,4 +1,3 @@
-using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Payments.Alerts;
@@ -7,7 +6,7 @@ using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Stripe;
+using HOAManagementCompany.Infrastructure.Payments;
 using Xunit;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
 
@@ -22,20 +21,9 @@ public class AlertFailureTests(TestDatabaseFixture fixture) : AlertTestBase(fixt
 {
     private static readonly Guid PropertyId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
 
-    private static Event Evt(string type, object dataObject) => EventUtility.ParseEvent(
-        JsonSerializer.Serialize(new
-        {
-            id = $"evt_{Guid.NewGuid():N}",
-            @object = "event",
-            type,
-            api_version = StripeConfiguration.ApiVersion,
-            request = (string?)null,
-            data = new { @object = dataObject },
-        }));
-
-    private static Event FailedEvent(string intentId, string code) => Evt(
-        "payment_intent.payment_failed",
-        new { id = intentId, @object = "payment_intent", last_payment_error = new { code, message = "declined" } });
+    private static PaymentProviderEvent FailedEvent(string intentId, string code) => new(
+        $"evt_{Guid.NewGuid():N}", PaymentProviderEventKind.PaymentFailed, "payment_intent.payment_failed",
+        PaymentIntentId: intentId, FailureCode: code, FailureMessage: "declined");
 
     private async Task<PaymentTransaction> ArrangeAsync(
         ApplicationDbContext db, bool sms, bool email, string? phone,
