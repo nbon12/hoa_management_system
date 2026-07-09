@@ -100,7 +100,7 @@ neko-hoa/
 
 ## Repowise Documentation
 
-**Status**: In progress
+**Status**: Complete (markers in RefreshEndpoint.cs `domain=auth-session`, auth.interceptor.ts `domain=frontend-session`, src/_headers `section=csp`)
 
 ### Configuration
 
