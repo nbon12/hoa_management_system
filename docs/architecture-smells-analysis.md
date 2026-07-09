@@ -181,3 +181,29 @@ Highest leverage first — several fixes collapse multiple findings:
 5. **Split `test.yml` into CI and CD workflows; extract shared setup into composite actions** (#18).
 6. **Add an environment backstop (`IsProduction()` hard-disable) to seeding and `/e2e/cleanup`, and exclude `testdata/` from publish** (#7).
 7. Decompose the two payment god components behind a shared Stripe-elements wrapper + error interceptor (#14, #15); split the OpenTofu PR-environment module (#19); delete the dead root `Dockerfile` and Blazor `Components/Pages` remnant (#20, #8).
+
+---
+
+## Remediation status (feature 015-architecture-remediation, implemented 2026-07)
+
+The findings above were remediated by spec `specs/015-architecture-remediation/` (PR #91). Mapping, by the top-findings table:
+
+| # | Finding | Status | Landed as |
+|---|---------|--------|-----------|
+| 1 | Non-atomic webhook writes / double-post risk | **Fixed** | `PaymentRecorder` — one FOR UPDATE row-locked transaction per handler; interrupt-and-retry + concurrent-duplicate tests |
+| 2 | `DomainException` in `Features/Auth` | **Fixed** | Moved to `Domain/DomainException.cs`; enforced by architecture tests |
+| 3 | Infrastructure → Features dependencies | **Fixed** | Options moved to `Infrastructure/Configuration`; NetArchTest rule keeps it at 0 |
+| 4 | Hand-duplicated frontend contract / god barrel drift | **Fixed** | Generated `core/api/generated-types.ts` (openapi-typescript) + CI drift gate; dead types removed |
+| 5 | Copy-pasted claim parsing + error catch blocks | **Fixed** | `GlobalExceptionHandler` DomainException branch + `ClaimsPrincipalExtensions`; 12 catches and 24 parses removed |
+| 6 | Test machinery in production | **Fixed** | Environment backstop (boot fail-fast + endpoint guard + security log); `testdata/` publish-excluded |
+| 7 | Payment god components | **Fixed** | `StripeElementsHostComponent` + wizard stores + `.html`/`.scss` split + shared `ErrorBanner`/`ApiError` |
+| 8 | `test.yml` CI+CD monolith | **Fixed** | Split into `ci.yml` (verification) and `release.yml` (ship); composite actions extracted |
+| 9 | Triplicated settle orchestration | **Fixed** | All three flows delegate to `PaymentRecorder` |
+| 10 | Anemic domain model | **Accepted** | Deliberate transaction-script style per spec Assumptions; cross-cutting policies centralized instead |
+| 11 | Mixed persistence boundary | **Accepted (documented)** | Existing split kept; EF entities still never leak into responses |
+| 12 | Duplicated OpenTofu modules | **Fixed (core)** | Shared `modules/cloud-run-service` consumed by both env modules with `moved` blocks; secrets/neon stay per-module (genuinely variant: branch-fork vs primary DB, per-PR placeholder flow) |
+| 13 | Single test assembly / god fixture | **Fixed (bounded)** | Container-free `HOAManagementCompany.UnitTests` project (unit + architecture tiers); `PaymentFactory` added, new suites factory-based; `TestDataSeeder` retained for legacy suites by design |
+| 14 | No shared frontend HTTP/error layer | **Fixed** | `ApiClient` (single base-address owner), `errorInterceptor` + typed `ApiError`, shared error banner |
+| 15 | Orphaned root `Dockerfile` | **Fixed** | Deleted (with the dead Blazor `Components/` remnant) |
+
+Also landed beyond the table: `MoneyPolicy` (single cents/rounding/currency definition), `SchedulerAuth` (deduped constant-time job auth), gateway-neutral `PaymentProviderEvent` + coverable `StripeEventTranslator` (Stripe SDK confined to `Infrastructure/Payments`), `RecomputeBalancesAsync` under the per-property advisory lock, report-only ledger-consistency detection on the reconcile sweep, and the `--export-openapi` contract export flag.

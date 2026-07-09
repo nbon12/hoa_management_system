@@ -57,7 +57,7 @@ output "deploy_alert_webhook_url" {
 
 output "cloud_run_service_url" {
   description = "Direct Cloud Run URL (sanity check / health probe before the custom domain is live)."
-  value       = google_cloud_run_v2_service.api.uri
+  value       = module.api_service.uri
 }
 
 output "next_steps" {
