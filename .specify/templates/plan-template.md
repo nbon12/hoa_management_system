@@ -34,15 +34,16 @@
 Confirm the plan satisfies the active HOA Management Company Constitution:
 
 - **Technology fit**: Angular frontend, .NET FastEndpoints REST API, PostgreSQL/Neon,
-  Auth0, Cloudflare, Cloud Run, Docker/Docker Hub, Sentry, FastEndpoints.Swagger (NSwag)
-  in development only, and GitHub Actions are used or explicitly marked not applicable.
+  in-application authentication (ASP.NET Core Identity + JWT bearer), Cloudflare, Cloud Run,
+  Docker/Docker Hub, Sentry, FastEndpoints.Swagger (NSwag) in development only, and GitHub
+  Actions are used or explicitly marked not applicable.
 - **HOA tenancy**: HOA-scoped data includes an `hoa_id`, `association_id`, or equivalent
   tenant boundary; cross-HOA access is denied by default; intentional cross-HOA queries
   document authorization and result scope.
 - **API contracts**: Endpoints document authentication, authorization, pagination
   (`limit`/`offset` for collections), error response shape, cacheability, and breaking
   contract migration notes.
-- **Security and operations**: Secrets are externalized, Auth0 authorization is enforced
+- **Security and operations**: Secrets are externalized, authorization is enforced
   server-side, structured Serilog logs and Sentry tracing are planned, and production
   errors do not leak system details.
 - **File storage**: If file/blob storage is introduced, hosted environments use Cloudflare
@@ -61,6 +62,11 @@ Confirm the plan satisfies the active HOA Management Company Constitution:
   feature's `spec.md` and `tasks.md` are slated to be updated before the PR (older specs only
   need their `spec.md` kept current; `tasks.md`/`plan.md`/`research.md` are not refreshed); and
   any contradiction with a former spec is reconciled so the spec corpus stays consistent.
+- **Spec independence & parallelism**: This spec is individually completable without requiring
+  another spec to land first. Any hard dependency on a sibling spec (schema, contract, or
+  shared component it must land after) is explicitly documented here and minimized; where this
+  feature was split from a larger effort, the split is designed so sibling specs can be worked
+  on in parallel.
 
 ## Project Structure
 

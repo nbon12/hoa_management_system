@@ -139,6 +139,11 @@
   (older specs only need their `spec.md` kept truthful — `tasks.md`/`plan.md`/`research.md`
   are not required to be refreshed); and any direct contradiction with a former spec is
   reconciled so the full spec corpus is internally consistent]
+- **Spec independence & parallelism**: [Confirm this spec is individually completable
+  without requiring another spec to land first; list any hard dependency on a sibling spec
+  explicitly, with rationale for why the split could not remove it; where this spec is one
+  of several split from a larger effort, confirm the split allows the specs to be worked on
+  in parallel]
 
 ## Success Criteria *(mandatory)*
 

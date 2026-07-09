@@ -22,6 +22,8 @@ Auto-generated from all feature plans. Last updated: 2026-07-02
 - Per-PR Neon Postgres **branch** (copy-on-write from a pre-seeded `pr-base`); per-PR (013-ephemeral-pr-envs)
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL for OpenTofu ≥ 1.8 (infra); GitHub Actions YAML (CI) + FastEndpoints (+ FastEndpoints.Swagger/NSwag for OpenAPI), EF Core 9 (Npgsql), Stripe.net (confined to `Infrastructure/Payments`), Serilog, Sentry, FluentValidation; Angular 17.3 + ngx-stripe; new dev-time additions: `NetArchTest.Rules` (architecture tests), `openapi-typescript` (types-only client codegen) (015-architecture-remediation)
 - PostgreSQL (Neon in deployed envs, Testcontainers locally/CI). **No schema changes**: remediation uses existing tables (`PaymentTransactions`, `LedgerEntries`, `WebhookEventInbox`, `OutboxMessages`); consistency detection is report-only (logs/alerts, no new tables) (015-architecture-remediation)
+- C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL / OpenTofu ≥1.8 (infra); GitHub Actions YAML + Bash (CI) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Identity, Stripe.net, Serilog, OpenTelemetry, `Microsoft.AspNetCore.RateLimiting`; Angular, ngx-stripe; `hashicorp/google`, `kislerdm/neon` (016-security-hardening)
+- PostgreSQL (Neon prod; Testcontainers CI/local). New tables: `PropertyClaimCodes`, `EmailVerifications`, `SettlementReviewQueue`. New indexes: `LedgerEntries (TransactionId, EntryType)` unique; `PaymentTransactions (PropertyId, IdempotencyKey)` unique. Identity lockout uses existing `AspNetUsers` columns. (016-security-hardening)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -59,6 +61,7 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 016-security-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL / OpenTofu ≥1.8 (infra); GitHub Actions YAML + Bash (CI) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Identity, Stripe.net, Serilog, OpenTelemetry, `Microsoft.AspNetCore.RateLimiting`; Angular, ngx-stripe; `hashicorp/google`, `kislerdm/neon`
 - 015-architecture-remediation: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL for OpenTofu ≥ 1.8 (infra); GitHub Actions YAML (CI) + FastEndpoints (+ FastEndpoints.Swagger/NSwag for OpenAPI), EF Core 9 (Npgsql), Stripe.net (confined to `Infrastructure/Payments`), Serilog, Sentry, FluentValidation; Angular 17.3 + ngx-stripe; new dev-time additions: `NetArchTest.Rules` (architecture tests), `openapi-typescript` (types-only client codegen)
 - 014-post-deploy-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 + Playwright 1.60 (frontend e2e) + FastEndpoints, `Microsoft.AspNetCore.RateLimiting` (built-in), OpenTelemetry (existing), `@playwright/test`; GitHub Actions (CI)
 - 013-ephemeral-pr-envs: Added HCL for OpenTofu ≥ 1.8 (provisioning); GitHub Actions YAML + Bash (CI); + OpenTofu providers `hashicorp/google ~5.0`, `hashicorp/google-beta ~5.0`,
@@ -109,5 +112,20 @@ If more work is needed after a merge:
 4. Do all further work on the new branch
 
 Merged branches exist only as historical artifacts. Treat them as read-only.
+
+## Don't ask about work order — just pick and start
+
+Per the constitution's Spec Independence & Parallelism principle (section 12), specs and
+sub-specs are designed to be individually completable and, where split from a larger effort,
+parallelizable. Because of this:
+
+- Do **not** ask the user "which should come first," "what should I work on first," or any
+  other question about ordering across independent specs or sub-specs.
+- These questions are low-value and only delay the workflow — if specs are truly independent,
+  order does not matter to the outcome.
+- Instead, **pick one and start.** Use any reasonable tie-breaker (priority label if present,
+  numeric spec order, or simple judgment) and proceed without waiting for confirmation.
+- This does not apply to genuine hard dependencies that are explicitly documented (see
+  constitution section 12) — those must still be sequenced correctly.
 
 <!-- MANUAL ADDITIONS END -->
