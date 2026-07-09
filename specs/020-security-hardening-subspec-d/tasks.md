@@ -91,16 +91,16 @@
 
 ### Tests (write first — must fail)
 
-- [ ] T027 [P] [US4] Backend integration test `HOAManagementCompany.Tests/Integration/DevTools/E2EAuthSupportTests.cs`: `GET /e2e/auth-codes` and `POST /e2e/claim-code` return 404 when flag off, 401 without/with wrong secret; with secret: claim-code issue returns a raw code redeemable via registration, auth-codes returns the verification code delivered for a contact (vault). Gate parity with `E2ECleanupEndpointTests`.
-- [ ] T028 [P] [US4] Cypress e2e `neko-hoa/cypress/e2e/registration.cy.ts`: mocked 3-step flow — request code → confirm → register (cookie-session response) → dashboard; wrong-code and failed-register cases render the same generic message (FR-D10); no account-number field anywhere (FR-D9).
+- [X] T027 [P] [US4] Backend integration test `HOAManagementCompany.Tests/Integration/DevTools/E2EAuthSupportTests.cs`: `GET /e2e/auth-codes` and `POST /e2e/claim-code` return 404 when flag off, 401 without/with wrong secret; with secret: claim-code issue returns a raw code redeemable via registration, auth-codes returns the verification code delivered for a contact (vault). Gate parity with `E2ECleanupEndpointTests`.
+- [X] T028 [P] [US4] Cypress e2e `neko-hoa/cypress/e2e/registration.cy.ts`: mocked 3-step flow — request code → confirm → register (cookie-session response) → dashboard; wrong-code and failed-register cases render the same generic message (FR-D10); no account-number field anywhere (FR-D9).
 
 ### Implementation
 
-- [ ] T029 [US4] Backend seams: `Features/DevTools/AuthCodeVault.cs` (singleton) + `VaultingAuthNotifier` decorator (registered only when `DevTools:E2ECleanupEnabled`) in `HOAManagementCompany/Program.cs`; `Features/DevTools/E2EAuthCodesEndpoint.cs` (`GET /e2e/auth-codes?contact=`) and `E2EClaimCodeEndpoint.cs` (`POST /e2e/claim-code`, issues via `ClaimCodeService.IssueAsync` for the seed property) with `E2ECleanupEndpoint`-identical gating (FR-D11).
-- [ ] T030 [US4] `neko-hoa/src/app/core/services/auth.service.ts`: `register(verificationToken, password, firstName, lastName, claimCode)` + `requestEmailVerification(email)` + `confirmEmailVerification(email, code)`; update `auth.service.spec.ts` accordingly.
-- [ ] T031 [US4] Rebuild `neko-hoa/src/app/features/auth/register.component.ts` as the 3-step verified flow (FR-D9, generic errors FR-D10); remove account-number/mock-lookup content.
-- [ ] T032 [US4] Rewrite the Playwright register test in `neko-hoa/e2e/auth.spec.ts` to drive the real flow: fetch claim code via `POST /e2e/claim-code`, request verification in UI, fetch delivered code via `GET /e2e/auth-codes`, complete registration; uses `PLAYWRIGHT_SCHEDULER_SECRET` (already plumbed). Not `@smoke` (mutating).
-- [ ] T033 [US4] Verification + freshness: backend suite (Category!=Sandbox), `npm run test:ci`, `npm run e2e:ci` green; spec/tasks ledger updated.
+- [X] T029 [US4] Backend seams: `Features/DevTools/AuthCodeVault.cs` (singleton) + `VaultingAuthNotifier` decorator (registered only when `DevTools:E2ECleanupEnabled`) in `HOAManagementCompany/Program.cs`; `Features/DevTools/E2EAuthCodesEndpoint.cs` (`GET /e2e/auth-codes?contact=`) and `E2EClaimCodeEndpoint.cs` (`POST /e2e/claim-code`, issues via `ClaimCodeService.IssueAsync` for the seed property) with `E2ECleanupEndpoint`-identical gating (FR-D11).
+- [X] T030 [US4] `neko-hoa/src/app/core/services/auth.service.ts`: `register(verificationToken, password, firstName, lastName, claimCode)` + `requestEmailVerification(email)` + `confirmEmailVerification(email, code)`; update `auth.service.spec.ts` accordingly.
+- [X] T031 [US4] Rebuild `neko-hoa/src/app/features/auth/register.component.ts` as the 3-step verified flow (FR-D9, generic errors FR-D10); remove account-number/mock-lookup content.
+- [X] T032 [US4] Rewrite the Playwright register test in `neko-hoa/e2e/auth.spec.ts` to drive the real flow: fetch claim code via `POST /e2e/claim-code`, request verification in UI, fetch delivered code via `GET /e2e/auth-codes`, complete registration; uses `PLAYWRIGHT_SCHEDULER_SECRET` (already plumbed). Not `@smoke` (mutating).
+- [X] T033 [US4] Verification + freshness: backend suite (Category!=Sandbox), `npm run test:ci`, `npm run e2e:ci` green; spec/tasks ledger updated.
 
 **Checkpoint**: US4 independently deliverable — A+D merge-blocking gap closed.
 

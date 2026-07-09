@@ -94,11 +94,37 @@ describe('AuthService', () => {
   });
 
   describe('register()', () => {
-    it('sets user after successful registration', async () => {
-      const promise = svc.register('new@example.com', 'pass', 'Jane', 'Doe', 'SAKURA-001');
-      http.expectOne(`${BASE}/auth/register`).flush(MOCK_AUTH_RESPONSE);
+    // 020-D FR-D9: register consumes a verification proof + claim code, never an account number.
+    it('posts proof + claim code and sets the user on success', async () => {
+      const promise = svc.register('proof-token', 'pass', 'Jane', 'Doe', 'HOA-CLAIM-1234');
+      const req = http.expectOne(`${BASE}/auth/register`);
+      expect(req.request.body).toEqual({
+        verificationToken: 'proof-token', password: 'pass',
+        firstName: 'Jane', lastName: 'Doe', claimCode: 'HOA-CLAIM-1234',
+      });
+      expect(req.request.withCredentials).toBeTrue();
+      req.flush(MOCK_AUTH_RESPONSE);
       await promise;
       expect(svc.isLoggedIn()).toBeTrue();
+    });
+
+    it('requestEmailVerification posts the email', async () => {
+      const promise = svc.requestEmailVerification('new@example.com');
+      const req = http.expectOne(`${BASE}/auth/verify-email/request`);
+      expect(req.request.body).toEqual({ email: 'new@example.com' });
+      req.flush({ status: 'sent' });
+      await promise;
+    });
+
+    it('confirmEmailVerification returns the proof, or null on generic failure', async () => {
+      const ok = svc.confirmEmailVerification('new@example.com', '123456');
+      http.expectOne(`${BASE}/auth/verify-email/confirm`).flush({ verificationToken: 'proof-1' });
+      expect(await ok).toBe('proof-1');
+
+      const bad = svc.confirmEmailVerification('new@example.com', '000000');
+      http.expectOne(`${BASE}/auth/verify-email/confirm`).flush(
+        { code: 'VERIFICATION_FAILED' }, { status: 400, statusText: 'Bad Request' });
+      expect(await bad).toBeNull();
     });
   });
 

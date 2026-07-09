@@ -54,10 +54,31 @@ export class AuthService {
     this.applySession(res);
   }
 
-  async register(email: string, password: string, firstName: string, lastName: string, accountNumber: string): Promise<void> {
+  // 020-D FR-D9 (017-A register contract): registration binds to a property via an
+  // email-verification proof + a single-use claim code — never an account number.
+  async requestEmailVerification(email: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${this.base}/auth/verify-email/request`, { email })
+    );
+  }
+
+  /** Returns the opaque verification proof, or null on a (generic) confirm failure. */
+  async confirmEmailVerification(email: string, code: string): Promise<string | null> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ verificationToken: string }>(
+          `${this.base}/auth/verify-email/confirm`, { email, code })
+      );
+      return res.verificationToken;
+    } catch {
+      return null;
+    }
+  }
+
+  async register(verificationToken: string, password: string, firstName: string, lastName: string, claimCode: string): Promise<void> {
     const res = await firstValueFrom(
       this.http.post<AuthSessionResponse>(`${this.base}/auth/register`, {
-        email, password, firstName, lastName, accountNumber
+        verificationToken, password, firstName, lastName, claimCode
       }, { withCredentials: true })
     );
     this.applySession(res);
