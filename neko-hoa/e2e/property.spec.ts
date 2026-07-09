@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 // ─── Property Info (GET /property) ───────────────────────────────────────────
 
 test.describe('Property Info', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/property/info');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -52,6 +54,7 @@ test.describe('Property Info', () => {
 
 test.describe.serial('Owner Profile', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/property/owner');
     // Wait for ngOnInit to complete by checking address history table has data
     // (ngOnInit runs Promise.all([getProperty, getOwner, getAddressHistory]))
@@ -111,6 +114,7 @@ test.describe.serial('Owner Profile', () => {
 
 test.describe.serial('Directory', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/property/directory');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,

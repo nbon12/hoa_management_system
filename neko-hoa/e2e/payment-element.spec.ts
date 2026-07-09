@@ -45,6 +45,7 @@ async function fillCard(frame: FrameLocator) {
 
 test.describe('Stripe Payment Element — one-time card (local-only)', { tag: '@local-only' }, () => {
   test('enters a card in the Stripe iframe and reaches the receipt', async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/payments/one-time');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -79,6 +80,7 @@ test.describe('Stripe Payment Element — one-time card (local-only)', { tag: '@
 
 test.describe('Stripe Payment Element — recurring vaulting (local-only)', { tag: '@local-only' }, () => {
   test('enters a card in the SetupIntent Element and saves auto-pay', async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/payments/recurring');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 /**
  * Post-deploy smoke gate (014 US2). A small, fast, deterministic, READ-ONLY set of
@@ -51,10 +52,13 @@ test.describe('Smoke: public pages render', { tag: '@smoke' }, () => {
 });
 
 // ─── Authenticated deployment-health (seed-user storage state) ──────────────
-// Uses the storageState captured by global-setup (a seed-user login — token issuance only,
-// no business-data mutation). These are read-only page loads.
+// Each test establishes its own cookie session via API login (020-D: strict refresh rotation
+// makes a shared storageState snapshot impossible). Read-only page loads.
 
 test.describe('Smoke: authenticated shell renders', { tag: '@smoke' }, () => {
+  test.beforeEach(async ({ page }) => {
+    await establishSession(page);
+  });
   test('dashboard renders greeting and the Balance stat card', async ({ page }) => {
     await page.goto('/app/dashboard');
     await page.waitForFunction(

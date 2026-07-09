@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/dashboard');
     // Wait for spinner to clear
     await page.waitForFunction(

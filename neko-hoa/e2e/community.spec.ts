@@ -4,6 +4,7 @@ import { test, expect, type Locator, type Page, type APIRequestContext } from '@
 
 test.describe('Announcements', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/community/announcements');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -71,6 +72,7 @@ test.describe('Announcements', () => {
 
 test.describe('Violations', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/community/violations');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -118,6 +120,7 @@ test.describe('Violations', () => {
 
 test.describe('Calendar', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/community/calendar');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -248,6 +251,7 @@ async function expectPdfOpensInNewTabAfterClick(page: Page, request: APIRequestC
 
 test.describe('Documents', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/community/documents');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,

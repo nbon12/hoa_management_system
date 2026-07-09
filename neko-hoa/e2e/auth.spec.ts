@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAs } from './helpers/auth';
+import { establishSession, loginAs } from './helpers/auth';
 
 // Auth tests do NOT use the global storageState — they test the auth flow itself
 const NO_AUTH = { cookies: [], origins: [] } as const;
@@ -80,8 +80,8 @@ test.describe('Login with valid credentials', () => {
 });
 
 test.describe('Logout', () => {
-  // Uses the global storageState (already authenticated)
   test('redirects to /login; protected routes redirect again', async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/dashboard');
     await expect(page.getByRole('button', { name: /Sign out/i })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: /Sign out/i }).click();
