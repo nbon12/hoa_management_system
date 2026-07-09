@@ -1,3 +1,4 @@
+using HOAManagementCompany.Domain;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth.Models;
@@ -15,16 +16,8 @@ public class RefreshEndpoint(AuthService authService) : Endpoint<RefreshRequest,
 
     public override async Task HandleAsync(RefreshRequest req, CancellationToken ct)
     {
-        try
-        {
-            var response = await authService.RefreshAsync(req.RefreshToken, ct);
-            await SendOkAsync(response, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+        var response = await authService.RefreshAsync(req.RefreshToken, ct);
+        await SendOkAsync(response, ct);
     }
 }
 

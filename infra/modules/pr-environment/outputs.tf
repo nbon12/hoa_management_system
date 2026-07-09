@@ -30,12 +30,12 @@ output "web_branch" {
 
 output "api_url" {
   description = "Per-PR Cloud Run service URL (frontend API base, Stripe webhook target, smoke tests)."
-  value       = google_cloud_run_v2_service.api.uri
+  value       = module.api_service.uri
 }
 
 output "cloud_run_service_name" {
   description = "Per-PR Cloud Run service name (for the workflow's image-only gcloud deploy)."
-  value       = google_cloud_run_v2_service.api.name
+  value       = module.api_service.name
 }
 
 output "stripe_webhook_secret_id" {

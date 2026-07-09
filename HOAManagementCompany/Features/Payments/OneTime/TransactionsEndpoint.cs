@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
@@ -17,7 +18,7 @@ public class TransactionsEndpoint(ApplicationDbContext db) : EndpointWithoutRequ
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var limit = Math.Clamp(Query<int?>("limit", isRequired: false) ?? 50, 1, 200);
         var offset = Math.Max(0, Query<int?>("offset", isRequired: false) ?? 0);
 

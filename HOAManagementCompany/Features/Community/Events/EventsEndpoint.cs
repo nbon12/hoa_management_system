@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Community.Models;
 
@@ -13,7 +14,7 @@ public class EventsEndpoint(CommunityService communityService) : Endpoint<EventL
 
     public override async Task HandleAsync(EventListRequest req, CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.GetCommunityId();
         await SendOkAsync(await communityService.GetEventsAsync(communityId, req, ct), ct);
     }
 }

@@ -35,8 +35,8 @@ Confirm the plan satisfies the active HOA Management Company Constitution:
 
 - **Technology fit**: Angular frontend, .NET FastEndpoints REST API, PostgreSQL/Neon,
   in-application authentication (ASP.NET Core Identity + JWT bearer), Cloudflare, Cloud Run,
-  Docker/Docker Hub, Sentry, Swashbuckle in development only, and GitHub Actions are used or
-  explicitly marked not applicable.
+  Docker/Docker Hub, Sentry, FastEndpoints.Swagger (NSwag) in development only, and GitHub
+  Actions are used or explicitly marked not applicable.
 - **HOA tenancy**: HOA-scoped data includes an `hoa_id`, `association_id`, or equivalent
   tenant boundary; cross-HOA access is denied by default; intentional cross-HOA queries
   document authorization and result scope.

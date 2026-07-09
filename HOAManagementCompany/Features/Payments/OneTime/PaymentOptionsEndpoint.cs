@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Ledger;
 using HOAManagementCompany.Features.Payments.Services;
@@ -18,7 +19,7 @@ public class PaymentOptionsEndpoint(LedgerService ledger, PaymentConfigService c
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
 
         var property = await db.Properties
             .Where(p => p.Id == propertyId)

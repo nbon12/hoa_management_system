@@ -1,3 +1,5 @@
+using HOAManagementCompany.Infrastructure.Configuration;
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Models;
 using HOAManagementCompany.Infrastructure.Payments;
@@ -25,7 +27,7 @@ public class SetupIntentEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct);
         if (owner is null) { await SendNotFoundAsync(ct); return; }
 

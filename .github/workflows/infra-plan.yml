@@ -41,22 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # WIF: impersonate the deployer SA via the repo-scoped provider. No long-lived keys (FR-027).
-      - id: auth
-        uses: google-github-actions/auth@v3
+      # WIF auth + setup + init via the shared composite (015 US6, FR-018). No long-lived keys (FR-027).
+      - name: Auth + tofu init
+        uses: ./.github/actions/tofu-init
         with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          wif_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
-
-      - uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: "1.8.0"
+          working-directory: infra/environments/dev
 
       - name: tofu fmt -check
         run: tofu fmt -check -recursive ../..
-
-      - name: tofu init
-        run: tofu init -input=false
 
       - name: tofu validate
         run: tofu validate

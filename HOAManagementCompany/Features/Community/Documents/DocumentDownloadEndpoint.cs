@@ -1,5 +1,6 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
-using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Community.Models;
 
 namespace HOAManagementCompany.Features.Community.Documents;
@@ -14,11 +15,9 @@ public class DocumentDownloadEndpoint(CommunityService communityService) : Endpo
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.GetCommunityId();
         var id = Route<Guid>("id");
 
-        try { await SendOkAsync(await communityService.GetDocumentDownloadUrlAsync(communityId, id, ct), ct); }
-        catch (DomainException ex) { HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct); }
+        await SendOkAsync(await communityService.GetDocumentDownloadUrlAsync(communityId, id, ct), ct);
     }
 }

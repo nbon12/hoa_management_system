@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +16,7 @@ public class ReceiptEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<R
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var id = Route<Guid>("id");
 
         var receipt = await db.Receipts

@@ -17,7 +17,8 @@
     "e2e:playwright-smoke": "playwright test --grep @smoke",
     "e2e:playwright-dev": "playwright test --grep-invert @local-only",
     "storybook": "ng run neko-hoa:storybook",
-    "build-storybook": "ng run neko-hoa:build-storybook"
+    "build-storybook": "ng run neko-hoa:build-storybook",
+    "generate:api-types": "node scripts/generate-api-types.mjs"
   },
   "private": true,
   "dependencies": {
@@ -61,6 +62,7 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "openapi-typescript": "^7.13.0",
     "start-server-and-test": "^2.1.5",
     "storybook": "^8.6.18",
     "typescript": "~5.4.2"

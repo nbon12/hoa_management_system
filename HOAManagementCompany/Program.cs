@@ -47,6 +47,12 @@ builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, re
 // Defaults preserve existing local Development behavior. See StartupOptions (009-dev-auto-deploy).
 var startupOptions = StartupOptions.Resolve(builder.Configuration, builder.Environment);
 
+// ── --export-openapi <path> CLI flag (015 US4, FR-011) ────────────────────────────────────────
+// Exports the NSwag OpenAPI document (client type-generation source of truth) and exits without
+// serving traffic or touching the database. Forces the Swagger document registration on so the
+// export works regardless of the environment's EnableSwagger default.
+var exportOpenApiPath = StartupTasks.GetExportOpenApiPath(args);
+
 // ── Serilog ────────────────────────────────────────────────────────────────
 // 3-arg form so DI-registered ILogEventSink/ILogEventEnricher (e.g. the integration
 // test in-memory sink, the scrubbing + trace enrichers) are composed in via
@@ -314,11 +320,20 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient(); // used by the browser telemetry proxy forward (FR-029)
 builder.Services.AddFastEndpoints();
 
-if (startupOptions.EnableSwagger)
-    builder.Services.SwaggerDocument(o => o.DocumentSettings = s =>
+if (startupOptions.EnableSwagger || exportOpenApiPath is not null)
+    builder.Services.SwaggerDocument(o =>
     {
-        s.Title = "NekoHOA API";
-        s.Version = "v1";
+        // Short schema names (015 US4): generated client types read as `PropertyDto`, not
+        // `HOAManagementCompanyFeaturesPropertyModelsPropertyDto`.
+        o.ShortSchemaNames = true;
+        o.DocumentSettings = s =>
+        {
+            s.Title = "NekoHOA API";
+            s.Version = "v1";
+            // Non-nullable C# properties become `required` in the OpenAPI schema, so generated
+            // client types are non-optional where the contract guarantees a value (015 US4).
+            s.MarkNonNullablePropsAsRequired();
+        };
     });
 
 // ── Feature Services ───────────────────────────────────────────────────────
@@ -333,6 +348,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.Idemp
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.PaymentConfigService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.LedgerService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Ledger.AllocationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Services.PaymentRecorder>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Webhooks.WebhookProcessor>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Jobs.ReconciliationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Recurring.RecurringDraftService>();
@@ -408,6 +424,19 @@ app.UseFastEndpoints(c =>
 
 if (startupOptions.EnableSwagger)
     app.UseSwaggerGen();
+
+// --export-openapi: write the contract document and exit (015 US4). The host starts on an
+// ephemeral loopback port only to materialize endpoint data sources (WebApplication populates
+// them at start); nothing is served and the database is never touched.
+if (exportOpenApiPath is not null)
+{
+    app.Urls.Clear();
+    app.Urls.Add("http://127.0.0.1:0");
+    await app.StartAsync();
+    var exportExitCode = await StartupTasks.ExportOpenApiAsync(app.Services, exportOpenApiPath);
+    await app.StopAsync();
+    return exportExitCode;
+}
 
 // Apply migrations and/or seed at startup, driven by config (009-dev-auto-deploy). The imperative
 // side-effects live in StartupTasks (excluded from coverage — they need a live database); the

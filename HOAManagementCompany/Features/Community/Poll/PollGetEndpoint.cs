@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Community.Models;
 
@@ -13,7 +14,7 @@ public class PollGetEndpoint(PollService pollService) : EndpointWithoutRequest<P
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.GetCommunityId();
         var poll = await pollService.GetActivePollAsync(communityId, ct);
         if (poll is null)
             await SendNoContentAsync(ct);

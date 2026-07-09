@@ -77,31 +77,11 @@ export interface LedgerEntry {
   balance: number;
 }
 
-export interface RecurringPayment {
-  status: 'active' | 'inactive';
-  amountType: 'assessment' | 'balance' | 'fixed';
-  fixedAmount: number | null;
-  method: 'ach' | 'card';
-  draftDay: number;
-  // ACH fields
-  bankName: string | null;
-  routingLast4: string | null;
-  accountLast4: string | null;
-  accountType: 'checking' | 'savings' | null;
-  // Card fields
-  cardholderName: string | null;
-  cardLast4: string | null;
-  cardExpiry: string | null;
-  cardZip: string | null;
-  processingFee: number;
-}
-
-export interface DraftEntry {
-  date: ISODate;
-  source: string;
-  amount: number;
-  status: 'paid' | 'scheduled' | 'failed';
-}
+// Auto-pay/draft contract shapes live in the GENERATED types (015 US4): see
+// `core/api/generated-types.ts` (`RecurringPaymentDto`, `DraftEntryDto`) and the
+// `RecurringInfo`/`DraftRow` re-exports from `core/services/payments.service`. The hand-written
+// `RecurringPayment`/`DraftEntry` duplicates that used to live here were dead and have been
+// removed (FR-012).
 
 // ─── Community ───────────────────────────────────────────────────────────────
 export type AnnouncementCategory = 'Board' | 'Maintenance' | 'Events' | 'Emergencies';

@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Payments.Models;
@@ -14,7 +15,7 @@ public class LedgerEndpoint(PaymentService paymentService) : Endpoint<LedgerRequ
 
     public override async Task HandleAsync(LedgerRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var result = await paymentService.GetLedgerAsync(propertyId, req, ct);
         await SendOkAsync(result, ct);
     }

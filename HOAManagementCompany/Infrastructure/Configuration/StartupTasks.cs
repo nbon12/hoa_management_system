@@ -42,6 +42,43 @@ public static class StartupTasks
     }
 
     /// <summary>
+    /// Parses the <c>--export-openapi &lt;path&gt;</c> CLI flag (015 US4, FR-011 — same pattern as
+    /// <c>--seed</c>). Returns the destination path when present, else <c>null</c>.
+    /// </summary>
+    public static string? GetExportOpenApiPath(string[] args)
+    {
+        var i = Array.IndexOf(args, "--export-openapi");
+        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    }
+
+    /// <summary>
+    /// Writes the NSwag-generated OpenAPI document (the contract source of truth for client type
+    /// generation, 015 US4) to <paramref name="destinationPath"/> and returns a process exit code.
+    /// The host must be STARTED before calling (WebApplication materializes its endpoint data
+    /// sources at start — Program.cs starts on an ephemeral loopback port and stops right after);
+    /// no request is ever served and the database is never touched.
+    /// </summary>
+    public static async Task<int> ExportOpenApiAsync(IServiceProvider services, string destinationPath)
+    {
+        try
+        {
+            var generator = services.GetRequiredService<NSwag.Generation.IOpenApiDocumentGenerator>();
+            var document = await generator.GenerateAsync("v1");
+            var directory = Path.GetDirectoryName(Path.GetFullPath(destinationPath));
+            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            await File.WriteAllTextAsync(destinationPath, document.ToJson());
+            Console.WriteLine($"OpenAPI document exported to {destinationPath}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            // The drift gate must fail loudly — never fall back to a stale committed file.
+            await Console.Error.WriteLineAsync($"ERROR: OpenAPI export failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>
     /// Applies migrations and/or seeds at startup per <paramref name="options"/>. <c>SeedAsync</c>
     /// runs <c>MigrateAsync</c> first and is idempotent, so a fresh database (local compose or a
     /// cold Dev deploy) becomes ready-to-use without a manual <c>--seed</c> step. The

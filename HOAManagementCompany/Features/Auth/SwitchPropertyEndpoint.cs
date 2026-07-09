@@ -1,3 +1,5 @@
+using HOAManagementCompany.Features.Common;
+using HOAManagementCompany.Domain;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth.Models;
@@ -14,20 +16,10 @@ public class SwitchPropertyEndpoint(AuthService authService) : Endpoint<SwitchPr
 
     public override async Task HandleAsync(SwitchPropertyRequest req, CancellationToken ct)
     {
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
-            ?? string.Empty;
+        var userId = User.GetUserId();
 
-        try
-        {
-            var response = await authService.SwitchPropertyAsync(userId, req.PropertyId, ct);
-            await SendOkAsync(response, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+        var response = await authService.SwitchPropertyAsync(userId, req.PropertyId, ct);
+        await SendOkAsync(response, ct);
     }
 }
 

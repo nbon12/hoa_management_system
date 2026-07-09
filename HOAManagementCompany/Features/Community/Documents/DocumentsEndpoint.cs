@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Community.Models;
 
@@ -13,7 +14,7 @@ public class DocumentsEndpoint(CommunityService communityService) : Endpoint<Doc
 
     public override async Task HandleAsync(DocumentListRequest req, CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.GetCommunityId();
         await SendOkAsync(await communityService.GetDocumentsAsync(communityId, req, ct), ct);
     }
 }

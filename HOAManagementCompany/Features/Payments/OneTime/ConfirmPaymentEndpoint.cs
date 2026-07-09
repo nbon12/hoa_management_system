@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using System.Globalization;
 using FastEndpoints;
 using FluentValidation;
@@ -21,7 +22,8 @@ namespace HOAManagementCompany.Features.Payments.OneTime;
 /// ACH stays Pending — its ledger entry is deferred to the settlement webhook (FR-007 ACH).
 /// </summary>
 public class ConfirmPaymentEndpoint(
-    IStripeGateway gateway, ApplicationDbContext db, LedgerService ledger, IdempotencyService idempotency)
+    IStripeGateway gateway, ApplicationDbContext db, LedgerService ledger, IdempotencyService idempotency,
+    PaymentRecorder recorder)
     : Endpoint<ConfirmPaymentRequest, ConfirmPaymentResponse>
 {
     public override void Configure()
@@ -32,7 +34,7 @@ public class ConfirmPaymentEndpoint(
 
     public override async Task HandleAsync(ConfirmPaymentRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var idempotencyKey = HttpContext.Request.Headers[IdempotencyService.HeaderName].FirstOrDefault();
 
         // Replay collapse (FR-007a/FR-035): a re-submitted confirm — keyed by the client idempotency
@@ -84,29 +86,22 @@ public class ConfirmPaymentEndpoint(
         };
 
         Receipt? receipt = null;
-        // Wrap the write in the retrying execution strategy: EnableRetryOnFailure forbids a bare
-        // user-initiated transaction, and a transient Neon disconnect must retry the whole unit.
-        var strategy = db.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        // One atomic unit via the shared recorder (015 FR-003): txn + ledger payment + receipt
+        // commit together under the retrying execution strategy.
+        await recorder.RecordNewAsync(txn, async innerCt =>
         {
             receipt = null;   // reset on retry so a partial first attempt isn't double-counted
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-            db.PaymentTransactions.Add(txn);
-            await db.SaveChangesAsync(ct);
 
             // A card charge is settled at confirm → write the ledger payment + receipt now. ACH is still
             // processing (Pending): its ledger entry waits for the settlement webhook to avoid double-posting.
             if (txn.Status == TransactionStatus.Succeeded && method == PaymentMethod.Card)
             {
                 await ledger.AddPaymentAsync(propertyId, txn.Id, gross,
-                    $"Online Payment – Card – {txn.StripeChargeId}", ct: ct);
+                    $"Online Payment – Card – {txn.StripeChargeId}", ct: innerCt);
                 receipt = ReceiptFactory.Create(txn, pi.CardBrand, pi.Last4);
                 db.Receipts.Add(receipt);
-                await db.SaveChangesAsync(ct);
             }
-
-            await tx.CommitAsync(ct);
-        });
+        }, ct);
         txn.Receipt = receipt;
         // Audit trail (FR-029): record the financial-record write with non-PII identifiers only —
         // no card/bank data, names, or amounts-as-PII. Serilog ships this to the structured sink.

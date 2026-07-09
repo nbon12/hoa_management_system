@@ -1,6 +1,7 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using FluentValidation;
-using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Community.Models;
 
 namespace HOAManagementCompany.Features.Community.Poll;
@@ -15,20 +16,12 @@ public class PollVoteEndpoint(PollService pollService) : Endpoint<PollVoteReques
 
     public override async Task HandleAsync(PollVoteRequest req, CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? string.Empty;
+        var communityId = User.GetCommunityId();
+        var userId = User.GetUserId();
         var pollId = Route<Guid>("id");
 
-        try
-        {
-            var result = await pollService.VoteAsync(communityId, pollId, userId, req.OptionIndex, ct);
-            await SendOkAsync(result, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+        var result = await pollService.VoteAsync(communityId, pollId, userId, req.OptionIndex, ct);
+        await SendOkAsync(result, ct);
     }
 }
 

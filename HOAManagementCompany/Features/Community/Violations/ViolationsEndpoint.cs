@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Community.Models;
 
@@ -13,7 +14,7 @@ public class ViolationsEndpoint(CommunityService communityService) : Endpoint<Vi
 
     public override async Task HandleAsync(ViolationListRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         await SendOkAsync(await communityService.GetViolationsAsync(propertyId, req, ct), ct);
     }
 }

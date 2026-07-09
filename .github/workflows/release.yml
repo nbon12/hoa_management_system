@@ -1,0 +1,230 @@
+# Release pipeline (015 US6, FR-018): everything that SHIPS a merged main commit — provider
+# sandbox gate, image build + Trivy gate + Docker Hub push, and the gated Dev deploy with health,
+# E2E, and smoke gates before traffic promotion. Verification of the change itself happened in
+# ci.yml on the PR (enforced by branch protection); this workflow deliberately re-runs only the
+# release-blocking tiers.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  integration-sandbox:
+    name: Integration (provider sandbox)
+    runs-on: ubuntu-latest
+    # Stage 2 (007): runs the REAL Stripe/SendGrid/Twilio adapters against each provider's
+    # test/sandbox mode. main-push only (FR-001) so PRs/forks never see provider secrets.
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup .NET
+        uses: ./.github/actions/dotnet-setup
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Sandbox integration tests
+        # Only the Sandbox tier. A FAIL = real regression (blocks the release). A SKIP = provider
+        # outage or an unconfigured secret = job stays green (does not block, SC-005). Secrets are
+        # test-scoped and GitHub masks them in logs (FR-006/FR-010).
+        run: dotnet test --filter "Category=Sandbox" --configuration Release
+        env:
+          ASPNETCORE_ENVIRONMENT: Test
+          Stripe__SecretKey: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          Stripe__WebhookSigningSecret: ${{ secrets.STRIPE_WEBHOOK_SIGNING_SECRET_TEST }}
+          SendGrid__ApiKey: ${{ secrets.SENDGRID_API_KEY }}
+          SendGrid__FromEmail: ${{ secrets.SENDGRID_FROM_EMAIL }}
+          SendGrid__Sandbox: 'true'
+          Twilio__AccountSid: ${{ secrets.TWILIO_TEST_ACCOUNT_SID }}
+          Twilio__AuthToken: ${{ secrets.TWILIO_TEST_AUTH_TOKEN }}
+          Twilio__FromNumber: '+15005550006'
+          TWILIO_TEST_CREDENTIALS: 'true'
+
+  docker-push:
+    name: Push Docker Image
+    runs-on: ubuntu-latest
+    # FR-003: a broken provider integration must not ship. A sandbox FAILURE blocks the image;
+    # a SKIP (outage/unconfigured) leaves integration-sandbox green, so deploy still proceeds.
+    needs: [integration-sandbox]
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # Build locally (load into the runner daemon, no push) so Trivy can scan the exact
+      # artifact BEFORE it is published (011 / FR-003 / FR-011).
+      - name: Build image (local, no push)
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: HOAManagementCompany/Dockerfile
+          load: true
+          push: false
+          tags: nekohoa-api:scan-${{ github.sha }}
+
+      # Gate the push: a fixable CRITICAL/HIGH (not allowlisted) fails here and the push
+      # steps below never run (FR-011). Severity is the same single source as security-scan.yml.
+      - name: Trivy image scan (gate before push)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: nekohoa-api:scan-${{ github.sha }}
+          format: table
+          severity: ${{ vars.TRIVY_SEVERITY || 'CRITICAL,HIGH' }}
+          ignore-unfixed: true
+          exit-code: '1'
+          trivyignores: .trivyignore
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      # Reuses the Buildx cache from the scanned build, so the pushed image is the one Trivy validated.
+      - name: Push to Docker Hub
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: HOAManagementCompany/Dockerfile
+          push: true
+          tags: |
+            sakurapatch/nekohoa-api:latest
+            sakurapatch/nekohoa-api:${{ github.sha }}
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: [docker-push]
+    # Auto-deploy to the isolated Dev environment on merge to main (009-dev-auto-deploy). Reuses the
+    # image docker-push already published, so the deployed artifact == the one CI validated.
+    # Gated on the DEV_DEPLOY_ENABLED repo variable so this job is a NO-OP until the Dev platform
+    # (Neon Dev DB, Cloud Run nekohoa-api-dev, Cloudflare Pages, WIF + Secret Manager) is provisioned
+    # and the variable is set to 'true'. vars.* (not secrets.*) is used in the if so the workflow parses.
+    if: vars.DEV_DEPLOY_ENABLED == 'true'
+    # Latest merged commit wins: a newer run cancels an in-flight older deploy (FR-009 / SC-007).
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      id-token: write   # required for Google Workload Identity Federation
+    env:
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      DEV_SERVICE: nekohoa-api-dev
+      IMAGE: sakurapatch/nekohoa-api:${{ github.sha }}
+      PAGES_PROJECT: nekohoa-dev
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # ── Auth to GCP via Workload Identity Federation (no exportable key — S6719/SC-006) ──
+      - name: Authenticate to Google Cloud
+        uses: ./.github/actions/gcloud-auth
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      # ── Backend: deploy a NO-TRAFFIC candidate revision. Migrations + seed run at candidate
+      #    startup (ASPNETCORE_ENVIRONMENT=Dev → StartupOptions). All secrets are --set-secrets
+      #    refs (no literal values in the workflow or image — FR-010/SC-006). ──
+      # Image-only deploy: tofu is the single declarative owner of the service's env vars, secrets,
+      # probes, scaling, SA, and access. A new revision INHERITS all of that from the current
+      # (tofu-managed) service config; this step only swaps the image and stages it as a no-traffic
+      # candidate. (Re-asserting --set-env-vars here previously WIPED tofu's non-secret env vars and
+      # crashed startup.) Secret rotation still applies — the inherited :latest refs re-resolve per
+      # revision. SC-006 holds: no secret literals in the workflow.
+      - name: Deploy backend candidate (no traffic)
+        run: |
+          gcloud run deploy "$DEV_SERVICE" \
+            --image "$IMAGE" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --no-traffic --tag candidate \
+            --quiet
+
+      - name: Resolve candidate URL
+        id: candidate
+        run: |
+          url=$(gcloud run services describe "$DEV_SERVICE" --region "$GCP_REGION" --format=json \
+            | python3 -c "import sys,json;d=json.load(sys.stdin);print(next((t.get('url','') for t in d['status'].get('traffic',[]) if t.get('tag')=='candidate'),''))")
+          if [ -z "$url" ]; then echo "Could not resolve candidate URL"; exit 1; fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # ── Health gate (migration-aware: ~5 min budget for startup migrations) ──
+      - name: Backend health gate
+        run: |
+          url="${{ steps.candidate.outputs.url }}/health"
+          echo "Polling $url"
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
+            if [ "$code" = "200" ]; then echo "Healthy after ${i} attempt(s)"; exit 0; fi
+            sleep 5
+          done
+          echo "Candidate never became healthy within the timeout"; exit 1
+
+      # ── Frontend: build the dev configuration and deploy a Cloudflare Pages PREVIEW ──
+      - name: Setup Node
+        uses: ./.github/actions/node-setup
+
+      - name: Build frontend (dev configuration)
+        working-directory: neko-hoa
+        run: |
+          npm ci
+          npm run build -- --configuration=dev
+
+      - name: Deploy frontend preview (Cloudflare Pages)
+        id: pages
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy neko-hoa/dist/neko-hoa/browser --project-name=${{ env.PAGES_PROJECT }} --branch=preview-${{ github.sha }}
+
+      # ── E2E gate: full suite against the Dev preview BEFORE promotion. Health + E2E run as
+      #    ordered steps, so a failure here fail-fasts the job and the promote steps below never
+      #    run — the prior healthy release keeps 100% of traffic (FR-006/FR-007/SC-003/SC-010). ──
+      - name: E2E gate (full suite vs Dev)
+        working-directory: neko-hoa
+        env:
+          CYPRESS_BASE_URL: ${{ steps.pages.outputs.deployment-url }}
+          DEV_API_BASE_URL: ${{ steps.candidate.outputs.url }}/api/v1
+        run: npm run e2e:dev
+
+      # ── Playwright smoke gate: a curated, read-only, deterministic @smoke subset (014 US2)
+      #    against the live Dev preview — "is this deployment healthy?", NOT the full local
+      #    regression suite. Runs after Cypress passes. Failure blocks promotion. The full
+      #    Playwright suite stays runnable locally/PR via `npm run e2e`. ──
+      - name: Playwright smoke gate (vs Dev preview)
+        working-directory: neko-hoa
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.pages.outputs.deployment-url }}
+          PLAYWRIGHT_API_URL: ${{ steps.candidate.outputs.url }}
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e:playwright-smoke
+
+      # ── Promote (reached only when health + E2E + Playwright passed) ──
+      - name: Promote backend traffic to candidate
+        run: gcloud run services update-traffic "$DEV_SERVICE" --region "$GCP_REGION" --to-tags candidate=100 --quiet
+
+      - name: Promote frontend preview to Dev production
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy neko-hoa/dist/neko-hoa/browser --project-name=${{ env.PAGES_PROJECT }} --branch=main
+
+      # ── Notify team chat on ANY failure of this job (success stays silent — FR-008/SC-008) ──
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -s -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"🚨 Dev deploy failed for commit ${{ github.sha }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "${{ secrets.DEPLOY_ALERT_WEBHOOK_URL }}" || true

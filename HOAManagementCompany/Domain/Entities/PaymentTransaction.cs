@@ -20,7 +20,7 @@ public class PaymentTransaction
     public decimal FeeAmount { get; set; }
     public decimal Total { get; set; }
     public decimal CumulativeRefundedAmount { get; set; }
-    public string Currency { get; set; } = "usd";
+    public string Currency { get; set; } = HOAManagementCompany.Domain.Payments.MoneyPolicy.Currency;
 
     public TransactionStatus Status { get; set; }
     public PaymentMethod PaymentMethod { get; set; }

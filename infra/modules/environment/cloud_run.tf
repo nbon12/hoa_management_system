@@ -1,127 +1,37 @@
-# Cloud Run v2 API service (matrix rows 1-8). Name nekohoa-api-${env_name} (Dev → nekohoa-api-dev),
-# scale-to-zero, port 8080, ASPNETCORE_ENVIRONMENT from var.aspnet_environment ("Dev"), /health
-# probes, the nine secret env refs, runtime SA. The image is PIPELINE-OWNED — ignore_changes keeps an
-# infra apply from reverting the revision the 009 deploy job pushes (FR-005/006/007/008).
+# Cloud Run API service (matrix rows 1-8) — provisioned through the SHARED core module
+# (015 US6, FR-019: one definition instead of the former ~150-line near-twin of
+# modules/pr-environment). This wrapper contributes only the long-lived-environment variant:
+# name nekohoa-api-${env_name}, the module-created runtime SA, this module's nine secrets, and
+# the optional custom-domain mapping.
 
 locals {
-  # .NET env key → unprefixed secret name (the nine refs, matrix rows 8-16). The literal-name fidelity
-  # lives in secrets.tf; here we just wire each container env var to its secret's latest version.
-  secret_env = {
-    "ConnectionStrings__DefaultConnection" = "db-connection"
-    "Jwt__Secret"                          = "jwt-secret"
-    "Sentry__Dsn"                          = "sentry-dsn"
-    "Stripe__SecretKey"                    = "stripe-secret-key"
-    "Stripe__WebhookSigningSecret"         = "stripe-webhook-secret"
-    "Storage__ServiceUrl"                  = "storage-service-url"
-    "Storage__AccessKey"                   = "storage-access-key"
-    "Storage__SecretKey"                   = "storage-secret-key"
-    "Jobs__SchedulerSharedSecret"          = "scheduler-secret"
+  # .NET env key → this module's Secret Manager secret id (the nine refs, matrix rows 8-16).
+  # The literal-name fidelity lives in secrets.tf; here we just wire env vars to secret ids.
+  secret_env_refs = {
+    "ConnectionStrings__DefaultConnection" = google_secret_manager_secret.this["db-connection"].secret_id
+    "Jwt__Secret"                          = google_secret_manager_secret.this["jwt-secret"].secret_id
+    "Sentry__Dsn"                          = google_secret_manager_secret.this["sentry-dsn"].secret_id
+    "Stripe__SecretKey"                    = google_secret_manager_secret.this["stripe-secret-key"].secret_id
+    "Stripe__WebhookSigningSecret"         = google_secret_manager_secret.this["stripe-webhook-secret"].secret_id
+    "Storage__ServiceUrl"                  = google_secret_manager_secret.this["storage-service-url"].secret_id
+    "Storage__AccessKey"                   = google_secret_manager_secret.this["storage-access-key"].secret_id
+    "Storage__SecretKey"                   = google_secret_manager_secret.this["storage-secret-key"].secret_id
+    "Jobs__SchedulerSharedSecret"          = google_secret_manager_secret.this["scheduler-secret"].secret_id
   }
 }
 
-resource "google_cloud_run_v2_service" "api" {
-  project  = var.gcp_project_id
-  name     = "nekohoa-api-${var.env_name}"
-  location = var.gcp_region
-  ingress  = "INGRESS_TRAFFIC_ALL"
+module "api_service" {
+  source = "../cloud-run-service"
 
-  template {
-    service_account = google_service_account.runtime.email
-
-    scaling {
-      min_instance_count = 0
-    }
-
-    containers {
-      image = var.container_image
-
-      ports {
-        container_port = 8080
-      }
-
-      # Literal runtime environment selector (matrix row 4). Dev → "Dev".
-      env {
-        name  = "ASPNETCORE_ENVIRONMENT"
-        value = var.aspnet_environment
-      }
-
-      # Stripe publishable key — non-secret (browser-safe), so a plain env var rather than a Secret
-      # Manager ref. Required by StripeOptionsValidator at startup; deployed envs supply it here.
-      env {
-        name  = "Stripe__PublishableKey"
-        value = var.stripe_publishable_key
-      }
-
-      # Document storage (Cloudflare R2). Non-secret config: the bucket is the one this module
-      # provisions (app default "hoa-documents" is the local-MinIO name and would 404 on R2), and R2
-      # requires PATH-STYLE addressing (the app default false yields virtual-host URLs R2 rejects).
-      # The R2 access key / secret / endpoint come from Secret Manager (storage-* secrets).
-      env {
-        name  = "Storage__BucketName"
-        value = cloudflare_r2_bucket.documents.name
-      }
-      env {
-        name  = "Storage__ForcePathStyle"
-        value = "true"
-      }
-
-      # The nine secret-backed env vars, each pointing at its Secret Manager secret's latest version.
-      dynamic "env" {
-        for_each = local.secret_env
-        content {
-          name = env.key
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.this[env.value].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-
-      startup_probe {
-        # First boot runs EF migrations + full data seed before /health is served; allow up to ~5 min
-        # (30 × 10s). Subsequent cold starts skip the seed and pass quickly.
-        initial_delay_seconds = 10
-        timeout_seconds       = 5
-        period_seconds        = 10
-        failure_threshold     = 30
-        http_get {
-          path = "/health"
-        }
-      }
-
-      liveness_probe {
-        timeout_seconds   = 5
-        period_seconds    = 30
-        failure_threshold = 3
-        http_get {
-          path = "/health"
-        }
-      }
-    }
-  }
-
-  # The deploy pipeline owns the image AND traffic; never let an infra apply revert them (FR-007).
-  # tofu is the single declarative owner of all OTHER config (env vars, secrets, probes, scaling, SA),
-  # so the pipeline deploys image-only and shifts traffic (canary tags) without drift here. image is
-  # the live :sha pushed by 009; client/client_version churn on every gcloud deploy; traffic is the
-  # canary split (candidate tag → 100%) the deploy job manages. template[0].revision is also
-  # pipeline-owned: every gcloud deploy stamps a new revision name, which tofu would otherwise null
-  # on each apply (perpetual churn / an extra revision per apply).
-  lifecycle {
-    ignore_changes = [
-      template[0].containers[0].image,
-      template[0].revision,
-      # gcloud image-only deploys re-emit the scaling block without the explicit min_instance_count=0
-      # (0 is the API default), so tofu perpetually wants to re-add it. min=0 (scale-to-zero) is the
-      # default regardless, so ignore the pipeline's scaling representation to stay drift-free.
-      template[0].scaling,
-      client,
-      client_version,
-      traffic,
-    ]
-  }
+  gcp_project_id          = var.gcp_project_id
+  gcp_region              = var.gcp_region
+  service_name            = "nekohoa-api-${var.env_name}"
+  runtime_service_account = google_service_account.runtime.email
+  container_image         = var.container_image
+  aspnet_environment      = var.aspnet_environment
+  stripe_publishable_key  = var.stripe_publishable_key
+  documents_bucket_name   = cloudflare_r2_bucket.documents.name
+  secret_env_refs         = local.secret_env_refs
 
   # Secrets + accessor IAM must exist before the service references them.
   depends_on = [
@@ -131,13 +41,16 @@ resource "google_cloud_run_v2_service" "api" {
   ]
 }
 
-# Public access: allow-unauthenticated (matrix row 5).
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  project  = var.gcp_project_id
-  location = google_cloud_run_v2_service.api.location
-  name     = google_cloud_run_v2_service.api.name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
+# State migration (015 US6): the service moved INTO the shared module — never destroy/recreate a
+# live environment over a refactor.
+moved {
+  from = google_cloud_run_v2_service.api
+  to   = module.api_service.google_cloud_run_v2_service.api
+}
+
+moved {
+  from = google_cloud_run_v2_service_iam_member.public
+  to   = module.api_service.google_cloud_run_v2_service_iam_member.public
 }
 
 # Custom domain mapping for the API (matrix row 20). The Cloudflare record for this host is in
@@ -156,6 +69,6 @@ resource "google_cloud_run_domain_mapping" "api" {
   }
 
   spec {
-    route_name = google_cloud_run_v2_service.api.name
+    route_name = module.api_service.name
   }
 }

@@ -1,3 +1,4 @@
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Payments.Alerts;
 using HOAManagementCompany.Tests.Fixtures;

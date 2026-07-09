@@ -114,10 +114,30 @@ public sealed class LedgerService(ApplicationDbContext db)
     /// <summary>
     /// Deterministically recomputes every <c>RunningBalance</c> for a property in <c>Sequence</c>
     /// order — the canonical repair for out-of-order ACH settlements/refunds (SC-009).
+    /// Holds the same per-property advisory lock as appends (015 FR-004), so a concurrent
+    /// <see cref="AppendAsync"/> cannot base its balance on a value this repair is rewriting.
     /// Returns the final balance.
     /// </summary>
     public async Task<decimal> RecomputeBalancesAsync(Guid propertyId, CancellationToken ct = default)
     {
+        if (db.Database.CurrentTransaction is not null)
+            return await RecomputeCoreAsync(propertyId, ct);
+
+        var strategy = db.Database.CreateExecutionStrategy();
+        var result = 0m;
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            result = await RecomputeCoreAsync(propertyId, ct);
+            await tx.CommitAsync(ct);
+        });
+        return result;
+    }
+
+    private async Task<decimal> RecomputeCoreAsync(Guid propertyId, CancellationToken ct)
+    {
+        await AcquirePropertyLockAsync(propertyId, ct);
+
         var entries = await db.LedgerEntries
             .Where(e => e.PropertyId == propertyId)
             .OrderBy(e => e.Sequence)

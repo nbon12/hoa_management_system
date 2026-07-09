@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/angular';
 import { provideRouter } from '@angular/router';
 import { provideNgxStripe } from 'ngx-stripe';
-import { of } from 'rxjs';
 import { RecurringComponent } from './recurring.component';
 import {
   PaymentsService, RecurringInfo, SetupIntentResult, DraftRow,
@@ -80,8 +79,8 @@ describe('RecurringComponent', () => {
   it('has NO raw card or bank inputs (SC-001 regression guard)', async () => {
     const { fixture } = await renderComponent(null);
     // Reveal the full setup form so any legacy raw-instrument fields would be in the DOM.
-    fixture.componentInstance.setupMode.set(true);
-    fixture.componentInstance.clientSecret.set(SETUP.clientSecret);
+    fixture.componentInstance.wizard.setupMode.set(true);
+    fixture.componentInstance.wizard.clientSecret.set(SETUP.clientSecret);
     fixture.detectChanges();
 
     expect(screen.queryByText('Card number')).toBeNull();
@@ -97,45 +96,45 @@ describe('RecurringComponent', () => {
     const { fixture, svc } = await renderComponent(null);
     const comp = fixture.componentInstance;
 
-    await comp.beginSetup();
+    await comp.wizard.beginSetup();
     fixture.detectChanges();
 
     expect(svc.createSetupIntent).toHaveBeenCalled();
-    expect(comp.clientSecret()).toBe(SETUP.clientSecret);
-    expect(comp.setupMode()).toBeTrue();
+    expect(comp.wizard.clientSecret()).toBe(SETUP.clientSecret);
+    expect(comp.wizard.setupMode()).toBeTrue();
   });
 
   it('blocks save until the mandate is accepted (FR-009)', async () => {
     const { fixture } = await renderComponent(null);
     const comp = fixture.componentInstance;
 
-    await comp.beginSetup();
-    (comp as any).paymentElement = { elements: {} };
-    comp.mandateAccepted = false;
-    const confirmSetup = spyOn(comp.stripe, 'confirmSetup');
+    await comp.wizard.beginSetup();
+    const confirmSetup = jasmine.createSpy('confirmSetup');
+    (comp as any).stripeHost = { confirmSetup };
+    comp.wizard.mandateAccepted = false;
 
     await comp.save();
 
     expect(confirmSetup).not.toHaveBeenCalled();
-    expect(comp.error()).toContain('authorization');
+    expect(comp.wizard.error()).toContain('authorization');
   });
 
   it('vaults via confirmSetup then persists the enrollment + mandate', async () => {
     const { fixture, svc } = await renderComponent(null);
     const comp = fixture.componentInstance;
 
-    await comp.beginSetup();
-    (comp as any).paymentElement = { elements: {} };
-    comp.amountType.set('fixed');
-    comp.fixedAmount = '150';
-    comp.draftDay = 5;
-    comp.mandateAccepted = true;
-    spyOn(comp.stripe, 'confirmSetup').and.returnValue(
-      of({ setupIntent: { status: 'succeeded' } }) as any);
+    await comp.wizard.beginSetup();
+    const confirmSetup = jasmine.createSpy('confirmSetup')
+      .and.resolveTo({ error: null, status: 'succeeded' });
+    (comp as any).stripeHost = { confirmSetup };
+    comp.wizard.amountType.set('fixed');
+    comp.wizard.fixedAmount = '150';
+    comp.wizard.draftDay = 5;
+    comp.wizard.mandateAccepted = true;
 
     await comp.save();
 
-    expect(comp.stripe.confirmSetup).toHaveBeenCalled();
+    expect(confirmSetup).toHaveBeenCalled();
     expect(svc.saveRecurring).toHaveBeenCalled();
     const req = (svc.saveRecurring as jasmine.Spy).calls.mostRecent().args[0];
     expect(req.amountType).toBe('fixed');
@@ -144,41 +143,42 @@ describe('RecurringComponent', () => {
     expect(req.setupIntentId).toBe('seti_1');
     expect(req.mandateAccepted).toBeTrue();
     expect(req.mandateVersion).toBeTruthy();
-    expect(comp.saved()).toBeTrue();
+    expect(comp.wizard.saved()).toBeTrue();
   });
 
   it('rejects a fixed amount of zero or less', async () => {
     const { fixture, svc } = await renderComponent(null);
     const comp = fixture.componentInstance;
 
-    await comp.beginSetup();
-    (comp as any).paymentElement = { elements: {} };
-    comp.amountType.set('fixed');
-    comp.fixedAmount = '0';
-    comp.mandateAccepted = true;
-    spyOn(comp.stripe, 'confirmSetup');
+    await comp.wizard.beginSetup();
+    const confirmSetup = jasmine.createSpy('confirmSetup');
+    (comp as any).stripeHost = { confirmSetup };
+    comp.wizard.amountType.set('fixed');
+    comp.wizard.fixedAmount = '0';
+    comp.wizard.mandateAccepted = true;
 
     await comp.save();
 
-    expect(comp.stripe.confirmSetup).not.toHaveBeenCalled();
+    expect(confirmSetup).not.toHaveBeenCalled();
     expect(svc.saveRecurring).not.toHaveBeenCalled();
-    expect(comp.error()).toContain('greater than zero');
+    expect(comp.wizard.error()).toContain('greater than zero');
   });
 
   it('surfaces a Stripe confirmSetup error without persisting', async () => {
     const { fixture, svc } = await renderComponent(null);
     const comp = fixture.componentInstance;
 
-    await comp.beginSetup();
-    (comp as any).paymentElement = { elements: {} };
-    comp.mandateAccepted = true;
-    spyOn(comp.stripe, 'confirmSetup').and.returnValue(
-      of({ error: { message: 'Your card was declined.' } }) as any);
+    await comp.wizard.beginSetup();
+    (comp as any).stripeHost = {
+      confirmSetup: jasmine.createSpy('confirmSetup')
+        .and.resolveTo({ error: 'Your card was declined.', status: null }),
+    };
+    comp.wizard.mandateAccepted = true;
 
     await comp.save();
 
     expect(svc.saveRecurring).not.toHaveBeenCalled();
-    expect(comp.error()).toContain('declined');
+    expect(comp.wizard.error()).toContain('declined');
   });
 
   it('cancels auto-pay after confirmation and reloads the (now empty) enrollment', async () => {
@@ -190,7 +190,7 @@ describe('RecurringComponent', () => {
     await comp.confirmCancel();
 
     expect(svc.cancelRecurring).toHaveBeenCalled();
-    expect(comp.rec()).toBeNull();
+    expect(comp.wizard.rec()).toBeNull();
   });
 
   it('does not cancel when the resident dismisses the confirm dialog', async () => {

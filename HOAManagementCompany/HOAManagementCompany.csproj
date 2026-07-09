@@ -61,8 +61,11 @@
     <PackageReference Include="Npgsql.OpenTelemetry" Version="9.*" />
   </ItemGroup>
 
+  <!-- Test fixture data is available to local runs and the test host but never ships in the
+       published image (015 US3, FR-010) — Infrastructure/Storage/TestDataFiles.cs falls back to
+       an embedded PDF at runtime, so production needs nothing from this folder. -->
   <ItemGroup>
-    <Content Include="testdata\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="testdata\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <!-- Keep local-only environment configs OUT of the published image (011-trivy-security-scanning).

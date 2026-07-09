@@ -1,6 +1,7 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using FluentValidation;
-using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Domain;
 using HOAManagementCompany.Features.Property.Models;
 
 namespace HOAManagementCompany.Features.Property;
@@ -15,10 +16,8 @@ public class OwnerPatchEndpoint(PropertyService propertyService) : Endpoint<Owne
 
     public override async Task HandleAsync(OwnerPatchRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
-        try { await SendOkAsync(await propertyService.PatchOwnerAsync(propertyId, req, ct), ct); }
-        catch (DomainException ex) { HttpContext.Response.StatusCode = ex.StatusCode;
-        await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct); }
+        var propertyId = User.GetPropertyId();
+        await SendOkAsync(await propertyService.PatchOwnerAsync(propertyId, req, ct), ct);
     }
 }
 

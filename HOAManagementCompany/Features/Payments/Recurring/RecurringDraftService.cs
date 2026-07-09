@@ -1,5 +1,6 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Domain.Payments;
 using HOAManagementCompany.Features.Payments.Ledger;
 using HOAManagementCompany.Features.Payments.Models;
 using HOAManagementCompany.Features.Payments.Services;
@@ -33,6 +34,7 @@ public sealed class RecurringDraftService(
     FeeCalculator feeCalculator,
     PaymentConfigService configService,
     LedgerService ledger,
+    PaymentRecorder recorder,
     ILogger<RecurringDraftService> logger)
 {
     /// <summary>
@@ -131,13 +133,13 @@ public sealed class RecurringDraftService(
 
             var config = await configService.GetForPropertyAsync(r.PropertyId, ct);
             var fee = feeCalculator.Calculate(gross, r.Method, r.MethodFunding, config);
-            var amountCents = (long)Math.Round(fee.Total * 100m, MidpointRounding.AwayFromZero);
+            var amountCents = MoneyPolicy.ToCents(fee.Total);
 
             var result = await gateway.ChargeOffSessionAsync(new CreateOffSessionChargeRequest(
                 owner.StripeCustomerId!,
                 r.VaultedPaymentMethodId!,
                 amountCents,
-                "usd",
+                MoneyPolicy.Currency,
                 new Dictionary<string, string>
                 {
                     ["propertyId"] = r.PropertyId.ToString(),
@@ -181,21 +183,17 @@ public sealed class RecurringDraftService(
                 TransactionId = txn.Id,
             };
 
-            var strategy = db.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            // One atomic unit per mandate via the shared recorder (015 FR-003) — a failed mandate
+            // never rolls back the others, and txn + draft + ledger commit together.
+            await recorder.RecordNewAsync(txn, async innerCt =>
             {
-                await using var tx = await db.Database.BeginTransactionAsync(ct);
-                db.PaymentTransactions.Add(txn);
                 db.DraftEntries.Add(draft);
-                await db.SaveChangesAsync(ct);
 
                 if (succeeded)
                     await ledger.AddPaymentAsync(r.PropertyId, txn.Id, fee.Gross,
                         $"Auto-Pay – {(r.Method == PaymentMethod.Card ? "Card" : "ACH")} – {txn.StripeChargeId}",
-                        entryDate: asOf, ct: ct);
-
-                await tx.CommitAsync(ct);
-            });
+                        entryDate: asOf, ct: innerCt);
+            }, ct);
 
             if (succeeded) charged++; else failed++;
         }

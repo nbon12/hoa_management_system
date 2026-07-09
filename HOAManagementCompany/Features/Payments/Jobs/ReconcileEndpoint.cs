@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using HOAManagementCompany.Infrastructure.Configuration;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Alerts;
 using Microsoft.Extensions.Options;
@@ -25,11 +24,7 @@ public class ReconcileEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var expected = options.Value.SchedulerSharedSecret;
-        var provided = HttpContext.Request.Headers["X-Scheduler-Secret"].FirstOrDefault();
-        if (string.IsNullOrEmpty(expected) || !CryptographicOperations.FixedTimeEquals(
-                Encoding.UTF8.GetBytes(expected),
-                Encoding.UTF8.GetBytes(provided ?? string.Empty)))
+        if (!SchedulerAuth.IsAuthorized(HttpContext, options))
         {
             await SendUnauthorizedAsync(ct);
             return;
@@ -38,9 +33,11 @@ public class ReconcileEndpoint(
         var resolvedAch = await reconciliation.ResolvePendingAchAsync(ct);
         var retriedWebhooks = await reconciliation.RetryPendingWebhooksAsync(ct);
         var dispatchedAlerts = await dispatcher.DispatchPendingAsync(ct);
+        // Report-only status/ledger consistency scan (015 FR-005) — findings go to logs/Sentry.
+        var inconsistencies = await reconciliation.DetectLedgerInconsistenciesAsync(ct);
 
-        await SendOkAsync(new ReconcileResponse(resolvedAch, retriedWebhooks, dispatchedAlerts), ct);
+        await SendOkAsync(new ReconcileResponse(resolvedAch, retriedWebhooks, dispatchedAlerts, inconsistencies.Count), ct);
     }
 }
 
-public record ReconcileResponse(int ResolvedAchTransactions, int RetriedWebhooks, int DispatchedAlerts);
+public record ReconcileResponse(int ResolvedAchTransactions, int RetriedWebhooks, int DispatchedAlerts, int LedgerInconsistencies);

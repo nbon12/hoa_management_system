@@ -1,0 +1,166 @@
+<div class="page-header">
+  <h1 class="page-title">Make a <span class="hand">one-time</span> payment</h1>
+</div>
+
+<!-- Stepper -->
+<div class="stepper">
+  @for (s of steps; track s.n) {
+    <span class="pill"
+          [style.background]="wizard.currentStep() >= s.n ? 'var(--rose)' : ''"
+          [style.color]="wizard.currentStep() >= s.n ? 'var(--paper)' : ''">
+      {{ s.n }} {{ s.label }}
+    </span>
+    @if (!$last) { <span class="stepper__line"></span> }
+  }
+</div>
+
+<!-- Step 1: Amount -->
+@if (wizard.currentStep() === 1) {
+  <div class="card step-card">
+    <div class="section-title">Step 1 — How much?</div>
+    <p class="muted step-card__hint">Pick a preset or type your own.</p>
+    <div class="grid-3 preset-grid">
+      @for (preset of wizard.presets(); track preset.id) {
+        <div class="card preset-card"
+             [attr.data-preset]="preset.id"
+             [style.border-color]="wizard.selectedPreset() === preset.id ? 'var(--ink)' : 'var(--line)'"
+             [style.border-style]="wizard.selectedPreset() === preset.id ? 'solid' : 'dashed'"
+             [style.background]="wizard.selectedPreset() === preset.id ? 'var(--pink)' : 'var(--paper)'"
+             (click)="wizard.selectedPreset.set(preset.id)">
+          <div class="field-label">{{ preset.label }}</div>
+          <div class="mono preset-card__amount">{{ preset.amount | currency }}</div>
+          <div class="muted preset-card__sub">{{ preset.sub }}</div>
+        </div>
+      }
+    </div>
+    <div class="custom-amount">
+      <div class="field-label">Or custom amount</div>
+      <div class="custom-amount__row">
+        <span class="custom-amount__symbol">$</span>
+        <input class="field field--dashed mono"
+               type="number" min="0.01" step="0.01"
+               placeholder="0.00"
+               [disabled]="wizard.selectedPreset() !== 'custom'"
+               [(ngModel)]="wizard.customAmount"
+               (focus)="wizard.selectedPreset.set('custom')">
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Step 2: Method + Stripe Payment Element -->
+@if (wizard.currentStep() === 2) {
+  <div class="card step-card">
+    <div class="section-title">Step 2 — Payment method</div>
+    <div class="method-row">
+      <div class="card method-card"
+           [style.border-color]="wizard.method() === 'card' ? 'var(--ink)' : 'var(--line)'"
+           [style.background]="wizard.method() === 'card' ? 'var(--pink)' : 'var(--paper)'"
+           (click)="wizard.selectMethod('card')">
+        <div class="method-card__icon" aria-hidden="true">💳</div>
+        <div class="method-card__name">Credit card</div>
+        <div class="muted method-card__fee">{{ wizard.cardFeeLabel() }}</div>
+      </div>
+      <div class="card method-card"
+           [style.border-color]="wizard.method() === 'ach' ? 'var(--ink)' : 'var(--line)'"
+           [style.background]="wizard.method() === 'ach' ? 'var(--pink)' : 'var(--paper)'"
+           (click)="wizard.selectMethod('ach')">
+        <div class="method-card__icon" aria-hidden="true">🏦</div>
+        <div class="method-card__name">eCheck (ACH)</div>
+        <div class="muted method-card__fee">{{ wizard.achFeeLabel() }}</div>
+      </div>
+    </div>
+
+    @if (!wizard.clientSecret() && wizard.loading()) {
+      <div class="muted preparing" role="status">
+        <span class="spinner" aria-hidden="true"></span> Preparing secure payment form…
+      </div>
+    }
+
+    <app-error-banner [message]="wizard.error() || null" />
+  </div>
+}
+
+<!-- Stripe Payment Element. Kept mounted across method (2) and review (3): confirmPayment needs
+     the same elements instance that rendered the form, so it must outlive the step-2 card. Card
+     and bank details live only in the Stripe-hosted iframe — no PAN/account touches Angular
+     state or our backend (SC-001). -->
+@if (wizard.clientSecret() && (wizard.currentStep() === 2 || wizard.currentStep() === 3)) {
+  <div class="card step-card">
+    <div class="section-title">{{ wizard.currentStep() === 2 ? 'Card or bank details' : 'Paying with' }}</div>
+    <div class="element-slot">
+      <app-stripe-elements-host [clientSecret]="wizard.clientSecret()!" />
+    </div>
+  </div>
+}
+
+<!-- Step 3: Review -->
+@if (wizard.currentStep() === 3) {
+  <div class="card step-card review-card">
+    <div class="section-title">Step 3 — Review & submit</div>
+    <div class="review-rows">
+      <div class="review-row">
+        <span>Amount</span>
+        <b class="mono" data-testid="summary-amount">{{ wizard.intent()?.amount | currency }}</b>
+      </div>
+      <div class="review-row">
+        <span>Processing fee</span>
+        <b class="mono" data-testid="summary-fee">{{ wizard.feeDisplay() }}</b>
+      </div>
+      <hr class="divider">
+      <div class="review-row">
+        <b>Total</b>
+        <b class="mono review-row__total" data-testid="summary-total">{{ wizard.intent()?.total | currency }}</b>
+      </div>
+      <div class="review-row review-row--soft">
+        <span>Method</span>
+        <span>{{ wizard.method() === 'card' ? '💳 Credit card' : '🏦 eCheck' }}</span>
+      </div>
+    </div>
+    <div class="card card--pink posts-note">
+      <span aria-hidden="true">ⓘ</span> Posts within 1 business day.
+    </div>
+    <app-error-banner [message]="wizard.error() || null" />
+  </div>
+}
+
+<!-- Step 4: Confirmation -->
+@if (wizard.currentStep() === 4 && wizard.result()) {
+  <div class="card card--lav receipt-card" role="status" data-testid="receipt">
+    <div class="receipt-card__icon" aria-hidden="true">✅</div>
+    <h2 class="receipt-card__title">Payment submitted!</h2>
+    <p class="muted receipt-card__line">Confirmation # <b class="mono" data-testid="confirmation-number">{{ wizard.result()!.confirmationNumber }}</b></p>
+    <p class="muted">{{ wizard.result()!.total | currency }} — {{ wizard.result()!.maskedMethod }}</p>
+    <div class="receipt-card__actions">
+      <a routerLink="/app/payments/statement" class="btn">View statement</a>
+      <a routerLink="/app/dashboard" class="btn btn--primary">Back to dashboard</a>
+    </div>
+  </div>
+}
+
+<!-- Navigation buttons -->
+@if (wizard.currentStep() < 4) {
+  <div class="wizard-nav">
+    @if (wizard.currentStep() > 1) {
+      <button class="btn btn--ghost" (click)="wizard.back()">← Back</button>
+    } @else {
+      <a routerLink="/app/payments/statement" class="btn btn--ghost">← Cancel</a>
+    }
+    <button class="btn btn--primary wizard-nav__next"
+            (click)="next()" [disabled]="wizard.loading() || (wizard.currentStep() === 2 && !wizard.clientSecret())">
+      @if (wizard.loading()) { <span class="spinner" aria-hidden="true"></span> }
+      @else if (wizard.currentStep() === 3) { Submit payment }
+      @else { Continue → }
+    </button>
+  </div>
+}
+
+<!-- Pay by mail note -->
+<div class="card card--dashed mail-note">
+  <div class="section-title">Pay by mail</div>
+  <p class="muted mail-note__body">
+    Payment Processing Center<br>
+    C/O NekoHOA · 8508 Park Rd<br>
+    PMB #118 · Charlotte, NC 28210
+  </p>
+</div>

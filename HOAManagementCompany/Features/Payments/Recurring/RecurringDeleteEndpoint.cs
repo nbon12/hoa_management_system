@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 
 namespace HOAManagementCompany.Features.Payments.Recurring;
@@ -12,7 +13,7 @@ public class RecurringDeleteEndpoint(PaymentService paymentService) : EndpointWi
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         await paymentService.CancelRecurringAsync(propertyId, ct);
         await SendNoContentAsync(ct);
     }

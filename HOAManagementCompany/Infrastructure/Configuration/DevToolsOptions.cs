@@ -28,11 +28,19 @@ public sealed class DevToolsOptions
     public bool? ExposeExceptionDetail { get; set; }
 
     /// <summary>
+    /// The resolved host environment name — not bound from configuration; stamped by
+    /// <see cref="ApplyEnvironmentDefaults"/> so the validator can enforce environment-level
+    /// invariants (015 US3: configuration flags cannot enable test machinery in Production).
+    /// </summary>
+    public string EnvironmentName { get; set; } = string.Empty;
+
+    /// <summary>
     /// Applies environment-derived defaults after binding: when <see cref="ExposeExceptionDetail"/>
     /// was not set explicitly it defaults to dev-like; Production then forces it off unconditionally.
     /// </summary>
     public void ApplyEnvironmentDefaults(IHostEnvironment environment)
     {
+        EnvironmentName = environment.EnvironmentName;
         ExposeExceptionDetail ??= StartupOptions.IsDevLike(environment);
 
         if (environment.IsProduction())

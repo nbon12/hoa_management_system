@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using HOAManagementCompany.Domain.Enums;
-using HOAManagementCompany.Features.Payments;
+using HOAManagementCompany.Domain.Payments;
+using HOAManagementCompany.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
 using Stripe;
 
@@ -68,14 +69,28 @@ public sealed class StripeGateway : IStripeGateway
         return new StripeChargeResult(
             charge.Id,
             charge.BalanceTransactionId,
-            charge.BalanceTransaction is not null ? charge.BalanceTransaction.Fee / 100m : null,
+            charge.BalanceTransaction is not null ? MoneyPolicy.FromCents(charge.BalanceTransaction.Fee) : null,
             null,
-            charge.AmountRefunded / 100m);
+            MoneyPolicy.FromCents(charge.AmountRefunded));
     }
 
-    public Event ConstructEvent(string json, string signatureHeader) =>
-        EventUtility.ConstructEvent(json, signatureHeader, _options.WebhookSigningSecret,
-            tolerance: _options.WebhookToleranceSeconds);
+    public PaymentProviderEvent ParseEvent(string json, string signatureHeader)
+    {
+        Event evt;
+        try
+        {
+            evt = EventUtility.ConstructEvent(json, signatureHeader, _options.WebhookSigningSecret,
+                tolerance: _options.WebhookToleranceSeconds);
+        }
+        catch (StripeException ex)
+        {
+            throw new ProviderSignatureVerificationException("Webhook signature verification failed.", ex);
+        }
+        return StripeEventTranslator.Translate(evt);
+    }
+
+    public PaymentProviderEvent ParseStoredEvent(string json) =>
+        StripeEventTranslator.Translate(EventUtility.ParseEvent(json));
 
     public async Task<string> EnsureCustomerAsync(string? existingCustomerId, string email, string? name, CancellationToken ct = default)
     {

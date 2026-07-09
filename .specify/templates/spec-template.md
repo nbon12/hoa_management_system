@@ -112,7 +112,7 @@
 - **API contract**: [Response shape, error shape, pagination defaults/max limits for
   collections (`limit`/`offset`), UTC timestamps, ID format, and breaking-change notes]
 - **API implementation and docs**: [FastEndpoints endpoint requirements;
-  Swagger/OpenAPI behavior via Swashbuckle; confirm `/swagger` only exists in
+  Swagger/OpenAPI behavior via FastEndpoints.Swagger (NSwag); confirm `/swagger` only exists in
   development and is disabled in production]
 - **Database/runtime**: [Strict migrations, idempotent startup migrations in Cloud Run,
   Neon low max connections, pooling, and short-lived DbContext expectations]

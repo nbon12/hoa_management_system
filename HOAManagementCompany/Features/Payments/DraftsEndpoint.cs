@@ -1,3 +1,4 @@
+using HOAManagementCompany.Features.Common;
 using FastEndpoints;
 using HOAManagementCompany.Features.Payments.Models;
 
@@ -13,7 +14,7 @@ public class DraftsEndpoint(PaymentService paymentService) : Endpoint<DraftsRequ
 
     public override async Task HandleAsync(DraftsRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        var propertyId = User.GetPropertyId();
         var result = await paymentService.GetDraftsAsync(propertyId, req, ct);
         await SendOkAsync(result, ct);
     }

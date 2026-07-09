@@ -1,3 +1,4 @@
+using HOAManagementCompany.Domain;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -201,10 +202,4 @@ public class AuthService(
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
-}
-
-public class DomainException(string code, string message, int statusCode) : Exception(message)
-{
-    public string Code { get; } = code;
-    public int StatusCode { get; } = statusCode;
 }
