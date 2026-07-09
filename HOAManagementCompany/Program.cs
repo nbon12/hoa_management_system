@@ -335,17 +335,24 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Auth.AuthService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.EmailVerificationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.ClaimCodeService>();
 // Verification/claim-code delivery: SendGrid email when configured, otherwise audit-log only
-// (local dev / CI, where no SendGrid credentials exist).
+// (local dev / CI, where no SendGrid credentials exist). When e2e test support is enabled
+// (Dev/PR/Test — never Production/Staging), the notifier is decorated so delivered codes are
+// also captured in the in-memory AuthCodeVault for the gated /e2e/auth-codes seam (020-D FR-D11).
+builder.Services.AddSingleton<HOAManagementCompany.Features.DevTools.AuthCodeVault>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.IAuthNotifier>(sp =>
 {
     var emailProvider = sp.GetServices<HOAManagementCompany.Infrastructure.Payments.Alerts.IAlertProvider>()
         .FirstOrDefault(p => p.Channel == "email");
-    return emailProvider is { IsConfigured: true }
+    HOAManagementCompany.Features.Auth.IAuthNotifier notifier = emailProvider is { IsConfigured: true }
         ? new HOAManagementCompany.Features.Auth.EmailAuthNotifier(
             emailProvider,
             sp.GetRequiredService<ILogger<HOAManagementCompany.Features.Auth.EmailAuthNotifier>>())
         : new HOAManagementCompany.Features.Auth.LoggingAuthNotifier(
             sp.GetRequiredService<ILogger<HOAManagementCompany.Features.Auth.LoggingAuthNotifier>>());
+    return builder.Configuration.GetValue<bool>("DevTools:E2ECleanupEnabled")
+        ? new HOAManagementCompany.Features.DevTools.VaultingAuthNotifier(
+            notifier, sp.GetRequiredService<HOAManagementCompany.Features.DevTools.AuthCodeVault>())
+        : notifier;
 });
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.PaymentService>();
