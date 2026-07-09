@@ -28,6 +28,10 @@ describe('Session security (020-D FR-D1)', () => {
     cy.get('input[name="password"]').type('Password1!');
     cy.get('button.btn--primary').click();
     cy.wait('@login');
+    // Await the post-login navigation before proceeding — on deployed previews the lazy
+    // dashboard chunk loads over the network, and reloading before it lands leaves the test
+    // on /login (observed live on pr-env; local dev-server chunks are instant).
+    cy.url({ timeout: 15000 }).should('include', '/app/dashboard');
   }
 
   it('after login no credential material is script-readable; only the hint remains', () => {
