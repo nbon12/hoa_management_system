@@ -140,6 +140,44 @@ jobs:
         # happy-path. The Stripe instance is faked at the window.Stripe seam — no live Stripe calls.
         run: npm run e2e:ci
 
+  contract-drift:
+    # 015 US4 (FR-011): the committed generated client types must match the backend's OpenAPI
+    # document. Regenerates types (backend `--export-openapi` → openapi-typescript) and fails on
+    # any diff — a contract change without regenerated committed types cannot pass verification.
+    name: API contract drift gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: neko-hoa/package-lock.json
+
+      - name: Install dependencies
+        working-directory: neko-hoa
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+        run: npm ci
+
+      - name: Regenerate API contract types
+        working-directory: neko-hoa
+        run: npm run generate:api-types
+
+      - name: Fail on drift
+        run: |
+          git diff --exit-code -- neko-hoa/src/app/core/api/generated-types.ts || {
+            echo "::error::Generated API types are stale. Run 'npm run generate:api-types' in neko-hoa/ and commit the result."
+            exit 1
+          }
+
   integration-sandbox:
     name: Integration (provider sandbox)
     runs-on: ubuntu-latest

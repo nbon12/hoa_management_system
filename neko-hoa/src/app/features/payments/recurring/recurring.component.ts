@@ -227,7 +227,8 @@ export class RecurringComponent implements OnInit {
       const rec = await this.svc.getRecurring();
       this.rec.set(rec);
       if (rec) {
-        this.amountType.set(rec.amountType);
+        // Contract type is `string` (generated); the backend only ever emits these three values.
+        this.amountType.set(rec.amountType as 'assessment' | 'balance' | 'fixed');
         this.fixedAmount = rec.fixedAmount != null ? String(rec.fixedAmount) : '';
         this.draftDay = rec.draftDay;
       }
