@@ -1,0 +1,162 @@
+<div class="page-header">
+  <h1 class="page-title">Auto-pay</h1>
+  <span class="muted tagline">set it &amp; forget it</span>
+  @if (wizard.rec()?.status === 'active') {
+    <span class="pill pill--ok enrolled-pill" data-testid="enrolled-pill"><span aria-hidden="true">✓</span> Enrolled</span>
+    <div class="page-header__actions">
+      <button class="btn btn--ghost" (click)="confirmCancel()" data-testid="turn-off"><span aria-hidden="true">🗑</span> Turn off</button>
+    </div>
+  }
+</div>
+
+@if (wizard.error()) {
+  <div class="alert alert--error" role="alert" data-testid="error"><span aria-hidden="true">⚠</span> {{ wizard.error() }}</div>
+}
+
+@if (wizard.loading()) {
+  <div class="card" role="status"><span class="spinner" aria-hidden="true"></span> Loading auto-pay…</div>
+} @else {
+  <!-- Current enrollment status -->
+  @if (wizard.rec(); as r) {
+    <div class="card card--lav status-card" data-testid="status-card">
+      <div>
+        <div class="field-label">Status</div>
+        <div class="status-card__value" data-testid="status-state">
+          {{ r.status === 'active' ? 'Active' : 'Inactive' }}
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Next draft</div>
+        <div class="status-card__value" data-testid="next-draft">
+          @if (r.nextDraftDate) {
+            {{ r.nextDraftDate | date:'MMM d' }} ·
+            <span data-testid="next-draft-amount">{{ r.nextDraftAmount | currency }}</span>
+          } @else { — }
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Source</div>
+        <div class="status-card__value" data-testid="masked-method">{{ r.maskedMethod ?? 'Not set' }}</div>
+      </div>
+    </div>
+  }
+
+  <!-- Set up / update -->
+  @if (!wizard.setupMode()) {
+    <div class="setup-toggle-row">
+      <button class="btn btn--primary" (click)="wizard.beginSetup()" data-testid="setup-toggle">
+        {{ wizard.rec()?.status === 'active' ? 'Update payment method & settings' : 'Set up auto-pay' }}
+      </button>
+    </div>
+  } @else {
+    <div class="grid-2 setup-grid">
+      <!-- What gets paid -->
+      <div class="card">
+        <div class="section-title">What gets paid</div>
+        <div class="amount-options">
+          @for (opt of amountOptions; track opt.id) {
+            <div class="card amount-option" [attr.data-amount-type]="opt.id"
+                 [style.border-color]="wizard.amountType() === opt.id ? 'var(--ink)' : 'var(--line)'"
+                 [style.background]="wizard.amountType() === opt.id ? 'var(--pink)' : 'var(--paper)'"
+                 (click)="wizard.amountType.set(opt.id)">
+              <span class="radio" [class.radio--on]="wizard.amountType() === opt.id"></span>
+              <div class="amount-option__body">
+                <div [style.font-weight]="wizard.amountType() === opt.id ? 600 : 400">{{ opt.label }}</div>
+                <div class="muted amount-option__sub">{{ opt.sub }}</div>
+              </div>
+            </div>
+          }
+          @if (wizard.amountType() === 'fixed') {
+            <div class="fixed-amount">
+              <div class="field-label">Fixed amount</div>
+              <input class="field mono" type="number" min="1" step="0.01"
+                     placeholder="0.00" [(ngModel)]="wizard.fixedAmount" data-testid="fixed-amount">
+            </div>
+          }
+        </div>
+
+        <div class="field-label draft-date-label">Draft date</div>
+        <select class="field field--dashed" [(ngModel)]="wizard.draftDay" data-testid="draft-day">
+          @for (d of draftDayOptions; track d) {
+            <option [value]="d">{{ ordinal(d) }} of each month</option>
+          }
+        </select>
+      </div>
+
+      <!-- Payment method (vaulted via Stripe) -->
+      <div class="card">
+        <div class="section-title">Payment method</div>
+        <p class="muted vault-note">
+          Your card or bank details are entered securely with Stripe and stored on file as a token —
+          they never touch NekoHOA's servers.
+        </p>
+        @if (wizard.clientSecret()) {
+          <div class="element-slot">
+            <app-stripe-elements-host [clientSecret]="wizard.clientSecret()!" />
+          </div>
+        } @else {
+          <div class="muted preparing" role="status">
+            <span class="spinner" aria-hidden="true"></span> Preparing secure form…
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Mandate authorization -->
+    <div class="card card--dashed">
+      <div class="section-title">Authorization</div>
+      <p class="muted mandate-text">{{ mandateText }}</p>
+      <label class="mandate-accept">
+        <input type="checkbox" [(ngModel)]="wizard.mandateAccepted" data-testid="mandate-checkbox">
+        I authorize this recurring payment.
+      </label>
+    </div>
+
+    <div class="setup-actions">
+      <button class="btn btn--ghost" (click)="wizard.cancelSetup()">Cancel</button>
+      <button class="btn btn--primary" (click)="save()"
+              [disabled]="wizard.saving() || !wizard.clientSecret() || !wizard.mandateAccepted" data-testid="save">
+        @if (wizard.saving()) { <span class="spinner" aria-hidden="true"></span> } @else { Save auto-pay }
+      </button>
+    </div>
+  }
+
+  @if (wizard.saved()) {
+    <div class="alert alert--success" role="status" data-testid="saved"><span aria-hidden="true">✓</span> Auto-pay settings saved.</div>
+  }
+
+  <!-- Payment alerts opt-in (US3) -->
+  <app-payment-alerts />
+
+  <!-- Draft history -->
+  <div class="card card--dashed">
+    <div class="drafts-header">
+      <div class="section-title drafts-header__title">Drafts</div>
+      <span class="muted drafts-header__sub">past &amp; scheduled</span>
+    </div>
+    <table class="data-table drafts-table" data-testid="drafts-table">
+      <caption class="sr-only">Auto-pay draft history: past and scheduled drafts with amount and status</caption>
+      <thead>
+        <tr><th scope="col">Date</th><th scope="col">Source</th><th scope="col" class="num">Amount</th><th scope="col">Status</th></tr>
+      </thead>
+      <tbody>
+        @for (d of wizard.drafts(); track d.id) {
+          <tr>
+            <td>{{ d.date | date:'MM/dd/yy' }}</td>
+            <td>{{ d.source }}</td>
+            <td class="num">{{ d.amount | currency }}</td>
+            <td><span class="pill" [class.pill--ok]="(d.transactionStatus ?? d.status) === 'Succeeded'">
+              {{ d.transactionStatus ?? d.status }}
+            </span></td>
+          </tr>
+        } @empty {
+          <tr><td colspan="4" class="muted">No drafts yet.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="back-row">
+    <a routerLink="/app/payments/statement" class="btn btn--ghost">Back to statement</a>
+  </div>
+}

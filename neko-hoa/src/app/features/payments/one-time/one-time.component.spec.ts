@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/angular';
 import { provideRouter } from '@angular/router';
 import { provideNgxStripe } from 'ngx-stripe';
-import { of } from 'rxjs';
 import { OneTimeComponent } from './one-time.component';
 import {
   PaymentsService, PaymentOptions, PaymentIntentResult, ConfirmResult,
@@ -47,14 +46,14 @@ async function renderComponent() {
 describe('OneTimeComponent', () => {
   it('renders and starts on step 1', async () => {
     const { fixture } = await renderComponent();
-    expect(fixture.componentInstance.currentStep()).toBe(1);
+    expect(fixture.componentInstance.wizard.currentStep()).toBe(1);
     expect(screen.getByText('Step 1 — How much?')).toBeTruthy();
   });
 
   it('builds amount presets from the backend options (FR-007)', async () => {
     const { fixture } = await renderComponent();
     const comp = fixture.componentInstance;
-    const presets = comp.presets();
+    const presets = comp.wizard.presets();
     expect(presets.find(p => p.id === 'current')!.amount).toBe(300);
     expect(presets.find(p => p.id === 'next')!.amount).toBe(250);
     expect(presets.find(p => p.id === 'both')!.amount).toBe(550);
@@ -76,9 +75,9 @@ describe('OneTimeComponent', () => {
     const { fixture } = await renderComponent();
     const comp = fixture.componentInstance;
     // Jump to review with the intent the server returned.
-    comp.intent.set(INTENT);
-    comp.clientSecret.set(INTENT.clientSecret);
-    comp.currentStep.set(3);
+    comp.wizard.intent.set(INTENT);
+    comp.wizard.clientSecret.set(INTENT.clientSecret);
+    comp.wizard.currentStep.set(3);
     fixture.detectChanges();
 
     expect(screen.getByTestId('summary-fee').textContent).toContain('1.95');
@@ -90,12 +89,12 @@ describe('OneTimeComponent', () => {
     const comp = fixture.componentInstance;
     const svc = fixture.debugElement.injector.get(PaymentsService);
 
-    comp.selectedPreset.set('current');
-    comp.selectMethod('ach');
+    comp.wizard.selectedPreset.set('current');
+    comp.wizard.selectMethod('ach');
     await fixture.whenStable();
 
     expect(svc.createIntent).toHaveBeenCalledWith(300, 'ach');
-    expect(comp.clientSecret()).toBe(INTENT.clientSecret);
+    expect(comp.wizard.clientSecret()).toBe(INTENT.clientSecret);
   });
 
   it('confirms via Stripe.js then records on the backend and shows the receipt', async () => {
@@ -104,19 +103,19 @@ describe('OneTimeComponent', () => {
     const svc = fixture.debugElement.injector.get(PaymentsService);
 
     // Arrange a ready-to-confirm review state without mounting the real Stripe iframe.
-    comp.intent.set(INTENT);
-    comp.clientSecret.set(INTENT.clientSecret);
-    comp.currentStep.set(3);
-    (comp as any).paymentElement = { elements: {} };
-    spyOn(comp.stripe, 'confirmPayment').and.returnValue(
-      of({ paymentIntent: { status: 'succeeded' } }) as any);
+    comp.wizard.intent.set(INTENT);
+    comp.wizard.clientSecret.set(INTENT.clientSecret);
+    comp.wizard.currentStep.set(3);
+    const confirmPayment = jasmine.createSpy('confirmPayment')
+      .and.resolveTo({ error: null, status: 'succeeded' });
+    (comp as any).stripeHost = { confirmPayment };
 
     await comp.next(); // step 3 → submit
 
-    expect(comp.stripe.confirmPayment).toHaveBeenCalled();
+    expect(confirmPayment).toHaveBeenCalled();
     expect(svc.confirmPayment).toHaveBeenCalledWith('pi_test_123');
-    expect(comp.currentStep()).toBe(4);
-    expect(comp.result()!.confirmationNumber).toBe('NEKO-ABC123');
+    expect(comp.wizard.currentStep()).toBe(4);
+    expect(comp.wizard.result()!.confirmationNumber).toBe('NEKO-ABC123');
 
     fixture.detectChanges();
     expect(screen.getByTestId('confirmation-number').textContent).toContain('NEKO-ABC123');
@@ -126,16 +125,17 @@ describe('OneTimeComponent', () => {
     const { fixture } = await renderComponent();
     const comp = fixture.componentInstance;
 
-    comp.intent.set(INTENT);
-    comp.clientSecret.set(INTENT.clientSecret);
-    comp.currentStep.set(3);
-    (comp as any).paymentElement = { elements: {} };
-    spyOn(comp.stripe, 'confirmPayment').and.returnValue(
-      of({ error: { message: 'Your card was declined.' } }) as any);
+    comp.wizard.intent.set(INTENT);
+    comp.wizard.clientSecret.set(INTENT.clientSecret);
+    comp.wizard.currentStep.set(3);
+    (comp as any).stripeHost = {
+      confirmPayment: jasmine.createSpy('confirmPayment')
+        .and.resolveTo({ error: 'Your card was declined.', status: null }),
+    };
 
     await comp.next();
 
-    expect(comp.currentStep()).toBe(3);
-    expect(comp.error()).toContain('declined');
+    expect(comp.wizard.currentStep()).toBe(3);
+    expect(comp.wizard.error()).toContain('declined');
   });
 });

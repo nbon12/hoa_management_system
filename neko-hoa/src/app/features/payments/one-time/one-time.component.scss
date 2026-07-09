@@ -1,0 +1,57 @@
+/* One-time payment wizard (015 US6, FR-020): presentation extracted from the former inline
+   template — dynamic state styling stays as [style.*] bindings in the template. */
+
+.step-card { padding: 24px; }
+.step-card__hint { margin-bottom: 14px; }
+
+.preset-grid { gap: 10px; }
+.preset-card {
+  cursor: pointer;
+  padding: 14px 10px;
+  text-align: center;
+}
+.preset-card__amount { font-size: 22px; margin: 4px 0; }
+.preset-card__sub { font-size: 11px; }
+
+.custom-amount { margin-top: 14px; }
+.custom-amount__row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  max-width: 200px;
+}
+.custom-amount__symbol { font-weight: 600; }
+
+.method-row { display: flex; gap: 10px; margin-top: 14px; }
+.method-card { cursor: pointer; flex: 1; text-align: center; }
+.method-card__icon { font-size: 24px; }
+.method-card__name { font-weight: 600; margin-top: 6px; }
+.method-card__fee { font-size: 11px; }
+
+.preparing { align-items: center; display: flex; gap: 8px; margin-top: 16px; }
+.element-slot { margin-top: 14px; }
+
+.review-card { max-width: 480px; }
+.review-rows {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  gap: 8px;
+  margin-top: 16px;
+}
+.review-row { display: flex; justify-content: space-between; }
+.review-row--soft { color: var(--ink-soft); }
+.review-row__total { font-size: 18px; }
+.posts-note { display: flex; font-size: 11px; gap: 8px; margin-top: 14px; }
+
+.receipt-card { max-width: 480px; padding: 32px; text-align: center; }
+.receipt-card__icon { font-size: 48px; }
+.receipt-card__title { font-weight: 600; margin-top: 12px; }
+.receipt-card__line { margin-top: 6px; }
+.receipt-card__actions { display: flex; gap: 8px; justify-content: center; margin-top: 20px; }
+
+.wizard-nav { display: flex; gap: 8px; margin-top: auto; }
+.wizard-nav__next { margin-left: auto; }
+
+.mail-note { max-width: 300px; }
+.mail-note__body { font-size: 11px; line-height: 1.6; }
