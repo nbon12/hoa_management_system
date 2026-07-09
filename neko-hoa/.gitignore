@@ -48,3 +48,7 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# 020-D FR-D3: Playwright auth state is regenerated at runtime by e2e/global-setup.ts and
+# must never be committed (it contains a live refresh token).
+e2e/.auth/
