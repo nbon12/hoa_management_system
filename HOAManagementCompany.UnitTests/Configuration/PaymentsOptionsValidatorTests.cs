@@ -2,7 +2,7 @@ using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Configuration;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Configuration;
+namespace HOAManagementCompany.UnitTests.Configuration;
 
 /// <summary>
 /// Locks in the payments fee-policy rules that were previously comment-only (008 FR-006/FR-007).

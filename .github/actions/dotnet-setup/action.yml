@@ -1,0 +1,17 @@
+# Shared .NET toolchain setup (015 US6, FR-018): one pinned setup-dotnet reference instead of a
+# copy per workflow. Checkout stays in the caller (fetch-depth varies per job).
+name: "Setup .NET"
+description: "Pinned actions/setup-dotnet with the repo's .NET version."
+
+inputs:
+  dotnet-version:
+    description: ".NET SDK version"
+    required: false
+    default: "9.0.x"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}

@@ -4,7 +4,7 @@ using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Features.Payments.Services;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Payments;
+namespace HOAManagementCompany.UnitTests.Payments;
 
 /// <summary>
 /// <see cref="PaymentConfigService.BuildDefault"/> materialises a per-HOA fee policy from deployment

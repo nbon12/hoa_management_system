@@ -3,7 +3,7 @@ using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Payments.Ledger;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Payments;
+namespace HOAManagementCompany.UnitTests.Payments;
 
 public class AllocationServiceTests
 {

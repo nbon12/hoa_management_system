@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { HttpParams } from '@angular/common/http';
+import { ApiClient } from '../api/api-client';
 import {
   Announcement, AnnouncementCategory,
   Poll, Violation, ViolationStatus, ViolationCategory,
@@ -46,26 +45,20 @@ interface ApiDocument {
 
 @Injectable({ providedIn: 'root' })
 export class CommunityService {
-  private readonly base = environment.apiBaseUrl;
-
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiClient) {}
 
   // ── Announcements ─────────────────────────────────────────────────────────
 
   async getAnnouncements(category?: AnnouncementCategory): Promise<Announcement[]> {
     let params = new HttpParams().set('pageSize', '50');
     if (category) params = params.set('category', category);
-    const res = await firstValueFrom(
-      this.http.get<ApiPage<ApiAnnouncement>>(`${this.base}/community/announcements`, { params })
-    );
+    const res = await this.api.get<ApiPage<ApiAnnouncement>>('/community/announcements', params);
     return res.items.map(a => this._mapAnnouncement(a));
   }
 
   async getPoll(): Promise<Poll | null> {
     try {
-      const p = await firstValueFrom(
-        this.http.get<ApiPoll>(`${this.base}/community/poll`)
-      );
+      const p = await this.api.get<ApiPoll>('/community/poll');
       return {
         question:    p.question,
         options:     p.options.map(o => ({ label: o.optionText, percent: Math.round(Number(o.percentage)) })),
@@ -80,9 +73,7 @@ export class CommunityService {
   async getViolations(status?: 'open' | 'closed'): Promise<Violation[]> {
     let params = new HttpParams().set('pageSize', '100');
     if (status) params = params.set('status', status);
-    const res = await firstValueFrom(
-      this.http.get<ApiPage<ApiViolation>>(`${this.base}/community/violations`, { params })
-    );
+    const res = await this.api.get<ApiPage<ApiViolation>>('/community/violations', params);
     return res.items.map(v => ({
       id:       v.id,
       issue:    v.title,
@@ -97,9 +88,7 @@ export class CommunityService {
   async getCalendarEvents(category?: EventCategory): Promise<CalendarEvent[]> {
     let params = new HttpParams().set('pageSize', '100');
     if (category) params = params.set('category', category);
-    const res = await firstValueFrom(
-      this.http.get<ApiPage<ApiEvent>>(`${this.base}/community/events`, { params })
-    );
+    const res = await this.api.get<ApiPage<ApiEvent>>('/community/events', params);
     return res.items.map(e => ({
       id:          e.id,
       title:       e.title,
@@ -118,33 +107,25 @@ export class CommunityService {
       if (category === 'Pinned') params = params.set('pinned', 'true');
       else params = params.set('category', category);
     }
-    const res = await firstValueFrom(
-      this.http.get<ApiPage<ApiDocument>>(`${this.base}/community/documents`, { params })
-    );
+    const res = await this.api.get<ApiPage<ApiDocument>>('/community/documents', params);
     return res.items.map(d => this._mapDocument(d));
   }
 
   async searchDocuments(query: string): Promise<HOADocument[]> {
     const params = new HttpParams().set('search', query).set('pageSize', '200');
-    const res = await firstValueFrom(
-      this.http.get<ApiPage<ApiDocument>>(`${this.base}/community/documents`, { params })
-    );
+    const res = await this.api.get<ApiPage<ApiDocument>>('/community/documents', params);
     return res.items.map(d => this._mapDocument(d));
   }
 
   async getDocumentDownloadUrl(documentId: string): Promise<{ url: string; expiresAt: string }> {
-    return firstValueFrom(
-      this.http.get<{ url: string; expiresAt: string }>(
-        `${this.base}/community/documents/${documentId}/download`,
-      ),
+    return this.api.get<{ url: string; expiresAt: string }>(
+      `/community/documents/${documentId}/download`,
     );
   }
 
   async getCommunityDirectory(): Promise<{ neighbors: any[]; totalSharing: number; totalHouseholds: number }> {
-    return firstValueFrom(
-      this.http.get<{ neighbors: any[]; totalSharing: number; totalHouseholds: number }>(
-        `${this.base}/community/directory`
-      )
+    return this.api.get<{ neighbors: any[]; totalSharing: number; totalHouseholds: number }>(
+      '/community/directory'
     );
   }
 

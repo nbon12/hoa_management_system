@@ -2,7 +2,7 @@ using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Infrastructure.Storage;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Configuration;
+namespace HOAManagementCompany.UnitTests.Configuration;
 
 public class StorageOptionsValidatorTests
 {

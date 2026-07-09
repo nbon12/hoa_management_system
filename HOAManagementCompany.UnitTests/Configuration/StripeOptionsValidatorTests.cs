@@ -2,7 +2,7 @@ using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Configuration;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Configuration;
+namespace HOAManagementCompany.UnitTests.Configuration;
 
 public class StripeOptionsValidatorTests
 {

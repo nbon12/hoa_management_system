@@ -29,19 +29,8 @@ public class LedgerConsistencyDetectionTests(TestDatabaseFixture fixture) : Paym
         return (property.Id, owner.Id);
     }
 
-    private static PaymentTransaction Txn(Guid propertyId, Guid ownerId, TransactionStatus status, decimal gross = 250m) => new()
-    {
-        Id = Guid.NewGuid(),
-        PropertyId = propertyId,
-        OwnerId = ownerId,
-        StripePaymentIntentId = $"pi_test_{Guid.NewGuid():N}",
-        StripeChargeId = $"ch_test_{Guid.NewGuid():N}",
-        GrossAmount = gross,
-        FeeAmount = 0m,
-        Total = gross,
-        Status = status,
-        PaymentMethod = PaymentMethod.Ach,
-    };
+    private static PaymentTransaction Txn(Guid propertyId, Guid ownerId, TransactionStatus status, decimal gross = 250m) =>
+        PaymentFactory.Transaction(propertyId, ownerId, status, PaymentMethod.Ach, gross);
 
     [Fact]
     public async Task ReturnedWithoutReversal_IsReportedAndNotMutated()

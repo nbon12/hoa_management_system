@@ -2,7 +2,7 @@ using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Features.Payments;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Payments;
+namespace HOAManagementCompany.UnitTests.Payments;
 
 /// <summary>
 /// <see cref="TwilioOptions.IsConfigured"/> must accept either auth pairing the adapter supports:

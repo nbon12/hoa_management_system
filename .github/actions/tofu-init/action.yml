@@ -1,0 +1,38 @@
+# Shared OpenTofu setup for the long-lived environment roots (015 US6, FR-018): WIF auth +
+# setup-opentofu + init. The per-PR variant with its state-prefix contract stays in
+# pr-env-tofu-init; this one serves infra-plan.yml / infra-apply.yml against the default prefix.
+name: "Tofu init (environment root)"
+description: "Authenticate via WIF and run tofu init in the given working directory."
+
+inputs:
+  wif_provider:
+    description: "GCP Workload Identity provider"
+    required: true
+  service_account:
+    description: "Deployer SA email"
+    required: true
+  working-directory:
+    description: "Environment root to init"
+    required: true
+  tofu_version:
+    description: "OpenTofu version"
+    required: false
+    default: "1.8.0"
+
+runs:
+  using: composite
+  steps:
+    - id: auth
+      uses: google-github-actions/auth@v3
+      with:
+        workload_identity_provider: ${{ inputs.wif_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - uses: opentofu/setup-opentofu@v1
+      with:
+        tofu_version: ${{ inputs.tofu_version }}
+
+    - name: tofu init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: tofu init -input=false

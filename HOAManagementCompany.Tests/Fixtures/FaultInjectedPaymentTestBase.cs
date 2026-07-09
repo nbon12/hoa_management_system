@@ -56,27 +56,9 @@ public abstract class FaultInjectedPaymentTestBase(TestDatabaseFixture fixture) 
         var owner = OwnerFactory.Create(property.Id, email: $"us1-{suffix}@test.dev");
         db.Properties.Add(property);
         db.Owners.Add(owner);
-        db.HoaPaymentConfigs.Add(new HoaPaymentConfig
-        {
-            Id = Guid.NewGuid(),
-            CommunityId = property.CommunityId,
-            NsfFeeEnabled = true,
-            NsfFeeAmount = 25m,
-        });
+        db.HoaPaymentConfigs.Add(PaymentFactory.NsfEnabledConfig(property.CommunityId));
 
-        var txn = new PaymentTransaction
-        {
-            Id = Guid.NewGuid(),
-            PropertyId = property.Id,
-            OwnerId = owner.Id,
-            StripePaymentIntentId = $"pi_test_{Guid.NewGuid():N}",
-            StripeChargeId = $"ch_test_{Guid.NewGuid():N}",
-            GrossAmount = gross,
-            FeeAmount = 0m,
-            Total = gross,
-            Status = status,
-            PaymentMethod = method,
-        };
+        var txn = PaymentFactory.Transaction(property.Id, owner.Id, status, method, gross);
         db.PaymentTransactions.Add(txn);
         await db.SaveChangesAsync();
         return txn;

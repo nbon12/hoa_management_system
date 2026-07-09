@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { ApiClient } from '../api/api-client';
 import { DashboardSummary, Announcement, CalendarEvent, LedgerEntry } from '../models';
 
 // Shapes returned by the API (camelCase from .NET System.Text.Json)
@@ -37,15 +35,10 @@ interface ApiExpense { id: string; label: string; color: string; amount: number;
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
-  private readonly base = environment.apiBaseUrl;
-
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiClient) {}
 
   async getSummary(): Promise<DashboardSummary> {
-    const api = await firstValueFrom(
-      this.http.get<ApiDashboard>(`${this.base}/dashboard`)
-    );
-    return this._map(api);
+    return this._map(await this.api.get<ApiDashboard>('/dashboard'));
   }
 
   private _map(api: ApiDashboard): DashboardSummary {

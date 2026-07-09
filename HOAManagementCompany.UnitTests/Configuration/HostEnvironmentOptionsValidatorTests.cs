@@ -1,7 +1,7 @@
 using HOAManagementCompany.Infrastructure.Configuration;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Configuration;
+namespace HOAManagementCompany.UnitTests.Configuration;
 
 /// <summary>
 /// Unit tests for <see cref="HostEnvironmentOptionsValidator"/> (010, constitution §8): the host

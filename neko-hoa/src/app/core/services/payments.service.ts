@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { HttpParams } from '@angular/common/http';
+import { ApiClient } from '../api/api-client';
 import { LedgerEntry } from '../models';
 import type { components } from '../api/generated-types';
 
@@ -65,26 +64,20 @@ type ApiDraftEntry = Schemas['DraftEntryDto'];
 
 @Injectable({ providedIn: 'root' })
 export class PaymentsService {
-  private readonly base = environment.apiBaseUrl;
-
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiClient) {}
 
   // ── Ledger ────────────────────────────────────────────────────────────────
 
   async getLedger(page = 1, pageSize = 100): Promise<LedgerEntry[]> {
     const params = new HttpParams().set('page', page).set('pageSize', pageSize);
-    const res = await firstValueFrom(
-      this.http.get<ApiLedgerPage>(`${this.base}/payments/ledger`, { params })
-    );
+    const res = await this.api.get<ApiLedgerPage>('/payments/ledger', params);
     return res.items.map(e => this._mapLedger(e));
   }
 
   // ── Balance ───────────────────────────────────────────────────────────────
 
   async getBalance(): Promise<BalanceSummary> {
-    const page = await firstValueFrom(
-      this.http.get<ApiLedgerPage>(`${this.base}/payments/ledger?page=1&pageSize=1`)
-    );
+    const page = await this.api.get<ApiLedgerPage>('/payments/ledger?page=1&pageSize=1');
     const latest = page.items[0];
     return {
       currentBalance:    latest?.runningBalance ?? 0,
@@ -97,9 +90,7 @@ export class PaymentsService {
 
   async getDrafts(limit = 50, offset = 0): Promise<DraftRow[]> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    const res = await firstValueFrom(
-      this.http.get<{ items: ApiDraftEntry[] }>(`${this.base}/payments/drafts`, { params })
-    );
+    const res = await this.api.get<{ items: ApiDraftEntry[] }>('/payments/drafts', params);
     return res.items.map(d => ({
       id:                d.id,
       date:              d.draftDate,
@@ -114,7 +105,7 @@ export class PaymentsService {
 
   /** Balance presets + fee policy for the one-time screen. */
   async getPaymentOptions(): Promise<PaymentOptions> {
-    return firstValueFrom(this.http.get<PaymentOptions>(`${this.base}/payments/options`));
+    return this.api.get<PaymentOptions>('/payments/options');
   }
 
   /**
@@ -122,28 +113,22 @@ export class PaymentsService {
    * and returns the clientSecret the Payment Element mounts against. No raw instrument data is sent.
    */
   async createIntent(amount: number, method: 'card' | 'ach'): Promise<PaymentIntentResult> {
-    return firstValueFrom(
-      this.http.post<PaymentIntentResult>(`${this.base}/payments/intent`, { amount, method })
-    );
+    return this.api.post<PaymentIntentResult>('/payments/intent', { amount, method });
   }
 
   /** Records the payment after Stripe.js has confirmed the intent in-browser; returns the receipt detail. */
   async confirmPayment(paymentIntentId: string): Promise<ConfirmResult> {
-    return firstValueFrom(
-      this.http.post<ConfirmResult>(`${this.base}/payments/one-time/confirm`, { paymentIntentId })
-    );
+    return this.api.post<ConfirmResult>('/payments/one-time/confirm', { paymentIntentId });
   }
 
   async getTransactions(limit = 20, offset = 0): Promise<TransactionSummary[]> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    const res = await firstValueFrom(
-      this.http.get<{ items: TransactionSummary[] }>(`${this.base}/payments/transactions`, { params })
-    );
+    const res = await this.api.get<{ items: TransactionSummary[] }>('/payments/transactions', params);
     return res.items;
   }
 
   async getReceipt(id: string): Promise<Receipt> {
-    return firstValueFrom(this.http.get<Receipt>(`${this.base}/payments/receipts/${id}`));
+    return this.api.get<Receipt>(`/payments/receipts/${id}`);
   }
 
   // ── Recurring payment (auto-pay via vaulted method) ─────────────────────────
@@ -153,45 +138,35 @@ export class PaymentsService {
    * method on file. Returns the clientSecret the Element mounts against — no raw instrument data is sent.
    */
   async createSetupIntent(): Promise<SetupIntentResult> {
-    return firstValueFrom(
-      this.http.post<SetupIntentResult>(`${this.base}/payments/recurring/setup-intent`, {})
-    );
+    return this.api.post<SetupIntentResult>('/payments/recurring/setup-intent', {});
   }
 
   /** Current auto-pay enrollment, or null when the resident has none (backend returns 204). */
   async getRecurring(): Promise<RecurringInfo | null> {
-    const r = await firstValueFrom(
-      this.http.get<RecurringInfo>(`${this.base}/payments/recurring`, { observe: 'response' })
-    );
+    const r = await this.api.getResponse<RecurringInfo>('/payments/recurring');
     return r.status === 204 ? null : r.body;
   }
 
   /** Enrolls/updates auto-pay against a vaulted method (setupIntentId) with an explicit mandate. */
   async saveRecurring(req: RecurringSaveRequest): Promise<RecurringInfo> {
-    return firstValueFrom(
-      this.http.put<RecurringInfo>(`${this.base}/payments/recurring`, req)
-    );
+    return this.api.put<RecurringInfo>('/payments/recurring', req);
   }
 
   /** Disables auto-pay and terminates the stored mandate. */
   async cancelRecurring(): Promise<void> {
-    await firstValueFrom(this.http.delete(`${this.base}/payments/recurring`));
+    await this.api.delete('/payments/recurring');
   }
 
   // ── Payment alerts (opt-in) ─────────────────────────────────────────────────
 
   /** Current SMS/email opt-in flags + alert phone for the signed-in owner. */
   async getAlertPreferences(): Promise<AlertPreferences> {
-    return firstValueFrom(
-      this.http.get<AlertPreferences>(`${this.base}/payments/alert-preferences`)
-    );
+    return this.api.get<AlertPreferences>('/payments/alert-preferences');
   }
 
   /** Updates the opt-in matrix; the backend appends an immutable TCPA consent row per changed channel. */
   async saveAlertPreferences(prefs: AlertPreferences): Promise<AlertPreferences> {
-    return firstValueFrom(
-      this.http.put<AlertPreferences>(`${this.base}/payments/alert-preferences`, prefs)
-    );
+    return this.api.put<AlertPreferences>('/payments/alert-preferences', prefs);
   }
 
   // ── Mappers ───────────────────────────────────────────────────────────────

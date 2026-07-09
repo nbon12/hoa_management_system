@@ -1,8 +1,6 @@
 import { Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { ApiClient } from '../api/api-client';
 import { TokenService } from './token.service';
 import { CurrentUser } from '../models';
 
@@ -25,10 +23,8 @@ export class AuthService {
   private readonly _user = signal<CurrentUser | null>(null);
   readonly user = this._user.asReadonly();
 
-  private readonly base = environment.apiBaseUrl;
-
   constructor(
-    private http: HttpClient,
+    private api: ApiClient,
     private tokens: TokenService,
     private router: Router,
   ) {
@@ -50,18 +46,14 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<void> {
-    const res = await firstValueFrom(
-      this.http.post<AuthResponse>(`${this.base}/auth/login`, { email, password })
-    );
+    const res = await this.api.post<AuthResponse>('/auth/login', { email, password });
     this._applyAuth(res);
   }
 
   async register(email: string, password: string, firstName: string, lastName: string, accountNumber: string): Promise<void> {
-    const res = await firstValueFrom(
-      this.http.post<AuthResponse>(`${this.base}/auth/register`, {
-        email, password, firstName, lastName, accountNumber
-      })
-    );
+    const res = await this.api.post<AuthResponse>('/auth/register', {
+      email, password, firstName, lastName, accountNumber
+    });
     this._applyAuth(res);
   }
 
@@ -69,7 +61,7 @@ export class AuthService {
     const token = this.tokens.getAccessToken();
     if (token) {
       // Best-effort — don't block UI on network
-      this.http.post(`${this.base}/auth/logout`, {}).subscribe({ error: () => {} });
+      this.api.post('/auth/logout', {}).catch(() => {});
     }
     this._user.set(null);
     this.tokens.clearTokens();

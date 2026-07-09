@@ -40,18 +40,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - id: auth
-        uses: google-github-actions/auth@v3
+      # WIF auth + setup + init via the shared composite (015 US6, FR-018).
+      - name: Auth + tofu init
+        uses: ./.github/actions/tofu-init
         with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          wif_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
-
-      - uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: "1.8.0"
-
-      - name: tofu init
-        run: tofu init -input=false
+          working-directory: infra/environments/dev
 
       - name: tofu apply
         run: tofu apply -input=false -auto-approve
@@ -79,15 +74,11 @@ jobs:
   #     TF_VAR_operator_secrets: ${{ secrets.PROD_TF_VAR_OPERATOR_SECRETS }}
   #   steps:
   #     - uses: actions/checkout@v4
-  #     - id: auth
-  #       uses: google-github-actions/auth@v3
+  #     - name: Auth + tofu init
+  #       uses: ./.github/actions/tofu-init
   #       with:
-  #         workload_identity_provider: ${{ secrets.PROD_GCP_WIF_PROVIDER }}
+  #         wif_provider: ${{ secrets.PROD_GCP_WIF_PROVIDER }}
   #         service_account: ${{ secrets.PROD_GCP_DEPLOY_SERVICE_ACCOUNT }}
-  #     - uses: opentofu/setup-opentofu@v1
-  #       with:
-  #         tofu_version: "1.8.0"
-  #     - name: tofu init
-  #       run: tofu init -input=false
+  #         working-directory: infra/environments/prod
   #     - name: tofu apply
   #       run: tofu apply -input=false -auto-approve

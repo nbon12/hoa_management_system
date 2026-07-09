@@ -2,7 +2,7 @@ using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Features.Payments.Services;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Payments;
+namespace HOAManagementCompany.UnitTests.Payments;
 
 public class ReceiptFactoryTests
 {

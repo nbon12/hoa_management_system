@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { ApiClient } from '../api/api-client';
 import { Property, Owner, AddressHistory, DirectoryField } from '../models';
 
 interface ApiProperty {
@@ -31,12 +29,10 @@ interface ApiDirectoryField {
 
 @Injectable({ providedIn: 'root' })
 export class PropertyService {
-  private readonly base = environment.apiBaseUrl;
-
-  constructor(private http: HttpClient) {}
+  constructor(private api: ApiClient) {}
 
   async getProperty(): Promise<Property> {
-    const p = await firstValueFrom(this.http.get<ApiProperty>(`${this.base}/property`));
+    const p = await this.api.get<ApiProperty>('/property');
     return {
       accountNumber:      p.accountNumber,
       communityId:        p.communityId,
@@ -62,7 +58,7 @@ export class PropertyService {
   }
 
   async getOwner(): Promise<Owner> {
-    const o = await firstValueFrom(this.http.get<ApiOwner>(`${this.base}/property/owner`));
+    const o = await this.api.get<ApiOwner>('/property/owner');
     return {
       firstName:           o.firstName,
       lastName:            o.lastName,
@@ -81,9 +77,7 @@ export class PropertyService {
   }
 
   async getAddressHistory(): Promise<AddressHistory[]> {
-    const items = await firstValueFrom(
-      this.http.get<ApiAddressHistory[]>(`${this.base}/property/address-history`)
-    );
+    const items = await this.api.get<ApiAddressHistory[]>('/property/address-history');
     return items.map(h => ({
       event:   h.eventType as any,
       address: h.address,
@@ -92,9 +86,7 @@ export class PropertyService {
   }
 
   async getDirectoryFields(): Promise<DirectoryField[]> {
-    const items = await firstValueFrom(
-      this.http.get<ApiDirectoryField[]>(`${this.base}/property/directory-fields`)
-    );
+    const items = await this.api.get<ApiDirectoryField[]>('/property/directory-fields');
     return items.map(f => ({
       key:    f.fieldKey,
       label:  f.label,
@@ -104,9 +96,7 @@ export class PropertyService {
   }
 
   async updateOwner(partial: Partial<Owner>): Promise<Owner> {
-    const o = await firstValueFrom(
-      this.http.patch<ApiOwner>(`${this.base}/property/owner`, partial)
-    );
+    const o = await this.api.patch<ApiOwner>('/property/owner', partial);
     return {
       firstName: o.firstName, lastName: o.lastName, ownerName2: null,
       memberSince: null, accountNumber: o.accountNumber,
@@ -117,8 +107,6 @@ export class PropertyService {
   }
 
   async toggleDirectoryField(key: string, shared: boolean): Promise<void> {
-    await firstValueFrom(
-      this.http.patch(`${this.base}/property/directory-fields/${key}`, { shared })
-    );
+    await this.api.patch(`/property/directory-fields/${key}`, { shared });
   }
 }

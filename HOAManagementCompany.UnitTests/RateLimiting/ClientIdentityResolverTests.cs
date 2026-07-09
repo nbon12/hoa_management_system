@@ -4,7 +4,7 @@ using HOAManagementCompany.Infrastructure.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.RateLimiting;
+namespace HOAManagementCompany.UnitTests.RateLimiting;
 
 /// <summary>
 /// Unit coverage for the rate-limit partition-key resolver (014 US1). Verifies the security-critical

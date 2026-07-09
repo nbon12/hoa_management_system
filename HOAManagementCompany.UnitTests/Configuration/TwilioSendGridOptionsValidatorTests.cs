@@ -2,7 +2,7 @@ using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Configuration;
 using Xunit;
 
-namespace HOAManagementCompany.Tests.Unit.Configuration;
+namespace HOAManagementCompany.UnitTests.Configuration;
 
 /// <summary>
 /// Optional alert providers (008 FR-012): all-empty disables them (valid); a partially-configured
