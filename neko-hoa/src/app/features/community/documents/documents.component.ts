@@ -158,8 +158,9 @@ export class DocumentsComponent implements OnInit {
     try {
       const { url } = await this.svc.getDocumentDownloadUrl(doc.id);
       if (tab) {
-        tab.location.href = url;
+        // 020-D FR-D6: sever the opener BEFORE navigating — after is a reverse-tabnabbing window.
         tab.opener = null;
+        tab.location.href = url;
       } else {
         window.open(url, '_blank', 'noopener,noreferrer');
       }

@@ -54,7 +54,11 @@ export class TokenService implements OnDestroy {
 
   isTokenExpired(token: string): boolean {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      // 020-D FR-D6: JWT payloads are base64url — normalize before atob or valid tokens
+      // containing '-'/'_' are misread as expired.
+      const segment = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = segment.padEnd(segment.length + ((4 - (segment.length % 4)) % 4), '=');
+      const payload = JSON.parse(atob(padded));
       return Date.now() >= payload.exp * 1000;
     } catch {
       return true;

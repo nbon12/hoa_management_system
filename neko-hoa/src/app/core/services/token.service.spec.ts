@@ -42,6 +42,31 @@ describe('TokenService', () => {
     expect(svc.hasSessionHint()).toBeTrue();
   });
 
+  // 020-D FR-D6 (T019): JWT payloads are base64url — '-'/'_' instead of '+'/'/', no padding.
+  // A decoder that feeds them straight to atob() misreads valid tokens as expired.
+  describe('isTokenExpired with base64url payloads', () => {
+    const b64url = (o: object) =>
+      btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    it('a future-dated token whose payload needs URL-safe chars is NOT expired', () => {
+      const svc = TestBed.inject(TokenService);
+      // '???>>>' forces '/' and '+' into standard base64, i.e. '_' and '-' in base64url.
+      const token = `h.${b64url({ exp: 9999999999, sub: '???>>>' })}.s`;
+      expect(svc.isTokenExpired(token)).toBeFalse();
+    });
+
+    it('a past-dated base64url token IS expired', () => {
+      const svc = TestBed.inject(TokenService);
+      const token = `h.${b64url({ exp: 1000, sub: '???>>>' })}.s`;
+      expect(svc.isTokenExpired(token)).toBeTrue();
+    });
+
+    it('garbage still reads as expired', () => {
+      const svc = TestBed.inject(TokenService);
+      expect(svc.isTokenExpired('not-a-jwt')).toBeTrue();
+    });
+  });
+
   it('setSessionHint(false) removes the hint', () => {
     const svc = TestBed.inject(TokenService);
     svc.setAccessToken('access-abc');

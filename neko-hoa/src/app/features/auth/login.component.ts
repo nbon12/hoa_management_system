@@ -42,10 +42,6 @@ import { AuthService } from '../../core/services/auth.service';
           }
 
           <div style="display:flex;flex-direction:column;gap:14px;margin-top:14px;">
-            <button class="btn btn--block" style="justify-content:center;padding:10px 14px;" type="button">
-              ◯&nbsp; Continue with Google
-            </button>
-
             <div style="display:flex;align-items:center;gap:8px;color:var(--ink-mute);font-size:11px;">
               <hr class="divider" style="flex:1;">
               <span>or with email</span>

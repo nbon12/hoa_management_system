@@ -76,6 +76,31 @@ describe('DocumentsComponent', () => {
     expect(mockTab.location.href).toBe('http://minio.test/hoa-documents/test.pdf');
   });
 
+  // 020-D FR-D6 (T020): the pre-opened tab's opener must be severed BEFORE navigation — the
+  // reverse order leaves a window where the target page can script window.opener.
+  it('nulls the opener before assigning the target URL', async () => {
+    const openSpy = window.open as jasmine.Spy;
+    const order: string[] = [];
+    const fakeTab: any = { close: jasmine.createSpy('close'), location: {} };
+    Object.defineProperty(fakeTab.location, 'href', { set: () => order.push('href') });
+    Object.defineProperty(fakeTab, 'opener', { set: () => order.push('opener') });
+    openSpy.and.returnValue(fakeTab);
+
+    await comp.openDocument(MOCK_DOCS[0]);
+
+    expect(order).toEqual(['opener', 'href']);
+  });
+
+  it('falls back to noopener,noreferrer when the tab could not be pre-opened', async () => {
+    const openSpy = window.open as jasmine.Spy;
+    openSpy.and.returnValue(null);
+
+    await comp.openDocument(MOCK_DOCS[0]);
+
+    expect(openSpy.calls.mostRecent().args).toEqual(
+      ['http://minio.test/hoa-documents/test.pdf', '_blank', 'noopener,noreferrer']);
+  });
+
   it('clicking document name opens PDF in a new tab', async () => {
     const svc = TestBed.inject(CommunityService) as jasmine.SpyObj<CommunityService>;
     const openSpy = window.open as jasmine.Spy;

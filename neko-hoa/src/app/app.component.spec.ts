@@ -20,4 +20,13 @@ describe('AppComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('router-outlet')).toBeTruthy();
   });
+
+  // 020-D FR-D7 (T023): the Angular CLI starter template must stay deleted from the shell.
+  it('ships no starter-template content', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent ?? '';
+    expect(text).not.toContain('Congratulations');
+    expect(fixture.nativeElement.querySelectorAll('a[href*="angular.dev"]').length).toBe(0);
+  });
 });
