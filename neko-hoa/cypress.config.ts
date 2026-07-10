@@ -10,6 +10,9 @@ export default defineConfig({
     // (009-dev-auto-deploy / `npm run e2e:dev`). Cypress also honors CYPRESS_BASE_URL natively.
     baseUrl: process.env['CYPRESS_BASE_URL'] || 'http://localhost:4200',
     specPattern: 'cypress/e2e/**/*.cy.ts',
+    // Deployed previews serve lazy chunks over the network with cold caches; the 4s default
+    // intermittently times out on first element lookups after a visit (seen on pr-env).
+    defaultCommandTimeout: 10_000,
     supportFile: false,
     fixturesFolder: false,
     video: false,
