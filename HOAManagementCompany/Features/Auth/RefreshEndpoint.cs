@@ -17,6 +17,7 @@ namespace HOAManagementCompany.Features.Auth;
 public class RefreshEndpoint(
     AuthService authService,
     IOptions<RefreshCookieOptions> cookieOptions,
+    CorsOriginSettings corsOrigins,
     IConfiguration config) : EndpointWithoutRequest<AuthResponse>
 {
     public override void Configure()
@@ -63,8 +64,8 @@ public class RefreshEndpoint(
                 : referer;
         }
 
-        var exact = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-        var suffixes = config.GetSection("Cors:AllowedOriginSuffixes").Get<string[]>() ?? [];
-        return CorsOriginPolicy.IsAllowed(origin, exact, suffixes);
+        // Shared resolved policy (incl. the local-Development localhost fallback) — must never
+        // diverge from what the CORS middleware itself allows.
+        return corsOrigins.IsAllowed(origin);
     }
 }

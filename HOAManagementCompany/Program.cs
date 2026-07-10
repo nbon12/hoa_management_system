@@ -303,6 +303,10 @@ if (corsOrigins is null || corsOrigins.Length == 0)
 // host under a trusted suffix; it is set ONLY for Dev, so Production keeps its exact-origin allow-list.
 var corsSuffixes = builder.Configuration.GetSection("Cors:AllowedOriginSuffixes").Get<string[]>() ?? [];
 
+// 020-D: expose the RESOLVED policy (incl. the localhost fallback above) so the refresh
+// endpoint's Origin check can never diverge from what the CORS middleware allows.
+builder.Services.AddSingleton(new CorsOriginSettings(corsOrigins, corsSuffixes));
+
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.SetIsOriginAllowed(origin => CorsOriginPolicy.IsAllowed(origin, corsOrigins, corsSuffixes))
      .WithHeaders(

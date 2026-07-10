@@ -1,4 +1,5 @@
 using HOAManagementCompany.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using HOAManagementCompany.Infrastructure.Persistence;
 
 namespace HOAManagementCompany.Seed;
@@ -85,8 +86,16 @@ public class PropertySeeder(ApplicationDbContext db, SeedResult result, ILogger 
             (Acct: "SAKURA-012", Addr: "12 Sakura Drive",      City: "San Jose", First: "Marco",   Last: "Ferrari",   Email: "mferrari@example.com",        Phone: "408-555-1212", ShareName: true,  ShareEmail: false, SharePhone: false, ShareAddress: true),
         };
 
+        // 017-A's AuthSeeder pre-creates SAKURA-003 as the unclaimed, claim-code-bearing property
+        // for the registration flow; on a fresh database it must not be created twice here.
+        var existingAccounts = await db.Properties
+            .Select(x => x.AccountNumber)
+            .ToListAsync(ct);
+
         foreach (var n in neighbors)
         {
+            if (existingAccounts.Contains(n.Acct)) continue;
+
             var prop = new Property
             {
                 Id               = Guid.NewGuid(),
