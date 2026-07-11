@@ -18,7 +18,7 @@ export async function establishSession(
   // back off briefly on 429 instead of flaking the test.
   let res = await page.request.post(`${apiBase}/api/v1/auth/login`, { data: { email, password } });
   for (let attempt = 0; res.status() === 429 && attempt < 3; attempt++) {
-    await new Promise(r => setTimeout(r, 15_000 * (attempt + 1)));
+    await new Promise(r => setTimeout(r, 5_000 * (attempt + 1)));
     res = await page.request.post(`${apiBase}/api/v1/auth/login`, { data: { email, password } });
   }
   if (!res.ok()) {
