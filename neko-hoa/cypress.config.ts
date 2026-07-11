@@ -19,6 +19,8 @@ export default defineConfig({
     supportFile: false,
     fixturesFolder: false,
     video: false,
-    screenshotOnRunFailure: false,
+    // Screenshots feed the pr-env failure-artifact upload — without them Cypress-phase
+    // failures on live deployments are undebuggable (Playwright already captures its own).
+    screenshotOnRunFailure: true,
   },
 });
