@@ -51,6 +51,7 @@ Refines the umbrella research (`specs/016-security-hardening/research.md` §Sub-
   `__API_ORIGIN__` is stamped post-build by a small node script (`neko-hoa/scripts/stamp-headers.mjs`, same pattern as the existing `generate-build-id.mjs`) from the built environment's API origin; CI already knows the origin in both `test.yml` (deploy-dev) and `pr-env.yml`. The script fails the build if the placeholder is left unstamped.
 - **Rationale**: Clarifications (repo-controlled file, enforcing day one, exact origin per deployment, no wildcards, PR previews same posture). Stripe origins per Stripe's official CSP guidance; the app's only other runtime origin is the API itself (telemetry included).
 - **Alternatives**: Static allowlist + `*.run.app` wildcard (rejected in clarification); `<meta http-equiv>` CSP (rejected: cannot express `frame-ancestors`, weaker than headers).
+- **Build note (2026-07-11)**: Angular's critical-CSS inlining emits the global stylesheet as `<link media="print" onload="this.media='all'">` — the inline `onload` is blocked by the enforcing CSP, leaving the app half-styled (found live via pr-env forensics: purely CSS-sized elements rendered zero-size). `inlineCritical` is disabled in `angular.json`; the stylesheet ships as a plain link.
 - **Test**: Karma/na — asserted by (a) a Playwright/e2e check that the deployed response carries the CSP and (b) a cheap unit assertion that the built `_headers` contains no `__API_ORIGIN__` placeholder and payments/API origins are present.
 
 ## D-R5: Committed auth-state removal + token invalidation
