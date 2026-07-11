@@ -203,6 +203,20 @@ jobs:
           npx playwright install --with-deps chromium
           npm run e2e:playwright-dev
 
+      # Failure forensics: Playwright writes per-test error-context.md (ARIA snapshot),
+      # screenshots, and retain-on-failure videos into test-results/ — without this upload they
+      # die with the runner and live-only failures are undebuggable.
+      - name: Upload e2e failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-env-e2e-failures
+          path: |
+            neko-hoa/test-results/
+            neko-hoa/cypress/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
+
       # 10. Report the env URLs + status back to the PR (sticky comment).
       - name: Comment env URLs on the PR
         if: always()
