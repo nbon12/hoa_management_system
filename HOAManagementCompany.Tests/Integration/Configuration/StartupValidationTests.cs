@@ -43,6 +43,17 @@ public class StartupValidationTests
         ["Stripe:PublishableKey"] = "pk_test_placeholder",
         ["Stripe:WebhookSigningSecret"] = "whsec_placeholder",
         ["Jobs:SchedulerSharedSecret"] = "test-scheduler-shared-secret-placeholder",
+        // Explicitly blank the optional alert providers so a developer-local
+        // appsettings.Secrets.json can't complete a deliberately-partial config
+        // and mask the abort-on-startup behavior under test.
+        ["SendGrid:ApiKey"] = "",
+        ["SendGrid:FromEmail"] = "",
+        ["SendGrid:FromName"] = "",
+        ["Twilio:AccountSid"] = "",
+        ["Twilio:ApiKeySid"] = "",
+        ["Twilio:ApiKeySecret"] = "",
+        ["Twilio:AuthToken"] = "",
+        ["Twilio:FromNumber"] = "",
     };
 
     /// <summary>Forces host build + start, which triggers ValidateOnStart.</summary>

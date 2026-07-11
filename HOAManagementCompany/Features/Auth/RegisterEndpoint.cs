@@ -10,7 +10,8 @@ public class RegisterEndpoint(AuthService authService) : Endpoint<RegisterReques
     {
         Post("/auth/register");
         AllowAnonymous();
-        Description(x => x.WithName("Register").WithTags("Auth"));
+        // 016-A FR-A2: throttle registration.
+        Description(x => x.WithName("Register").WithTags("Auth").RequireRateLimiting("auth"));
     }
 
     public override async Task HandleAsync(RegisterRequest req, CancellationToken ct)
@@ -32,10 +33,10 @@ public class RegisterValidator : Validator<RegisterRequest>
 {
     public RegisterValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.VerificationToken).NotEmpty();
         RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
         RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
-        RuleFor(x => x.AccountNumber).NotEmpty();
+        RuleFor(x => x.ClaimCode).NotEmpty();
     }
 }

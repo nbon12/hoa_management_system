@@ -1,6 +1,10 @@
+using System.Security.Cryptography;
+using System.Text;
 using FastEndpoints;
+using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Features.DevTools;
 
@@ -16,7 +20,8 @@ namespace HOAManagementCompany.Features.DevTools;
 /// Playwright smoke gate runs — the older <c>IsDevelopment()</c> check 404'd there. Disabled
 /// (returns 404) wherever the flag is unset, e.g. Production.
 /// </summary>
-public class E2ECleanupEndpoint(ApplicationDbContext db, IConfiguration config)
+public class E2ECleanupEndpoint(
+    ApplicationDbContext db, IConfiguration config, IOptions<JobsOptions> jobs, IHostEnvironment env)
     : EndpointWithoutRequest
 {
     public override void Configure()
@@ -28,9 +33,27 @@ public class E2ECleanupEndpoint(ApplicationDbContext db, IConfiguration config)
 
     public override async Task HandleAsync(CancellationToken ct)
     {
+        // 016-A FR-A6: unavailable in production-like environments regardless of configuration.
+        if (env.IsProduction() || env.IsStaging())
+        {
+            await SendNotFoundAsync(ct);
+            return;
+        }
+
         if (!config.GetValue<bool>("DevTools:E2ECleanupEnabled"))
         {
             await SendNotFoundAsync(ct);
+            return;
+        }
+
+        // 016-A FR-A6: require the shared secret (constant-time), like the scheduler job endpoints.
+        var expected = jobs.Value.SchedulerSharedSecret;
+        var provided = HttpContext.Request.Headers["X-Scheduler-Secret"].FirstOrDefault();
+        if (string.IsNullOrEmpty(expected) || !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(expected),
+                Encoding.UTF8.GetBytes(provided ?? string.Empty)))
+        {
+            await SendUnauthorizedAsync(ct);
             return;
         }
 
