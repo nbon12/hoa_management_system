@@ -13,6 +13,9 @@ export default defineConfig({
     // Deployed previews serve lazy chunks over the network with cold caches; the 4s default
     // intermittently times out on first element lookups after a visit (seen on pr-env).
     defaultCommandTimeout: 10_000,
+    // cy.wait('@alias') uses requestTimeout, not defaultCommandTimeout — the first page load of
+    // a spec pays cold chunk + silent-refresh before data requests fire (seen on pr-env).
+    requestTimeout: 15_000,
     supportFile: false,
     fixturesFolder: false,
     video: false,
