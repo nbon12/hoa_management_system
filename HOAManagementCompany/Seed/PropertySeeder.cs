@@ -86,8 +86,17 @@ public class PropertySeeder(ApplicationDbContext db, SeedResult result, ILogger 
             (Acct: "SAKURA-012", Addr: "12 Sakura Drive",      City: "San Jose", First: "Marco",   Last: "Ferrari",   Email: "mferrari@example.com",        Phone: "408-555-1212", ShareName: true,  ShareEmail: false, SharePhone: false, ShareAddress: true),
         };
 
-        // 017-A's AuthSeeder pre-creates SAKURA-003 as the unclaimed, claim-code-bearing property
-        // for the registration flow; on a fresh database it must not be created twice here.
+        await SeedNeighborsAsync(neighbors, ct);
+    }
+
+    // 017-A's AuthSeeder pre-creates SAKURA-003 as the unclaimed, claim-code-bearing property
+    // for the registration flow; on a fresh database it must not be created twice here (unique
+    // IX_Properties_AccountNumber). Public so the fresh-DB overlap invariant is directly testable.
+    public async Task SeedNeighborsAsync(
+        (string Acct, string Addr, string City, string First, string Last, string Email, string Phone,
+         bool ShareName, bool ShareEmail, bool SharePhone, bool ShareAddress)[] neighbors,
+        CancellationToken ct = default)
+    {
         var existingAccounts = await db.Properties
             .Select(x => x.AccountNumber)
             .ToListAsync(ct);
