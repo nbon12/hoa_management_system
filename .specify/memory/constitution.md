@@ -1,6 +1,25 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 3.0.0 -> 3.1.0
+Modified principles: None (no existing principle redefined or removed).
+Added sections:
+  New section 12 "Spec Independence & Parallelism" — each spec or sub-spec MUST be
+    individually completable (implementable, testable, mergeable) without requiring
+    another spec to land first, absent an explicitly documented hard dependency; when a
+    larger effort is split across specs, the split SHOULD be designed so the resulting
+    specs CAN be worked on in parallel.
+  Prior "Governance & Amendments" renumbered from section 12 to section 13.
+Templates requiring updates:
+  .specify/templates/plan-template.md ✅ updated (Constitution Check: spec independence bullet)
+  .specify/templates/spec-template.md ✅ updated (Constitution Requirements: spec independence bullet)
+  .specify/templates/tasks-template.md ✅ updated (Dependencies & Execution Order: cross-spec note)
+  CLAUDE.md ✅ updated (guidance to not ask about work order; just pick and start)
+Version bump rationale (MINOR): new principle section added; no existing rule removed or
+  redefined.
+Follow-up TODOs: None
+
+----- prior amendment -----
 Version change: 2.2.0 -> 3.0.0
 Modified principles:
   Technology Stack (section 2) — REMOVED the Auth0 mandate. Authentication/authorization is now
@@ -81,7 +100,7 @@ Follow-up TODOs: None
 
 # HOA Management Company Constitution
 
-**Version**: 3.0.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-07-03
+**Version**: 3.1.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-07-04
 **Authors**: Project maintainers
 
 ## 1. Project Purpose
@@ -392,7 +411,26 @@ contract of the system and MUST stay true at all times.
 - **Corpus invariant**: The full body of specs MUST be free of mutually contradictory
   executable assertions at all times.
 
-## 12. Governance & Amendments
+## 12. Spec Independence & Parallelism
+
+- Each spec or sub-spec MUST be **individually completable**: implementable, testable, and
+  mergeable on its own, without requiring another spec to land first — unless an explicit,
+  documented hard dependency exists (e.g., a schema or contract this spec's tests require
+  from another spec).
+- When a larger effort is split across multiple specs or sub-specs, the split SHOULD be
+  designed so the resulting specs **CAN be worked on in parallel** by different
+  contributors or agents without blocking one another.
+- Hard dependencies between specs (spec B cannot start or merge until spec A merges) MUST
+  be the exception, MUST be explicitly documented in both specs' `plan.md`, and MUST be
+  minimized during spec planning — prefer restructuring the split to remove the dependency
+  over accepting it.
+- A spec MUST NOT assume a sibling spec has already been implemented unless that
+  dependency is documented as above.
+- This complements the cross-spec consistency rule in section 11: independence governs
+  how specs are split and sequenced; consistency governs what happens when their
+  executable assertions overlap or conflict.
+
+## 13. Governance & Amendments
 
 - Changes to this constitution MUST be reviewed and approved like any architectural decision
   record affecting the whole project.
