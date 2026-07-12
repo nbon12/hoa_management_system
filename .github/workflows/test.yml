@@ -322,14 +322,20 @@ jobs:
           cache: npm
           cache-dependency-path: neko-hoa/package-lock.json
 
-      - name: Build frontend (dev configuration)
+      - name: Build frontend (candidate API origin — for the pre-promotion smoke)
         working-directory: neko-hoa
         run: |
           npm ci
+          # 020-D: cookie auth binds the refresh token to its login origin, so the smoke frontend
+          # MUST talk to the candidate backend (the stable api-dev.nekohoa.com is still the old,
+          # pre-cookie revision until the promote step below). Point the dev build at the candidate
+          # URL for the smoke; it is rebuilt at the stable origin before the frontend promote.
+          CAND='${{ steps.candidate.outputs.url }}'
+          sed -i "s#https://api-dev.nekohoa.com#${CAND}#g" src/environments/environment.dev.ts
           npm run build -- --configuration=dev
-          # 020-D FR-D2: stamp the enforcing CSP with Dev's API origin (matches environment.dev.ts).
-          node scripts/stamp-headers.mjs https://api-dev.nekohoa.com
+          node scripts/stamp-headers.mjs "${CAND}"
           node scripts/stamp-headers.test.mjs dist/neko-hoa/browser/_headers
+          git checkout -- src/environments/environment.dev.ts
 
       - name: Deploy frontend preview (Cloudflare Pages)
         id: pages
@@ -380,6 +386,15 @@ jobs:
       # ── Promote (reached only when health + E2E + Playwright passed) ──
       - name: Promote backend traffic to candidate
         run: gcloud run services update-traffic "$DEV_SERVICE" --region "$GCP_REGION" --to-tags candidate=100 --quiet
+
+      # The smoke build pointed at the candidate URL; the promoted frontend must point at the
+      # STABLE api-dev.nekohoa.com (which now serves the just-promoted candidate). Rebuild + restamp.
+      - name: Rebuild frontend (stable API origin — for promotion)
+        working-directory: neko-hoa
+        run: |
+          npm run build -- --configuration=dev
+          node scripts/stamp-headers.mjs https://api-dev.nekohoa.com
+          node scripts/stamp-headers.test.mjs dist/neko-hoa/browser/_headers
 
       - name: Promote frontend preview to Dev production
         uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
