@@ -18,7 +18,9 @@ public class LoginLogoutTests(TestDatabaseFixture fixture) : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         Assert.NotNull(body);
         Assert.True(body.ContainsKey("token"));
-        Assert.True(body.ContainsKey("refreshToken"));
+        // 020-D FR-D1: the refresh token travels only in the HttpOnly cookie, never the body.
+        Assert.False(body.ContainsKey("refreshToken"));
+        Assert.Contains(response.Headers.GetValues("Set-Cookie"), c => c.StartsWith("neko_refresh="));
     }
 
     [Theory]
@@ -61,15 +63,18 @@ public class LoginLogoutTests(TestDatabaseFixture fixture) : IntegrationTestBase
             new { email = "resident@nekohoa.dev", password = "Password1!" });
         var loginBody = await loginResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         var token = loginBody!["token"]!.ToString();
-        var refreshToken = loginBody["refreshToken"]!.ToString();
+        // 020-D FR-D1: refresh token arrives only as an HttpOnly cookie.
+        var refreshCookie = loginResponse.Headers.GetValues("Set-Cookie")
+            .First(c => c.StartsWith("neko_refresh=")).Split(';')[0];
 
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var logoutResponse = await Client.PostAsync("/api/v1/auth/logout", null);
         Assert.Equal(HttpStatusCode.NoContent, logoutResponse.StatusCode);
 
         Client.DefaultRequestHeaders.Authorization = null;
-        var refreshResponse = await Client.PostAsJsonAsync("/api/v1/auth/refresh",
-            new { refreshToken });
+        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh");
+        refreshRequest.Headers.Add("Cookie", refreshCookie);
+        var refreshResponse = await Client.SendAsync(refreshRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
     }
 }

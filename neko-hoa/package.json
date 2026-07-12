@@ -17,7 +17,9 @@
     "e2e:playwright-smoke": "playwright test --grep @smoke",
     "e2e:playwright-dev": "playwright test --grep-invert @local-only",
     "storybook": "ng run neko-hoa:storybook",
-    "build-storybook": "ng run neko-hoa:build-storybook"
+    "build-storybook": "ng run neko-hoa:build-storybook",
+    "stamp-headers": "node scripts/stamp-headers.mjs",
+    "test:headers": "node scripts/stamp-headers.test.mjs"
   },
   "private": true,
   "dependencies": {

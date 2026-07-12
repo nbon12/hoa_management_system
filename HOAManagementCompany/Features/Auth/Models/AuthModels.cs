@@ -16,11 +16,15 @@ public record VerifyEmailConfirmResponse(string VerificationToken);
 
 public record LoginRequest(string Email, string Password);
 
-public record RefreshRequest(string RefreshToken);
-
 public record SwitchPropertyRequest(Guid PropertyId);
 
-public record AuthResponse(string Token, string RefreshToken, DateTimeOffset ExpiresAt, CurrentUserDto User);
+// 020-D FR-D1: the refresh token is transported only in an HttpOnly cookie — it must never
+// appear in a response body, so AuthResponse deliberately has no RefreshToken member.
+public record AuthResponse(string Token, DateTimeOffset ExpiresAt, CurrentUserDto User);
+
+// Internal pairing of the client-safe response with the raw refresh token the endpoint puts in
+// the cookie. Never serialized.
+public sealed record AuthResult(AuthResponse Response, string RefreshToken);
 
 public record CurrentUserDto(
     string Id,

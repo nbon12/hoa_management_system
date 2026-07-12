@@ -1,10 +1,15 @@
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth.Models;
+using HOAManagementCompany.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace HOAManagementCompany.Features.Auth;
 
-public class LoginEndpoint(AuthService authService) : Endpoint<LoginRequest, AuthResponse>
+public class LoginEndpoint(
+    AuthService authService,
+    IOptions<RefreshCookieOptions> cookieOptions,
+    IConfiguration config) : Endpoint<LoginRequest, AuthResponse>
 {
     public override void Configure()
     {
@@ -17,8 +22,11 @@ public class LoginEndpoint(AuthService authService) : Endpoint<LoginRequest, Aut
     {
         try
         {
-            var response = await authService.LoginAsync(req, ct);
-            await SendOkAsync(response, ct);
+            var result = await authService.LoginAsync(req, ct);
+            // 020-D FR-D1: refresh token travels only in the HttpOnly cookie, never the body.
+            RefreshCookie.Append(HttpContext, result.RefreshToken, cookieOptions.Value,
+                config.GetValue("Jwt:RefreshTokenExpiryDays", 30));
+            await SendOkAsync(result.Response, ct);
         }
         catch (DomainException ex)
         {

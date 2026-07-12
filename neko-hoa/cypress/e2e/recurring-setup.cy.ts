@@ -50,16 +50,25 @@ function fakeStripe() {
   };
 }
 
+const REFRESH_SESSION = {
+  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.fake',
+  expiresAt: '2099-01-01T00:00:00Z',
+  user: {
+    id: 'u1', firstName: 'Nico', lastName: 'Tester', email: 'nico@example.com',
+    initials: 'NT', properties: [],
+  },
+};
+
 function seedAuthAndStripe(win: Window) {
-  win.localStorage.setItem('neko_user', JSON.stringify({
-    id: 'u1', firstName: 'Nico', lastName: 'Tester', email: 'nico@example.com', initials: 'NT',
-  }));
-  win.localStorage.setItem('neko_refresh', 'fake-refresh-token');
+  // 020-D FR-D1: sessions re-hydrate via the hint-gated silent refresh — the hint below
+  // makes APP_INITIALIZER call /auth/refresh, which the intercept in beforeEach answers.
+  win.localStorage.setItem('neko_has_session', '1');
   (win as unknown as { Stripe: () => unknown }).Stripe = () => fakeStripe();
 }
 
 describe('Auto-pay setup (Stripe SetupIntent + Payment Element)', () => {
   beforeEach(() => {
+    cy.intercept('POST', '**/auth/refresh', { statusCode: 200, body: REFRESH_SESSION }).as('refresh');
     // Scope to the API base path (…/api/v1/…) so these globs don't hijack the SPA navigation
     // to /app/payments/recurring — the document load must reach the dev server, not an intercept.
     cy.intercept('POST', '**/api/*/payments/recurring/setup-intent', { statusCode: 200, body: SETUP }).as('setupIntent');

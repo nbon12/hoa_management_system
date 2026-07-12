@@ -5,6 +5,8 @@ import { provideNgxStripe } from 'ngx-stripe';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { initObservability } from './core/observability/otel.bootstrap';
+import { SessionRefreshService, sessionRefreshInitializer } from './core/services/session-refresh';
+import { TokenService } from './core/services/token.service';
 import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
@@ -25,6 +27,15 @@ export const appConfig: ApplicationConfig = {
           propagateTraceHeaderCorsUrls: environment.propagateTraceHeaderCorsUrls,
         });
       },
+    },
+    // 020-D FR-D1 (research D-R2): hint-gated silent refresh — returning users re-hydrate the
+    // session from the HttpOnly cookie before protected routes render; anonymous visits skip
+    // the call entirely.
+    {
+      provide: APP_INITIALIZER,
+      multi: true,
+      useFactory: sessionRefreshInitializer,
+      deps: [TokenService, SessionRefreshService],
     },
   ],
 };

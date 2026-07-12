@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAs } from './helpers/auth';
+import { establishSession, loginAs } from './helpers/auth';
 
 // Auth tests do NOT use the global storageState — they test the auth flow itself
 const NO_AUTH = { cookies: [], origins: [] } as const;
@@ -80,8 +80,8 @@ test.describe('Login with valid credentials', () => {
 });
 
 test.describe('Logout', () => {
-  // Uses the global storageState (already authenticated)
   test('redirects to /login; protected routes redirect again', async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/dashboard');
     await expect(page.getByRole('button', { name: /Sign out/i })).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: /Sign out/i }).click();
@@ -98,29 +98,48 @@ test.describe('Logout', () => {
 test.describe('Register', () => {
   test.use({ storageState: NO_AUTH });
 
-  test('page renders stepper and account number field', async ({ page }) => {
+  test('page renders the verified-registration stepper (no account-number path)', async ({ page }) => {
     await page.goto('/register');
-    await expect(page.getByText('find property')).toBeVisible();
-    await expect(page.locator('input[name="accountNum"]')).toBeVisible();
+    await expect(page.getByText('verify email')).toBeVisible();
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.locator('input[name="accountNum"]')).toHaveCount(0);
   });
 
-  test('creates a new account and lands on dashboard', async ({ page }) => {
+  // 020-D FR-D9/FR-D11: the real verified flow. Codes are stored hashed server-side, so the
+  // test obtains them via the e2e test-support seams, gated exactly like /e2e/cleanup
+  // (DevTools flag + X-Scheduler-Secret; absent in Production/Staging).
+  test('creates a new account via verification + claim code and lands on dashboard', async ({ page, request }) => {
+    const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
+    const schedulerSecret =
+      process.env.PLAYWRIGHT_SCHEDULER_SECRET || 'dev-scheduler-shared-secret-placeholder';
+    const headers = { 'X-Scheduler-Secret': schedulerSecret };
     const unique = `e2e+${Date.now()}@test.dev`;
+
+    // Obtain a fresh claim code for the seed property (supersedes any live one).
+    const claimRes = await request.post(`${apiBase}/api/v1/e2e/claim-code`, { headers });
+    expect(claimRes.ok()).toBeTruthy();
+    const { claimCode } = await claimRes.json();
+
+    // Step 1: request the verification code for a unique e2e address.
     await page.goto('/register');
+    await page.locator('input[name="email"]').fill(unique);
+    await page.getByRole('button', { name: /Send code/i }).click();
 
-    // Step 1: look up by account number (lookup is mocked — any input triggers "found")
-    await page.locator('input[name="accountNum"]').fill('SAKURA-003');
-    await page.getByRole('button', { name: /Find my property/i }).click();
+    // Step 2: fetch the delivered code from the gated vault and enter it.
+    await expect(page.locator('input[name="code"]')).toBeVisible({ timeout: 10_000 });
+    const codesRes = await request.get(
+      `${apiBase}/api/v1/e2e/auth-codes?contact=${encodeURIComponent(unique)}`, { headers });
+    expect(codesRes.ok()).toBeTruthy();
+    const { verificationCode } = await codesRes.json();
+    await page.locator('input[name="code"]').fill(verificationCode);
+    await page.getByRole('button', { name: /Verify/i }).click();
 
-    // Step 2: confirm property card appears (mocked 700ms delay)
-    await expect(page.getByText(/Yes, that.*me/i)).toBeVisible({ timeout: 5_000 });
-    await page.getByText(/Yes, that.*me/i).click();
-
-    // Step 3: create login
+    // Step 3: create the login with the claim code.
+    await expect(page.locator('input[name="firstName"]')).toBeVisible({ timeout: 10_000 });
     await page.locator('input[name="firstName"]').fill('E2E');
     await page.locator('input[name="lastName"]').fill('Test');
-    await page.locator('input[name="email"]').fill(unique);
     await page.locator('input[name="password"]').fill('Password1!');
+    await page.locator('input[name="claimCode"]').fill(claimCode);
     await page.getByRole('button', { name: /Create account/i }).click();
 
     await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 15_000 });

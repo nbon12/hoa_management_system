@@ -1,5 +1,12 @@
 # Contract: Auth Session (cookie-based refresh) — Sub-specs A & D
 
+> **SUPERSEDED (2026-07-08)**: the authoritative version of this contract is
+> `specs/020-security-hardening-subspec-d/contracts/auth-session.md`. Two corrections there,
+> from verified environment origins: `SameSite` is config-driven per environment (`Strict` prod /
+> `None` Dev+PR — preview-origin smoke and per-PR envs are cross-site / `Lax` local), not blanket
+> `Strict`; and the cookie `Path` is `/api/v1/auth` (actual route prefix), not `/auth`.
+
+
 Changes the token-transport contract so the refresh token lives in an `HttpOnly` cookie instead of a response body / client storage. Access token remains a bearer token held in memory by the SPA.
 
 ## POST /auth/login

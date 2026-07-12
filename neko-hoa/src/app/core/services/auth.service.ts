@@ -6,9 +6,10 @@ import { environment } from '../../../environments/environment';
 import { TokenService } from './token.service';
 import { CurrentUser } from '../models';
 
-interface AuthResponse {
+// 020-D FR-D1 (contracts/auth-session.md): auth responses carry the access token + user only —
+// the refresh token arrives as an HttpOnly cookie, so /auth calls use withCredentials.
+export interface AuthSessionResponse {
   token: string;
-  refreshToken: string;
   expiresAt: string;
   user: {
     id: string;
@@ -32,17 +33,14 @@ export class AuthService {
     private tokens: TokenService,
     private router: Router,
   ) {
-    // Restore session from localStorage on startup
-    const stored = localStorage.getItem('neko_user');
-    const token  = this.tokens.getAccessToken();
-    if (stored && token && !this.tokens.isTokenExpired(token)) {
-      this._user.set(JSON.parse(stored));
-    } else if (stored && this.tokens.getRefreshToken()) {
-      // Token expired but refresh exists — will be silently refreshed on next API call
-      this._user.set(JSON.parse(stored));
-    } else {
-      this.tokens.clearTokens();
-    }
+    // Cross-tab logout (research D-R3): another tab ending the session ends it here too.
+    // Startup re-hydration is handled by the hint-gated APP_INITIALIZER (session-refresh.ts).
+    this.tokens.sessionEvents$.subscribe(evt => {
+      if (evt.type === 'logout') {
+        this._user.set(null);
+        this.router.navigate(['/login']);
+      }
+    });
   }
 
   isLoggedIn(): boolean {
@@ -51,32 +49,54 @@ export class AuthService {
 
   async login(email: string, password: string): Promise<void> {
     const res = await firstValueFrom(
-      this.http.post<AuthResponse>(`${this.base}/auth/login`, { email, password })
+      this.http.post<AuthSessionResponse>(`${this.base}/auth/login`, { email, password }, { withCredentials: true })
     );
-    this._applyAuth(res);
+    this.applySession(res);
   }
 
-  async register(email: string, password: string, firstName: string, lastName: string, accountNumber: string): Promise<void> {
-    const res = await firstValueFrom(
-      this.http.post<AuthResponse>(`${this.base}/auth/register`, {
-        email, password, firstName, lastName, accountNumber
-      })
+  // 020-D FR-D9 (017-A register contract): registration binds to a property via an
+  // email-verification proof + a single-use claim code — never an account number.
+  async requestEmailVerification(email: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${this.base}/auth/verify-email/request`, { email })
     );
-    this._applyAuth(res);
+  }
+
+  /** Returns the opaque verification proof, or null on a (generic) confirm failure. */
+  async confirmEmailVerification(email: string, code: string): Promise<string | null> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ verificationToken: string }>(
+          `${this.base}/auth/verify-email/confirm`, { email, code })
+      );
+      return res.verificationToken;
+    } catch {
+      return null;
+    }
+  }
+
+  async register(verificationToken: string, password: string, firstName: string, lastName: string, claimCode: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<AuthSessionResponse>(`${this.base}/auth/register`, {
+        verificationToken, password, firstName, lastName, claimCode
+      }, { withCredentials: true })
+    );
+    this.applySession(res);
   }
 
   logout(): void {
     const token = this.tokens.getAccessToken();
     if (token) {
-      // Best-effort — don't block UI on network
-      this.http.post(`${this.base}/auth/logout`, {}).subscribe({ error: () => {} });
+      // Best-effort — don't block UI on network. Server revokes + clears the cookie.
+      this.http.post(`${this.base}/auth/logout`, {}, { withCredentials: true }).subscribe({ error: () => {} });
     }
-    this._user.set(null);
-    this.tokens.clearTokens();
+    this.clearSession();
+    this.tokens.broadcastLogout();
     this.router.navigate(['/login']);
   }
 
-  private _applyAuth(res: AuthResponse): void {
+  /** Adopt a fresh session (login/register/silent refresh). */
+  applySession(res: AuthSessionResponse): void {
     const user: CurrentUser = {
       id:        res.user.id,
       firstName: res.user.firstName,
@@ -85,7 +105,13 @@ export class AuthService {
       initials:  res.user.initials,
     };
     this._user.set(user);
-    this.tokens.setTokens(res.token, res.refreshToken);
-    localStorage.setItem('neko_user', JSON.stringify(user));
+    this.tokens.setAccessToken(res.token);
+  }
+
+  /** Drop the local session (no navigation, no cross-tab broadcast). */
+  clearSession(): void {
+    this._user.set(null);
+    this.tokens.clearAccessToken();
+    this.tokens.setSessionHint(false);
   }
 }

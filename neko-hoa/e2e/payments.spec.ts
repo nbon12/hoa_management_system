@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 // ─── Statement (GET /payments/ledger) ────────────────────────────────────────
 
 test.describe('Statement', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/payments/statement');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -71,6 +73,7 @@ test.describe('Statement', () => {
 
 test.describe('One-time payment wizard', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     // Preset amounts are populated from /payments/options; until it resolves they default to 0,
     // and Continue refuses to advance (amount must be > 0). Wait for the response so the wizard
     // is interactive before tests select a preset.
@@ -114,6 +117,7 @@ test.describe('One-time payment wizard', () => {
 
 test.describe.serial('Recurring payment CRUD', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/payments/recurring');
     // Wait for ngOnInit to complete: loadRecurring() then getDrafts()
     // Draft history rows appear only after both API calls finish

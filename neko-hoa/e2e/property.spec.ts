@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { establishSession } from './helpers/auth';
 
 // ─── Property Info (GET /property) ───────────────────────────────────────────
 
 test.describe('Property Info', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/property/info');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -52,6 +54,7 @@ test.describe('Property Info', () => {
 
 test.describe.serial('Owner Profile', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/property/owner');
     // Wait for ngOnInit to complete by checking address history table has data
     // (ngOnInit runs Promise.all([getProperty, getOwner, getAddressHistory]))
@@ -111,6 +114,7 @@ test.describe.serial('Owner Profile', () => {
 
 test.describe.serial('Directory', () => {
   test.beforeEach(async ({ page }) => {
+    await establishSession(page);
     await page.goto('/app/property/directory');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -144,7 +148,7 @@ test.describe.serial('Directory', () => {
   test('UPDATE: toggle "Phone" field ON and verify active state', async ({ page }) => {
     const phoneRow = page.locator('tr').filter({ hasText: /^.*Phone.*$/ });
     const toggle = phoneRow.locator('.toggle').first();
-    await expect(toggle).toBeVisible({ timeout: 5_000 });
+    await expect(toggle).toBeVisible();
     const wasOn = await toggle.evaluate((el) => el.classList.contains('toggle--on'));
     if (!wasOn) {
       await toggle.click();
@@ -158,7 +162,7 @@ test.describe.serial('Directory', () => {
   test('UPDATE teardown: toggle "Phone" field OFF', async ({ page }) => {
     const phoneRow = page.locator('tr').filter({ hasText: /^.*Phone.*$/ });
     const toggle = phoneRow.locator('.toggle').first();
-    await expect(toggle).toBeVisible({ timeout: 5_000 });
+    await expect(toggle).toBeVisible();
     const isOn = await toggle.evaluate((el) => el.classList.contains('toggle--on'));
     if (isOn) {
       await toggle.click();

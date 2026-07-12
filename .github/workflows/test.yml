@@ -129,6 +129,18 @@ jobs:
       - name: Unit tests (headless)
         run: npm run test:ci
 
+      - name: CSP headers template check (020-D FR-D2)
+        run: npm run test:headers
+
+      # 020-D FR-D3 / SC-D3: e2e auth state carries a live refresh token; it is regenerated at
+      # runtime by global-setup and must never re-enter version control.
+      - name: Repo hygiene — no tracked e2e auth state (020-D FR-D3)
+        run: |
+          tracked="$(git ls-files e2e/.auth/)"
+          if [ -n "$tracked" ]; then
+            echo "::error::credential state tracked in git: $tracked"; exit 1
+          fi
+
       - name: Build
         run: npm run build
 
@@ -315,6 +327,9 @@ jobs:
         run: |
           npm ci
           npm run build -- --configuration=dev
+          # 020-D FR-D2: stamp the enforcing CSP with Dev's API origin (matches environment.dev.ts).
+          node scripts/stamp-headers.mjs https://api-dev.nekohoa.com
+          node scripts/stamp-headers.test.mjs dist/neko-hoa/browser/_headers
 
       - name: Deploy frontend preview (Cloudflare Pages)
         id: pages

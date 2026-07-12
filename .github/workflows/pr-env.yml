@@ -155,6 +155,9 @@ jobs:
           sed -i "s#https://pr-env-api-origin.invalid#${API_URL}#" src/environments/environment.pr-preview.ts
           npm ci
           npm run build -- --configuration pr-preview
+          # 020-D FR-D2: stamp the enforcing CSP with this PR's API origin (same posture as Dev).
+          node scripts/stamp-headers.mjs "${API_URL}"
+          node scripts/stamp-headers.test.mjs dist/neko-hoa/browser/_headers
           npx wrangler pages deploy dist/neko-hoa/browser --project-name=nekohoa-dev --branch="pr-${PRN}"
 
       # 8. US1 real-resource proof: confirm the PR's checks ran against the REAL per-PR Neon branch + R2
@@ -199,6 +202,20 @@ jobs:
           npm run e2e:dev
           npx playwright install --with-deps chromium
           npm run e2e:playwright-dev
+
+      # Failure forensics: Playwright writes per-test error-context.md (ARIA snapshot),
+      # screenshots, and retain-on-failure videos into test-results/ — without this upload they
+      # die with the runner and live-only failures are undebuggable.
+      - name: Upload e2e failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-env-e2e-failures
+          path: |
+            neko-hoa/test-results/
+            neko-hoa/cypress/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
 
       # 10. Report the env URLs + status back to the PR (sticky comment).
       - name: Comment env URLs on the PR
