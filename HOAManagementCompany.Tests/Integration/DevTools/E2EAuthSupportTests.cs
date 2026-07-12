@@ -79,6 +79,45 @@ public class E2EAuthSupportTests(TestDatabaseFixture fixture) : IntegrationTestB
             confirmBody.RootElement.GetProperty("verificationToken").GetString()));
     }
 
+    // The full verified-registration round trip (020-D US4 / 017-A FR-A1): request a code,
+    // confirm it via the vaulted raw value, issue a claim code for the seed property, register —
+    // 201 with the cookie session and no refreshToken in the body.
+    [Fact]
+    public async Task VerifiedRegistration_EndToEnd_CreatesAccountWithCookieSession()
+    {
+        var email = $"e2e+reg{Guid.NewGuid():N}@test.dev";
+        await Client.PostAsJsonAsync("/api/v1/auth/verify-email/request", new { email });
+
+        var codeRes = await Client.SendAsync(Req(HttpMethod.Get, $"/api/v1/e2e/auth-codes?contact={Uri.EscapeDataString(email)}"));
+        using var codeBody = JsonDocument.Parse(await codeRes.Content.ReadAsStringAsync());
+        var code = codeBody.RootElement.GetProperty("verificationCode").GetString();
+
+        var confirm = await Client.PostAsJsonAsync("/api/v1/auth/verify-email/confirm", new { email, code });
+        using var confirmBody = JsonDocument.Parse(await confirm.Content.ReadAsStringAsync());
+        var proof = confirmBody.RootElement.GetProperty("verificationToken").GetString();
+
+        var claimRes = await Client.SendAsync(Req(HttpMethod.Post, "/api/v1/e2e/claim-code"));
+        using var claimBody = JsonDocument.Parse(await claimRes.Content.ReadAsStringAsync());
+        var claimCode = claimBody.RootElement.GetProperty("claimCode").GetString();
+
+        var register = await Client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            verificationToken = proof,
+            password = "Password1!",
+            firstName = "Reg",
+            lastName = "Istrant",
+            claimCode
+        });
+
+        Assert.Equal(HttpStatusCode.Created, register.StatusCode);
+        var cookie = register.Headers.GetValues("Set-Cookie").FirstOrDefault(c => c.StartsWith("neko_refresh="));
+        Assert.NotNull(cookie);
+        Assert.Contains("httponly", cookie, StringComparison.OrdinalIgnoreCase);
+        using var regBody = JsonDocument.Parse(await register.Content.ReadAsStringAsync());
+        Assert.True(regBody.RootElement.TryGetProperty("token", out _));
+        Assert.False(regBody.RootElement.TryGetProperty("refreshToken", out _));
+    }
+
     [Fact]
     public async Task AuthCodes_UnknownContact_Returns404()
     {
