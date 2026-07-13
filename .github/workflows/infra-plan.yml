@@ -39,7 +39,7 @@ jobs:
       # 013: account-level billing budget for PR ephemeral envs (no default in dev/budget.tf).
       TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # WIF: impersonate the deployer SA via the repo-scoped provider. No long-lived keys (FR-027).
       - id: auth
