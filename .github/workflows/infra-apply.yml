@@ -46,7 +46,7 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
 
-      - uses: opentofu/setup-opentofu@v1
+      - uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: "1.8.0"
 
@@ -84,7 +84,7 @@ jobs:
   #       with:
   #         workload_identity_provider: ${{ secrets.PROD_GCP_WIF_PROVIDER }}
   #         service_account: ${{ secrets.PROD_GCP_DEPLOY_SERVICE_ACCOUNT }}
-  #     - uses: opentofu/setup-opentofu@v1
+  #     - uses: opentofu/setup-opentofu@v2
   #       with:
   #         tofu_version: "1.8.0"
   #     - name: tofu init
