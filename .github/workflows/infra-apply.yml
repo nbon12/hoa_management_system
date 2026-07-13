@@ -38,7 +38,7 @@ jobs:
       # 013: account-level billing budget for PR ephemeral envs (no default in dev/budget.tf).
       TF_VAR_billing_account_id: ${{ secrets.TF_VAR_BILLING_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: auth
         uses: google-github-actions/auth@v3
@@ -78,7 +78,7 @@ jobs:
   #     TF_VAR_deploy_alert_webhook_url: ${{ secrets.PROD_DEPLOY_ALERT_WEBHOOK_URL }}
   #     TF_VAR_operator_secrets: ${{ secrets.PROD_TF_VAR_OPERATOR_SECRETS }}
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v7
   #     - id: auth
   #       uses: google-github-actions/auth@v3
   #       with:
