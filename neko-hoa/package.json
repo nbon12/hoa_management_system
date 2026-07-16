@@ -24,9 +24,9 @@
   "private": true,
   "dependencies": {
     "@angular/animations": "^17.3.0",
-    "@angular/common": "^17.3.0",
-    "@angular/compiler": "^17.3.0",
-    "@angular/core": "^17.3.0",
+    "@angular/common": "^20.3.25",
+    "@angular/compiler": "^20.3.25",
+    "@angular/core": "^20.3.25",
     "@angular/forms": "^17.3.0",
     "@angular/platform-browser": "^17.3.0",
     "@angular/platform-browser-dynamic": "^17.3.0",
@@ -46,8 +46,8 @@
     "zone.js": "~0.14.3"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^17.3.11",
-    "@angular/cli": "^17.3.11",
+    "@angular-devkit/build-angular": "^21.2.19",
+    "@angular/cli": "^22.0.7",
     "@angular/compiler-cli": "^17.3.0",
     "@playwright/test": "^1.60.0",
     "@storybook/addon-essentials": "^8.6.14",
@@ -56,7 +56,7 @@
     "@testing-library/angular": "^17.4.0",
     "@testing-library/dom": "^10.4.1",
     "@types/jasmine": "~5.1.0",
-    "cypress": "^13.17.0",
+    "cypress": "^15.18.1",
     "jasmine-core": "~5.1.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
