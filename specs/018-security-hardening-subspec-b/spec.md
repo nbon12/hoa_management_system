@@ -9,6 +9,15 @@
 
 The payments subsystem is well-architected overall — signature-verified webhooks, a durable idempotent event inbox, server-authoritative amounts, strict property-scoping, and no raw card/bank data on the server. The material gaps are in **financial-record integrity on the deferred (ACH) settlement path**, where a ledger credit and its transaction-status flip are not committed atomically, creating a double-credit window under crashes, webhook redelivery, or a race with reconciliation. Two lower-severity items harden tenant isolation of idempotency keys and add a settlement-amount cross-check.
 
+## Clarifications
+
+### Session 2026-07-18
+
+- Q: What should this slice build for the FR-B5 settlement review surface? → A: Backend endpoints (list-open / resolve / dismiss with role-based authz) plus a written runbook — no dedicated Angular admin UI. Amount-mismatch settlements are rare, ops-facing exceptions; an authenticated, integration-tested resolution API + runbook is in scope, a frontend surface is not.
+- Q: How should the `LedgerEntries (TransactionId, EntryType)` unique-index migration handle a pre-existing historical duplicate on a deployed DB (migrations apply at Cloud Run startup)? → A: Fail loud + runbook. Plain `CREATE UNIQUE INDEX`; if a duplicate exists the migration fails and boot halts with a clear error, and a runbook guides manual per-case resolution. No pre-flight detection pass and no auto-repair (consistent with FR-B0 forward-only).
+- Q: Beyond a single transaction, what authoritatively guarantees exactly-one settlement credit under webhook redelivery racing the reconciliation sweep? → A: The FR-B2 database unique index — the second settler's credit INSERT hits the unique violation, caught and collapsed to a no-op replay; correctness rests on the DB constraint, not an application lock. Webhook and reconciliation share the `SettleSucceededAsync` path, so both are covered.
+- Q: How is "matches" defined for the FR-B5 settlement amount cross-check (provider reports integer cents; server computes a decimal)? → A: Exact equality in integer minor units (cents) — no tolerance/epsilon.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Credit each settled payment exactly once (Priority: P1)
@@ -66,12 +75,12 @@ A ledger credit is written only when the settled amount reported by the payment 
 
 ### Functional Requirements
 
-- **FR-B0**: The remediation is **forward-only**. *(Clarified 2026-07-02: this program prevents new double-credits and does not auto-remediate any historical duplicate ledger credits that may already exist. Correcting pre-existing duplicates, if any, is handled separately and is out of scope here — no automated repair or detection pass is included.)*
+- **FR-B0**: The remediation is **forward-only**. *(Clarified 2026-07-02: this program prevents new double-credits and does not auto-remediate any historical duplicate ledger credits that may already exist. Correcting pre-existing duplicates, if any, is handled separately and is out of scope here — no automated repair or detection pass is included.)* *(Clarified 2026-07-18: the FR-B2 `(TransactionId, EntryType)` unique-index migration is a plain `CREATE UNIQUE INDEX` with no pre-flight duplicate-detection pass; if a historical duplicate exists the migration fails and Cloud Run startup halts with a clear error, and a runbook guides manual per-case resolution — the failing index is itself the surfacing mechanism.)*
 - **FR-B1**: The deferred-settlement path MUST commit the ledger credit, the transaction-status transition, and any receipt creation as a single atomic unit, so an interruption cannot leave a credit without its corresponding status change.
 - **FR-B2**: The ledger MUST enforce a durable uniqueness backstop that prevents more than one settlement credit per payment (per transaction and entry type), independent of application-level guards, while still permitting distinct compensating entries.
-- **FR-B3**: Settlement processing MUST be safe under webhook redelivery and under concurrent execution with the reconciliation sweep, producing exactly one credit per settled payment.
+- **FR-B3**: Settlement processing MUST be safe under webhook redelivery and under concurrent execution with the reconciliation sweep, producing exactly one credit per settled payment. *(Clarified 2026-07-18: the authoritative exactly-once guarantee is the FR-B2 database unique index, not an application-level lock or status guard. Settlement wraps the status transition + ledger credit in one transaction; a concurrent or redelivered second settler's credit INSERT hits the unique-constraint violation, which MUST be caught and collapsed to a no-op replay (leaving the first credit intact). This holds across processes/instances since correctness rests on the DB constraint. Since webhook and reconciliation share one settlement code path — `SettleSucceededAsync`, also invoked by `ResolvePendingAchAsync` — the fix applies to both by construction.)*
 - **FR-B4**: Idempotency-key uniqueness MUST be scoped per tenant (property), matching the per-tenant replay lookup, and a key collision MUST be handled as a graceful replay/duplicate response rather than a server error.
-- **FR-B5**: A ledger settlement credit MUST be written only when the provider-reported received amount matches the server-computed expected total; on mismatch, the credit MUST be blocked and the mismatch MUST be recorded in a **manual review queue** for human resolution. *(Clarified 2026-07-02: block + manual review queue — no auto-credit of the expected amount and no alert-only handling; a review surface/runbook is in scope.)*
+- **FR-B5**: A ledger settlement credit MUST be written only when the provider-reported received amount matches the server-computed expected total; on mismatch, the credit MUST be blocked and the mismatch MUST be recorded in a **manual review queue** for human resolution. *(Clarified 2026-07-02: block + manual review queue — no auto-credit of the expected amount and no alert-only handling; a review surface/runbook is in scope.)* *(Clarified 2026-07-18: the review surface is **backend-only** — authenticated, role-authorized endpoints to list open items and resolve/dismiss them, plus a written runbook. No dedicated Angular admin UI in this slice; resolution is an ops-facing exception path, integration-tested at the API layer.)* *(Clarified 2026-07-18: "matches" means **exact equality in integer minor units** — the server-computed total is converted to minor units (cents) and compared for exact equality with the provider-reported received amount; no tolerance/epsilon. `SettlementReviewQueue.ExpectedAmount`/`ProviderAmount` record the compared values.)*
 - **FR-B6**: Payment endpoints MUST read the property claim defensively and return a clean authorization error when it is absent (shared with Sub-Spec A FR-A8; owned here for payment endpoints).
 
 ### Key Entities
@@ -93,7 +102,7 @@ A ledger credit is written only when the settled amount reported by the payment 
 
 - **SC-B1**: Under simulated crash-and-reprocess and under concurrent webhook/reconciliation processing, a settled payment results in exactly one ledger credit in 100% of test runs.
 - **SC-B2**: The same idempotency key used by two different tenants succeeds for both with zero server errors; a same-tenant replay returns the original result.
-- **SC-B3**: A settlement with a mismatched provider amount writes zero ledger credits and produces a review record, verified by automated test.
+- **SC-B3**: A settlement whose provider-reported received amount differs from the server-computed total by even one minor unit (cent) writes zero ledger credits and produces a review record; an exact minor-unit match settles normally — both verified by automated test.
 - **SC-B4**: The card (immediate-capture) path, already atomic, remains correct and covered by tests after the changes.
 
 ## Assumptions
