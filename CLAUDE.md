@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-07-02
+Auto-generated from all feature plans. Last updated: 2026-07-18
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -22,6 +22,8 @@ Auto-generated from all feature plans. Last updated: 2026-07-02
 - Per-PR Neon Postgres **branch** (copy-on-write from a pre-seeded `pr-base`); per-PR (013-ephemeral-pr-envs)
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL / OpenTofu ≥1.8 (infra); GitHub Actions YAML + Bash (CI) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Identity, Stripe.net, Serilog, OpenTelemetry, `Microsoft.AspNetCore.RateLimiting`; Angular, ngx-stripe; `hashicorp/google`, `kislerdm/neon` (016-security-hardening)
 - PostgreSQL (Neon prod; Testcontainers CI/local). New tables: `PropertyClaimCodes`, `EmailVerifications`, `SettlementReviewQueue`. New indexes: `LedgerEntries (TransactionId, EntryType)` unique; `PaymentTransactions (PropertyId, IdempotencyKey)` unique. Identity lockout uses existing `AspNetUsers` columns. (016-security-hardening)
+- C# / .NET 9.0 (backend only — no frontend in this slice) + FastEndpoints, EF Core 9 (Npgsql), Stripe.net (existing gateway abstraction), FluentValidation (options), Serilog, OpenTelemetry (existing payment metrics) (018-security-hardening-subspec-b)
+- PostgreSQL (Neon prod; Testcontainers CI/local). **New table** `SettlementReviewQueue`. **Index changes**: new unique `LedgerEntries (TransactionId, EntryType)`; replace global unique `PaymentTransactions (IdempotencyKey)` with composite unique `(PropertyId, IdempotencyKey)`. Migration baseline = `20260607165538_OutboxDedupKey`. (018-security-hardening-subspec-b)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -59,9 +61,9 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 018-security-hardening-subspec-b: Added C# / .NET 9.0 (backend only — no frontend in this slice) + FastEndpoints, EF Core 9 (Npgsql), Stripe.net (existing gateway abstraction), FluentValidation (options), Serilog, OpenTelemetry (existing payment metrics)
 - 016-security-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL / OpenTofu ≥1.8 (infra); GitHub Actions YAML + Bash (CI) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Identity, Stripe.net, Serilog, OpenTelemetry, `Microsoft.AspNetCore.RateLimiting`; Angular, ngx-stripe; `hashicorp/google`, `kislerdm/neon`
 - 014-post-deploy-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 + Playwright 1.60 (frontend e2e) + FastEndpoints, `Microsoft.AspNetCore.RateLimiting` (built-in), OpenTelemetry (existing), `@playwright/test`; GitHub Actions (CI)
-- 013-ephemeral-pr-envs: Added HCL for OpenTofu ≥ 1.8 (provisioning); GitHub Actions YAML + Bash (CI); + OpenTofu providers `hashicorp/google ~5.0`, `hashicorp/google-beta ~5.0`,
 
 
 <!-- MANUAL ADDITIONS START -->
