@@ -248,7 +248,18 @@ jobs:
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
             }
 
-      # FR-009 clean failure: destroy partial resources so nothing billable is stranded (sweep backstops).
+      # FR-009 clean failure: the Stripe webhook endpoint is created imperatively (step 4), OUTSIDE tofu,
+      # so `tofu destroy` alone would strand it — a live test endpoint pointing at the now-destroyed
+      # Cloud Run URL, which Stripe retries and eventually emails about. Deregister it explicitly first,
+      # then destroy the tofu-managed resources. (Cancellation from cancel-in-progress does not run this;
+      # the daily sweep's metadata[pr] reconciliation backstops those once the PR is closed.)
+      - name: Deregister Stripe webhook on failure
+        if: failure()
+        env:
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: scripts/stripe-webhook-deregister.sh || true
+
       - name: Clean up on failure
         if: failure()
         working-directory: infra/environments/pr
