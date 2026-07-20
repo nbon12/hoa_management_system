@@ -23,7 +23,7 @@ jobs:
       - name: Fetch main for risk baseline
         run: git fetch origin main:refs/remotes/origin/main || true
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
