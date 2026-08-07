@@ -76,6 +76,8 @@
     "@sigstore/tuf": "^3.1.0",
     "qs": "6.15.2",
     "tmp": "^0.2.7",
-    "http-proxy-middleware": "2.0.10"
+    "http-proxy-middleware": "2.0.10",
+    "postcss": "^8.5.12",
+    "serialize-javascript": "^7.0.7"
   }
 }
