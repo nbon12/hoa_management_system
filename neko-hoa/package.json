@@ -78,6 +78,8 @@
     "tmp": "^0.2.7",
     "http-proxy-middleware": "2.0.10",
     "postcss": "^8.5.12",
-    "serialize-javascript": "^7.0.7"
+    "serialize-javascript": "^7.0.7",
+    "socket.io-parser": "^4.2.7",
+    "ip-address": "^10.4.0"
   }
 }
