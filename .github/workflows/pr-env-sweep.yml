@@ -125,3 +125,42 @@ jobs:
                 "🧹 This PR's ephemeral environment was reclaimed after ${INACTIVITY_DAYS} days with no new commits. Push any commit (or re-run the **pr-env** workflow) to rebuild it." || true
             fi
           done
+
+      # Authoritative Stripe reconciliation (contract stripe-webhook.md invariant): the loop above only
+      # reaches PRs that still have tofu state, so a webhook orphaned by a FAILED provision (the endpoint
+      # is created imperatively, outside tofu — a `tofu destroy` cleanup can't remove it) or by a missed
+      # teardown leaks forever once its state is gone. Here we ignore state entirely: list EVERY test-mode
+      # endpoint tagged metadata[pr] (paginated — the list loops above cap at 100 and silently drop the
+      # rest once orphans pile up) and delete any whose PR is closed/merged. Open PRs are left untouched
+      # (their env may be live or will rebuild on the next push); a still-broken open-PR endpoint is
+      # resolved by re-running pr-env or by teardown when the PR closes.
+      - name: Reconcile orphaned Stripe webhooks (metadata[pr] vs PR state)
+        env:
+          REPO: ${{ github.repository }}
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+        run: |
+          set -uo pipefail
+          api() { curl -sS -u "${STRIPE_SECRET_KEY_TEST}:" "$@"; }
+          starting_after=""
+          while :; do
+            url="https://api.stripe.com/v1/webhook_endpoints?limit=100"
+            [ -n "$starting_after" ] && url="${url}&starting_after=${starting_after}"
+            page="$(api "$url")"
+            rows="$(printf '%s' "$page" | python3 -c "import sys,json;d=json.load(sys.stdin);print('\n'.join(e['id']+'\t'+e['metadata']['pr'] for e in d.get('data',[]) if e.get('metadata',{}).get('pr')))")"
+            while IFS=$'\t' read -r id pr; do
+              [ -z "$id" ] && continue
+              state=$(gh api "repos/${REPO}/pulls/${pr}" --jq '.state' 2>/dev/null || echo "unknown")
+              if [ "$state" = "closed" ]; then
+                api -X DELETE "https://api.stripe.com/v1/webhook_endpoints/${id}" >/dev/null \
+                  && echo "Deleted orphaned webhook ${id} (PR #${pr} is closed)."
+              elif [ "$state" = "open" ]; then
+                echo "Keeping webhook ${id} (PR #${pr} open)."
+              else
+                echo "Skipping webhook ${id} (PR #${pr} state '${state}' — cannot confirm)."
+              fi
+            done <<< "$rows"
+            has_more="$(printf '%s' "$page" | python3 -c "import sys,json;print(str(json.load(sys.stdin).get('has_more',False)).lower())")"
+            [ "$has_more" = "true" ] || break
+            starting_after="$(printf '%s' "$page" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['data'][-1]['id'] if d.get('data') else '')")"
+            [ -z "$starting_after" ] && break
+          done
