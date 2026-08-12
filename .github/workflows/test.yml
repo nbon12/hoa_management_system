@@ -144,6 +144,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 020-D FR-D2: the enforcing CSP has no 'unsafe-inline', so the built index.html must carry
+      # no inline scripts/handlers (the recurring offender is Angular's inlineCritical). Runs after
+      # Build because it inspects dist/.../index.html — catches the regression at PR time, not only
+      # at the deployed @smoke gate.
+      - name: CSP inline-script guard
+        run: npm run test:csp-inline
+
       - name: Build Storybook
         run: npm run build-storybook
 

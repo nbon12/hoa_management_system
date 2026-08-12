@@ -19,7 +19,8 @@
     "storybook": "ng run neko-hoa:storybook",
     "build-storybook": "ng run neko-hoa:build-storybook",
     "stamp-headers": "node scripts/stamp-headers.mjs",
-    "test:headers": "node scripts/stamp-headers.test.mjs"
+    "test:headers": "node scripts/stamp-headers.test.mjs",
+    "test:csp-inline": "node scripts/check-no-inline-scripts.mjs"
   },
   "private": true,
   "dependencies": {
