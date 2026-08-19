@@ -45,9 +45,11 @@ public class S3DocumentStorage(IAmazonS3 s3Client, IOptions<StorageOptions> opts
             // ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented" → 501) nor its checksum-trailer
             // variant. DisablePayloadSigning sends a single UNSIGNED-PAYLOAD request instead; integrity
             // is still covered by TLS. UseChunkEncoding=false makes the non-chunked intent explicit.
-            // Verified against live R2: without these the upload 501s; with them it succeeds. MinIO
-            // accepts both forms, so local/Test behaviour is unchanged.
-            DisablePayloadSigning = true,
+            // Verified against live R2: without these the upload 501s; with them it succeeds.
+            // The SDK refuses to send an unsigned payload over plain HTTP, so this only applies to
+            // R2 (always HTTPS in production) — local/Test MinIO (http://) falls back to a normal
+            // signed upload, which it accepts fine.
+            DisablePayloadSigning = !_opts.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase),
             UseChunkEncoding = false,
         }, ct);
     }

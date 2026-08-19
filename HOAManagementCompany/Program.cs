@@ -57,6 +57,9 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(services)
         .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+        // Global config silences "Microsoft" to Warning; carve this one category back to
+        // Information so "Now listening on: ..." / "Application started" still print locally.
+        .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
         .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
         .Enrich.FromLogContext()
         .Enrich.With(new ActivityTraceEnricher()) // trace_id/span_id on every record (FR-003).
