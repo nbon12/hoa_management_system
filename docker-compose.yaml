@@ -55,7 +55,11 @@ services:
     networks:
       - app_network
 
+  # Containerized API — opt-in via `docker compose --profile full up -d`.
+  # Day-to-day development runs this project natively from Rider instead
+  # (hot reload + debugger), against the db/minio/aspire-dashboard services below.
   api:
+    profiles: ["full"]
     build:
       context: .
       dockerfile: HOAManagementCompany/Dockerfile
@@ -90,7 +94,9 @@ services:
       - app_network
 
   # NekoHOA Angular app (neko-hoa/). Stop any local `ng serve` on 4200 before starting.
+  # Opt-in via `docker compose --profile full up -d` — see `api` above.
   ui:
+    profiles: ["full"]
     container_name: nekohoa-ui
     build:
       context: ./neko-hoa
