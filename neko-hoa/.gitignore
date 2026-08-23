@@ -45,6 +45,10 @@ testem.log
 /cypress/screenshots
 /cypress/downloads
 
+# Playwright
+/playwright-report
+/test-results
+
 # System files
 .DS_Store
 Thumbs.db

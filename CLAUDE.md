@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-07-07
+Auto-generated from all feature plans. Last updated: 2026-08-20
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -24,6 +24,8 @@ Auto-generated from all feature plans. Last updated: 2026-07-07
 - PostgreSQL (Neon prod; Testcontainers CI/local). New tables: `PropertyClaimCodes`, `EmailVerifications`, `SettlementReviewQueue`. New indexes: `LedgerEntries (TransactionId, EntryType)` unique; `PaymentTransactions (PropertyId, IdempotencyKey)` unique. Identity lockout uses existing `AspNetUsers` columns. (016-security-hardening)
 - TypeScript / Angular 17.3 (frontend); C# / .NET 9.0 (backend cookie endpoints) + Angular signals/standalone APIs, RxJS, ngx-stripe (CSP origins), Web Locks API + BroadcastChannel (cross-tab refresh); FastEndpoints, ASP.NET Identity/JWT (existing), FluentValidation (new `Auth:RefreshCookie` options) (020-security-hardening-subspec-d)
 - N/A — no schema changes; refresh tokens already persisted hashed in PostgreSQL (020-security-hardening-subspec-d)
+- C# / .NET 9.0 (backend, `HOAManagementCompany`); TypeScript / Angular 17.3 (frontend, `neko-hoa`) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity, JWT bearer issuance, `IDocumentStorage` (all existing, reused — see research.md R3); Angular standalone components/signals, existing `AuthService` claim decoding. No new package for either project. (025-board-overall-design)
+- PostgreSQL (Neon in production, Testcontainers in CI/local). New tables: `Communities`, `CommunityMemberships`. Modified: `Properties` (`CommunityId`/`CommunityName` strings → `CommunityId` GUID FK), `Violations` (`CommunityId` string → GUID FK), `AspNetUsers` (+ `LastActiveMode`). (025-board-overall-design)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -61,9 +63,9 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 025-board-overall-design: Added C# / .NET 9.0 (backend, `HOAManagementCompany`); TypeScript / Angular 17.3 (frontend, `neko-hoa`) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity, JWT bearer issuance, `IDocumentStorage` (all existing, reused — see research.md R3); Angular standalone components/signals, existing `AuthService` claim decoding. No new package for either project.
 - 020-security-hardening-subspec-d: Added TypeScript / Angular 17.3 (frontend); C# / .NET 9.0 (backend cookie endpoints) + Angular signals/standalone APIs, RxJS, ngx-stripe (CSP origins), Web Locks API + BroadcastChannel (cross-tab refresh); FastEndpoints, ASP.NET Identity/JWT (existing), FluentValidation (new `Auth:RefreshCookie` options)
 - 016-security-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL / OpenTofu ≥1.8 (infra); GitHub Actions YAML + Bash (CI) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Identity, Stripe.net, Serilog, OpenTelemetry, `Microsoft.AspNetCore.RateLimiting`; Angular, ngx-stripe; `hashicorp/google`, `kislerdm/neon`
-- 014-post-deploy-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 + Playwright 1.60 (frontend e2e) + FastEndpoints, `Microsoft.AspNetCore.RateLimiting` (built-in), OpenTelemetry (existing), `@playwright/test`; GitHub Actions (CI)
 
 
 <!-- MANUAL ADDITIONS START -->
