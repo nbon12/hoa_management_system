@@ -1,6 +1,6 @@
 # Feature Specification: Board Member Experience — Overall Design
 
-**Feature Branch**: `025-board-overall-design`
+**Feature Branch**: `021-board-overall-design`
 **Created**: 2026-08-19
 **Status**: Draft
 **Input**: User description: "Overall design for the board member flows — the shared shell, role model, community scope, and metric presentation contract that the Community Overview, Architectural Applications, Board Approvals, Accounting, and Reports specs all build on."
@@ -16,7 +16,7 @@ This is spec 1 of 6 in the board member effort:
 | 1 | **Overall design** (this spec) | — |
 | 2 | Community Overview & Metrics | Community entity, metric descriptor contract, shell |
 | 3 | Architectural Applications | Community scope, board role, attachment URLs |
-| 4 | Board Approvals | Community scope, board role |
+| 4 | Board Approvals | Community scope, board/committee roles |
 | 5 | Accounting (invoices, vendor aging) | Community scope, manager/accountant roles |
 | 6 | Reports | Community scope, role gating, scheduled delivery identity |
 
@@ -45,12 +45,6 @@ The board experience cannot be built on any of this without first introducing co
 - Q: How should metric definitions be surfaced? → A: Clicking a per-row help link opens a right-side glossary panel scrolled to that term.
 - Q: Visual language for the board side? → A: Identical to the resident side — same palette, same warmth.
 - Q: Should metrics be hand-built per page? → A: No. A single reusable registry must drive them so metrics can be added or retired without redesign.
-
-### Session 2026-08-20
-
-- Q: How are board membership records administered? → A: In-product — community managers can create and edit board memberships within the application, not only via seed/import.
-- Q: What read scope should Committee Members have? → A: Question is moot — there is no separate Committee Member role. Architectural review is a Board Member capability; the architectural review committee is the board.
-- Q: Are nav entries for capabilities the role doesn't have hidden entirely, or shown disabled with a lock affordance? → A: Shown disabled with a lock affordance, matching the wireframes.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -125,24 +119,6 @@ As a board member looking at a table of community metrics, I can click a help li
 
 ---
 
-### User Story 5 — Grant and edit board membership (Priority: P1)
-
-As a community manager, I can create a `CommunityMembership` for a homeowner or outside professional — assigning them a community, a role, and an optional end date — and edit or end that membership later, without engineering involvement.
-
-**Why this priority**: Every other story in this spec assumes an active membership already exists. Without an in-product way to create one, no board member can ever enter board mode in a real deployment — this is the only path into the entire feature outside of test fixtures.
-
-**Independent Test**: Sign in as a community manager, grant a board membership to a resident user, confirm they can now enter board mode for that community; edit the membership's end date to the past, confirm they lose access on their next request.
-
-**Acceptance Scenarios**:
-
-1. **Given** I am a community manager for community A, **When** I create a membership for a user with role Board Member and no end date, **Then** the membership is active immediately and that user's mode control appears on their next request.
-2. **Given** I am a community manager, **When** I attempt to create a membership for a community I do not manage, **Then** the request is denied server-side.
-3. **Given** an active membership I administer, **When** I change its role or end date, **Then** the change takes effect on the member's next request with no re-authentication required.
-4. **Given** an active membership I administer, **When** I end it (set an end date in the past, or set status inactive), **Then** the member loses the associated permissions on their next request per FR-023.
-5. **Given** I am not a community manager, **When** I attempt to reach the membership-admin surface, **Then** I am refused per the same role-gated navigation rules as any other restricted section (FR-027, FR-028).
-
----
-
 ### Edge Cases
 
 - **A user holds different roles in different communities** (board member at home, manager professionally). Role is resolved per community, never globally; entering community A must not carry community B's permissions.
@@ -168,13 +144,11 @@ As a community manager, I can create a `CommunityMembership` for a homeowner or 
 
 ### Functional Requirements
 
-> **Design references.** UI-facing requirements below cite the board wireframe bundle at `wireframes/HOA Management CRM v1.0.1/` (`WFb`) — canvas section **`7 · Board & manager side`**. Screen components live in `wf-board-screens.jsx` (`BoardModeSwitch`, `BoardHome`, `BoardMetrics`, `BoardOverview`, `BoardArchApps`, `BoardVendors`, `BoardNavMulti`); the shared shell, metric registry, and nav derivation live in `wf-board.jsx` (`WFShellBoard`, `METRICS`, `boardNav()`, `MetricTable`, `GlossaryPanel`, `HeroStat`). These are **lofi wireframes**: layout, hierarchy, table columns, and copy are intentional; color/spacing are placeholder — map them to `neko-hoa/src/styles.scss` tokens, not the sketch palette (`wireframe-styles.css`). Do **not** port the JSX; the target is Angular. The bundle's written spec is `specs/021-board-overall-design/spec.md`, an **earlier revision of this one** — where they differ (notably FR-040/FR-041/FR-042, clarified here), this `025` spec is authoritative. Requirements with no wireframe are marked `[no WFb]`.
-
 **Community as a first-class entity**
 
-- **FR-001**: System MUST introduce a `Community` entity with a stable GUID primary key, and MUST persist: legal name, community name (the management company's human-readable handle), county, formation date, management start date, description, and status. *[design: `WFb BoardOverview` is the surface that displays these fields — legal name, community name, county, formation date, management start date, Community GUID, and description; on-canvas note: "Community GUID drives queries; Community Name is the human handle."]*
+- **FR-001**: System MUST introduce a `Community` entity with a stable GUID primary key, and MUST persist: legal name, community name (the management company's human-readable handle), county, formation date, management start date, description, and status.
 - **FR-002**: The community name MUST be unique per management company and MUST be usable as a lookup handle; the GUID MUST be the identifier used in all queries and API paths.
-- **FR-003**: System MUST support a parent/child relation between communities so a master association can contain sub-associations. *[design: `WFb BoardOverview` "Sub-associations" card shows Keystone Crossing SF and TH under the Master; `BoardNavMulti` lists the Master and both children as distinct communities.]*
+- **FR-003**: System MUST support a parent/child relation between communities so a master association can contain sub-associations.
 - **FR-004**: `Property.CommunityId` MUST become a foreign key to `Community`, and the denormalized `Property.CommunityName` MUST be derived from the related community rather than stored separately.
 - **FR-005**: A migration MUST backfill existing distinct `CommunityId` / `CommunityName` string pairs into `Community` rows with no loss of existing property associations, and MUST be reversible.
 - **FR-006**: All entities currently carrying a loose `CommunityId` string (including `Violation`) MUST be migrated to the foreign key.
@@ -182,11 +156,10 @@ As a community manager, I can create a `CommunityMembership` for a homeowner or 
 **Membership and roles**
 
 - **FR-007**: System MUST introduce a `CommunityMembership` entity linking a user to a community with a role, a status, a start date, and an optional end date.
-- **FR-008**: System MUST support at minimum these roles: Resident, Board Member, Community Manager, Accountant. Architectural review is a Board Member capability, not a separate role.
+- **FR-008**: System MUST support at minimum these roles: Resident, Board Member, Committee Member, Community Manager, Accountant.
 - **FR-009**: A user MUST be able to hold memberships in multiple communities, with a different role in each.
 - **FR-010**: A membership whose end date has passed, or whose status is not active, MUST confer no permissions.
 - **FR-011**: Board membership MUST be independent of property ownership; granting or revoking one MUST NOT alter the other.
-- **FR-042**: System MUST provide an in-product surface for community managers to create and edit `CommunityMembership` records (assign a user, community, role, status, and term) without requiring a seed/import step. *[design: `[no WFb]` — the handoff states plainly "No admin surface is specified in this effort"; this FR was added by the 2026-08-20 clarification, beyond what the wireframes cover. Closest reusable layout is the resident bundle's editable-form + history pattern; the surface needs a new wireframe or a Storybook-first build.]*
 
 **Community scope (the shared authorization primitive)**
 
@@ -199,44 +172,49 @@ As a community manager, I can create a `CommunityMembership` for a homeowner or 
 
 **Mode switching**
 
-- **FR-018**: System MUST offer a single sign-in for all personas. No separate board portal, URL, or credential set. *[design: `WFb BoardModeSwitch` — one login; a board-eligible resident sees "🗝️ Enter board mode" in their own top bar and the resident dashboard stays unchanged, with no portal picker. (The older resident bundle's `§1` portal-selection screen offered a separate "Board / Mgmt" door; that approach is superseded by this design and FR-018.)]*
-- **FR-019**: The mode control MUST render in the top bar within the account-controls cluster, to the left of the alerts and avatar controls, and MUST NOT occupy space in the page body. *[design: `WFb BoardModeSwitch` — the "🗝️ Enter board mode" chip sits in the `wf-user` cluster immediately left of `🔔 3` and the `NB` avatar; the on-canvas note reads "sits with the other account controls, top-right — nothing added to the page body."]*
+- **FR-018**: System MUST offer a single sign-in for all personas. No separate board portal, URL, or credential set.
+- **FR-019**: The mode control MUST render in the top bar within the account-controls cluster, to the left of the alerts and avatar controls, and MUST NOT occupy space in the page body.
 - **FR-020**: The mode control MUST be rendered only for users holding at least one active non-resident membership.
-- **FR-021**: While in board mode, a visually distinct banner MUST identify the mode and state that association-wide data is shown. *[design: `WFb WFShellBoard` renders the violet board banner above the shell; it carries no control (the toggle lives in the top bar). Binding contrast decision from the handoff: dark ink on the violet fill — white-on-violet measured 2.51:1 and fails WCAG 2.1 AA (FR-038).]*
+- **FR-021**: While in board mode, a visually distinct banner MUST identify the mode and state that association-wide data is shown.
 - **FR-022**: The user's last-used mode MUST persist across sessions.
 - **FR-023**: When a user's last non-resident membership becomes inactive, the application MUST return them to resident mode on their next request.
 
 **Navigation shell**
 
-- **FR-024**: The board shell MUST present a grouped left sidebar and MUST accept its navigation set as data, so sibling specs add sections without modifying the shell. *[design: `WFb boardNav()` in `wf-board.jsx` returns the grouped nav array (Community management / Finance / Vendors groups) that `WFShellBoard` renders as data; sibling specs extend the array, not the shell.]*
-- **FR-025**: A "My Communities" navigation item MUST be rendered if and only if the user holds more than one active community membership, independent of role. *[design: `WFb boardNav()` — `if (communities > 1) g.push({ items: [{ label: 'My Communities' }] })`; the `BoardNavMulti` screen shows the multi-community state (role Manager, communities 4).]*
-- **FR-026**: A user holding exactly one active community membership MUST land directly on that community's home page. *[design: `WFb BoardHome` is that landing page; `boardNav()` omits the "My Communities" item when `communities === 1`.]*
-- **FR-027**: Navigation entries for capabilities the user's role does not confer MUST NOT be offered as working links. *[design: `WFb boardNav()` tags Finance items with `roles: ['manager', 'accountant']`; `WFShellBoard` renders them non-navigable for a board member — see the `BoardVendors` note "board sees approval + insurance; managers open the full grid."]*
-- **FR-028**: Direct navigation to a route the user's role cannot use MUST be refused and redirected to a permitted page. *[design: behavioral, no static frame — the handoff specifies "refused and redirected to a permitted page — never an empty screen."]*
-- **FR-040**: Navigation entries the user's role does not confer MUST be rendered visible but disabled, with a lock affordance signaling the capability exists and is unavailable to this role. *[design: `WFb WFShellBoard` (`wf-board.jsx`) computes `const locked = it.roles && !it.roles.includes(role)` and renders a `🔒` titled "Not available to your role" with the `locked` class — this is the wireframe the 2026-08-20 clarification refers to.]*
+- **FR-024**: The board shell MUST present a grouped left sidebar and MUST accept its navigation set as data, so sibling specs add sections without modifying the shell.
+- **FR-025**: A "My Communities" navigation item MUST be rendered if and only if the user holds more than one active community membership, independent of role.
+- **FR-026**: A user holding exactly one active community membership MUST land directly on that community's home page.
+- **FR-027**: Navigation entries for capabilities the user's role does not confer MUST NOT be offered as working links.
+- **FR-028**: Direct navigation to a route the user's role cannot use MUST be refused and redirected to a permitted page.
 
 **Metric presentation contract**
 
-- **FR-029**: System MUST define a single metric descriptor contract carrying at minimum: stable id, surface, label, definition text, value, optional supporting detail, status, emphasis, and required capability. *[design: `WFb METRICS` in `wf-board.jsx` is that contract — each descriptor carries `id`, `surface` (routes to a page section), `label`, `value`, `status`, `help` (glossary copy), `tone` (emphasis), `hero` (promotes to a summary card).]*
-- **FR-030**: All metric surfaces (summary statistics, metric tables, and the glossary) MUST be rendered from that one collection of descriptors. No metric may be positioned by hand in a template. *[design: `WFb` — `HeroStat` (via `heroes()`), `MetricTable` (via `bySurface()`), and `GlossaryPanel` all read the single `METRICS` array; `BoardHome` renders Work Processed + Community Metrics tables and hero stats entirely from it.]*
+- **FR-029**: System MUST define a single metric descriptor contract carrying at minimum: stable id, surface, label, definition text, value, optional supporting detail, status, emphasis, and required capability.
+- **FR-030**: All metric surfaces (summary statistics, metric tables, and the glossary) MUST be rendered from that one collection of descriptors. No metric may be positioned by hand in a template.
 - **FR-031**: Adding or removing a metric MUST require only a change to the descriptor collection — no layout, component, or template change.
-- **FR-032**: The help affordance MUST be the right-most column of every metric row. *[design: `WFb MetricTable` puts the help trigger in the right-most column; the `BoardHome` on-canvas note reads "help moved to the right-most column →".]*
-- **FR-033**: Selecting a metric's help affordance MUST open a glossary panel positioned at that metric's definition, with the targeted entry visually distinguished. *[design: `WFb BoardMetrics` renders the open state — `WFShellBoard(... glossary="over60")` drives `GlossaryPanel target=` to scroll to and highlight that term in the right-side panel.]*
-- **FR-034**: Glossary content MUST be derived from the same descriptors as the rows, so a definition cannot drift from its metric. *[design: `WFb GlossaryPanel` reads the `help` field of the same `METRICS` descriptors the rows render from — one source, no drift.]*
+- **FR-032**: The help affordance MUST be the right-most column of every metric row.
+- **FR-033**: Selecting a metric's help affordance MUST open a glossary panel positioned at that metric's definition, with the targeted entry visually distinguished.
+- **FR-034**: Glossary content MUST be derived from the same descriptors as the rows, so a definition cannot drift from its metric.
 - **FR-035**: A descriptor whose required capability the user lacks MUST NOT render on any surface.
 - **FR-036**: An individual metric that fails to resolve MUST render an explicit unavailable state without preventing its siblings from rendering.
 
 **Shared presentation**
 
-- **FR-037**: The board side MUST use the existing design tokens and visual language; no separate board palette is introduced. *[design: `WFb` is lofi — its sketch palette in `wireframe-styles.css` is placeholder only. The handoff is explicit: map to `neko-hoa/src/styles.scss` tokens; no new board palette. The `--violet` fill and `--ink` text of the banner are the one binding color pairing (see FR-021).]*
+- **FR-037**: The board side MUST use the existing design tokens and visual language; no separate board palette is introduced.
 - **FR-038**: Text and interactive controls introduced by this spec MUST meet WCAG 2.1 AA contrast, including the board mode banner and the help affordance.
-- **FR-039**: System MUST provide a shared short-lived pre-signed URL primitive for private documents, so sibling specs (notably Architectural Applications) never expose durable public object URLs. *[design: `WFb BoardArchApps` — homeowner attachments (plans, elevations, plat surveys) are labeled "stored in S3, opens in a new tab" and link out rather than embedding; the handoff requires these be served through the short-lived pre-signed URL, never a durable public object URL.]*
+- **FR-039**: System MUST provide a shared short-lived pre-signed URL primitive for private documents, so sibling specs (notably Architectural Applications) never expose durable public object URLs.
+
+**Open questions**
+
+- **FR-040**: Navigation entries the user's role does not confer MUST be [NEEDS CLARIFICATION: hidden entirely, or rendered disabled with a lock affordance to signal the capability exists? Hiding avoids support noise; showing a lock helps a board member understand what a manager does. The wireframes currently show a lock.]
+- **FR-041**: Committee members MUST have [NEEDS CLARIFICATION: the same read scope as board members, or a narrower scope limited to the committee's subject area?]
+- **FR-042**: Board membership records MUST be administered by [NEEDS CLARIFICATION: community managers in-product, or seeded/imported from the management company's system of record? No admin surface is specified in this effort.]
 
 ### Key Entities
 
 - **Community**: An association. Stable GUID identity, a unique human-readable name used as a handle, legal name, county, formation date, management start date, description, status, and an optional parent community for master/sub relationships. The tenant boundary for all board features.
 - **CommunityMembership**: The relationship granting a user a role within one community, with status and a term (start date, optional end date). The sole source of board-side authorization.
-- **CommunityRole**: The enumerated capability set — Resident, Board Member, Community Manager, Accountant. Architectural review authority belongs to Board Member; there is no separate committee role.
+- **CommunityRole**: The enumerated capability set — Resident, Board Member, Committee Member, Community Manager, Accountant.
 - **MetricDescriptor**: The presentation contract for a single metric — id, surface, label, definition, value, detail, status, emphasis, required capability. Drives summary statistics, tables, and glossary alike.
 - **Property** *(modified)*: Gains a real foreign key to Community; loses its denormalized community name.
 - **Violation** *(modified)*: Gains a real foreign key to Community in place of its loose string.
@@ -271,4 +249,3 @@ As a community manager, I can create a `CommunityMembership` for a homeowner or 
 - **SC-006**: Existing resident-mode behavior is unchanged, verified by the pre-existing dashboard, payments, and property test suites passing without modification.
 - **SC-007**: Every metric row exposes its definition in one click, and no definition exists outside the descriptor collection.
 - **SC-008**: All new interactive controls pass WCAG 2.1 AA contrast and are reachable by keyboard alone.
-- **SC-009**: A community manager can grant a new board membership and have that member enter board mode within the same test session, with no engineering, database, or seed-script involvement.

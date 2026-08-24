@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>HOA Management CRM · wireframes</title>
+<meta name="viewport" content="width=1400"/>
+<link rel="stylesheet" href="wireframe-styles.css"/>
+<style>
+  html, body { margin:0; padding:0; background: #f0eee9; font-family: 'Geist', system-ui, sans-serif; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="wf-shell.jsx"></script>
+<script type="text/babel" src="wf-auth.jsx"></script>
+<script type="text/babel" src="wf-dashboard.jsx"></script>
+<script type="text/babel" src="wf-statement.jsx"></script>
+<script type="text/babel" src="wf-payments.jsx"></script>
+<script type="text/babel" src="wf-stripe.jsx"></script>
+<script type="text/babel" src="wf-property.jsx"></script>
+<script type="text/babel" src="wf-community.jsx"></script>
+<script type="text/babel" src="wf-board.jsx"></script>
+<script type="text/babel" src="wf-board-screens.jsx"></script>
+
+<script type="text/babel">
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "hue": "balanced",
+  "density": "comfy",
+  "annotations": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAKS);
+
+  // hue palette swap
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const palettes = {
+      pinker:    { pink:'oklch(0.94 0.05 350)', pink2:'oklch(0.86 0.07 350)', rose:'oklch(0.76 0.12 350)', lav:'oklch(0.94 0.03 340)', lav2:'oklch(0.88 0.05 340)', violet:'oklch(0.74 0.10 340)' },
+      balanced:  { pink:'oklch(0.94 0.03 350)', pink2:'oklch(0.88 0.05 350)', rose:'oklch(0.78 0.10 350)', lav:'oklch(0.92 0.04 300)', lav2:'oklch(0.86 0.06 300)', violet:'oklch(0.72 0.10 300)' },
+      purpler:   { pink:'oklch(0.93 0.04 320)', pink2:'oklch(0.86 0.06 320)', rose:'oklch(0.74 0.11 310)', lav:'oklch(0.91 0.05 290)', lav2:'oklch(0.84 0.08 290)', violet:'oklch(0.68 0.12 290)' },
+    };
+    const p = palettes[tweaks.hue] || palettes.balanced;
+    root.style.setProperty('--pink', p.pink);
+    root.style.setProperty('--pink-2', p.pink2);
+    root.style.setProperty('--rose', p.rose);
+    root.style.setProperty('--lav', p.lav);
+    root.style.setProperty('--lav-2', p.lav2);
+    root.style.setProperty('--violet', p.violet);
+  }, [tweaks.hue]);
+
+  React.useEffect(() => {
+    const id = 'tweak-anno-css';
+    let s = document.getElementById(id);
+    if (!s) { s = document.createElement('style'); s.id = id; document.head.appendChild(s); }
+    s.textContent = tweaks.annotations ? '' : '.wf-note{display:none !important;}';
+  }, [tweaks.annotations]);
+
+  React.useEffect(() => {
+    const sizes = { airy: 14, comfy: 13, dense: 12 };
+    document.querySelectorAll('.wf').forEach(el => { el.style.fontSize = (sizes[tweaks.density] || 13) + 'px'; });
+  }, [tweaks.density]);
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection id="auth" title="1 · Sign-in flow" subtitle="Portal selection → registration → login">
+          <DCArtboard id="portal" label="Portal selection · split with hero" width={1100} height={780}><PortalSelectB/></DCArtboard>
+          <DCArtboard id="register" label="Registration · find property, then confirm" width={1100} height={780}><Registration/></DCArtboard>
+          <DCArtboard id="login" label="Login · card + quick pay" width={1100} height={760}><LoginA/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="home" title="2 · Resident home" subtitle="The 'I just signed in' moment">
+          <DCArtboard id="dash" label="Dashboard · sidebar + KPI cards" width={1280} height={920}><DashboardB/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="payments" title="3 · Billing & payments" subtitle="Statement · one-time · recurring">
+          <DCArtboard id="stmt" label="Billing · status header + metrics + consolidated history" width={1280} height={900}><Statement/></DCArtboard>
+          <DCArtboard id="pay" label="One-time payment · 3-step stepper" width={1280} height={780}><PaymentB/></DCArtboard>
+          <DCArtboard id="rec" label="Recurring · plain-language toggle, CC/ACH swap" width={1280} height={1030}><RecurringB/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="stripe" title="3b · Billing on Stripe (redesign)" subtitle="Stop collecting raw card / bank numbers — Stripe collects & vaults them">
+          <DCArtboard id="s-redirect" label="One-time · A · pick amount → hosted Stripe Checkout" width={1280} height={760}><StripeOneTimeRedirect/></DCArtboard>
+          <DCArtboard id="s-hosted" label="One-time · A · the redirect target (Stripe-hosted page)" width={1100} height={800}><StripeHostedCheckout/></DCArtboard>
+          <DCArtboard id="s-embedded" label="One-time · B · embedded Payment Element (no redirect)" width={1280} height={760}><StripeOneTimeEmbedded/></DCArtboard>
+          <DCArtboard id="s-saved" label="One-time · C · vaulted methods, one-tap pay" width={1280} height={760}><StripeOneTimeSaved/></DCArtboard>
+          <DCArtboard id="s-rec-saved" label="Recurring · A · rules ours, method on file via Stripe" width={1280} height={940}><StripeRecurringSaved/></DCArtboard>
+          <DCArtboard id="s-rec-embed" label="Recurring · B · embedded setup (SetupIntent + mandate)" width={1280} height={780}><StripeRecurringEmbedded/></DCArtboard>
+          <DCArtboard id="s-rec-portal" label="Recurring · C · delegate to Stripe Customer Portal" width={1280} height={760}><StripeRecurringPortal/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="property" title="4 · Property & owner" subtitle="Info · owner profile · directory sharing">
+          <DCArtboard id="prop" label="Property info · KPIs + assessment rules" width={1280} height={820}><PropertyA/></DCArtboard>
+          <DCArtboard id="own" label="Owner info · editable form + mailing prefs" width={1280} height={780}><OwnerA/></DCArtboard>
+          <DCArtboard id="dir" label="Directory · field-toggle table" width={1280} height={680}><DirectoryB/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="compliance" title="5 · Compliance" subtitle="Violations">
+          <DCArtboard id="viol" label="Violations · summary + history table" width={1280} height={720}><ViolationsB/></DCArtboard>
+        </DCSection>
+
+        <DCSection id="community" title="6 · Community" subtitle="Documents · announcements · calendar">
+          <DCArtboard id="docs" label="Documents · grouped card grid" width={1280} height={780}><DocumentsB/></DCArtboard>
+          <DCArtboard id="ann" label="Announcements · feed + filters + poll" width={1280} height={820}><AnnouncementsB/></DCArtboard>
+          <DCArtboard id="cal" label="Calendar · vertical timeline by month" width={1280} height={970}><CalendarB/></DCArtboard>
+        </DCSection>
+        <DCSection id="board" title="7 · Board & manager side" subtitle="One login, board mode · role-gated shell · registry-driven metrics">
+          <DCArtboard id="b-switch" label="Sign-in · “Enter board mode” sits in the top bar, left of alerts" width={1280} height={800}><BoardModeSwitch/></DCArtboard>
+          <DCArtboard id="b-home" label="Community Home · votes, photos, calendar, Work Processed, metrics — one scrolling page" width={1360} height={1860}><BoardHome/></DCArtboard>
+          <DCArtboard id="b-metrics" label="Community Home scrolled to metrics · glossary open on a term" width={1440} height={880}><BoardMetrics/></DCArtboard>
+          <DCArtboard id="b-overview" label="Community overview · legal name, GUID, description" width={1360} height={880}><BoardOverview/></DCArtboard>
+          <DCArtboard id="b-arc" label="Architectural applications · attachments column + inline vote" width={1440} height={1000}><BoardArchApps/></DCArtboard>
+          <DCArtboard id="b-vendors" label="Vendor management · board view, approval + insurance" width={1360} height={920}><BoardVendors/></DCArtboard>
+          <DCArtboard id="b-multi" label="Nav · “My Communities” only when you hold more than one" width={1360} height={720}><BoardNavMulti/></DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Palette">
+          <TweakRadio label="Hue" value={tweaks.hue} onChange={v => setTweak('hue', v)}
+            options={[
+              {value:'pinker', label:'Pink'},
+              {value:'balanced', label:'Mix'},
+              {value:'purpler', label:'Purple'},
+            ]}/>
+        </TweakSection>
+        <TweakSection title="Layout">
+          <TweakRadio label="Density" value={tweaks.density} onChange={v => setTweak('density', v)}
+            options={[
+              {value:'airy', label:'Airy'},
+              {value:'comfy', label:'Comfy'},
+              {value:'dense', label:'Dense'},
+            ]}/>
+          <TweakToggle label="Show sketch annotations" value={tweaks.annotations} onChange={v => setTweak('annotations', v)}/>
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
