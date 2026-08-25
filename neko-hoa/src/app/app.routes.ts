@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { boardGuard } from './core/guards/board.guard';
 
 export const routes: Routes = [
   // Public auth routes
@@ -32,6 +33,12 @@ export const routes: Routes = [
       { path: 'community/calendar',      loadComponent: () => import('./features/community/calendar/calendar.component').then(m => m.CalendarComponent) },
       { path: 'community/violations',    loadComponent: () => import('./features/community/violations/violations.component').then(m => m.ViolationsComponent) },
       { path: 'community/documents',     loadComponent: () => import('./features/community/documents/documents.component').then(m => m.DocumentsComponent) },
+
+      // Board (025) — guarded by authGuard + boardGuard; role-gated routes carry requiredRoles.
+      { path: 'board/home',        canActivate: [boardGuard], loadComponent: () => import('./features/board/community-home/community-home.component').then(m => m.CommunityHomeComponent) },
+      { path: 'board/communities', canActivate: [boardGuard], loadComponent: () => import('./features/board/communities/communities.component').then(m => m.CommunitiesComponent) },
+      { path: 'board/metrics',     canActivate: [boardGuard], loadComponent: () => import('./features/board/metrics/metrics-page.component').then(m => m.BoardMetricsPageComponent) },
+      { path: 'board/memberships', canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'] }, loadComponent: () => import('./features/board/membership-admin/membership-admin.component').then(m => m.MembershipAdminComponent) },
     ]
   },
 

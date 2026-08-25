@@ -2,12 +2,26 @@
 export type ISODate = string; // "2026-05-01"
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
+// 025: an active community membership the user holds. Drives board mode-toggle
+// visibility (FR-020) and the board nav set (FR-024/FR-025), all derived client-side
+// from the login/refresh response (research.md R6).
+export interface CommunityMembershipSummary {
+  communityId: string;
+  communityName: string;
+  role: string; // CommunityRole name: Resident | BoardMember | CommunityManager | Accountant
+}
+
+export type UserMode = 'Resident' | 'Board';
+
 export interface CurrentUser {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
   initials: string;
+  // 025: persisted last-used mode (FR-022) and active memberships.
+  lastActiveMode: UserMode;
+  memberships: CommunityMembershipSummary[];
 }
 
 // ─── Property ────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { TokenService } from './token.service';
-import { CurrentUser } from '../models';
+import { CurrentUser, UserMode } from '../models';
 
 // 020-D FR-D1 (contracts/auth-session.md): auth responses carry the access token + user only —
 // the refresh token arrives as an HttpOnly cookie, so /auth calls use withCredentials.
@@ -18,6 +18,9 @@ export interface AuthSessionResponse {
     email: string;
     initials: string;
     properties: { id: string; accountNumber: string; address: string }[];
+    // 025: present on backends that ship the board feature; older tokens omit them.
+    lastActiveMode?: string;
+    memberships?: { communityId: string; communityName: string; role: string }[];
   };
 }
 
@@ -103,9 +106,23 @@ export class AuthService {
       lastName:  res.user.lastName,
       email:     res.user.email,
       initials:  res.user.initials,
+      lastActiveMode: res.user.lastActiveMode === 'Board' ? 'Board' : 'Resident',
+      memberships: res.user.memberships ?? [],
     };
     this._user.set(user);
     this.tokens.setAccessToken(res.token);
+  }
+
+  /**
+   * 025 FR-018/FR-022: switch the active UI mode in place (no separate portal).
+   * The server verifies board eligibility and persists the choice; the response is
+   * a fresh session, adopted like any other.
+   */
+  async switchMode(mode: UserMode): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<AuthSessionResponse>(`${this.base}/auth/board-mode`, { mode }, { withCredentials: true })
+    );
+    this.applySession(res);
   }
 
   /** Drop the local session (no navigation, no cross-tab broadcast). */
