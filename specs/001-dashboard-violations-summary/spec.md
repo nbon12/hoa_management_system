@@ -17,6 +17,13 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
+> **Reconciliation with 025-board-overall-design (2026-08-25).** This spec's "board member"
+> references describe the **resident-mode** dashboard: a user — homeowner or board member —
+> viewing *their own* property. Spec 025 introduces a separate **board mode** in which a board
+> member sees association-wide data; that mode is additive and does not change any behavior
+> described here. The property-scoped dashboard below remains correct for resident mode (025
+> FR-015 / SC-006).
+
 ### User Story 1 - View Dashboard After Login (Priority: P1)
 
 As a homeowner or board member, after I log in, I am taken to a Dashboard that shows four summary boxes: Current Balance, Violations, Work Orders, and Architecture Requests, so that I can see key information at a glance.
