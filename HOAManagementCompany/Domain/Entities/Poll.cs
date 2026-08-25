@@ -3,7 +3,8 @@ namespace HOAManagementCompany.Domain.Entities;
 public class Poll
 {
     public Guid Id { get; set; }
-    public string CommunityId { get; set; } = string.Empty;
+    public Guid CommunityId { get; set; }
+    public Community Community { get; set; } = null!;
     public string Question { get; set; } = string.Empty;
     public string ClosingLabel { get; set; } = string.Empty;
     public int TotalVotes { get; set; }

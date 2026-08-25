@@ -13,7 +13,7 @@ namespace HOAManagementCompany.Features.Community;
 
 public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
 {
-    public async Task<AnnouncementListResponse> GetAnnouncementsAsync(string communityId, AnnouncementListRequest req, CancellationToken ct = default)
+    public async Task<AnnouncementListResponse> GetAnnouncementsAsync(Guid communityId, AnnouncementListRequest req, CancellationToken ct = default)
     {
         var query = db.Announcements.Where(a => a.CommunityId == communityId).AsQueryable();
 
@@ -34,7 +34,7 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         return new AnnouncementListResponse(items, total, req.Page, req.PageSize);
     }
 
-    public async Task<AnnouncementDto> GetAnnouncementAsync(string communityId, Guid id, CancellationToken ct = default)
+    public async Task<AnnouncementDto> GetAnnouncementAsync(Guid communityId, Guid id, CancellationToken ct = default)
     {
         var a = await db.Announcements.FirstOrDefaultAsync(a => a.CommunityId == communityId && a.Id == id, ct)
             ?? throw new DomainException("NOT_FOUND", "Announcement not found.", 404);
@@ -62,7 +62,7 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         return new ViolationListResponse(items, total, req.Page, req.PageSize);
     }
 
-    public async Task<EventListResponse> GetEventsAsync(string communityId, EventListRequest req, CancellationToken ct = default)
+    public async Task<EventListResponse> GetEventsAsync(Guid communityId, EventListRequest req, CancellationToken ct = default)
     {
         var query = db.CalendarEvents.Where(e => e.CommunityId == communityId).AsQueryable();
 
@@ -86,7 +86,7 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         return new EventListResponse(items, total, req.Page, req.PageSize);
     }
 
-    public async Task RsvpEventAsync(string communityId, Guid eventId, string userId, bool attending, CancellationToken ct = default)
+    public async Task RsvpEventAsync(Guid communityId, Guid eventId, string userId, bool attending, CancellationToken ct = default)
     {
         var ev = await db.CalendarEvents.FirstOrDefaultAsync(e => e.CommunityId == communityId && e.Id == eventId, ct)
             ?? throw new DomainException("NOT_FOUND", "Event not found.", 404);
@@ -109,7 +109,7 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<DocumentListResponse> GetDocumentsAsync(string communityId, DocumentListRequest req, CancellationToken ct = default)
+    public async Task<DocumentListResponse> GetDocumentsAsync(Guid communityId, DocumentListRequest req, CancellationToken ct = default)
     {
         var query = db.HoaDocuments.Where(d => d.CommunityId == communityId).AsQueryable();
 
@@ -131,7 +131,7 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         return new DocumentListResponse(items, total, req.Page, req.PageSize);
     }
 
-    public async Task<CommunityDirectoryResponse> GetCommunityDirectoryAsync(string communityId, Guid currentPropertyId, CancellationToken ct = default)
+    public async Task<CommunityDirectoryResponse> GetCommunityDirectoryAsync(Guid communityId, Guid currentPropertyId, CancellationToken ct = default)
     {
         var totalHouseholds = await db.Properties.CountAsync(p => p.CommunityId == communityId, ct);
 
@@ -165,7 +165,7 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         return new CommunityDirectoryResponse(neighbors, neighbors.Count, totalHouseholds);
     }
 
-    public async Task<DocumentDownloadResponse> GetDocumentDownloadUrlAsync(string communityId, Guid id, CancellationToken ct = default)
+    public async Task<DocumentDownloadResponse> GetDocumentDownloadUrlAsync(Guid communityId, Guid id, CancellationToken ct = default)
     {
         var doc = await db.HoaDocuments.FirstOrDefaultAsync(d => d.CommunityId == communityId && d.Id == id, ct)
             ?? throw new DomainException("NOT_FOUND", "Document not found.", 404);

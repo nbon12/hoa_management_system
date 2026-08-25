@@ -8,7 +8,7 @@ namespace HOAManagementCompany.Features.Community;
 
 public class PollService(ApplicationDbContext db)
 {
-    public async Task<PollDto?> GetActivePollAsync(string communityId, CancellationToken ct = default)
+    public async Task<PollDto?> GetActivePollAsync(Guid communityId, CancellationToken ct = default)
     {
         var poll = await db.Polls
             .Include(p => p.Options)
@@ -17,7 +17,7 @@ public class PollService(ApplicationDbContext db)
         return poll is null ? null : MapPoll(poll);
     }
 
-    public async Task<PollDto> VoteAsync(string communityId, Guid pollId, string userId, int optionIndex, CancellationToken ct = default)
+    public async Task<PollDto> VoteAsync(Guid communityId, Guid pollId, string userId, int optionIndex, CancellationToken ct = default)
     {
         var poll = await db.Polls
             .Include(p => p.Options)

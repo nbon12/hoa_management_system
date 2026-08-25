@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HOAManagementCompany.Features.Common;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Community.Models;
@@ -15,7 +16,7 @@ public class PollVoteEndpoint(PollService pollService) : Endpoint<PollVoteReques
 
     public override async Task HandleAsync(PollVoteRequest req, CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.RequireCommunityId();
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? string.Empty;
         var pollId = Route<Guid>("id");
 

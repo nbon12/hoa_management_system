@@ -133,6 +133,25 @@ Cases ("a community has no metrics configured → explicit empty state").
 - **Add**: `CommunityId` (`Guid`, FK to `Community.Id`) — set from `Property.CommunityId` at
   migration time (FR-006).
 
+### Other community-scoped entities (FR-006)
+
+`Property.CommunityId` is not the only loose string tenant key. **FR-006 requires every entity
+carrying a loose `CommunityId` string to migrate to the `Community` foreign key.** The full set:
+`HoaDocument`, `Poll`, `CalendarEvent`, `HoaPaymentConfig`, `Announcement`, `CommunityExpense`
+(plus `Property` and `Violation` above). Each:
+
+- **Remove**: `CommunityId` (string, previously the `"SAKURA"`-style handle).
+- **Add**: `CommunityId` (`Guid`, FK to `Community.Id`), backfilled from the matching `Community`
+  row (looked up by the old string = `Community.CommunityName`).
+
+This is mandatory because research **R2** repoints the JWT `communityId` claim from the string to
+the `Community.Id` GUID. Consumers that filter by that claim — `DashboardService`,
+`CommunityService`, `PollService`, `PaymentConfigService`, and `ClaimsPrincipalExtensions.RequireCommunityId()`
+— MUST therefore switch their `CommunityId` comparisons and their `RequireCommunityId()` return
+type to `Guid`, and `PropertyDto` / `OwnerDto` derive `CommunityName` via the related `Community`
+(FR-004). Migrating only `Property`/`Violation` while repointing the claim would break every
+resident surface that reads these entities (FR-015, SC-006) — hence the full set.
+
 ### `ApplicationUser`
 
 - **Add**: `Memberships` (`ICollection<CommunityMembership>`) navigation property.
@@ -161,15 +180,18 @@ between them — a user's board membership and their property ownership are inde
 ## Migration sequencing (single EF Core migration, per research.md R5)
 
 1. Create `Community`, `CommunityMembership` tables and the three new enums.
-2. Add nullable `Property.CommunityId` (Guid) and `Violation.CommunityId` (Guid) columns
-   alongside the existing string columns (temporary dual-write window within the same migration's
-   data step, not a separate deploy).
-3. Data step: backfill `Community` rows from distinct existing
-   `(Property.CommunityId, Property.CommunityName)` pairs; set the new Guid FK columns on
-   `Property` and `Violation` from the matching `Community.Id`.
-4. Drop the old string `CommunityId` / `CommunityName` columns; make the new Guid FK columns
-   non-nullable; add the FK constraints and the `Community.CommunityName` unique index.
+2. Add a nullable Guid `CommunityId` (`Guid?`) column alongside the existing string column on
+   **each** of the eight community-scoped tables (`Property`, `Violation`, `HoaDocument`, `Poll`,
+   `CalendarEvent`, `HoaPaymentConfig`, `Announcement`, `CommunityExpense`) — a temporary
+   dual-column window within the same migration's data step, not a separate deploy.
+3. Data step: backfill `Community` rows from the distinct existing
+   `(Property.CommunityId, Property.CommunityName)` pairs (idempotent — insert only when no
+   `Community` with that `CommunityName` exists); then set every table's new Guid FK column from
+   the `Community` row whose `CommunityName` equals that table's old string `CommunityId` handle.
+4. Drop the old string `CommunityId` column on all eight tables and `Property.CommunityName`; make
+   the new Guid FK columns non-nullable; add the FK constraints and the `Community.CommunityName`
+   unique index.
 5. Add `ApplicationUser.LastActiveMode` (default `Resident`).
 
-Reversible per FR-005: the down-migration re-derives the string columns from the `Community` row
-being referenced before dropping the new schema.
+Reversible per FR-005: the down-migration re-adds the string columns and re-derives each from the
+referenced `Community.CommunityName` before dropping the new schema.

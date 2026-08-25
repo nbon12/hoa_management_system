@@ -56,8 +56,7 @@ public class RecurringNoticeTests(TestDatabaseFixture fixture) : AlertTestBase(f
             {
                 Id = propertyId,
                 AccountNumber = $"SAKURA-{propertyId.ToString("N")[^6..]}",
-                CommunityId = "SAKURA",
-                CommunityName = "Sakura Heights HOA",
+                CommunityId = TestDataSeeder.SakuraCommunityId,
                 Address = "56 Sakura Drive",
                 City = "San Jose", State = "CA", Zip = "95101", Lot = "A56", Section = "1",
                 FiscalYear = 2026, YearBuilt = 2005, Status = "active",

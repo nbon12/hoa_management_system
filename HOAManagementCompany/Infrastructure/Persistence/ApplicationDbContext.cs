@@ -33,6 +33,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<HoaDocument> HoaDocuments => Set<HoaDocument>();
     public DbSet<CommunityExpense> CommunityExpenses => Set<CommunityExpense>();
 
+    // Board member experience (025-board-overall-design).
+    public DbSet<Community> Communities => Set<Community>();
+    public DbSet<CommunityMembership> CommunityMemberships => Set<CommunityMembership>();
+
     // Payments (006-stripe-payments).
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentAuthorization> PaymentAuthorizations => Set<PaymentAuthorization>();
@@ -92,11 +96,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasIndex(x => x.CommunityId);
             e.HasIndex(x => x.AccountNumber).IsUnique();
             e.Property(x => x.AccountNumber).HasMaxLength(50);
-            e.Property(x => x.CommunityId).HasMaxLength(20);
             e.Property(x => x.MonthlyAssessment).HasColumnType("decimal(10,2)");
             e.Property(x => x.AnnualAssessment).HasColumnType("decimal(10,2)");
             e.Property(x => x.LateFeeAmount).HasColumnType("decimal(10,2)");
             e.Property(x => x.FinanceChargeRate).HasColumnType("decimal(5,4)");
+            e.HasOne(x => x.Community).WithMany(c => c.Properties)
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("Properties");
         });
 
@@ -172,12 +177,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.HasIndex(x => x.CommunityId);
             e.Property(x => x.Category).HasConversion<string>();
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("Announcements");
         });
 
         builder.Entity<Poll>(e =>
         {
             e.HasIndex(x => x.CommunityId);
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("Polls");
         });
 
@@ -205,6 +214,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(x => x.Status).HasConversion<string>();
             e.HasOne(x => x.Property).WithMany(p => p.Violations)
                 .HasForeignKey(x => x.PropertyId);
+            e.HasIndex(x => x.CommunityId);
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("Violations");
         });
 
@@ -212,6 +224,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.HasIndex(x => x.CommunityId);
             e.Property(x => x.Category).HasConversion<string>();
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("CalendarEvents");
         });
 
@@ -227,6 +241,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.HasIndex(x => x.CommunityId);
             e.Property(x => x.Category).HasConversion<string>();
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("HoaDocuments");
         });
 
@@ -234,6 +250,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.HasIndex(x => new { x.CommunityId, x.FiscalYear });
             e.Property(x => x.Amount).HasColumnType("decimal(10,2)");
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable("CommunityExpenses");
         });
 
@@ -330,7 +348,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<HoaPaymentConfig>(e =>
         {
             e.HasIndex(x => x.CommunityId).IsUnique();
-            e.Property(x => x.CommunityId).HasMaxLength(20);
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.AllocationOrderJson).HasColumnType("jsonb");
             e.Property(x => x.CardFeeType).HasConversion<string>();
             e.Property(x => x.CardScope).HasConversion<string>();
@@ -358,6 +377,36 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.HasOne(x => x.Transaction).WithMany().HasForeignKey(x => x.TransactionId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── Board member experience (025-board-overall-design) ───────────────
+        builder.Entity<Community>(e =>
+        {
+            // FR-002: CommunityName is the unique human-readable handle; the GUID
+            // Id is the identifier used in all queries and API paths.
+            e.HasIndex(x => x.CommunityName).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>();
+            // FR-003: self-referencing master/sub-association relation.
+            e.HasOne(x => x.ParentCommunity).WithMany(c => c.SubCommunities)
+                .HasForeignKey(x => x.ParentCommunityId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable("Communities");
+        });
+
+        builder.Entity<CommunityMembership>(e =>
+        {
+            // A user cannot hold the same role twice in one community; they MAY hold
+            // two different roles (each a separate row) — the resolver grants the
+            // union of their capabilities (Clarifications 2026-08-23).
+            e.HasIndex(x => new { x.UserId, x.CommunityId, x.Role }).IsUnique();
+            e.HasIndex(x => x.CommunityId);
+            e.HasIndex(x => x.UserId);
+            e.Property(x => x.Role).HasConversion<string>();
+            e.Property(x => x.Status).HasConversion<string>();
+            e.HasOne(x => x.User).WithMany(u => u.Memberships)
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Community).WithMany(c => c.Memberships)
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable("CommunityMemberships");
         });
     }
 }

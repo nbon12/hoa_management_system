@@ -5,7 +5,8 @@ namespace HOAManagementCompany.Domain.Entities;
 public class Announcement
 {
     public Guid Id { get; set; }
-    public string CommunityId { get; set; } = string.Empty;
+    public Guid CommunityId { get; set; }
+    public Community Community { get; set; } = null!;
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public DateTimeOffset PublishedAt { get; set; }

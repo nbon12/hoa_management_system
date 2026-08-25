@@ -6,7 +6,7 @@ public class Violation
 {
     public Guid Id { get; set; }
     public Guid PropertyId { get; set; }
-    public string CommunityId { get; set; } = string.Empty;
+    public Guid CommunityId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public ViolationCategory Category { get; set; }
@@ -19,4 +19,5 @@ public class Violation
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Property Property { get; set; } = null!;
+    public Community Community { get; set; } = null!;
 }

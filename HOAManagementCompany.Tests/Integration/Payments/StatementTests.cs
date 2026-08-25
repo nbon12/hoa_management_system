@@ -37,8 +37,7 @@ public class StatementTests(TestDatabaseFixture fixture) : PaymentTestBase(fixtu
             {
                 Id = propertyId,
                 AccountNumber = $"SAKURA-{propertyId.ToString("N")[^6..]}",
-                CommunityId = "SAKURA",
-                CommunityName = "Sakura Heights HOA",
+                CommunityId = TestDataSeeder.SakuraCommunityId,
                 Address = "78 Statement Way",
                 City = "San Jose", State = "CA", Zip = "95101", Lot = "B78", Section = "2",
                 FiscalYear = 2026, YearBuilt = 2008, Status = "active",

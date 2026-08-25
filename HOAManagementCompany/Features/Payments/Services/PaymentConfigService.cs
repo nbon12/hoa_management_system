@@ -21,11 +21,11 @@ public sealed class PaymentConfigService(ApplicationDbContext db, IOptions<Payme
             .Select(p => p.CommunityId)
             .FirstOrDefaultAsync(ct);
 
-        return await GetForCommunityAsync(communityId ?? string.Empty, ct);
+        return await GetForCommunityAsync(communityId, ct);
     }
 
     /// <summary>Returns the stored config for a community, or a transient default from options.</summary>
-    public async Task<HoaPaymentConfig> GetForCommunityAsync(string communityId, CancellationToken ct = default)
+    public async Task<HoaPaymentConfig> GetForCommunityAsync(Guid communityId, CancellationToken ct = default)
     {
         var stored = await db.HoaPaymentConfigs
             .AsNoTracking()
@@ -35,7 +35,7 @@ public sealed class PaymentConfigService(ApplicationDbContext db, IOptions<Payme
     }
 
     /// <summary>Materialises a default config from deployment options (FR-004b safe posture).</summary>
-    public static HoaPaymentConfig BuildDefault(string communityId, PaymentsOptions opts)
+    public static HoaPaymentConfig BuildDefault(Guid communityId, PaymentsOptions opts)
     {
         var fee = opts.DefaultFee;
         return new HoaPaymentConfig

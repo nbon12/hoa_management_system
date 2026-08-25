@@ -11,7 +11,7 @@ namespace HOAManagementCompany.Features.Dashboard;
 
 public class DashboardService(ApplicationDbContext db)
 {
-    public async Task<DashboardResponse> GetDashboardAsync(Guid propertyId, string communityId, CancellationToken ct = default)
+    public async Task<DashboardResponse> GetDashboardAsync(Guid propertyId, Guid communityId, CancellationToken ct = default)
     {
         var property = await db.Properties.FindAsync([propertyId], ct)
             ?? throw new Features.Auth.DomainException("NOT_FOUND", "Property not found.", 404);

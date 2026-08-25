@@ -1,4 +1,5 @@
 using HOAManagementCompany.Domain.Entities;
+using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
     private const string PrimaryEmail = "resident@nekohoa.dev";
     private const string SecondaryEmail = "resident2@nekohoa.dev";
     private const string Password = "Password1!";
-    private const string CommunityId = "SAKURA";
+    private const string CommunityName = "Sakura Heights HOA";
 
     public async Task<bool> ShouldSeedAsync(CancellationToken ct = default)
         => !await db.Users.AnyAsync(u => u.Email == PrimaryEmail, ct);
@@ -42,12 +43,25 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
         };
         await userManager.CreateAsync(secondaryUser, Password);
 
+        // Ensure exactly one Community row (the tenant boundary) exists for the seed data.
+        var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == CommunityName, ct);
+        if (community is null)
+        {
+            community = new Community
+            {
+                CommunityName = CommunityName,
+                LegalName = CommunityName,
+                Status = CommunityStatus.Active
+            };
+            db.Communities.Add(community);
+            await db.SaveChangesAsync(ct);
+        }
+
         var primaryProperty = new Property
         {
             Id = Guid.NewGuid(),
             AccountNumber = "SAKURA-001",
-            CommunityId = CommunityId,
-            CommunityName = "Sakura Heights HOA",
+            CommunityId = community.Id,
             Address = "1 Sakura Drive",
             City = "San Jose",
             State = "CA",
@@ -69,8 +83,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
         {
             Id = Guid.NewGuid(),
             AccountNumber = "SAKURA-002",
-            CommunityId = CommunityId,
-            CommunityName = "Sakura Heights HOA",
+            CommunityId = community.Id,
             Address = "2 Sakura Drive",
             City = "San Jose",
             State = "CA",
@@ -95,7 +108,6 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             Id = Guid.NewGuid(),
             AccountNumber = "SAKURA-003",
             CommunityId = primaryProperty.CommunityId,
-            CommunityName = primaryProperty.CommunityName,
             Address = "3 Sakura Drive",
             City = primaryProperty.City,
             State = primaryProperty.State,
@@ -123,6 +135,6 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             services.GetRequiredService<ILogger<Features.Auth.ClaimCodeService>>());
         await claimCodes.IssueAsync(unclaimedProperty.Id, "owner-of-sakura-003@seed.local", ct);
 
-        return new SeedResult(primaryUser.Id, secondaryUser.Id, primaryProperty.Id, secondaryProperty.Id, CommunityId);
+        return new SeedResult(primaryUser.Id, secondaryUser.Id, primaryProperty.Id, secondaryProperty.Id, community.Id);
     }
 }

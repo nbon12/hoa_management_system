@@ -4,8 +4,9 @@ public class Property
 {
     public Guid Id { get; set; }
     public string AccountNumber { get; set; } = string.Empty;
-    public string CommunityId { get; set; } = string.Empty;
-    public string CommunityName { get; set; } = string.Empty;
+    // FR-004: real foreign key to Community; the community name is derived from
+    // the related Community rather than stored as a denormalized copy.
+    public Guid CommunityId { get; set; }
     public string Address { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
     public string State { get; set; } = string.Empty;
@@ -25,6 +26,7 @@ public class Property
     public decimal FinanceChargeRate { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    public Community Community { get; set; } = null!;
     public Owner? Owner { get; set; }
     public ICollection<UserProperty> UserProperties { get; set; } = [];
     public ICollection<AddressHistory> AddressHistories { get; set; } = [];
