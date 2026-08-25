@@ -174,10 +174,10 @@ primitive that every user story depends on. Nothing in Phases 3+ can proceed unt
 **Purpose**: Documentation, accessibility verification, spec reconciliation, and full-suite green.
 
 - [x] T057 [P] Add Repowise marker regions to the new files (`Community.cs`, `CommunityMembership.cs`, `Features/Board/*`) following the existing `domain=entities` / feature-scoped convention (plan.md → Repowise Documentation)
-- [ ] T058 [P] Verify WCAG 2.1 AA contrast and keyboard operability for all new controls — mode toggle, board banner (dark ink on violet), sidebar, help affordance, glossary panel (FR-038, SC-008)
+- [x] T058 [P] Verify WCAG 2.1 AA contrast and keyboard operability for all new controls — mode toggle, board banner (dark ink on violet), sidebar, help affordance, glossary panel (FR-038, SC-008)
 - [x] T059 [P] Reconcile specs 001 and 003 — annotate spec 001's "board members see only their own properties" as scoped to *resident mode* now that board mode widens the model (spec.md → Executable & living spec)
 - [ ] T060 Run `quickstart.md` end-to-end and confirm the demonstrable slice (sign in → enter board mode → scoped Community Home) works
-- [ ] T061 Run the full backend (`dotnet test`) and frontend (`npm run test:ci`) suites and confirm existing resident dashboard/payments/property tests pass unmodified (SC-006), and static-analysis check that no board endpoint implements its own scope check (SC-003); confirm the existing auth rate-limit policy covers `POST /api/v1/auth/board-mode` (§7)
+- [x] T061 Run the full backend (`dotnet test`) and frontend (`npm run test:ci`) suites and confirm existing resident dashboard/payments/property tests pass unmodified (SC-006), and static-analysis check that no board endpoint implements its own scope check (SC-003); confirm the existing auth rate-limit policy covers `POST /api/v1/auth/board-mode` (§7)
 
 ---
 

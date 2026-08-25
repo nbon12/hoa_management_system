@@ -71,6 +71,7 @@ npm run storybook -- --ci
 
 ## Repowise
 
-Update the `<!-- REPOWISE:START domain=entities -->` marker in
+Update the `REPOWISE:START domain=entities` marker region in
 `HOAManagementCompany/Domain/Entities/ApplicationUser.cs` to mention the new `Memberships`
-collection and `LastActiveMode` field before opening the PR (constitution §2).
+collection and `LastActiveMode` field before opening the PR (constitution §2). (Already done in
+this feature's implementation.)
