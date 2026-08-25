@@ -26,7 +26,7 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
 
         var seeder = new HOAManagementCompany.Seed.PropertySeeder(
             db,
-            new HOAManagementCompany.Seed.SeedResult("u1", "u2", primary.Id, secondary.Id),
+            new HOAManagementCompany.Seed.SeedResult("u1", "u2", primary.Id, secondary.Id, primary.CommunityId),
             scope.ServiceProvider.GetRequiredService<
                 Microsoft.Extensions.Logging.ILogger<HOAManagementCompany.Seed.DatabaseSeeder>>());
 
