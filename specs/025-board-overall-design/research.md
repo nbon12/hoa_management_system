@@ -67,6 +67,17 @@ review and maintenance cost for no behavioral benefit over a directly injected, 
 service. `CanAccessAsync` still centralizes the actual scope-check logic (FR-012's real
 requirement) — "one shared resolver" does not require "one framework mechanism."
 
+**Scope semantics** (spec Clarifications 2026-08-23): `CanAccessAsync` decides scope **strictly
+per `Community` row** — it never traverses `Community.ParentCommunityId`. Membership in a master
+community grants no access to its sub-associations, and membership in a sub-association grants no
+access to the master; a portfolio holder needs a distinct `CommunityMembership` per community.
+When the caller holds more than one active membership row in the target community, the method
+returns `true` if **any** active row confers the requested capability (**union** across role
+rows) — a plain "allow if any grants it" check, with no role-precedence table. This keeps the
+implementation and its 95%-coverage-critical tests simple: Theory data varies role × membership
+status × target community, and adds two explicit boundary cases — a master/sub pair (each denied
+scope over the other) and a dual-role membership (both capability sets granted).
+
 **Alternatives considered**: A custom `[RequireCommunityScope]` endpoint filter/attribute.
 Considered viable, deferred rather than rejected — it can be layered on top of
 `ICommunityScopeResolver` later without changing the resolver's contract or requiring endpoints

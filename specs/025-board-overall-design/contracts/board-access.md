@@ -27,10 +27,11 @@ Switches the caller's active mode. Mirrors `POST /api/v1/auth/switch-property`
 Backs the "My Communities" nav item (FR-025).
 
 - **Auth**: authenticated (bearer).
-- **Request**: none.
-- **Response 200**: `{ communities: [{ id, communityName, role, status }] }` — only communities
-  where the caller holds an **active** membership; summary fields only, per the constitution's
-  "My Communities" cross-community exception (spec.md, Constitution Requirements: Tenant boundary).
+- **Request query**: `limit` (default 25, max 100), `offset` (default 0) — constitution §4 pagination standard.
+- **Response 200**: `{ items: [{ id, communityName, role, status }], total, limit, offset }` — only
+  communities where the caller holds an **active** membership; summary fields only, per the
+  constitution's "My Communities" cross-community exception (spec.md, Constitution Requirements:
+  Tenant boundary).
 - **Errors**: none beyond standard 401.
 
 ## GET /api/v1/communities/{communityId}/memberships
@@ -67,7 +68,7 @@ Edits or ends a membership (User Story 5, Acceptance Scenarios 3 & 4).
   member's next request per FR-023.
 - **Errors**: `403 FORBIDDEN`; `404 NOT_FOUND` (membership does not belong to `communityId`).
 
-## GET /api/v1/board/metrics?surface={surface}
+## GET /api/v1/board/metrics?communityId={communityId}&surface={surface}
 
 Serves the `MetricDescriptor` registry (data-model.md) for a given `MetricSurface`. Ships in this
 spec as the generic, registry-driven endpoint; returns an empty `items` array until spec 2
@@ -75,10 +76,10 @@ spec as the generic, registry-driven endpoint; returns an empty `items` array un
 explicit empty state required by the spec's Edge Cases, not an error.
 
 - **Auth**: authenticated; `ICommunityScopeResolver.CanAccessAsync(user, communityId, capability)`
-  evaluated **per descriptor** against `MetricDescriptor.RequiredCapability` (FR-035) — the
+  evaluated **per descriptor** against `MetricDescriptor.RequiredCapability` (a `CommunityCapability`; FR-035) — the
   endpoint itself only requires an active membership in `communityId`, of any role.
-- **Request query**: `communityId` (required), `surface` (required — enum name).
-- **Response 200**: `{ items: [{ id, label, definitionText, value, detail?, status, emphasis }] }`
+- **Request query**: `communityId` (required), `surface` (required — enum name), `limit` (default 25, max 100), `offset` (default 0).
+- **Response 200**: `{ items: [{ id, label, definitionText, value, detail?, status, emphasis }], total, limit, offset }`
   — descriptors the caller lacks the capability for are silently omitted (FR-035), not returned
   with a locked flag.
 - **Errors**: `403 FORBIDDEN` (no active membership in `communityId` at all).

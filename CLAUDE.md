@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-08-20
+Auto-generated from all feature plans. Last updated: 2026-08-23
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -25,7 +25,7 @@ Auto-generated from all feature plans. Last updated: 2026-08-20
 - TypeScript / Angular 17.3 (frontend); C# / .NET 9.0 (backend cookie endpoints) + Angular signals/standalone APIs, RxJS, ngx-stripe (CSP origins), Web Locks API + BroadcastChannel (cross-tab refresh); FastEndpoints, ASP.NET Identity/JWT (existing), FluentValidation (new `Auth:RefreshCookie` options) (020-security-hardening-subspec-d)
 - N/A — no schema changes; refresh tokens already persisted hashed in PostgreSQL (020-security-hardening-subspec-d)
 - C# / .NET 9.0 (backend, `HOAManagementCompany`); TypeScript / Angular 17.3 (frontend, `neko-hoa`) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity, JWT bearer issuance, `IDocumentStorage` (all existing, reused — see research.md R3); Angular standalone components/signals, existing `AuthService` claim decoding. No new package for either project. (025-board-overall-design)
-- PostgreSQL (Neon in production, Testcontainers in CI/local). New tables: `Communities`, `CommunityMemberships`. Modified: `Properties` (`CommunityId`/`CommunityName` strings → `CommunityId` GUID FK), `Violations` (`CommunityId` string → GUID FK), `AspNetUsers` (+ `LastActiveMode`). (025-board-overall-design)
+- PostgreSQL (Neon in production, Testcontainers in CI/local). New tables: `Communities`, `CommunityMemberships`. Modified: `Properties` (`CommunityId`/`CommunityName` strings → `CommunityId` GUID FK), `Violations` (`CommunityId` string → GUID FK), `AspNetUsers` (+ `LastActiveMode`). **No audit table** — the FR-017 trail is Serilog-only (Clarifications 2026-08-23). (025-board-overall-design)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -65,7 +65,6 @@ C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard c
 ## Recent Changes
 - 025-board-overall-design: Added C# / .NET 9.0 (backend, `HOAManagementCompany`); TypeScript / Angular 17.3 (frontend, `neko-hoa`) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity, JWT bearer issuance, `IDocumentStorage` (all existing, reused — see research.md R3); Angular standalone components/signals, existing `AuthService` claim decoding. No new package for either project.
 - 020-security-hardening-subspec-d: Added TypeScript / Angular 17.3 (frontend); C# / .NET 9.0 (backend cookie endpoints) + Angular signals/standalone APIs, RxJS, ngx-stripe (CSP origins), Web Locks API + BroadcastChannel (cross-tab refresh); FastEndpoints, ASP.NET Identity/JWT (existing), FluentValidation (new `Auth:RefreshCookie` options)
-- 016-security-hardening: Added C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend); HCL / OpenTofu ≥1.8 (infra); GitHub Actions YAML + Bash (CI) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Identity, Stripe.net, Serilog, OpenTelemetry, `Microsoft.AspNetCore.RateLimiting`; Angular, ngx-stripe; `hashicorp/google`, `kislerdm/neon`
 
 
 <!-- MANUAL ADDITIONS START -->
@@ -128,5 +127,39 @@ parallelizable. Because of this:
   numeric spec order, or simple judgment) and proceed without waiting for confirmation.
 - This does not apply to genuine hard dependencies that are explicitly documented (see
   constitution section 12) — those must still be sequenced correctly.
+
+## Code review: every natural-language test MUST map to a real, faithful automated test
+
+A **natural-language test (NLT)** in this repo is any Given/When/Then **Acceptance Scenario**
+and any **Independent Test** line written in a `specs/<feature>/spec.md`. Each feature's
+"Executable & living spec" clause already commits that *every acceptance scenario maps to an
+automated test that runs on demand and passes before merge*. Code review MUST enforce that
+commitment. These rules bind the code reviewer (both the project-standards and testing lenses)
+whenever a change implements, modifies, or claims to complete a Spec Kit feature.
+
+- **Existence — every NLT MUST have a test.** For each acceptance scenario and each Independent
+  Test in the changed feature's `spec.md`, the reviewer MUST locate the specific automated test
+  (backend xUnit test, or frontend Karma/Angular Testing Library/Playwright/Cypress test) that
+  covers it, and cite the test by file and name. An acceptance scenario with **no** corresponding
+  automated test is a review finding — the scenario MUST be named and the gap reported. Do not
+  accept "covered by the suite" without pointing at the exact test.
+- **Faithfulness — the test MUST test what the NLT describes.** For each mapped test, the reviewer
+  MUST verify the test actually exercises the scenario's Given/When/Then: the arrange sets up the
+  **Given**, the act performs the **When**, and the assertions verify the **Then**. A test that
+  exists in name but does not assert the scenario's stated outcome MUST be flagged as *not covering
+  its NLT*. Specifically flag: assertions that only prove the code "does not throw"; truthiness
+  assertions where the scenario states a specific value, record set, status code, or error code;
+  tests that assert a different condition than the scenario describes; tautological or mock-only
+  tests that verify the mocks rather than the behavior; and tests that are skipped or disabled
+  (`[Fact(Skip=…)]`, `[Theory(Skip=…)]`, `xit`/`it.skip`/`describe.skip`, `.only` that excludes
+  siblings).
+- **Negative and denial scenarios count.** A scenario stating a request is denied, refused, or
+  fails closed (e.g. `403 FORBIDDEN`, redirect, `NO_ACTIVE_MEMBERSHIP`) MUST have a test asserting
+  that exact denial — not merely that the happy path works. A missing negative-path test for a
+  stated denial scenario is a finding.
+- **Report format.** Report each violation against the specific scenario, quoting the scenario
+  text from `spec.md` and naming either the missing test or the test whose assertions do not match
+  the scenario. A finding without both the cited scenario and the cited test-or-gap is not a
+  finding.
 
 <!-- MANUAL ADDITIONS END -->

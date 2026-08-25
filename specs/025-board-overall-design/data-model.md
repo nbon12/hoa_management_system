@@ -41,7 +41,10 @@ The sole source of board-side authorization (FR-007, FR-012). Deliberately separ
 
 Index: unique on `(UserId, CommunityId, Role)` — a user cannot hold the same role twice in the
 same community; they *can* hold two different roles in the same community (e.g. Board Member and
-Accountant), each as a separate row, which the resolver evaluates independently.
+Accountant), each as a separate row. The resolver evaluates the rows together and grants the
+**union** of their capabilities — allow if any active row confers the requested capability (spec
+Clarifications 2026-08-23; research.md R4). Scope stays per `Community` row: neither row is
+widened across the master/sub-association hierarchy.
 
 **Effective-permission rule** (FR-010): a membership confers no permission when
 `Status != Active`, or `EndDate` is non-null and `EndDate < today (UTC)`. This is evaluated at
@@ -103,7 +106,7 @@ public sealed record MetricDescriptor(
     string DefinitionText,            // glossary content — same source as the row (FR-034)
     Func<MetricContext, Task<MetricValue>> Resolve, // computes Value/Detail/Status per request
     MetricEmphasis Emphasis,
-    CommunityRole RequiredCapability  // FR-035: not rendered if the caller lacks this role
+    CommunityCapability RequiredCapability  // FR-035: not rendered if the caller lacks this capability
 );
 ```
 
