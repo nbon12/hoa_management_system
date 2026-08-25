@@ -11,6 +11,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
 {
     private const string PrimaryEmail = "resident@nekohoa.dev";
     private const string SecondaryEmail = "resident2@nekohoa.dev";
+    private const string BoardEmail = "board@nekohoa.dev";
     private const string Password = "Password1!";
     private const string CommunityName = "Sakura Heights HOA";
 
@@ -42,6 +43,20 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             LockoutEnabled = true
         };
         await userManager.CreateAsync(secondaryUser, Password);
+
+        // 025: a board-eligible user so the board-mode journey can be exercised in dev/E2E
+        // (the Playwright board-mode spec logs in as board@nekohoa.dev). Gets a property link
+        // (to be login-capable) and an active BoardMember membership below.
+        var boardUser = new ApplicationUser
+        {
+            Email = BoardEmail,
+            UserName = BoardEmail,
+            FirstName = "Bianca",
+            LastName = "Board",
+            EmailConfirmed = true,
+            LockoutEnabled = true
+        };
+        await userManager.CreateAsync(boardUser, Password);
 
         // Ensure exactly one Community row (the tenant boundary) exists for the seed data.
         var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == CommunityName, ct);
@@ -126,7 +141,18 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
 
         db.UserProperties.AddRange(
             new UserProperty { UserId = primaryUser.Id, PropertyId = primaryProperty.Id },
-            new UserProperty { UserId = secondaryUser.Id, PropertyId = secondaryProperty.Id });
+            new UserProperty { UserId = secondaryUser.Id, PropertyId = secondaryProperty.Id },
+            // The board user co-resides at the secondary property so it can log in, and holds an
+            // active BoardMember membership so it can enter board mode (025 US1).
+            new UserProperty { UserId = boardUser.Id, PropertyId = secondaryProperty.Id });
+        db.CommunityMemberships.Add(new CommunityMembership
+        {
+            UserId = boardUser.Id,
+            CommunityId = community.Id,
+            Role = CommunityRole.BoardMember,
+            Status = MembershipStatus.Active,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1))
+        });
         await db.SaveChangesAsync(ct);
 
         var claimCodes = new Features.Auth.ClaimCodeService(

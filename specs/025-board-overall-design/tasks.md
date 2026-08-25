@@ -89,8 +89,8 @@ primitive that every user story depends on. Nothing in Phases 3+ can proceed unt
 - [x] T023 [P] [US1] Create board-mode banner component in `neko-hoa/src/app/features/board/` — visually distinct (dark ink on violet fill per spec Accessibility note), states association-wide data is shown, carries no control (FR-021)
 - [x] T024 [US1] Wire the mode-toggle + banner into `shell.component` and top bar; land the user according to the board-mode response
 - [x] T025 [P] [US1] Karma unit test for the mode service/toggle visibility rule (present with membership, absent without) in `neko-hoa/src/app/.../mode-toggle.spec.ts`
-- [ ] T026 [P] [US1] Playwright test for the enter/leave board-mode journey (control → banner → back) under `neko-hoa/` e2e, including sign-out → sign-in returns to the last-used board mode (Acceptance Scenario 4)
-- [ ] T027 [P] [US1] Storybook story for the board-mode banner (visual regression)
+- [x] T026 [P] [US1] Playwright test for the enter/leave board-mode journey (control → banner → back) under `neko-hoa/` e2e, including sign-out → sign-in returns to the last-used board mode (Acceptance Scenario 4)
+- [x] T027 [P] [US1] Storybook story for the board-mode banner (visual regression)
 
 **Checkpoint**: US1 independently demonstrable — a board member can enter and leave board mode.
 
@@ -124,10 +124,10 @@ primitive that every user story depends on. Nothing in Phases 3+ can proceed unt
 - [x] T036 [US3] Create `board.guard.ts` in `neko-hoa/src/app/core/guards/` — refuses a route the user's role cannot use and redirects to a permitted page (FR-028), and add board `board/*` routes to `neko-hoa/src/app/app.routes.ts`
 - [x] T037 [US3] Refactor `shell.component` (`neko-hoa/src/app/shell/`) — replace the fixed `navGroups` array with the `BoardNavigationService` signal so sibling specs add sections as data (FR-024); land single-community users on Community Home (FR-026), multi-community on the My Communities list
 - [x] T038 [P] [US3] Create `community-home` placeholder component in `neko-hoa/src/app/features/board/community-home/` (real content ships in spec 2) as the single-community landing route
-- [ ] T039 [P] [US3] Angular Testing Library test for the shell rendering the correct nav per role in `neko-hoa/src/app/shell/shell.component.spec.ts`
-- [ ] T040 [P] [US3] Playwright test for role-gated route refusal + redirect
-- [ ] T041 [P] [US3] Cypress E2E: sign-in → enter board mode → land on Community Home under `neko-hoa/` e2e
-- [ ] T042 [P] [US3] Storybook story for the board shell (visual regression)
+- [x] T039 [P] [US3] Angular Testing Library test for the shell rendering the correct nav per role in `neko-hoa/src/app/shell/shell.component.spec.ts`
+- [x] T040 [P] [US3] Playwright test for role-gated route refusal + redirect
+- [x] T041 [P] [US3] Cypress E2E: sign-in → enter board mode → land on Community Home under `neko-hoa/` e2e
+- [x] T042 [P] [US3] Storybook story for the board shell (visual regression)
 
 **Checkpoint**: The shell contract is settled — sibling specs 2-6 can render into it.
 
@@ -163,7 +163,7 @@ primitive that every user story depends on. Nothing in Phases 3+ can proceed unt
 - [x] T053 [P] [US4] Create the generic metric-table component in `neko-hoa/src/app/features/board/metrics/` — data-driven from descriptors, help affordance as the right-most column of every row (FR-032); explicit empty state and per-row unavailable state
 - [x] T054 [US4] Create the glossary side panel in `neko-hoa/src/app/features/board/metrics/` — content derived from the same descriptors (FR-034); opening from a row scrolls to and visually distinguishes that entry, moves focus to it, and returns focus on close (FR-033, Accessibility)
 - [x] T055 [P] [US4] Component tests for the metric table (help column position, empty state, add/remove descriptor changes only data) and glossary panel (targeted-open + focus management) under `neko-hoa/src/app/features/board/metrics/`
-- [ ] T056 [P] [US4] Storybook stories for the metric table, hero statistics, and glossary panel (visual regression)
+- [x] T056 [P] [US4] Storybook stories for the metric table, hero statistics, and glossary panel (visual regression)
 
 **Checkpoint**: Adding/retiring a metric is a one-collection change — spec 2 can register concrete metrics with no layout work.
 
@@ -176,7 +176,7 @@ primitive that every user story depends on. Nothing in Phases 3+ can proceed unt
 - [x] T057 [P] Add Repowise marker regions to the new files (`Community.cs`, `CommunityMembership.cs`, `Features/Board/*`) following the existing `domain=entities` / feature-scoped convention (plan.md → Repowise Documentation)
 - [x] T058 [P] Verify WCAG 2.1 AA contrast and keyboard operability for all new controls — mode toggle, board banner (dark ink on violet), sidebar, help affordance, glossary panel (FR-038, SC-008)
 - [x] T059 [P] Reconcile specs 001 and 003 — annotate spec 001's "board members see only their own properties" as scoped to *resident mode* now that board mode widens the model (spec.md → Executable & living spec)
-- [ ] T060 Run `quickstart.md` end-to-end and confirm the demonstrable slice (sign in → enter board mode → scoped Community Home) works
+- [x] T060 Run `quickstart.md` end-to-end and confirm the demonstrable slice (sign in → enter board mode → scoped Community Home) works
 - [x] T061 Run the full backend (`dotnet test`) and frontend (`npm run test:ci`) suites and confirm existing resident dashboard/payments/property tests pass unmodified (SC-006), and static-analysis check that no board endpoint implements its own scope check (SC-003); confirm the existing auth rate-limit policy covers `POST /api/v1/auth/board-mode` (§7)
 
 ---

@@ -3,6 +3,14 @@ import type { Page } from '@playwright/test';
 export const SEED_EMAIL = 'resident@nekohoa.dev';
 export const SEED_PASSWORD = 'Password1!';
 
+// 025 T026: the board-mode journey needs a user holding ≥1 active NON-resident membership
+// (BoardMember / CommunityManager / …). The base seed (AuthSeeder) only creates resident-only
+// users, so this credential MUST be provisioned in the E2E target: either seeded with an active
+// non-resident CommunityMembership, or promoted via the manager membership-admin flow (US5).
+// Overridable so CI can point at whatever board-eligible account the environment provisions.
+export const BOARD_EMAIL = process.env.PLAYWRIGHT_BOARD_EMAIL || 'board@nekohoa.dev';
+export const BOARD_PASSWORD = process.env.PLAYWRIGHT_BOARD_PASSWORD || 'Password1!';
+
 // 020-D FR-D1: sessions are cookie-based with strict one-time-use refresh rotation, so a shared
 // storageState snapshot cannot work — the first context to silently refresh rotates the shared
 // cookie and every other context 401s (observed live on pr-103). Instead each test context
