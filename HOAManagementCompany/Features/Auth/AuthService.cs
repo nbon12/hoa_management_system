@@ -206,6 +206,16 @@ public class AuthService(
             .Select(m => new MembershipSummaryDto(m.CommunityId, m.Community.CommunityName, m.Role.ToString()))
             .ToListAsync(ct);
 
+        // FR-023: when the user holds no active non-resident membership, they are
+        // returned to resident mode on their next request — even if LastActiveMode
+        // is still Board (e.g. a board term expired mid-session). Reporting Board
+        // without an active membership would strand them in a board shell with no
+        // way out, since every board endpoint would then deny them.
+        var hasBoardMembership = memberships.Any(m => m.Role != CommunityRole.Resident.ToString());
+        var effectiveMode = user.LastActiveMode == UserMode.Board && hasBoardMembership
+            ? UserMode.Board
+            : UserMode.Resident;
+
         return new CurrentUserDto(
             user.Id,
             user.FirstName,
@@ -213,7 +223,7 @@ public class AuthService(
             user.Email!,
             $"{user.FirstName[0]}{user.LastName[0]}",
             properties,
-            user.LastActiveMode.ToString(),
+            effectiveMode.ToString(),
             memberships);
     }
 

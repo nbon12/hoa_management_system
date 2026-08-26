@@ -18,6 +18,57 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
     public async Task<bool> ShouldSeedAsync(CancellationToken ct = default)
         => !await db.Users.AnyAsync(u => u.Email == PrimaryEmail, ct);
 
+    // 025: idempotently ensure a board-eligible user (board@nekohoa.dev) exists so the
+    // board-mode journey can be exercised in dev/E2E — even on an already-seeded database
+    // (e.g. the pr-env fork, where the full seed no-ops via ShouldSeedAsync). Attaches the
+    // user to an existing property in the seeded community and grants an active BoardMember
+    // membership. Safe to run every startup.
+    public async Task EnsureBoardUserAsync(CancellationToken ct = default)
+    {
+        if (await db.Users.AnyAsync(u => u.Email == BoardEmail, ct))
+            return;
+
+        var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == CommunityName, ct);
+        var property = community is null
+            ? null
+            : await db.Properties.FirstOrDefaultAsync(p => p.CommunityId == community.Id, ct);
+        if (community is null || property is null)
+        {
+            logger.LogWarning("EnsureBoardUserAsync skipped — no seeded community/property to attach the board user to.");
+            return;
+        }
+
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var boardUser = new ApplicationUser
+        {
+            Email = BoardEmail,
+            UserName = BoardEmail,
+            FirstName = "Bianca",
+            LastName = "Board",
+            EmailConfirmed = true,
+            LockoutEnabled = true
+        };
+        var result = await userManager.CreateAsync(boardUser, Password);
+        if (!result.Succeeded)
+        {
+            logger.LogWarning("EnsureBoardUserAsync could not create the board user: {Errors}",
+                string.Join("; ", result.Errors.Select(e => e.Description)));
+            return;
+        }
+
+        db.UserProperties.Add(new UserProperty { UserId = boardUser.Id, PropertyId = property.Id });
+        db.CommunityMemberships.Add(new CommunityMembership
+        {
+            UserId = boardUser.Id,
+            CommunityId = community.Id,
+            Role = CommunityRole.BoardMember,
+            Status = MembershipStatus.Active,
+            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1))
+        });
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Ensured board-eligible seed user {Email}.", BoardEmail);
+    }
+
     public async Task<SeedResult> SeedAsync(CancellationToken ct = default)
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
@@ -43,20 +94,6 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             LockoutEnabled = true
         };
         await userManager.CreateAsync(secondaryUser, Password);
-
-        // 025: a board-eligible user so the board-mode journey can be exercised in dev/E2E
-        // (the Playwright board-mode spec logs in as board@nekohoa.dev). Gets a property link
-        // (to be login-capable) and an active BoardMember membership below.
-        var boardUser = new ApplicationUser
-        {
-            Email = BoardEmail,
-            UserName = BoardEmail,
-            FirstName = "Bianca",
-            LastName = "Board",
-            EmailConfirmed = true,
-            LockoutEnabled = true
-        };
-        await userManager.CreateAsync(boardUser, Password);
 
         // Ensure exactly one Community row (the tenant boundary) exists for the seed data.
         var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == CommunityName, ct);
@@ -141,18 +178,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
 
         db.UserProperties.AddRange(
             new UserProperty { UserId = primaryUser.Id, PropertyId = primaryProperty.Id },
-            new UserProperty { UserId = secondaryUser.Id, PropertyId = secondaryProperty.Id },
-            // The board user co-resides at the secondary property so it can log in, and holds an
-            // active BoardMember membership so it can enter board mode (025 US1).
-            new UserProperty { UserId = boardUser.Id, PropertyId = secondaryProperty.Id });
-        db.CommunityMemberships.Add(new CommunityMembership
-        {
-            UserId = boardUser.Id,
-            CommunityId = community.Id,
-            Role = CommunityRole.BoardMember,
-            Status = MembershipStatus.Active,
-            StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1))
-        });
+            new UserProperty { UserId = secondaryUser.Id, PropertyId = secondaryProperty.Id });
         await db.SaveChangesAsync(ct);
 
         var claimCodes = new Features.Auth.ClaimCodeService(

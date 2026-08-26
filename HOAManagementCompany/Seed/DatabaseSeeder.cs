@@ -21,19 +21,23 @@ public class DatabaseSeeder(
         await db.Database.MigrateAsync(ct);
 
         var authSeeder = new AuthSeeder(db, services, logger);
-        if (!await authSeeder.ShouldSeedAsync(ct))
+        if (await authSeeder.ShouldSeedAsync(ct))
         {
-            logger.LogInformation("Seed data already present — skipping.");
-            return;
+            var authResult = await authSeeder.SeedAsync(ct);
+            await new PropertySeeder(db, authResult, logger).SeedAsync(ct);
+            await new PaymentSeeder(db, authResult, logger).SeedAsync(ct);
+            await new CommunitySeeder(db, authResult, logger).SeedAsync(ct);
+            await new StorageSeeder(db, authResult, logger).SeedAsync(ct);
+            await documentStorageInitializer.EnsureValidPdfsAsync(ct);
+            logger.LogInformation("Seed complete.");
+        }
+        else
+        {
+            logger.LogInformation("Seed data already present — skipping full seed.");
         }
 
-        var authResult = await authSeeder.SeedAsync(ct);
-        await new PropertySeeder(db, authResult, logger).SeedAsync(ct);
-        await new PaymentSeeder(db, authResult, logger).SeedAsync(ct);
-        await new CommunitySeeder(db, authResult, logger).SeedAsync(ct);
-        await new StorageSeeder(db, authResult, logger).SeedAsync(ct);
-        await documentStorageInitializer.EnsureValidPdfsAsync(ct);
-
-        logger.LogInformation("Seed complete.");
+        // 025: runs on every startup, including a pre-seeded fork (pr-env) where the full
+        // seed above is skipped — ensures the board-eligible E2E user exists. Idempotent.
+        await authSeeder.EnsureBoardUserAsync(ct);
     }
 }

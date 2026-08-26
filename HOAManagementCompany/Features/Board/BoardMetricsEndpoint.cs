@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FastEndpoints;
 
 namespace HOAManagementCompany.Features.Board;
@@ -28,6 +29,12 @@ public class BoardMetricsEndpoint(
             return;
         }
 
+        // FR-017: record association-wide (financial) data access — actor, community,
+        // resource, UTC timestamp — as a structured sensitive event (constitution §7).
+        logger.LogInformation(
+            "BoardAssociationDataAccess: Actor={ActorId} Community={CommunityId} Resource={Resource} At={UtcNow:o}",
+            ActorId(), req.CommunityId, $"board/metrics/{req.Surface}", DateTimeOffset.UtcNow);
+
         var rows = new List<MetricRowDto>();
         foreach (var d in registry.Where(d => d.Surface == req.Surface))
         {
@@ -56,4 +63,7 @@ public class BoardMetricsEndpoint(
         var page = rows.Skip(offset).Take(limit).ToList();
         await SendOkAsync(new PagedResponse<MetricRowDto>(page, rows.Count, limit, offset), ct);
     }
+
+    private string ActorId() =>
+        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown";
 }
