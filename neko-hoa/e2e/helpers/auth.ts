@@ -36,6 +36,16 @@ export async function establishSession(
   await page.addInitScript(() => localStorage.setItem('neko_has_session', '1'));
 }
 
+// 025: force the server-persisted UI mode for the authenticated context (deterministic,
+// no render race). Requires establishSession to have set the auth cookie first.
+export async function setMode(page: Page, mode: 'Resident' | 'Board'): Promise<void> {
+  const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
+  const res = await page.request.post(`${apiBase}/api/v1/auth/board-mode`, { data: { mode } });
+  if (!res.ok()) {
+    throw new Error(`setMode(${mode}) failed with ${res.status()}`);
+  }
+}
+
 export async function loginAs(
   page: Page,
   email = SEED_EMAIL,

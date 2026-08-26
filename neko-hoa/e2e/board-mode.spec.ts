@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { establishSession, loginAs, BOARD_EMAIL, BOARD_PASSWORD } from './helpers/auth';
+import { establishSession, loginAs, setMode, BOARD_EMAIL, BOARD_PASSWORD } from './helpers/auth';
 
 /**
  * 025 US1 (T026) — the enter/leave board-mode journey.
@@ -20,6 +20,9 @@ import { establishSession, loginAs, BOARD_EMAIL, BOARD_PASSWORD } from './helper
 test.describe('Board mode: enter / leave journey (US1)', () => {
   test('board-eligible user can enter board mode, see the banner + board nav, and return to resident', async ({ page }) => {
     await establishSession(page, BOARD_EMAIL, BOARD_PASSWORD);
+    // Deterministically start in resident mode — a sibling test persists Board for this
+    // shared user, so set the server-side mode before the app boots (no client render race).
+    await setMode(page, 'Resident');
     await page.goto('/app/dashboard');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -28,14 +31,6 @@ test.describe('Board mode: enter / leave journey (US1)', () => {
     // The silent-refresh boot populates auth state asynchronously; the avatar only
     // renders once auth.user() is hydrated, so wait for it before asserting nav/mode.
     await expect(page.locator('.avatar')).toBeVisible({ timeout: 15_000 });
-
-    // This user's server-persisted last-used mode may be Board (a sibling test leaves it
-    // there). Normalize to resident mode so the journey below is deterministic and
-    // order-independent, honouring the constitution's parallel-safe requirement.
-    if (await page.locator('.board-banner').count() > 0) {
-      await page.locator('.mode-seg__btn', { hasText: /^Resident$/ }).click();
-      await expect(page.locator('.board-banner')).toHaveCount(0);
-    }
 
     // Scenario 1: the "Enter board mode" control is present in the top bar.
     const enterBtn = page.getByRole('button', { name: /Enter board mode/i });

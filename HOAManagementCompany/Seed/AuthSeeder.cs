@@ -29,9 +29,14 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             return;
 
         var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == CommunityName, ct);
+        // Attach the board user to an ALREADY-CLAIMED property (co-residence). Never pick an
+        // unclaimed property — that would add a UserProperty link and break the registration
+        // flow (RegisterAsync refuses a property that already has a link).
         var property = community is null
             ? null
-            : await db.Properties.FirstOrDefaultAsync(p => p.CommunityId == community.Id, ct);
+            : await db.Properties.FirstOrDefaultAsync(
+                p => p.CommunityId == community.Id
+                     && db.UserProperties.Any(up => up.PropertyId == p.Id), ct);
         if (community is null || property is null)
         {
             logger.LogWarning("EnsureBoardUserAsync skipped — no seeded community/property to attach the board user to.");
