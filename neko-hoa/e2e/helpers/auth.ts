@@ -36,11 +36,25 @@ export async function establishSession(
   await page.addInitScript(() => localStorage.setItem('neko_has_session', '1'));
 }
 
-// 025: force the server-persisted UI mode for the authenticated context (deterministic,
-// no render race). Requires establishSession to have set the auth cookie first.
-export async function setMode(page: Page, mode: 'Resident' | 'Board'): Promise<void> {
+// 025: force the server-persisted UI mode for a user (deterministic, no client render
+// race). Logs in to obtain a bearer access token (the /auth/board-mode endpoint requires
+// one — the refresh cookie alone is not sufficient), then sets the mode.
+export async function setMode(
+  page: Page,
+  mode: 'Resident' | 'Board',
+  email = BOARD_EMAIL,
+  password = BOARD_PASSWORD,
+): Promise<void> {
   const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
-  const res = await page.request.post(`${apiBase}/api/v1/auth/board-mode`, { data: { mode } });
+  const login = await page.request.post(`${apiBase}/api/v1/auth/login`, { data: { email, password } });
+  if (!login.ok()) {
+    throw new Error(`setMode: login failed with ${login.status()}`);
+  }
+  const token = (await login.json()).token as string;
+  const res = await page.request.post(`${apiBase}/api/v1/auth/board-mode`, {
+    data: { mode },
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok()) {
     throw new Error(`setMode(${mode}) failed with ${res.status()}`);
   }
