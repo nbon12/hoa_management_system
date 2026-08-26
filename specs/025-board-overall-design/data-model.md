@@ -193,5 +193,8 @@ between them — a user's board membership and their property ownership are inde
    unique index.
 5. Add `ApplicationUser.LastActiveMode` (default `Resident`).
 
-Reversible per FR-005: the down-migration re-adds the string columns and re-derives each from the
-referenced `Community.CommunityName` before dropping the new schema.
+**Forward-only per FR-005** (owner decision, 2026-08-26). A `Down()` exists in the generated
+migration but is **not maintained, not exercised, and not a supported reversal path** — recovery
+from a bad migration is by restoring a database branch or snapshot. See the *Migration notes*
+under FR-005 in `spec.md` for the known `Down()` landmine and the re-baselining required when the
+migrations are squashed.

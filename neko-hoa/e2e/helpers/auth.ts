@@ -60,14 +60,23 @@ export async function setMode(
   }
 }
 
+// 025 FR-026: sign-in landing is mode-aware — a user whose persisted mode is Board lands on
+// their community's home (single community) or the My Communities list, everyone else on the
+// resident dashboard. `loginAs` therefore has to be told which landing to expect; the default
+// keeps the resident dashboard so existing callers are unaffected.
+export const RESIDENT_LANDING = '**/app/dashboard';
+export const BOARD_HOME_LANDING = '**/app/board/home';
+export const BOARD_COMMUNITIES_LANDING = '**/app/board/communities';
+
 export async function loginAs(
   page: Page,
   email = SEED_EMAIL,
   password = SEED_PASSWORD,
+  expectedLanding: string | RegExp = RESIDENT_LANDING,
 ): Promise<void> {
   await page.goto('/login');
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: /Sign in/i }).click();
-  await page.waitForURL('**/app/dashboard', { timeout: 15_000 });
+  await page.waitForURL(expectedLanding, { timeout: 15_000 });
 }

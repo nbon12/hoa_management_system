@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { boardGuard } from './core/guards/board.guard';
+import { landingGuard } from './core/guards/landing.guard';
 
 export const routes: Routes = [
   // Public auth routes
@@ -15,7 +16,10 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell.component').then(m => m.ShellComponent),
     canActivate: [authGuard],
     children: [
-      { path: '',          redirectTo: 'dashboard', pathMatch: 'full' },
+      // 025 FR-026: the default landing is mode-aware — board mode lands on the community's
+      // home (or the My Communities list), everyone else on the resident dashboard. Only this
+      // empty-path entry is redirected; explicit deep links below are matched as written.
+      { path: '',          pathMatch: 'full', canActivate: [landingGuard], children: [] },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
 
       // Payments

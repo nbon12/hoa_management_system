@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { landingTargetFor } from '../../../core/services/landing';
 import { BoardNavigationService, RESIDENT_ROLE } from '../../../core/services/board-navigation.service';
 
 // 025 FR-019/FR-020: the Resident ↔ Board control. Lives in the top-bar account-controls
@@ -76,19 +77,12 @@ export class ModeToggleComponent {
     this.error.set(null);
     try {
       await this.auth.switchMode(mode);
-      if (mode === 'Board') {
-        const memberships = this.auth.user()?.memberships ?? [];
-        const communityIds = Array.from(new Set(memberships.map(m => m.communityId)));
-        if (communityIds.length === 1) {
-          this.nav.setActiveCommunity(communityIds[0]);
-          await this.router.navigate(['/app/board/home']);
-        } else {
-          this.nav.setActiveCommunity(null);
-          await this.router.navigate(['/app/board/communities']);
-        }
-      } else {
-        await this.router.navigate(['/app/dashboard']);
-      }
+      // FR-026: the post-switch landing is the SAME decision sign-in makes, so both go
+      // through landingTargetFor — switchMode has already refreshed auth.user() with the
+      // new lastActiveMode, so the shared rule sees the mode we just moved to.
+      const target = landingTargetFor(this.auth.user());
+      this.nav.setActiveCommunity(target.activeCommunityId);
+      await this.router.navigate(target.commands);
     } catch (e: any) {
       // FR-020: a board-ineligible switch is refused server-side (403 NO_ACTIVE_MEMBERSHIP).
       const code = e?.error?.code;

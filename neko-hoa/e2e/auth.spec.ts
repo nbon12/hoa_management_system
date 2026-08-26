@@ -140,7 +140,22 @@ test.describe('Register', () => {
     await page.locator('input[name="lastName"]').fill('Test');
     await page.locator('input[name="password"]').fill('Password1!');
     await page.locator('input[name="claimCode"]').fill(claimCode);
-    await page.getByRole('button', { name: /Create account/i }).click();
+
+    // Assert the registration POST itself before asserting the landing. Without this, a backend
+    // refusal (bad claim code, expired verification proof, 500) surfaces only as an opaque
+    // "timed out waiting for URL /app/dashboard" and the failure never names its own cause.
+    const [registerRes] = await Promise.all([
+      page.waitForResponse(
+        r => r.url().includes('/auth/register') && r.request().method() === 'POST',
+        { timeout: 15_000 },
+      ),
+      page.getByRole('button', { name: /Create account/i }).click(),
+    ]);
+    const failureBody = registerRes.ok() ? '' : await registerRes.text();
+    expect(
+      registerRes.ok(),
+      `POST /auth/register returned ${registerRes.status()}: ${failureBody}`,
+    ).toBeTruthy();
 
     await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 15_000 });
   });
