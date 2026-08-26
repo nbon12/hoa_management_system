@@ -23,28 +23,59 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
     // (e.g. the pr-env fork, where the full seed no-ops via ShouldSeedAsync). Attaches the
     // user to an existing property in the seeded community and grants an active BoardMember
     // membership. Safe to run every startup.
+    // The e2e registration flow (E2EClaimCodeEndpoint) claims this seed property, so it MUST
+    // stay unclaimed — the board user must never hold a link to it.
+    private const string E2eRegistrationAccount = "SAKURA-003";
+
     public async Task EnsureBoardUserAsync(CancellationToken ct = default)
     {
-        if (await db.Users.AnyAsync(u => u.Email == BoardEmail, ct))
-            return;
-
         var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == CommunityName, ct);
-        // Attach the board user to an ALREADY-CLAIMED property (co-residence). Never pick an
-        // unclaimed property — that would add a UserProperty link and break the registration
-        // flow (RegisterAsync refuses a property that already has a link).
-        var property = community is null
-            ? null
-            : await db.Properties.FirstOrDefaultAsync(
-                p => p.CommunityId == community.Id
-                     && db.UserProperties.Any(up => up.PropertyId == p.Id), ct);
-        if (community is null || property is null)
+        if (community is null)
         {
-            logger.LogWarning("EnsureBoardUserAsync skipped — no seeded community/property to attach the board user to.");
+            logger.LogWarning("EnsureBoardUserAsync skipped — no seeded community found.");
+            return;
+        }
+
+        var regProperty = await db.Properties
+            .FirstOrDefaultAsync(p => p.AccountNumber == E2eRegistrationAccount, ct);
+
+        // A safe co-residence property: already-claimed, in the community, and NOT the
+        // registration seed property.
+        var safeProperty = await db.Properties.FirstOrDefaultAsync(
+            p => p.CommunityId == community.Id
+                 && p.AccountNumber != E2eRegistrationAccount
+                 && db.UserProperties.Any(up => up.PropertyId == p.Id), ct);
+        if (safeProperty is null)
+        {
+            logger.LogWarning("EnsureBoardUserAsync skipped — no safe claimed property to attach the board user to.");
+            return;
+        }
+
+        var boardUser = await db.Users.FirstOrDefaultAsync(u => u.Email == BoardEmail, ct);
+        if (boardUser is not null)
+        {
+            // Self-heal: an earlier build may have linked the board user to the registration
+            // property (SAKURA-003), which blocks the registration e2e. Free it and re-home
+            // the board user on the safe property.
+            if (regProperty is not null)
+            {
+                var stale = await db.UserProperties
+                    .Where(up => up.UserId == boardUser.Id && up.PropertyId == regProperty.Id)
+                    .ToListAsync(ct);
+                if (stale.Count > 0)
+                {
+                    db.UserProperties.RemoveRange(stale);
+                    if (!await db.UserProperties.AnyAsync(up => up.UserId == boardUser.Id && up.PropertyId == safeProperty.Id, ct))
+                        db.UserProperties.Add(new UserProperty { UserId = boardUser.Id, PropertyId = safeProperty.Id });
+                    await db.SaveChangesAsync(ct);
+                    logger.LogInformation("Repaired board user property link — freed {Account}.", E2eRegistrationAccount);
+                }
+            }
             return;
         }
 
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-        var boardUser = new ApplicationUser
+        var newUser = new ApplicationUser
         {
             Email = BoardEmail,
             UserName = BoardEmail,
@@ -53,7 +84,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             EmailConfirmed = true,
             LockoutEnabled = true
         };
-        var result = await userManager.CreateAsync(boardUser, Password);
+        var result = await userManager.CreateAsync(newUser, Password);
         if (!result.Succeeded)
         {
             logger.LogWarning("EnsureBoardUserAsync could not create the board user: {Errors}",
@@ -61,10 +92,10 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             return;
         }
 
-        db.UserProperties.Add(new UserProperty { UserId = boardUser.Id, PropertyId = property.Id });
+        db.UserProperties.Add(new UserProperty { UserId = newUser.Id, PropertyId = safeProperty.Id });
         db.CommunityMemberships.Add(new CommunityMembership
         {
-            UserId = boardUser.Id,
+            UserId = newUser.Id,
             CommunityId = community.Id,
             Role = CommunityRole.BoardMember,
             Status = MembershipStatus.Active,
