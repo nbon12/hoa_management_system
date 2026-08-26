@@ -46,6 +46,10 @@ test.describe('Board mode: enter / leave journey (US1)', () => {
     // Scenario 3: entering board mode shows the banner and the Resident/Board toggle,
     // and the shell navigation changes to the board sidebar.
     await enterBtn.click();
+    // Switching mode is a server round-trip that then navigates a single-community board
+    // user to /app/board/home; wait for that landing so the board nav has rendered before
+    // asserting on it (FR-026).
+    await page.waitForURL(/\/app\/board\/home/, { timeout: 15_000 });
     await expect(page.locator('.board-banner')).toBeVisible();
     await expect(page.locator('.board-banner')).toContainText(/Board mode/i);
     await expect(page.locator('.board-banner')).toContainText(/association-wide data/i);
@@ -57,6 +61,8 @@ test.describe('Board mode: enter / leave journey (US1)', () => {
 
     // Toggle back to Resident and confirm the resident view is intact.
     await page.locator('.mode-seg__btn', { hasText: /^Resident$/ }).click();
+    // Switching back navigates the user to the resident dashboard.
+    await page.waitForURL(/\/app\/dashboard/, { timeout: 15_000 });
     await expect(page.locator('.board-banner')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Enter board mode/i })).toBeVisible();
     await expect(page.locator('.shell__side-item').filter({ hasText: /^Dashboard$/ })).toBeVisible();
