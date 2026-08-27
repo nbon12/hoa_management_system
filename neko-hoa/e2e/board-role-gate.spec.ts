@@ -16,6 +16,11 @@ import { establishSession } from './helpers/auth';
 test.describe('Board route role-gating (US3)', () => {
   test('a role that cannot use a board route is redirected to a permitted page, not shown a blank screen', async ({ page }) => {
     await establishSession(page);
+    // Warm the session in-app before deep-linking. authGuard is synchronous, so a deep link
+    // arriving before startup re-hydration has settled bounces to /login and boardGuard never
+    // gets to decide — which makes this spec assert the boot race instead of the ROLE gate.
+    await page.goto('/app/dashboard');
+    await expect(page.locator('.avatar')).toBeVisible({ timeout: 15_000 });
 
     // Direct navigation to a board route the resident role cannot use.
     await page.goto('/app/board/home');
@@ -34,6 +39,10 @@ test.describe('Board route role-gating (US3)', () => {
 
   test('a manager-only board route is likewise refused for a role that cannot use it', async ({ page }) => {
     await establishSession(page);
+    // Same hydration warm-up as above — this deep link races the boot refresh identically.
+    await page.goto('/app/dashboard');
+    await expect(page.locator('.avatar')).toBeVisible({ timeout: 15_000 });
+
     await page.goto('/app/board/memberships');
     await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 10_000 });
     await expect(page).not.toHaveURL(/\/app\/board\//);
