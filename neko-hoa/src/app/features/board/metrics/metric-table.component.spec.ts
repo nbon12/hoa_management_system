@@ -2,9 +2,11 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { MetricTableComponent } from './metric-table.component';
 import { MetricDescriptor } from '../../../core/services/board.service';
 
+// Fixtures use the exact wire values the backend sends (`MetricStatus` / `MetricEmphasis`
+// serialized by name), so a mismatch between the template and the contract fails here.
 const ROWS: MetricDescriptor[] = [
-  { id: 'over30', label: 'Over 30-Days Delinquent', definitionText: 'def a', value: '10%', detail: '37 homeowners', status: 'warn', emphasis: 'warn' },
-  { id: 'ach',    label: 'Registered ACH Owners',   definitionText: 'def b', value: '60%', detail: null, status: 'ok', emphasis: 'ok' },
+  { id: 'over30', label: 'Over 30-Days Delinquent', definitionText: 'def a', value: '10%', detail: '37 homeowners', status: 'Watch', emphasis: 'Highlight' },
+  { id: 'ach',    label: 'Registered ACH Owners',   definitionText: 'def b', value: '60%', detail: null, status: 'Ok', emphasis: 'Normal' },
 ];
 
 describe('MetricTableComponent', () => {
@@ -65,15 +67,36 @@ describe('MetricTableComponent', () => {
     fixture.detectChanges();
     expect(el.querySelectorAll('tbody tr').length).toBe(1);
     // Add a new one — again only data.
-    comp.rows = [...ROWS, { id: 'x', label: 'New Metric', definitionText: 'd', value: 1, status: 'ok', emphasis: 'none' }];
+    comp.rows = [...ROWS, { id: 'x', label: 'New Metric', definitionText: 'd', value: 1, status: 'Ok', emphasis: 'Normal' }];
     fixture.detectChanges();
     expect(el.querySelectorAll('tbody tr').length).toBe(3);
     expect(el.textContent).toContain('New Metric');
   });
 
+  it('maps the backend status/emphasis wire values onto their affordances', () => {
+    comp.rows = ROWS;
+    fixture.detectChanges();
+    const [watchRow, okRow] = Array.from(el.querySelectorAll('tbody tr'));
+
+    // status 'Watch' → the watch pill; status 'Ok' → the ✓ marker (no pill).
+    const watchCells = watchRow.querySelectorAll('td');
+    const okCells = okRow.querySelectorAll('td');
+    expect(watchCells[1].querySelector('.pill--warn')?.textContent?.trim()).toBe('watch');
+    expect(okCells[1].querySelector('.pill--warn')).toBeNull();
+    expect(okCells[1].textContent?.trim()).toBe('✓');
+
+    // emphasis 'Highlight' → the emphasized (rose, bold) value; 'Normal' → plain ink.
+    const watchValue = watchCells[2].querySelector('span') as HTMLElement;
+    const okValue = okCells[2].querySelector('span') as HTMLElement;
+    expect(watchValue.style.color).toBe('var(--rose)');
+    expect(watchValue.style.fontWeight).toBe('600');
+    expect(okValue.style.color).toBe('var(--ink)');
+    expect(okValue.style.fontWeight).toBe('400');
+  });
+
   it('renders an explicit per-row unavailable state without blanking siblings (FR-036)', () => {
     comp.rows = [
-      { id: 'broken', label: 'Broken Metric', definitionText: 'd', value: null, status: 'Unavailable', emphasis: 'none' },
+      { id: 'broken', label: 'Broken Metric', definitionText: 'd', value: null, status: 'Unavailable', emphasis: 'Normal' },
       ROWS[1],
     ];
     fixture.detectChanges();

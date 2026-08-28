@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
+using HOAManagementCompany.Tests.Factories;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -91,7 +92,7 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
         var regProperty = await db.Properties.FirstOrDefaultAsync(p => p.AccountNumber == e2eAccountNumber);
         if (regProperty is null)
         {
-            regProperty = NewProperty(e2eAccountNumber, community.Id);
+            regProperty = PropertyFactory.Create(community.Id, e2eAccountNumber);
             db.Properties.Add(regProperty);
             await db.SaveChangesAsync();
         }
@@ -111,7 +112,7 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
 
         // A claimed co-residence property in that community, so the seeder has somewhere
         // safe to home the board user (without one it skips and proves nothing).
-        var safeProperty = NewProperty($"SEED-SAFE-{Guid.NewGuid():N}"[..24], community.Id);
+        var safeProperty = PropertyFactory.Create(community.Id, $"SEED-SAFE-{Guid.NewGuid():N}"[..24]);
         var coResident = NewUser($"seed-test-{Guid.NewGuid():N}");
         db.Properties.Add(safeProperty);
         db.Users.Add(coResident);
@@ -161,30 +162,6 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
         Assert.NotEmpty(boardLinks);
         Assert.DoesNotContain(regPropertyId, boardLinks);
     }
-
-    // Fully qualified: HOAManagementCompany.Tests.Integration.Property is also a namespace.
-    private static HOAManagementCompany.Domain.Entities.Property NewProperty(
-        string accountNumber, Guid communityId) => new()
-    {
-        Id = Guid.NewGuid(),
-        AccountNumber = accountNumber,
-        CommunityId = communityId,
-        Address = "9 Seeder Lane",
-        City = "San Jose",
-        State = "CA",
-        Zip = "95101",
-        Lot = "S1",
-        Section = "1",
-        FiscalYear = 2026,
-        YearBuilt = 2005,
-        Status = "active",
-        MonthlyAssessment = 250m,
-        AnnualAssessment = 3000m,
-        AssessmentDueDay = 1,
-        LateFeeAmount = 50m,
-        LateFeeGraceDays = 15,
-        FinanceChargeRate = 0.015m,
-    };
 
     private static ApplicationUser NewUser(string id)
     {

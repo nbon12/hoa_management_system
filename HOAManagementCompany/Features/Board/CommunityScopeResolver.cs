@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -25,23 +26,16 @@ public class CommunityScopeResolver(ApplicationDbContext db) : ICommunityScopeRe
         if (string.IsNullOrEmpty(userId))
             return false;
 
-        // An inactive/offboarded community confers no access to anyone, regardless
-        // of the membership's own status (spec Edge Cases).
-        var communityActive = await db.Communities
-            .AnyAsync(c => c.Id == communityId && c.Status == CommunityStatus.Active, ct);
-        if (!communityActive)
-            return false;
-
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Only THIS community's rows — the parent/child relation is never traversed
-        // (Clarifications 2026-08-23). Effective-permission rule per data-model.md:
-        // Status == Active AND (EndDate is null OR EndDate >= today UTC).
+        // (Clarifications 2026-08-23). CommunityMembership.IsEffectiveAsOf carries the
+        // effective-permission rule, including the community-must-be-Active clause: an
+        // inactive/offboarded community (and, via the FK, a community that does not exist)
+        // matches no rows, so the caller fails closed below.
         var roles = await db.CommunityMemberships
-            .Where(m => m.UserId == userId
-                     && m.CommunityId == communityId
-                     && m.Status == MembershipStatus.Active
-                     && (m.EndDate == null || m.EndDate >= today))
+            .Where(CommunityMembership.IsEffectiveAsOf(today))
+            .Where(m => m.UserId == userId && m.CommunityId == communityId)
             .Select(m => m.Role)
             .ToListAsync(ct);
 

@@ -1,5 +1,5 @@
 import { CurrentUser } from '../models';
-import { RESIDENT_ROLE } from './board-navigation.service';
+import { isBoardEligible } from './board-navigation.service';
 
 // 025 FR-026: where a user lands when they arrive without asking for a specific page —
 // signing in, or entering the app at the bare `/app` path. The rule is the same one
@@ -28,9 +28,9 @@ export function landingTargetFor(user: CurrentUser | null | undefined): LandingT
   const memberships = user?.memberships ?? [];
 
   // Board mode is only meaningful for a user holding ≥1 active non-resident membership —
-  // the same eligibility ModeToggleComponent renders on (FR-020) and boardGuard enforces.
-  const boardEligible = memberships.some(m => m.role !== RESIDENT_ROLE);
-  if (user?.lastActiveMode !== 'Board' || !boardEligible) {
+  // literally the same `isBoardEligible` predicate ModeToggleComponent renders on (FR-020)
+  // and boardGuard enforces.
+  if (user?.lastActiveMode !== 'Board' || !isBoardEligible(memberships)) {
     return { commands: ['/app/dashboard'], activeCommunityId: null };
   }
 

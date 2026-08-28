@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 
 namespace HOAManagementCompany.Features.Board;
@@ -17,4 +18,11 @@ internal static class BoardHttp
     // Every board response is authenticated and community-specific — never edge-cached
     // (constitution §8). Call before writing the body.
     public static void NoStore(HttpContext ctx) => ctx.Response.Headers.CacheControl = "no-store";
+
+    // The actor recorded on board sensitive events (FR-017 data access, FR-042 membership
+    // changes). Deliberately non-throwing: a token missing both identity claims still gets
+    // an audit record, attributed to "unknown", rather than losing the event to a 401/500.
+    // (Distinct from ClaimsPrincipalExtensions.Require*, which fail the request instead.)
+    public static string ActorId(ClaimsPrincipal user) =>
+        user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value ?? "unknown";
 }

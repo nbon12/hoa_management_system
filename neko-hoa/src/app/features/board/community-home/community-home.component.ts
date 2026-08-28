@@ -39,12 +39,7 @@ export class CommunityHomeComponent {
   private auth = inject(AuthService);
   private nav = inject(BoardNavigationService);
 
-  readonly communityId = computed(() => {
-    const memberships = this.auth.user()?.memberships ?? [];
-    const active = this.nav.activeCommunityId();
-    if (active) return active;
-    return memberships.length ? memberships[0].communityId : null;
-  });
+  readonly communityId = this.nav.effectiveCommunityId;
 
   readonly communityName = computed(() => {
     const id = this.communityId();

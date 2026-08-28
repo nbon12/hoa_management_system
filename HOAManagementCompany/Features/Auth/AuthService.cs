@@ -106,11 +106,16 @@ public class AuthService(
 
     public async Task LogoutAsync(string userId, CancellationToken ct = default)
     {
-        await db.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow), ct);
+        await RevokeActiveRefreshTokensAsync(userId, ct);
         logger.LogInformation("User logged out: {UserId}", userId);
     }
+
+    // Revokes every outstanding refresh token for a user. Called on logout and whenever the
+    // token's contents change out from under an existing session (switch property, switch mode).
+    private Task RevokeActiveRefreshTokensAsync(string userId, CancellationToken ct) =>
+        db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow), ct);
 
     public async Task<AuthResult> RefreshAsync(string rawToken, CancellationToken ct = default)
     {
@@ -141,9 +146,7 @@ public class AuthService(
         var user = await userManager.FindByIdAsync(userId)
             ?? throw new DomainException("NOT_FOUND", "User not found.", 404);
 
-        await db.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow), ct);
+        await RevokeActiveRefreshTokensAsync(userId, ct);
 
         return await CreateTokenPairAsync(user, link.Property, ct);
     }
@@ -170,9 +173,7 @@ public class AuthService(
 
         user.LastActiveMode = mode;
 
-        await db.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow), ct);
+        await RevokeActiveRefreshTokensAsync(userId, ct);
 
         var property = await GetActivePropertyAsync(userId, ct);
         return await CreateTokenPairAsync(user, property, ct);
@@ -181,12 +182,9 @@ public class AuthService(
     private async Task<bool> HasActiveBoardMembershipAsync(string userId, CancellationToken ct)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        return await db.CommunityMemberships.AnyAsync(m =>
-            m.UserId == userId
-            && m.Role != CommunityRole.Resident
-            && m.Status == MembershipStatus.Active
-            && (m.EndDate == null || m.EndDate >= today)
-            && m.Community.Status == CommunityStatus.Active, ct);
+        return await db.CommunityMemberships
+            .Where(CommunityMembership.IsEffectiveAsOf(today))
+            .AnyAsync(m => m.UserId == userId && m.Role != CommunityRole.Resident, ct);
     }
 
     private async Task<CurrentUserDto> BuildCurrentUserAsync(ApplicationUser user, CancellationToken ct)
@@ -199,10 +197,8 @@ public class AuthService(
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var memberships = await db.CommunityMemberships
-            .Where(m => m.UserId == user.Id
-                     && m.Status == MembershipStatus.Active
-                     && (m.EndDate == null || m.EndDate >= today)
-                     && m.Community.Status == CommunityStatus.Active)
+            .Where(CommunityMembership.IsEffectiveAsOf(today))
+            .Where(m => m.UserId == user.Id)
             .Select(m => new MembershipSummaryDto(m.CommunityId, m.Community.CommunityName, m.Role.ToString()))
             .ToListAsync(ct);
 
