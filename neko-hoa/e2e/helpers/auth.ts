@@ -3,6 +3,14 @@ import type { Page } from '@playwright/test';
 export const SEED_EMAIL = 'resident@nekohoa.dev';
 export const SEED_PASSWORD = 'Password1!';
 
+// 025 T026: the board-mode journey needs a user holding ≥1 active NON-resident membership
+// (BoardMember / CommunityManager / …). The base seed (AuthSeeder) only creates resident-only
+// users, so this credential MUST be provisioned in the E2E target: either seeded with an active
+// non-resident CommunityMembership, or promoted via the manager membership-admin flow (US5).
+// Overridable so CI can point at whatever board-eligible account the environment provisions.
+export const BOARD_EMAIL = process.env.PLAYWRIGHT_BOARD_EMAIL || 'board@nekohoa.dev';
+export const BOARD_PASSWORD = process.env.PLAYWRIGHT_BOARD_PASSWORD || 'Password1!';
+
 // 020-D FR-D1: sessions are cookie-based with strict one-time-use refresh rotation, so a shared
 // storageState snapshot cannot work — the first context to silently refresh rotates the shared
 // cookie and every other context 401s (observed live on pr-103). Instead each test context
@@ -28,14 +36,47 @@ export async function establishSession(
   await page.addInitScript(() => localStorage.setItem('neko_has_session', '1'));
 }
 
+// 025: force the server-persisted UI mode for a user (deterministic, no client render
+// race). Logs in to obtain a bearer access token (the /auth/board-mode endpoint requires
+// one — the refresh cookie alone is not sufficient), then sets the mode.
+export async function setMode(
+  page: Page,
+  mode: 'Resident' | 'Board',
+  email = BOARD_EMAIL,
+  password = BOARD_PASSWORD,
+): Promise<void> {
+  const apiBase = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
+  const login = await page.request.post(`${apiBase}/api/v1/auth/login`, { data: { email, password } });
+  if (!login.ok()) {
+    throw new Error(`setMode: login failed with ${login.status()}`);
+  }
+  const token = (await login.json()).token as string;
+  const res = await page.request.post(`${apiBase}/api/v1/auth/board-mode`, {
+    data: { mode },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok()) {
+    throw new Error(`setMode(${mode}) failed with ${res.status()}`);
+  }
+}
+
+// 025 FR-026: sign-in landing is mode-aware — a user whose persisted mode is Board lands on
+// their community's home (single community) or the My Communities list, everyone else on the
+// resident dashboard. `loginAs` therefore has to be told which landing to expect; the default
+// keeps the resident dashboard so existing callers are unaffected.
+export const RESIDENT_LANDING = '**/app/dashboard';
+export const BOARD_HOME_LANDING = '**/app/board/home';
+export const BOARD_COMMUNITIES_LANDING = '**/app/board/communities';
+
 export async function loginAs(
   page: Page,
   email = SEED_EMAIL,
   password = SEED_PASSWORD,
+  expectedLanding: string | RegExp = RESIDENT_LANDING,
 ): Promise<void> {
   await page.goto('/login');
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button', { name: /Sign in/i }).click();
-  await page.waitForURL('**/app/dashboard', { timeout: 15_000 });
+  await page.waitForURL(expectedLanding, { timeout: 15_000 });
 }

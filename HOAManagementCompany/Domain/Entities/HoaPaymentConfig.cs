@@ -10,8 +10,9 @@ public class HoaPaymentConfig
 {
     public Guid Id { get; set; }
 
-    /// <summary>Tenant key — the community (HOA) this policy applies to (matches <see cref="Property.CommunityId"/>).</summary>
-    public string CommunityId { get; set; } = string.Empty;
+    /// <summary>Tenant key — the community (HOA) this policy applies to (FK to <see cref="Community"/>).</summary>
+    public Guid CommunityId { get; set; }
+    public Community Community { get; set; } = null!;
 
     public FeeType CardFeeType { get; set; } = FeeType.Percentage;
 

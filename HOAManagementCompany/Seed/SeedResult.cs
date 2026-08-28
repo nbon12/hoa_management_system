@@ -5,4 +5,4 @@ public record SeedResult(
     string SecondaryUserId,
     Guid PrimaryPropertyId,
     Guid SecondaryPropertyId,
-    string CommunityId = "SAKURA");
+    Guid CommunityId = default);

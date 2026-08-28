@@ -17,7 +17,7 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.17")
+                .HasAnnotation("ProductVersion", "9.0.19")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -112,9 +112,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Property<int>("CommentCount")
                         .HasColumnType("integer");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
@@ -161,6 +160,9 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int>("LastActiveMode")
+                        .HasColumnType("integer");
 
                     b.Property<string>("LastName")
                         .IsRequired()
@@ -221,9 +223,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -254,6 +255,52 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.ToTable("CalendarEvents", (string)null);
                 });
 
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Community", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CommunityName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("County")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("FormationDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("LegalName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly?>("ManagementStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("ParentCommunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommunityName")
+                        .IsUnique();
+
+                    b.HasIndex("ParentCommunityId");
+
+                    b.ToTable("Communities", (string)null);
+                });
+
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CommunityExpense", b =>
                 {
                     b.Property<Guid>("Id")
@@ -267,9 +314,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("FiscalYear")
                         .HasColumnType("integer");
@@ -283,6 +329,48 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.HasIndex("CommunityId", "FiscalYear");
 
                     b.ToTable("CommunityExpenses", (string)null);
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CommunityMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommunityId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "CommunityId", "Role")
+                        .IsUnique();
+
+                    b.ToTable("CommunityMemberships", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.DirectoryField", b =>
@@ -445,9 +533,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -501,10 +588,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("NsfFeeAmount")
                         .HasColumnType("decimal(10,2)");
@@ -869,9 +954,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -977,14 +1061,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("CommunityName")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1261,9 +1339,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("CommunityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1298,6 +1375,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CommunityId");
 
                     b.HasIndex("PropertyId");
 
@@ -1504,6 +1583,68 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Navigation("Owner");
                 });
 
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Announcement", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CalendarEvent", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Community", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "ParentCommunity")
+                        .WithMany("SubCommunities")
+                        .HasForeignKey("ParentCommunityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentCommunity");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CommunityExpense", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CommunityMembership", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany("Memberships")
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", "User")
+                        .WithMany("Memberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Community");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.DirectoryField", b =>
                 {
                     b.HasOne("HOAManagementCompany.Domain.Entities.Property", "Property")
@@ -1546,6 +1687,28 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Event");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.HoaDocument", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.HoaPaymentConfig", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.LedgerEntry", b =>
@@ -1616,6 +1779,17 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Navigation("Property");
                 });
 
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Poll", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
+                });
+
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.PollOption", b =>
                 {
                     b.HasOne("HOAManagementCompany.Domain.Entities.Poll", "Poll")
@@ -1636,6 +1810,17 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Poll");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Property", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany("Properties")
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Community");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.PropertyClaimCode", b =>
@@ -1703,11 +1888,19 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Violation", b =>
                 {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HOAManagementCompany.Domain.Entities.Property", "Property")
                         .WithMany("Violations")
                         .HasForeignKey("PropertyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Community");
 
                     b.Navigation("Property");
                 });
@@ -1765,6 +1958,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("Memberships");
+
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("UserProperties");
@@ -1773,6 +1968,15 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CalendarEvent", b =>
                 {
                     b.Navigation("Rsvps");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Community", b =>
+                {
+                    b.Navigation("Memberships");
+
+                    b.Navigation("Properties");
+
+                    b.Navigation("SubCommunities");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Owner", b =>

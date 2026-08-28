@@ -33,23 +33,30 @@ If Repowise MCP is unavailable, say so and fall back to built-in search.
 > (documentation, ownership, history, decisions). **Always verify against
 > actual source files before making changes** — the index may be stale.
 
-Last indexed: 2026-06-21 (commit 096082b). Confidence: 100%.
+Last indexed: 2026-08-19 (commit 9de3a9c). Confidence: 100%.
 ### Architecture
-Repo is a full-stack Homeowners Association (HOA) management platform: it ingests community, resident, violation, and payment data through a C# REST API (built with .NET), processes business rules (e.g., violation categorization, payment options), persists state via Entity Framework Core to a relational database, and surfaces management dashboards and workflows through an Angular frontend (neko-hoa), with cloud infrastructure provisioned declaratively via Terraform across dev, staging, and ephemeral PR environments. | Layer          | Technology                                                     |
-|----------------|----------------------------------------------------------------|
-| **Backend**    | C# 12, .NET 8, ASP.NET Core Web API, Entity Framework Core     |
-| **Frontend**   | Angular 17 (TypeScript), Tailwind CSS ? (implied), Storybook   |
-| **Database**   | PostgreSQL / SQL Server (inferred from EF Core + Terraform)    |
-| **Infrastructure** | Terraform, AWS (likely ECS/EKS, RDS, S3 for state)         |
-| **Testing**    | xUnit / NUnit (backend), TestDataSeeder fixture                |
-| **CI/CD**      | GitHub Actions (pr-env-sweep, pr-env-teardown workflows)       |
-| **Packaging**  | NuGet, npm                                                     |
+Repo is a full-stack Homeowners Association (HOA) management platform: it ingests resident, property, violation, and payment data through an ASP.NET Core API (HOAManagementCompany), persists that data via Entity Framework Core and a design-time DbContext factory, serves an Angular dashboard (neko-hoa) that consumes the API, and provisions cloud infrastructure with Terraform across dev, staging, and pull-request environments. The domain core is built around HOA entities and enums — ViolationCategory, AddressHistory, CommunityModels — with feature modules for Payments, Auth, and Community, all verified by a dedicated test project (HOAManagementCompany.Tests) and exercised through GitHub Actions CI. The repository is roughly 59% C#, 16% TypeScript, and 8% Terraform, reflecting a backend-heavy monorepo with a modern Angular frontend and infrastructure-as-code baked in from day one. **Backend**
+- C# / ASP.NET Core — API host, feature modules (Payments, Auth, Community), middleware and configuration validation
+- Entity Framework Core — persistence layer, with DesignTimeDbContextFactory for migrations and design-time tooling
+- xUnit-style test project (HOAManagementCompany.Tests) with fixtures and seeders for integration coverage
+
+**Frontend**
+- Angular (TypeScript) — single-page dashboard named neko-hoa, with core domain models under src/app/core/models
+- Storybook — component development environment (neko-hoa/.storybook/main.ts)
+
+**Infrastructure & DevOps**
+- Terraform — multi-environment provisioning: bootstrap state bucket, dev, staging, and pr (pull-request) environments
+- GitHub Actions — CI workflow at .github/workflows/test.yml
+- Docker / Dockerfile — containerised backend deployment
+- Shell scripts — operational glue for bootstrap and environment tasks
+
+**Configuration & Data Formats**
+- JSON/YAML — application settings, environment configs, Angular environment files
+- Markdown — documentation across the repo
 
 
 
-The system has four primary entry points, each serving a distinct lifecycle:
-
-1. **HOAManagementCompany/Program.cs** – Backend API host.
+- **HOAManagementCompany/Program.cs** — ASP.NET Core application host; wires configuration, dependency injection, EF Core DbContext, feature modules, and middleware.
 ### Key Modules
 | Module | Purpose | Owner |
 |--------|---------|-------|
@@ -58,11 +65,11 @@ The system has four primary entry points, each serving a distinct lifecycle:
 | `HOAManagementCompany.Tests` | HOAManagementCompany.Tests is the integration and performance test suite for the | — |
 | `.github` | > **Maintainer:** Nicholas Bonilla · **Language:** Python · **Symbols:** 15 publ | — |
 | `HOAManagementCompany` | HOAManagementCompany is the primary backend application for a Homeowners Associa | — |
-| `community-1` | The neko-hoa/features module is the **payment UI subsystem** of the neko-hoa app | — |
+| `community-1` | The neko-hoa/features module is the presentation layer of the Neko HOA applicati | — |
 | `community-63` | The hoamanagementcompany.tests/integration module is the **system-level verifica | — |
-| `community-0` | The hoamanagementcompany/features module is the **application feature layer** of | — |
-| `community-3` | The external:microsoft.aspnetcore module is the **host-level entry point** of th | — |
-| `community-2` | The features module is the **entry-point and orchestration layer** of the neko-h | — |
+| `community-0` | The hoamanagementcompany/features module is the application‑service layer of the | — |
+| `community-3` | The external:opentelemetry module is the entry-point stage of the HOAManagementC | — |
+| `community-2` | The HOAManagementCompany/Features module is the **application-layer feature bus* | — |
 ### Entry Points
 - `neko-hoa/src/app/core/models/index.ts`
 - `neko-hoa-mock/models/index.ts`
@@ -73,7 +80,7 @@ The system has four primary entry points, each serving a distinct lifecycle:
 - `infra/environments/staging/main.tf`
 - `neko-hoa/.storybook/main.ts`
 - `neko-hoa/scripts/generate-build-id.mjs`
-- `neko-hoa/src/main.ts`
+- `neko-hoa/scripts/stamp-headers.mjs`
 ### Tech Stack
 **Languages:** C#
 **Frameworks:** .NET, ASP.NET Core
@@ -103,19 +110,20 @@ The system has four primary entry points, each serving a distinct lifecycle:
 ### Hotspots (High Churn)
 | File | Churn | 90d Commits | Owner |
 |------|-------|-------------|-------|
-| `neko-hoa/package-lock.json` | 100.0th %ile | 4 | Nicholas |
-| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.8th %ile | 4 | Nicholas |
-| `neko-hoa/src/app/features/payments/recurring/recurring.component.ts` | 99.6th %ile | 4 | Nicholas |
-| `HOAManagementCompany/Program.cs` | 99.5th %ile | 14 | Nicholas |
-| `neko-hoa/src/app/features/payments/one-time/one-time.component.ts` | 99.3th %ile | 3 | Nicholas |
+| `neko-hoa/package-lock.json` | 100.0th %ile | 15 | Nicholas |
+| `HOAManagementCompany/Infrastructure/Persistence/Migrations/ApplicationDbContextModelSnapshot.cs` | 99.8th %ile | 5 | Nicholas |
+| `neko-hoa/src/app/features/payments/recurring/recurring.component.ts` | 99.7th %ile | 4 | Nicholas |
+| `.specify/memory/constitution.md` | 99.5th %ile | 5 | Nicholas |
+| `neko-hoa/src/app/features/payments/one-time/one-time.component.ts` | 99.4th %ile | 3 | Nicholas |
 
 ## Code health
-Hotspot health: 9.39/10 (stable) ·
-Average: 9.51/10 ·
+Hotspot health: 9.3/10 (stable) ·
+Average: 9.47/10 ·
 Worst: 7.74/10 (`HOAManagementCompany/Features/Payments/Ledger/LedgerService.cs`)
 
 ### Critical biomarkers
 - `neko-hoa/src/app/core/models/index.ts` — untested hotspot — impact −2.0
+- `HOAManagementCompany/Program.cs` — prior defect — impact −2.0
 - `.github/scripts/check-repowise-health-gates.py` — complex method (main) — impact −1.1
 
 ### Repowise MCP Tools

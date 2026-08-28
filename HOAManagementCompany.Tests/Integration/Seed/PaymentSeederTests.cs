@@ -38,8 +38,7 @@ public class PaymentSeederTests(TestDatabaseFixture fixture)
         {
             Id = Guid.NewGuid(),
             AccountNumber = $"SEED-TEST-{Guid.NewGuid():N}",
-            CommunityId = "SAKURA",
-            CommunityName = "Sakura Hills",
+            CommunityId = TestDataSeeder.SakuraCommunityId,
             Address = "1 Test Way",
             City = "Testville",
             State = "CA",

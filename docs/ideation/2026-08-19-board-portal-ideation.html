@@ -1,0 +1,716 @@
+<title>Ideation: Board Portal &amp; Work Structuring</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --surface: #ffffff;
+    --surface-tint: #f4f2ee;
+    --ink: #1d1b17;
+    --ink-soft: #55524a;
+    --ink-faint: #8a8578;
+    --border: #e4e0d7;
+    --accent: #9a5a1f;
+    --accent-soft: #f4e6d3;
+    --accent-text: #8a4d15;
+    --ok: #2f6b46;
+    --ok-soft: #e2efe4;
+    --warn: #a3450f;
+    --warn-soft: #fbe9df;
+    --code-bg: #f1efe8;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17150f;
+      --surface: #201d16;
+      --surface-tint: #29251b;
+      --ink: #f1ede2;
+      --ink-soft: #c9c2b1;
+      --ink-faint: #948d7c;
+      --border: #3a3527;
+      --accent: #e2a565;
+      --accent-soft: #3a2a15;
+      --accent-text: #f0bd85;
+      --ok: #8fd6a5;
+      --ok-soft: #1e3527;
+      --warn: #f0a074;
+      --warn-soft: #3a2416;
+      --code-bg: #251f14;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .page {
+    max-width: 900px;
+    margin-inline: auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+  header.doc-header { margin-bottom: 2.5rem; }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent-text);
+    margin-bottom: 0.6rem;
+  }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 0.9rem; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 1.25rem;
+    margin: 2.6rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
+  p { max-width: 70ch; }
+  .meta-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.6rem;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .meta-list dt { font-weight: 700; display: inline; color: var(--ink-faint); }
+  .meta-list dd { display: inline; margin: 0 0 0 0.35rem; }
+  .meta-list > div { display: flex; gap: 0.3rem; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.87em; }
+  code { background: var(--code-bg); padding: 0.1em 0.4em; border-radius: 5px; }
+  .grounding p { color: var(--ink-soft); }
+  .grounding ul { padding-left: 1.2rem; }
+  .grounding li { margin-bottom: 0.5rem; max-width: 72ch; }
+  .axis-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.8rem;
+    list-style: none;
+    padding: 0; margin: 0;
+  }
+  .axis-list li {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem;
+    font-size: 0.9rem;
+  }
+  .axis-list .axis-name { font-weight: 700; display: block; margin-bottom: 0.2rem; }
+  .subnav {
+    background: var(--surface-tint);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem 1.2rem;
+    margin-bottom: 1.6rem;
+    font-size: 0.9rem;
+  }
+  .subnav-title { font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.72rem; margin-bottom: 0.5rem; }
+  .subnav ol { margin: 0; padding-left: 1.2rem; columns: 2; column-gap: 1.5rem; }
+  .subnav a { color: var(--ink); text-decoration: none; }
+  .subnav a:hover { color: var(--accent-text); text-decoration: underline; }
+  article.idea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.6rem 1.7rem;
+    margin-bottom: 1.4rem;
+    scroll-margin-top: 1rem;
+  }
+  .idea-head { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 0.8rem; flex-wrap: wrap; }
+  .idea-id {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 0.15rem 0.65rem;
+  }
+  article.idea h3 { flex: 1 1 auto; min-width: 200px; }
+  .idea-field { margin: 0.9rem 0; }
+  .idea-field-label {
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    margin-bottom: 0.3rem;
+  }
+  .idea-field p { margin: 0; max-width: 72ch; }
+  .basis-tag {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    border-radius: 5px;
+    padding: 0.05rem 0.45rem;
+    margin-right: 0.4rem;
+  }
+  .stat-strip { display: flex; gap: 0.7rem; margin-top: 1rem; flex-wrap: wrap; }
+  .stat-pill {
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface-tint);
+  }
+  .stat-pill.conf-high { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
+  .stat-pill.conf-medium { color: var(--accent-text); background: var(--accent-soft); border-color: transparent; }
+  .downsides { background: var(--warn-soft); border-radius: var(--radius-sm); padding: 0.8rem 1rem; }
+  .downsides .idea-field-label { color: var(--warn); }
+  .idea-diagram { margin: 1rem 0; background: var(--surface-tint); border-radius: var(--radius-sm); padding: 1rem; }
+  .idea-diagram svg { width: 100%; height: auto; display: block; }
+  table.reject-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  table.reject-table th, table.reject-table td { text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.reject-table th { color: var(--ink-faint); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .top-stats { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.4rem 0 0.4rem; }
+  .top-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.7rem 1rem; min-width: 130px; }
+  .top-stat .n { font-size: 1.4rem; font-weight: 700; display: block; }
+  .top-stat .l { font-size: 0.78rem; color: var(--ink-faint); }
+  footer.composition-signal {
+    margin-top: 3.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--ink-faint);
+  }
+</style>
+
+<div class="page">
+  <header class="doc-header">
+    <div class="eyebrow">Ideation</div>
+    <h1>Board Portal &amp; Work Structuring</h1>
+    <dl class="meta-list">
+      <div><dt>Date</dt><dd>2026-08-19</dd></div>
+      <div><dt>Topic</dt><dd>board-portal-work-structuring</dd></div>
+      <div><dt>Focus</dt><dd>Add an HOA Board-member portal alongside the existing Homeowner portal; structure that work (and future work) into an incremental backlog instead of one big batch; get a workable path from a Claude-Design frontend design to shipped code</dd></div>
+      <div><dt>Mode</dt><dd>repo-grounded</dd></div>
+    </dl>
+    <div class="top-stats">
+      <div class="top-stat"><span class="n">40</span><span class="l">raw ideas generated</span></div>
+      <div class="top-stat"><span class="n">13</span><span class="l">merged candidates</span></div>
+      <div class="top-stat"><span class="n">7</span><span class="l">survivors, all verified</span></div>
+      <div class="top-stat"><span class="n">5</span><span class="l">agents independently found the top finding</span></div>
+    </div>
+  </header>
+
+  <h2 id="grounding-context">Codebase Context</h2>
+  <div class="grounding">
+    <p>HOAManagementCompany is an ASP.NET Core / .NET 9 backend with an Angular 17.3 frontend
+    (<code>neko-hoa/</code>). It currently ships one working surface — a Homeowner self-service
+    portal — and a stated intent to add a second one that has never been built.</p>
+    <ul>
+      <li><strong>No role system exists yet.</strong> Identity is wired via <code>AddIdentityCore&lt;ApplicationUser&gt;</code>
+      (Program.cs), not <code>AddIdentity</code> — <code>AddRoles&lt;IdentityRole&gt;()</code> is
+      never called. JWTs carry <code>sub/email/propertyId/communityId/jti</code> only, no role claim.
+      Registration binds one user to exactly one property and hard-blocks a second claim on the
+      same property (<code>AuthService.cs</code>).</li>
+      <li><strong>Board intent already exists as unwired UI.</strong> <code>portal-select.component.ts</code>
+      renders five portal cards — Resident, Board/Mgmt, Vendor, Closing, Attorney — but every card
+      routes to the identical <code>/login</code> path today.</li>
+      <li><strong>The spec-kit umbrella/sub-spec pattern already shipped once, successfully.</strong>
+      <code>016-security-hardening</code> is a no-implementation-detail umbrella spec containing six
+      sub-specs, all of which were later promoted to their own numbered branches
+      (<code>017</code>–<code>022</code>), governed by Constitution §12 (Spec Independence &amp;
+      Parallelism). Two are merged, four are spec-only as of this writing.</li>
+      <li><strong>The backlog tool the user is missing already exists, unused.</strong>
+      <code>/speckit.taskstoissues</code> is a real command in this repo, but a repo-wide search
+      turns up zero uses of it — sub-spec status has instead been tracked in a hand-maintained
+      Markdown table.</li>
+      <li><strong>Board-relevant backend capability is uneven.</strong> Documents are already
+      community-scoped (Budgets/Minutes/Financials categories); Violations are hard-scoped to a
+      single property with no community-wide query; a <code>CommunityExpense</code> entity and a
+      <code>LedgerEntry.FundCode</code> field exist but only <code>CommunityExpense</code> is
+      actually read today (in the resident dashboard) — neither is aggregated at the community
+      level.</li>
+      <li><strong>Design-to-code tooling is installed but thin.</strong> Storybook is configured
+      and has one proven mocked-service story pattern, but only 3 of 17 frontend components use
+      it. <code>styles.scss</code> has 18 color design tokens and no spacing/radius/shadow scale;
+      no <code>shared/</code> or <code>ui/</code> component directory exists anywhere in the
+      frontend.</li>
+      <li><strong>External research (high value):</strong> HOA board portals are a mature SaaS
+      category (Vantaca, AppFolio, TownSq, Buildium, CINC, FRONTSTEPS) where in-platform ARC
+      (architectural review) voting is the named competitive wedge, and where the strongest
+      products share one backend across homeowner and board views rather than bolting a second
+      portal on. "Big bang release" is a named industry anti-pattern; the countermeasure is
+      partitioning a rollout into independently valuable slices — exactly what this repo's own
+      spec-kit pattern already does.</li>
+    </ul>
+  </div>
+
+  <h2 id="topic-axes">Topic Axes</h2>
+  <ul class="axis-list">
+    <li><span class="axis-name">role-access-model</span>How a Board-member identity fits the
+      existing single-owner-per-property Identity/JWT setup, including the unwired portal-select UX.</li>
+    <li><span class="axis-name">board-feature-surface</span>What capabilities the Board portal
+      should actually offer (ARC, budgets, documents, vendor triage) vs. what's placeholder today.</li>
+    <li><span class="axis-name">work-decomposition-sequencing</span>How to split this — and future
+      — work into an incrementally shippable backlog instead of one big batch.</li>
+    <li><span class="axis-name">design-to-code-handoff</span>How a Claude-Design-produced frontend
+      design becomes real, implemented, tested Angular components.</li>
+  </ul>
+
+  <h2 id="ranked-ideas">Ranked Ideas</h2>
+  <nav class="subnav">
+    <div class="subnav-title">Jump to an idea</div>
+    <ol>
+      <li><a href="#idea-1">Umbrella spec + capability sub-specs, sequenced like 016</a></li>
+      <li><a href="#idea-2">First shippable slice: real Board route + Documents view</a></li>
+      <li><a href="#idea-3">Board identity as a new grant type, not a role flag</a></li>
+      <li><a href="#idea-4">Storybook as the mandatory design-to-code gate</a></li>
+      <li><a href="#idea-5">Token layer first, then a constrained Claude Design brief</a></li>
+      <li><a href="#idea-6">ARC review workflow, after fixing the violations query gap</a></li>
+      <li><a href="#idea-7">Board financial rollup from existing ledger &amp; expense data</a></li>
+    </ol>
+  </nav>
+
+  <article class="idea" id="idea-1">
+    <div class="idea-head">
+      <span class="idea-id">1</span>
+      <h3>Umbrella spec + capability sub-specs, sequenced like 016</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Structure the Board Portal exactly the way 016-security-hardening was structured: one
+      umbrella spec with no implementation detail, split into capability sub-specs (role/access,
+      documents view, ARC workflow, financial rollup, vendor triage), each promoted to its own
+      numbered Spec Kit branch when work starts on it. Declare the role/access sub-spec as the one
+      explicit hard dependency the rest wait on — everything else runs in parallel per Constitution
+      §12. Then actually invoke <code>/speckit.taskstoissues</code> once each sub-spec has a
+      <code>tasks.md</code>, so GitHub Issues becomes the live, dependency-ordered backlog instead
+      of a hand-maintained status table.</p>
+    </div>
+    <div class="idea-diagram">
+      <svg viewBox="0 0 800 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Umbrella spec fans out into sub-specs, gated by one hard dependency, each syncing to GitHub Issues">
+        <rect x="20" y="20" width="200" height="60" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" />
+        <text x="120" y="45" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">Umbrella spec</text>
+        <text x="120" y="63" text-anchor="middle" font-size="11" fill="var(--ink-soft)">no implementation detail</text>
+
+        <rect x="20" y="120" width="200" height="60" rx="10" fill="var(--surface)" stroke="var(--border)" />
+        <text x="120" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">Role/access sub-spec</text>
+        <text x="120" y="163" text-anchor="middle" font-size="11" fill="var(--warn)">hard dependency</text>
+
+        <path d="M120 80 L120 120" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+
+        <rect x="300" y="60" width="180" height="46" rx="9" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="390" y="88" text-anchor="middle" font-size="12" fill="var(--ink)">Documents view</text>
+        <rect x="300" y="120" width="180" height="46" rx="9" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="390" y="148" text-anchor="middle" font-size="12" fill="var(--ink)">ARC workflow</text>
+        <rect x="300" y="180" width="180" height="30" rx="9" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="390" y="200" text-anchor="middle" font-size="12" fill="var(--ink)">Financial rollup</text>
+
+        <path d="M220 150 L300 83" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+        <path d="M220 150 L300 143" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+        <path d="M220 150 L300 195" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+
+        <rect x="560" y="120" width="220" height="60" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/>
+        <text x="670" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)">GitHub Issues</text>
+        <text x="670" y="163" text-anchor="middle" font-size="11" fill="var(--ink-soft)">via /speckit.taskstoissues</text>
+        <path d="M480 100 L560 140" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+        <path d="M480 150 L560 150" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+        <path d="M480 195 L560 165" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow1)"/>
+
+        <defs>
+          <marker id="arrow1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-faint)" />
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>work-decomposition-sequencing</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span><code>specs/016-security-hardening/spec.md</code>
+      states the work is split into six independently plannable/testable/deliverable sub-specs with
+      "no implementation detail"; <code>specs/016-security-hardening/HANDOFF-2026-07-12.md</code>
+      and the actual branch list confirm all six were promoted to numbered branches
+      <code>017</code>–<code>022</code>, two merged so far. <code>tasks.md</code> documents one real
+      hard dependency and one soft file-conflict sequencing note between sub-specs — proof this
+      scales past pure independence-in-theory. A repo-wide search confirms
+      <code>/speckit.taskstoissues</code> exists as a command but has never been invoked; status
+      instead lives in a hand-written table. <em>4 independently-generated ideas across the
+      ideation fleet converged on this same recommendation.</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>This is not a process to adopt on faith — it is a pattern this exact team already ran to
+      completion once, with the dependency and sequencing edge cases already worked out. Pairing it
+      with <code>taskstoissues</code> answers the user's stated gap ("no good backlog other than
+      maybe GitHub Issues") with a command invocation instead of a new tool.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>Sub-spec boundaries have to be chosen deliberately — 020's "signup-UI gap" (a cross-slice
+      requirement nobody owned, discovered late and retrofitted) shows what happens when they
+      aren't. Adopting <code>taskstoissues</code> as standard practice is also a process decision
+      that outlives this one feature and should be agreed to as such, not started unilaterally.</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-high">Confidence: High</span>
+      <span class="stat-pill">Complexity: Medium</span>
+    </div>
+  </article>
+
+  <article class="idea" id="idea-2">
+    <div class="idea-head">
+      <span class="idea-id">2</span>
+      <h3>First shippable slice: real Board route + Documents view</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Make the very first PR turn the dormant "Board / Mgmt" portal-select card into a real,
+      guarded route — additive, beside the existing Homeowner routes, touching nothing about how
+      homeowners log in — and have it serve exactly one capability that needs zero new backend
+      queries: a read-only board view of Documents (already scoped by <code>communityId</code>,
+      already carrying Budgets/Minutes/Financials categories). This is the smallest possible unit
+      that turns an aspirational UI stub into a real fork in the codebase everything else attaches to.</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>role-access-model / board-feature-surface</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span><code>portal-select.component.ts</code> — all five
+      portal cards, including "Board / Mgmt", route to the identical <code>/login</code> path today,
+      confirmed by reading the routing binding directly. <code>DocumentsEndpoint.cs</code> already
+      reads <code>communityId</code> (not <code>propertyId</code>) off the user's claims, unlike
+      every other community-surface endpoint checked. <em>2 independently-generated ideas converged
+      on shipping documents first.</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>Verification found this pair individually "too obviously correct to debate" rather than a
+      genuine fork — which is exactly why it belongs first: it's the low-controversy, low-risk slice
+      that proves the role-gating and routing pattern end-to-end before anything harder (ARC,
+      budgets) depends on it being right.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>It's deliberately small — on its own it doesn't answer what "Board member" means as an
+      identity (see idea 3). Treat it as a proof-of-plumbing slice, not the whole role/access
+      sub-spec.</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-high">Confidence: High</span>
+      <span class="stat-pill">Complexity: Small</span>
+    </div>
+  </article>
+
+  <article class="idea" id="idea-3">
+    <div class="idea-head">
+      <span class="idea-id">3</span>
+      <h3>Board identity as a new grant type, not a role flag</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Don't retrofit "Board member" onto the existing <code>UserProperty</code> claim — that
+      table assumes one owner per property and its registration path enforces that with a real
+      security check. Instead, give Board membership its own community-scoped grant path: an
+      invite-based registration (not a property claim code) that links a user to a community rather
+      than a single property, and a JWT variant that can carry a community-wide scope so board
+      members don't have to "switch properties" to see community-wide data the way homeowners do.
+      Two refinements worth deciding alongside this: whether board grants should carry an
+      election-cycle expiry (so departed board members don't silently keep access), and whether the
+      scope-switching mechanic already built for homeowners (<code>SwitchPropertyAsync</code>) can
+      be generalized rather than duplicated.</p>
+    </div>
+    <div class="idea-diagram">
+      <svg viewBox="0 0 800 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Homeowner claim path stays untouched; a new community-scoped grant path is added beside it">
+        <text x="20" y="28" font-size="13" font-weight="700" fill="var(--ink)">Today</text>
+        <rect x="20" y="42" width="230" height="52" rx="9" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="135" y="63" text-anchor="middle" font-size="12" fill="var(--ink)">Property claim code</text>
+        <text x="135" y="80" text-anchor="middle" font-size="11" fill="var(--ink-soft)">one owner per property</text>
+        <path d="M250 68 L330 68" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow2)"/>
+        <rect x="330" y="42" width="230" height="52" rx="9" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="445" y="63" text-anchor="middle" font-size="12" fill="var(--ink)">UserProperty row</text>
+        <text x="445" y="80" text-anchor="middle" font-size="11" fill="var(--ink-soft)">propertyId-scoped JWT</text>
+
+        <text x="20" y="128" font-size="13" font-weight="700" fill="var(--ink)">Proposed — additive</text>
+        <rect x="20" y="142" width="230" height="52" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="135" y="163" text-anchor="middle" font-size="12" fill="var(--ink)">Board invite grant</text>
+        <text x="135" y="180" text-anchor="middle" font-size="11" fill="var(--ink-soft)">optional term expiry</text>
+        <path d="M250 168 L330 168" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#arrow2)"/>
+        <rect x="330" y="142" width="230" height="52" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="445" y="163" text-anchor="middle" font-size="12" fill="var(--ink)">Community grant row</text>
+        <text x="445" y="180" text-anchor="middle" font-size="11" fill="var(--ink-soft)">communityId-scoped JWT</text>
+
+        <defs>
+          <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="var(--ink-faint)" />
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>role-access-model</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span><code>UserProperty.cs</code> has exactly
+      <code>Id/UserId/PropertyId/LinkedAt</code> — no role column, no expiry field.
+      <code>AuthService.cs</code> contains the exact check
+      (<code>AnyAsync(up =&gt; up.PropertyId == claimCode.PropertyId)</code>) that blocks any second
+      claim on a property. JWT claims today are exactly <code>sub/email/propertyId/communityId/jti</code>
+      — one scope per token — and <code>SwitchPropertyAsync</code> already re-mints tokens on a
+      property switch, which is the precedent for generalizing to scope-switching. <em>4
+      independently-generated ideas converged on "don't overload UserProperty," with an internal
+      fork between a cheaper role-column patch and a cleaner separate table.</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>The property-claim uniqueness check is real, already-hardened security logic from the 016
+      security-hardening work — reusing it for a structurally different relationship (one board
+      member, many properties) means either weakening that guarantee or building parallel plumbing
+      anyway. Deciding the shape now is cheaper than discovering the conflict mid-implementation.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>A new grant entity is more schema and more auth surface than a role column would be — the
+      cheaper column-based patch was raised independently by two other agents and is a legitimate
+      lower-cost alternative if the team judges the property-claim invariant doesn't need protecting
+      this carefully for a first version.</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-high">Confidence: High</span>
+      <span class="stat-pill">Complexity: Medium</span>
+    </div>
+  </article>
+
+  <article class="idea" id="idea-4">
+    <div class="idea-head">
+      <span class="idea-id">4</span>
+      <h3>Storybook as the mandatory design-to-code gate</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Require every new Board-portal component to land as a real Angular component plus a
+      Storybook story — built against a mocked backing service, following the pattern already
+      proven in the payments feature — before it's considered "done." This turns Storybook from
+      underused infrastructure into the literal contract between what Claude Design produced and
+      what shipped: a design isn't accepted until it exists as a reviewable, testable component in
+      isolation, not a static frame a human eyeballs into existence.</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>design-to-code-handoff</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span>Storybook is configured (<code>@storybook/angular</code>,
+      an Angular CLI builder) but exactly 3 of 17 frontend components have <code>.stories.ts</code>
+      files, all under <code>features/payments/</code>. The existing pattern
+      (<code>one-time.stories.ts</code>) mocks the backing service via Angular's
+      <code>moduleMetadata</code> so the story "never hits the network" — a working template, just
+      underused. <em>5 independently-generated ideas converged on this — the single strongest
+      finding in the design-to-code-handoff axis, verified against the actual file counts.</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>The repo already paid for the mechanism that solves this problem; it's just never been
+      required as policy. Using it as the acceptance gate for new Board work turns "does this match
+      the design" from a subjective eyeball comparison against a drifting mockup into a checkable
+      PR requirement, and it closes 13 of 17 components' coverage gap incrementally as a side effect.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>This is a Definition-of-Done change, not a one-off — it adds a step to every future Board
+      PR and should be agreed to as team policy, not assumed. Retrofitting stories onto components
+      built without them later is more expensive than requiring it from the first PR, so the timing
+      of adoption matters.</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-high">Confidence: High</span>
+      <span class="stat-pill">Complexity: Small–Medium</span>
+    </div>
+  </article>
+
+  <article class="idea" id="idea-5">
+    <div class="idea-head">
+      <span class="idea-id">5</span>
+      <h3>Token layer first, then a constrained Claude Design brief</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Before Claude Design touches a single Board screen, extract the missing spacing/radius/
+      shadow scale from the hardcoded values scattered through <code>styles.scss</code> into named
+      tokens alongside the 18 color tokens that already exist. Then give Claude Design a real brief
+      per sub-spec (one mini-brief for Documents, one for ARC, one for Budgets — not one giant
+      all-screens mockup) that hands over the token set and existing component patterns as hard
+      constraints, rather than letting it invent its own spacing scale that then has to be
+      reconciled against the Homeowner portal by hand.</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>design-to-code-handoff</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span><code>styles.scss</code> has an actively-used
+      <code>:root</code> block with 18 color tokens (oklch-based) — verified directly, correcting an
+      earlier overcount of "~21" — but no spacing, radius, or shadow scale; those values are
+      hardcoded per class (e.g. a literal border-radius on <code>.card</code>). No
+      <code>shared/</code>, <code>ui/</code>, or <code>design-system/</code> directory exists
+      anywhere in the frontend, and no Figma or design-tooling packages appear in
+      <code>package.json</code>. <em>4 independently-generated ideas converged on this gap.</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>Handing a design tool a system with half its foundation missing means it either invents its
+      own spacing scale (fighting the existing CSS) or every Board screen re-derives spacing by
+      eyeballing existing components — the exact "garbage in, garbage out" handoff failure mode
+      external research on 2026 design-handoff tooling flags as a production risk, not a cosmetic
+      one. A few days of token work up front is cheaper than cleaning up drift across five sub-specs
+      later.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>This is frontend-infrastructure spend that delays visible Board functionality in exchange
+      for compounding leverage on every screen after — worth an explicit go/no-go rather than
+      defaulting into it, and it should be scoped small (a handful of tokens, not a full design
+      system) so it doesn't become its own multi-week detour.</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-high">Confidence: High</span>
+      <span class="stat-pill">Complexity: Small–Medium</span>
+    </div>
+  </article>
+
+  <article class="idea" id="idea-6">
+    <div class="idea-head">
+      <span class="idea-id">6</span>
+      <h3>ARC review workflow, after fixing the violations query gap</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Build Architectural Review Committee (ARC) approval as an extension of the existing
+      Violation model rather than a new entity: extend <code>ViolationStatus</code> beyond
+      Open/Closed to include approval states (e.g. pending, approved, denied) and add a
+      reviewer/note field, scoped to the existing <code>Architectural</code> category. This needs
+      one explicit prerequisite first: the violations query today is hard-scoped to a single
+      property, while every other community-facing query (documents, announcements) is already
+      scoped by community — that asymmetry has to close before a board-wide ARC queue can exist at all.</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>board-feature-surface</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span><code>ViolationCategory</code> already has an
+      <code>Architectural</code> value; <code>ViolationStatus</code> is exactly
+      <code>{Open, Closed}</code> with no reviewer/note field on <code>Violation</code>. The
+      violations query is scoped by <code>propertyId</code> while the documents query is scoped by
+      <code>communityId</code> in the same feature area — confirmed by reading both endpoints
+      directly. <em>3 independently-generated ideas converged on the ARC extension; a fourth
+      independently flagged the query-scope asymmetry as the prerequisite.</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>External research names in-platform ARC voting as the clearest competitive wedge among
+      comparable HOA products — the alternative today is scattered email/text. This is also the
+      cheapest version of that feature to build here: the category taxonomy already exists, so it's
+      extending an enum and adding fields, not designing a new subsystem from scratch.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>Widening the violations query to be community-scoped raises a real question the team should
+      decide deliberately: does a board-wide view leak cross-property violation data to residents
+      who shouldn't see it, and does the endpoint need a separate board-only path rather than a
+      widened shared one?</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-high">Confidence: High</span>
+      <span class="stat-pill">Complexity: Medium</span>
+    </div>
+  </article>
+
+  <article class="idea" id="idea-7">
+    <div class="idea-head">
+      <span class="idea-id">7</span>
+      <h3>Board financial rollup from existing ledger &amp; expense data</h3>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Description</div>
+      <p>Build a board budget-vs-actuals view by aggregating the existing per-property ledger data
+      community-wide, activating the <code>LedgerEntry.FundCode</code> field that's never set today,
+      and extending the <code>CommunityExpense</code> entity's use beyond its current read-only role
+      in the resident dashboard into a real board-facing endpoint with community-level aggregation.</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Axis</div>
+      <p>board-feature-surface</p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Basis</div>
+      <p><span class="basis-tag">direct</span><code>LedgerEntry.FundCode</code> exists as a GL hook
+      but no code path ever sets it, confirmed by a repo-wide search. <code>LedgerService</code>'s
+      balance and recompute methods are scoped by <code>propertyId</code> only — no community-wide
+      aggregate exists. <code>CommunityExpense</code> is community-scoped with
+      <code>Label/Amount/FiscalYear</code> fields shaped like a budget line item, and — corrected
+      during verification — it is not fully dormant: <code>DashboardService.cs</code> already reads
+      it into the existing per-resident dashboard's expense-breakdown widget. What's missing is a
+      cross-property/board-level aggregate and a dedicated board endpoint, not first-time usage.
+      <em>5 raw ideas across the fleet independently found this schema — the single most
+      corroborated finding of the whole run — though the strongest version overstated
+      "CommunityExpense is unused."</em></p>
+    </div>
+    <div class="idea-field">
+      <div class="idea-field-label">Rationale</div>
+      <p>Even after the correction, this is real leverage: no new tables, mostly service/endpoint
+      work over schema that was already designed for this purpose and partially wired. It's a
+      meaningfully cheaper path to a board financial view than designing a budgeting feature from
+      scratch.</p>
+    </div>
+    <div class="downsides idea-field">
+      <div class="idea-field-label">Downsides</div>
+      <p>Because <code>CommunityExpense</code> is already live in the resident dashboard, changes
+      here touch an existing, working read path — this needs care to avoid regressing that widget
+      while extending it, not a clean-slate build.</p>
+    </div>
+    <div class="stat-strip">
+      <span class="stat-pill conf-medium">Confidence: Medium</span>
+      <span class="stat-pill">Complexity: Medium</span>
+    </div>
+  </article>
+
+  <h2 id="rejection-summary">Rejection Summary</h2>
+  <p>No idea was discarded as ungrounded — the fresh-context verifier found every base claim sound
+  except one overstatement (idea 7's "fully dormant" framing, corrected above) and one minor count
+  error (idea 5's token count). Instead, ideas that converged from multiple frames were merged into
+  one stronger combined entry rather than kept as duplicates:</p>
+  <table class="reject-table">
+    <thead>
+      <tr><th>#</th><th>Idea</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>–</td><td>Portal-select wiring (standalone)</td><td>Merged into idea 2 — verifier judged it individually below the meeting-test bar (too obviously correct to debate on its own), but genuinely useful combined with the Documents-view slice as one concrete "build this first" recommendation.</td></tr>
+      <tr><td>–</td><td>Documents-view-first (standalone)</td><td>Merged into idea 2 for the same reason — kept as a pair, not two separate cards.</td></tr>
+      <tr><td>–</td><td>taskstoissues adoption (standalone)</td><td>Merged into idea 1 — three separate work-decomposition ideas (umbrella pattern, hard-dependency sequencing, taskstoissues) described one coherent recommendation, split across cards would have fragmented it.</td></tr>
+      <tr><td>–</td><td>Pre-declare hard dependency (standalone)</td><td>Merged into idea 1 for the same reason.</td></tr>
+      <tr><td>–</td><td>Term-limited board grants (standalone)</td><td>Folded into idea 3 as a secondary design question rather than a standalone card — it's a refinement of the same role-model decision, not an independent move.</td></tr>
+      <tr><td>–</td><td>Community-scoped JWT / generalized scope-switching (standalone)</td><td>Folded into idea 3 as an implementation detail of the same grant-entity decision.</td></tr>
+      <tr><td>–</td><td>Fix the violations community-query gap (standalone)</td><td>Merged into idea 6 as its explicit prerequisite rather than a separate feature.</td></tr>
+    </tbody>
+  </table>
+
+  <footer class="composition-signal">
+    Composed 2026-08-19 by ce-ideate from the current state of <code>HOAManagementCompany</code>
+    (branch <code>main</code>, commit <code>7c02bf0</code>) plus web research on HOA board-portal
+    products and 2026 design-handoff tooling.
+  </footer>
+</div>

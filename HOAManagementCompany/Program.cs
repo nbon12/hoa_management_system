@@ -362,6 +362,11 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Auth.IAuthNotifier>(sp 
         : notifier;
 });
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
+// Board member experience (025-board-overall-design). The single community-scope
+// resolver every board-side endpoint authorizes through (FR-012). The MetricDescriptor
+// registry is intentionally empty here — spec 2 registers concrete descriptors.
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.ICommunityScopeResolver,
+    HOAManagementCompany.Features.Board.CommunityScopeResolver>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.PaymentService>();
 // Stripe payments (006-stripe-payments). Gateway is the network adapter; the rest is testable logic.
 builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.IStripeGateway,

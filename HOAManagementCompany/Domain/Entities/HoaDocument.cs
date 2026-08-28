@@ -5,7 +5,8 @@ namespace HOAManagementCompany.Domain.Entities;
 public class HoaDocument
 {
     public Guid Id { get; set; }
-    public string CommunityId { get; set; } = string.Empty;
+    public Guid CommunityId { get; set; }
+    public Community Community { get; set; } = null!;
     public string Name { get; set; } = string.Empty;
     public DocumentCategory Category { get; set; }
     public DateOnly EffectiveDate { get; set; }

@@ -15,6 +15,9 @@ const MOCK_AUTH_RESPONSE = {
     id: 'u1', firstName: 'Jane', lastName: 'Resident',
     email: 'resident@nekohoa.dev', initials: 'JR',
     properties: [{ id: 'p1', accountNumber: 'SAKURA-001', address: '1 Sakura Drive' }],
+    // 025: newer backends ship the board fields; the service defaults them when absent.
+    lastActiveMode: 'Resident',
+    memberships: [],
   },
 };
 

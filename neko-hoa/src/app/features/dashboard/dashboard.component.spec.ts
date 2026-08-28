@@ -6,7 +6,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { signal } from '@angular/core';
 import { CurrentUser, DashboardSummary } from '../../core/models';
 
-const MOCK_USER: CurrentUser = { id: '1', firstName: 'Nicholas', lastName: 'Bonilla', email: 'n@b.com', initials: 'NB' };
+const MOCK_USER: CurrentUser = { id: '1', firstName: 'Nicholas', lastName: 'Bonilla', email: 'n@b.com', initials: 'NB', lastActiveMode: 'Resident', memberships: [] };
 
 const MOCK_SUMMARY: DashboardSummary = {
   currentBalance:        500,

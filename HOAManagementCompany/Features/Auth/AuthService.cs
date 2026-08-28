@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using HOAManagementCompany.Domain.Entities;
+using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Auth.Models;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -152,11 +153,68 @@ public class AuthService(
         var user = await userManager.FindByIdAsync(userId)
             ?? throw new DomainException("NOT_FOUND", "User not found.", 404);
 
+        return await BuildCurrentUserAsync(user, ct);
+    }
+
+    // 025 FR-018/FR-020/FR-022/FR-023: switch the caller's active UI mode. Board mode
+    // requires an active non-resident membership, verified server-side (never from the
+    // client's requested mode — FR-014). Persists LastActiveMode and rotates refresh
+    // tokens, mirroring SwitchPropertyAsync.
+    public async Task<AuthResult> SwitchModeAsync(string userId, UserMode mode, CancellationToken ct = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct)
+            ?? throw new DomainException("NOT_FOUND", "User not found.", 404);
+
+        if (mode == UserMode.Board && !await HasActiveBoardMembershipAsync(userId, ct))
+            throw new DomainException("NO_ACTIVE_MEMBERSHIP", "You do not hold an active board membership.", 403);
+
+        user.LastActiveMode = mode;
+
+        await db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow), ct);
+
+        var property = await GetActivePropertyAsync(userId, ct);
+        return await CreateTokenPairAsync(user, property, ct);
+    }
+
+    private async Task<bool> HasActiveBoardMembershipAsync(string userId, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return await db.CommunityMemberships.AnyAsync(m =>
+            m.UserId == userId
+            && m.Role != CommunityRole.Resident
+            && m.Status == MembershipStatus.Active
+            && (m.EndDate == null || m.EndDate >= today)
+            && m.Community.Status == CommunityStatus.Active, ct);
+    }
+
+    private async Task<CurrentUserDto> BuildCurrentUserAsync(ApplicationUser user, CancellationToken ct)
+    {
         var properties = await db.UserProperties
             .Include(up => up.Property)
-            .Where(up => up.UserId == userId)
+            .Where(up => up.UserId == user.Id)
             .Select(up => new PropertySummaryDto(up.Property.Id, up.Property.AccountNumber, up.Property.Address))
             .ToListAsync(ct);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var memberships = await db.CommunityMemberships
+            .Where(m => m.UserId == user.Id
+                     && m.Status == MembershipStatus.Active
+                     && (m.EndDate == null || m.EndDate >= today)
+                     && m.Community.Status == CommunityStatus.Active)
+            .Select(m => new MembershipSummaryDto(m.CommunityId, m.Community.CommunityName, m.Role.ToString()))
+            .ToListAsync(ct);
+
+        // FR-023: when the user holds no active non-resident membership, they are
+        // returned to resident mode on their next request — even if LastActiveMode
+        // is still Board (e.g. a board term expired mid-session). Reporting Board
+        // without an active membership would strand them in a board shell with no
+        // way out, since every board endpoint would then deny them.
+        var hasBoardMembership = memberships.Any(m => m.Role != CommunityRole.Resident.ToString());
+        var effectiveMode = user.LastActiveMode == UserMode.Board && hasBoardMembership
+            ? UserMode.Board
+            : UserMode.Resident;
 
         return new CurrentUserDto(
             user.Id,
@@ -164,7 +222,9 @@ public class AuthService(
             user.LastName,
             user.Email!,
             $"{user.FirstName[0]}{user.LastName[0]}",
-            properties);
+            properties,
+            effectiveMode.ToString(),
+            memberships);
     }
 
     private async Task<Domain.Entities.Property> GetActivePropertyAsync(string userId, CancellationToken ct)
@@ -185,7 +245,7 @@ public class AuthService(
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
             new Claim("propertyId", property.Id.ToString()),
-            new Claim("communityId", property.CommunityId),
+            new Claim("communityId", property.CommunityId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -209,19 +269,7 @@ public class AuthService(
         });
         await db.SaveChangesAsync(ct);
 
-        var properties = await db.UserProperties
-            .Include(up => up.Property)
-            .Where(up => up.UserId == user.Id)
-            .Select(up => new PropertySummaryDto(up.Property.Id, up.Property.AccountNumber, up.Property.Address))
-            .ToListAsync(ct);
-
-        var currentUser = new CurrentUserDto(
-            user.Id,
-            user.FirstName,
-            user.LastName,
-            user.Email!,
-            $"{user.FirstName[0]}{user.LastName[0]}",
-            properties);
+        var currentUser = await BuildCurrentUserAsync(user, ct);
 
         return new AuthResult(new AuthResponse(accessToken, expiry, currentUser), rawRefresh);
     }

@@ -28,9 +28,10 @@ public class PaymentConfigServiceTests
             Nsf = new PaymentsOptions.NsfOptions { Enabled = true, Amount = 25m },
         };
 
-        var cfg = PaymentConfigService.BuildDefault("SAKURA", opts);
+        var communityId = Guid.NewGuid();
+        var cfg = PaymentConfigService.BuildDefault(communityId, opts);
 
-        Assert.Equal("SAKURA", cfg.CommunityId);
+        Assert.Equal(communityId, cfg.CommunityId);
         Assert.Equal(FeeType.Flat, cfg.CardFeeType);
         Assert.Equal(1.95m, cfg.CardFeeValue);
         Assert.Equal(CardScope.AllCards, cfg.CardScope);
@@ -49,7 +50,7 @@ public class PaymentConfigServiceTests
             DefaultFee = new PaymentsOptions.FeeOptions { CardFeeType = "nonsense", CardScope = "bogus" },
         };
 
-        var cfg = PaymentConfigService.BuildDefault("X", opts);
+        var cfg = PaymentConfigService.BuildDefault(Guid.NewGuid(), opts);
 
         Assert.Equal(FeeType.Percentage, cfg.CardFeeType);   // safe default when the option is garbage
         Assert.Equal(CardScope.CreditOnly, cfg.CardScope);   // percentage requires credit-only

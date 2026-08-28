@@ -58,6 +58,13 @@ _ReSharper.*/
 # Env files with secrets (tracked examples like repowise/.env.example are allowed)
 .env
 .env.local
+
+# macOS Finder metadata
+.DS_Store
+
+# Claude Design handoff bundles — local reference material only (wireframes, screenshots,
+# exported JSX/HTML); not committed. Copy any spec.md content into specs/ instead.
+docs/design/
 .env.*.local
 !.env.example
 !**/.env.example

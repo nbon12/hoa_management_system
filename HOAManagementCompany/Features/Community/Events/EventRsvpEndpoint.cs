@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Community.Models;
 
@@ -14,7 +15,7 @@ public class EventRsvpEndpoint(CommunityService communityService) : Endpoint<Eve
 
     public override async Task HandleAsync(EventRsvpRequest req, CancellationToken ct)
     {
-        var communityId = User.FindFirst("communityId")!.Value;
+        var communityId = User.RequireCommunityId();
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? string.Empty;
         var eventId = Route<Guid>("id");
 

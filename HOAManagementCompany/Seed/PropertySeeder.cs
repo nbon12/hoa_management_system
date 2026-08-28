@@ -110,7 +110,6 @@ public class PropertySeeder(ApplicationDbContext db, SeedResult result, ILogger 
                 Id               = Guid.NewGuid(),
                 AccountNumber    = n.Acct,
                 CommunityId      = result.CommunityId,
-                CommunityName    = "Sakura Heights HOA",
                 Address          = n.Addr,
                 City             = n.City,
                 State            = "CA",

@@ -14,12 +14,25 @@ public class TestDataSeeder(ApplicationDbContext db)
     private const string PrimaryEmail = "resident@nekohoa.dev";
     private const string SecondaryEmail = "resident2@nekohoa.dev";
     private const string ExistingEmail = "existing@nekohoa.dev";
-    private const string CommunityId = "SAKURA";
+
+    /// <summary>
+    /// Deterministic Guid for the seeded "Sakura Heights HOA" community. Exposed so other integration
+    /// tests that add isolated properties into the same shared database can reference the real FK.
+    /// </summary>
+    public static readonly Guid SakuraCommunityId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
         if (await db.Users.AnyAsync(u => u.Email == PrimaryEmail, ct))
             return;
+
+        // Tenant boundary for all seeded community-scoped data (FR-001).
+        db.Communities.Add(new Community
+        {
+            Id = SakuraCommunityId,
+            LegalName = "Sakura Heights HOA",
+            Status = CommunityStatus.Active,
+        });
 
         // Users (hash passwords with Identity's default hasher)
         var hasher = new PasswordHasher<ApplicationUser>();
@@ -73,8 +86,7 @@ public class TestDataSeeder(ApplicationDbContext db)
         {
             Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001"),
             AccountNumber = "SAKURA-001",
-            CommunityId = CommunityId,
-            CommunityName = "Sakura Heights HOA",
+            CommunityId = SakuraCommunityId,
             Address = "1 Sakura Drive",
             City = "San Jose",
             State = "CA",
@@ -96,8 +108,7 @@ public class TestDataSeeder(ApplicationDbContext db)
         {
             Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"),
             AccountNumber = "SAKURA-002",
-            CommunityId = CommunityId,
-            CommunityName = "Sakura Heights HOA",
+            CommunityId = SakuraCommunityId,
             Address = "2 Sakura Drive",
             City = "San Jose",
             State = "CA",
@@ -120,8 +131,7 @@ public class TestDataSeeder(ApplicationDbContext db)
         {
             Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003"),
             AccountNumber = "SAKURA-003",
-            CommunityId = CommunityId,
-            CommunityName = "Sakura Heights HOA",
+            CommunityId = SakuraCommunityId,
             Address = "3 Sakura Drive",
             City = "San Jose",
             State = "CA",
@@ -164,7 +174,7 @@ public class TestDataSeeder(ApplicationDbContext db)
         db.HoaPaymentConfigs.Add(new HoaPaymentConfig
         {
             Id = Guid.NewGuid(),
-            CommunityId = CommunityId,
+            CommunityId = SakuraCommunityId,
             CardFeeType = FeeType.Percentage,
             CardFeeValue = 0.03m,
             CardScope = CardScope.CreditOnly,
@@ -225,12 +235,12 @@ public class TestDataSeeder(ApplicationDbContext db)
 
         // Community data
         db.Announcements.AddRange(
-            new Announcement { Id = Guid.NewGuid(), CommunityId = CommunityId, Title = "Board Meeting – June 2026", Body = "Meeting at 7pm in the clubhouse.", PublishedAt = DateTimeOffset.UtcNow.AddDays(-5), Category = AnnouncementCategory.Board, Pinned = true, AuthorName = "HOA Board" },
-            new Announcement { Id = Guid.NewGuid(), CommunityId = CommunityId, Title = "Pool Maintenance", Body = "Pool closed June 1–3.", PublishedAt = DateTimeOffset.UtcNow.AddDays(-10), Category = AnnouncementCategory.Maintenance, AuthorName = "Facilities" });
+            new Announcement { Id = Guid.NewGuid(), CommunityId = SakuraCommunityId, Title = "Board Meeting – June 2026", Body = "Meeting at 7pm in the clubhouse.", PublishedAt = DateTimeOffset.UtcNow.AddDays(-5), Category = AnnouncementCategory.Board, Pinned = true, AuthorName = "HOA Board" },
+            new Announcement { Id = Guid.NewGuid(), CommunityId = SakuraCommunityId, Title = "Pool Maintenance", Body = "Pool closed June 1–3.", PublishedAt = DateTimeOffset.UtcNow.AddDays(-10), Category = AnnouncementCategory.Maintenance, AuthorName = "Facilities" });
 
         var poll = new Poll
         {
-            Id = Guid.NewGuid(), CommunityId = CommunityId,
+            Id = Guid.NewGuid(), CommunityId = SakuraCommunityId,
             Question = "Which improvement should we prioritize?",
             ClosingLabel = "Closes June 30", IsActive = true, TotalVotes = 10
         };
@@ -239,21 +249,21 @@ public class TestDataSeeder(ApplicationDbContext db)
         db.Polls.Add(poll);
 
         db.Violations.AddRange(
-            new Violation { Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, CommunityId = CommunityId, Title = "Overgrown hedges", Category = ViolationCategory.Landscape, Status = ViolationStatus.Open, IssuedDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-20)) },
-            new Violation { Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, CommunityId = CommunityId, Title = "Parking violation", Category = ViolationCategory.Parking, Status = ViolationStatus.Closed, IssuedDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-60)), ResolvedDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-55)) });
+            new Violation { Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, CommunityId = SakuraCommunityId, Title = "Overgrown hedges", Category = ViolationCategory.Landscape, Status = ViolationStatus.Open, IssuedDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-20)) },
+            new Violation { Id = Guid.NewGuid(), PropertyId = primaryProperty.Id, CommunityId = SakuraCommunityId, Title = "Parking violation", Category = ViolationCategory.Parking, Status = ViolationStatus.Closed, IssuedDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-60)), ResolvedDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-55)) });
 
         db.CalendarEvents.AddRange(
-            new CalendarEvent { Id = Guid.NewGuid(), CommunityId = CommunityId, Title = "Board Meeting", EventDate = DateTimeOffset.UtcNow.AddDays(3), Location = "Clubhouse", Category = EventCategory.Board, RsvpEnabled = true },
-            new CalendarEvent { Id = Guid.NewGuid(), CommunityId = CommunityId, Title = "Pool Opening", EventDate = DateTimeOffset.UtcNow.AddDays(7), Location = "Pool", Category = EventCategory.Amenity, RsvpEnabled = false });
+            new CalendarEvent { Id = Guid.NewGuid(), CommunityId = SakuraCommunityId, Title = "Board Meeting", EventDate = DateTimeOffset.UtcNow.AddDays(3), Location = "Clubhouse", Category = EventCategory.Board, RsvpEnabled = true },
+            new CalendarEvent { Id = Guid.NewGuid(), CommunityId = SakuraCommunityId, Title = "Pool Opening", EventDate = DateTimeOffset.UtcNow.AddDays(7), Location = "Pool", Category = EventCategory.Amenity, RsvpEnabled = false });
 
         db.CommunityExpenses.AddRange(
-            new CommunityExpense { Id = Guid.NewGuid(), CommunityId = CommunityId, Label = "Landscaping", Color = "#4CAF50", Amount = 28500m, FiscalYear = 2026 },
-            new CommunityExpense { Id = Guid.NewGuid(), CommunityId = CommunityId, Label = "Pool", Color = "#2196F3", Amount = 14200m, FiscalYear = 2026 });
+            new CommunityExpense { Id = Guid.NewGuid(), CommunityId = SakuraCommunityId, Label = "Landscaping", Color = "#4CAF50", Amount = 28500m, FiscalYear = 2026 },
+            new CommunityExpense { Id = Guid.NewGuid(), CommunityId = SakuraCommunityId, Label = "Pool", Color = "#2196F3", Amount = 14200m, FiscalYear = 2026 });
 
         db.HoaDocuments.AddRange(
-            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001"), CommunityId = CommunityId, Name = "2026 Budget", Category = DocumentCategory.Budgets, EffectiveDate = new DateOnly(2026, 1, 1), FileSizeLabel = "1.2 MB", Pinned = true, StorageKey = "documents/2026/budget.pdf" },
-            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002"), CommunityId = CommunityId, Name = "Community Rules", Category = DocumentCategory.Rules, EffectiveDate = new DateOnly(2024, 1, 1), FileSizeLabel = "2.1 MB", Pinned = false, StorageKey = "documents/rules/rules.pdf" },
-            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000003"), CommunityId = CommunityId, Name = "CC&R Declaration", Category = DocumentCategory.Governing, EffectiveDate = new DateOnly(2005, 6, 1), FileSizeLabel = "5.0 MB", Pinned = true, StorageKey = "documents/governing/ccr-declaration.pdf" });
+            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001"), CommunityId = SakuraCommunityId, Name = "2026 Budget", Category = DocumentCategory.Budgets, EffectiveDate = new DateOnly(2026, 1, 1), FileSizeLabel = "1.2 MB", Pinned = true, StorageKey = "documents/2026/budget.pdf" },
+            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000002"), CommunityId = SakuraCommunityId, Name = "Community Rules", Category = DocumentCategory.Rules, EffectiveDate = new DateOnly(2024, 1, 1), FileSizeLabel = "2.1 MB", Pinned = false, StorageKey = "documents/rules/rules.pdf" },
+            new HoaDocument { Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000003"), CommunityId = SakuraCommunityId, Name = "CC&R Declaration", Category = DocumentCategory.Governing, EffectiveDate = new DateOnly(2005, 6, 1), FileSizeLabel = "5.0 MB", Pinned = true, StorageKey = "documents/governing/ccr-declaration.pdf" });
 
         await db.SaveChangesAsync(ct);
     }

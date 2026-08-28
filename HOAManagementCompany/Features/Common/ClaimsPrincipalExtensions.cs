@@ -16,11 +16,11 @@ public static class ClaimsPrincipalExtensions
         return propertyId;
     }
 
-    public static string RequireCommunityId(this ClaimsPrincipal user)
+    public static Guid RequireCommunityId(this ClaimsPrincipal user)
     {
         var value = user.FindFirst("communityId")?.Value;
-        if (string.IsNullOrWhiteSpace(value))
+        if (!Guid.TryParse(value, out var communityId))
             throw new DomainException("UNAUTHORIZED", "Token is missing required identity claims.", StatusCodes.Status401Unauthorized);
-        return value;
+        return communityId;
     }
 }

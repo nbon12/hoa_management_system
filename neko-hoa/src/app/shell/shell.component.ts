@@ -1,8 +1,11 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { PropertyService } from '../core/services/property.service';
+import { BoardNavigationService } from '../core/services/board-navigation.service';
 import { Property } from '../core/models';
+import { ModeToggleComponent } from '../features/board/mode-toggle/mode-toggle.component';
+import { BoardBannerComponent } from '../features/board/board-banner/board-banner.component';
 
 interface NavGroup {
   group: string | null;
@@ -12,7 +15,7 @@ interface NavGroup {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ModeToggleComponent, BoardBannerComponent],
   template: `
     <div class="shell">
       <!-- Top bar -->
@@ -22,6 +25,8 @@ interface NavGroup {
           <span class="hand" style="font-size:22px;font-weight:700;">NekoHOA</span>
         </div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <!-- 025 FR-019: mode control sits to the LEFT of alerts + avatar. -->
+          <app-mode-toggle />
           <button class="pill" style="cursor:pointer;background:var(--pink-2);" (click)="logout()">
             🔔 3
           </button>
@@ -29,6 +34,11 @@ interface NavGroup {
           <button class="btn btn--ghost" (click)="logout()" style="font-size:11px;">Sign out</button>
         </div>
       </header>
+
+      <!-- 025 FR-021: board-mode banner (dark ink on violet), no control. -->
+      @if (boardMode()) {
+        <app-board-banner />
+      }
 
       <!-- Property strip -->
       <div class="shell__strip">
@@ -43,16 +53,42 @@ interface NavGroup {
       <!-- Body: sidebar + content -->
       <div class="shell__body">
         <aside class="shell__side">
-          @for (group of navGroups; track group.group) {
-            @if (group.group) {
-              <div class="shell__side-group">{{ group.group }}</div>
+          @if (boardMode()) {
+            @for (group of boardNav(); track group.group) {
+              @if (group.group) {
+                <div class="shell__side-group">{{ group.group }}</div>
+              }
+              @for (item of group.items; track item.label) {
+                @if (!item.disabled && item.route) {
+                  <a class="shell__side-item"
+                     [routerLink]="item.route"
+                     routerLinkActive="shell__side-item--active">
+                    {{ item.label }}
+                  </a>
+                } @else {
+                  <div class="shell__side-item shell__side-item--disabled"
+                       [class.shell__side-item--locked]="item.locked"
+                       [attr.aria-disabled]="true"
+                       [attr.title]="item.locked ? 'Not available to your role' : (item.stub ? 'Coming soon' : null)">
+                    <span style="flex:1;">{{ item.label }}</span>
+                    @if (item.locked) { <span aria-hidden="true">🔒</span> }
+                    @else if (item.stub) { <span class="shell__side-soon">soon</span> }
+                  </div>
+                }
+              }
             }
-            @for (item of group.items; track item.route) {
-              <a class="shell__side-item"
-                 [routerLink]="item.route"
-                 routerLinkActive="shell__side-item--active">
-                {{ item.label }}
-              </a>
+          } @else {
+            @for (group of navGroups; track group.group) {
+              @if (group.group) {
+                <div class="shell__side-group">{{ group.group }}</div>
+              }
+              @for (item of group.items; track item.route) {
+                <a class="shell__side-item"
+                   [routerLink]="item.route"
+                   routerLinkActive="shell__side-item--active">
+                  {{ item.label }}
+                </a>
+              }
             }
           }
         </aside>
@@ -113,6 +149,16 @@ interface NavGroup {
       background: var(--paper); color: var(--ink); font-weight: 500;
       border-color: var(--ink);
     }
+    .shell__side-item--disabled {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--ink-mute); cursor: default;
+      &:hover { background: transparent; }
+    }
+    .shell__side-item--locked { color: var(--ink-mute); }
+    .shell__side-soon {
+      font-size: 9px; padding: 1px 6px; border-radius: 999px;
+      background: var(--lav-2); border: 1px solid var(--line); color: var(--ink-mute);
+    }
 
     .shell__content {
       flex: 1; overflow: auto; padding: 22px 24px;
@@ -123,9 +169,15 @@ interface NavGroup {
 export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
   private propertySvc = inject(PropertyService);
+  private boardNavSvc = inject(BoardNavigationService);
 
   user = this.auth.user;
   property = signal<Property | null>(null);
+
+  /** 025: board mode is active when the persisted last-used mode is Board (FR-022). */
+  boardMode = computed(() => this.auth.user()?.lastActiveMode === 'Board');
+  /** 025 FR-024: the board sidebar is data from the derivation service, not hand-built here. */
+  boardNav = this.boardNavSvc.nav;
 
   async ngOnInit() {
     try {

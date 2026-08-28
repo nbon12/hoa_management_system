@@ -2,6 +2,8 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { BoardNavigationService } from '../../core/services/board-navigation.service';
+import { landingTargetFor } from '../../core/services/landing';
 
 @Component({
   selector: 'app-login',
@@ -81,6 +83,7 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class LoginComponent {
   private auth   = inject(AuthService);
+  private nav    = inject(BoardNavigationService);
   private router = inject(Router);
 
   email    = '';
@@ -97,7 +100,12 @@ export class LoginComponent {
     this.error.set('');
     try {
       await this.auth.login(this.email, this.password);
-      this.router.navigate(['/app/dashboard']);
+      // 025 FR-026/FR-022: sign-in resumes the mode the user was last in — a board user
+      // lands on their community's home (or the My Communities list), a resident on the
+      // dashboard. Shared with the `/app` landing guard so the rule cannot drift.
+      const target = landingTargetFor(this.auth.user());
+      this.nav.setActiveCommunity(target.activeCommunityId);
+      this.router.navigate(target.commands);
     } catch {
       this.error.set('Invalid email or password.');
     } finally {
