@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { landingTargetFor } from '../../../core/services/landing';
-import { BoardNavigationService, RESIDENT_ROLE } from '../../../core/services/board-navigation.service';
+import { BoardNavigationService, isBoardEligible } from '../../../core/services/board-navigation.service';
 
 // 025 FR-019/FR-020: the Resident ↔ Board control. Lives in the top-bar account-controls
 // cluster to the LEFT of alerts/avatar; rendered only for a user holding ≥1 active
@@ -69,7 +69,7 @@ export class ModeToggleComponent {
 
   /** FR-020: control renders only for a user holding ≥1 active non-resident membership. */
   readonly eligible = computed(() =>
-    (this.auth.user()?.memberships ?? []).some(m => m.role !== RESIDENT_ROLE));
+    isBoardEligible(this.auth.user()?.memberships ?? []));
 
   async switch(mode: 'Resident' | 'Board'): Promise<void> {
     if (this.busy()) return;

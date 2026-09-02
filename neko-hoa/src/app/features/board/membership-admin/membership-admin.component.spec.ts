@@ -48,7 +48,14 @@ describe('MembershipAdminComponent', () => {
       imports: [MembershipAdminComponent],
       providers: [
         { provide: AuthService, useValue: { user: userSig.asReadonly() } },
-        { provide: BoardNavigationService, useValue: { activeCommunityId: signal('c1').asReadonly() } },
+        {
+          provide: BoardNavigationService,
+          useValue: {
+            activeCommunityId: signal('c1').asReadonly(),
+            // The component reads its community from the service's shared computed.
+            effectiveCommunityId: signal('c1').asReadonly(),
+          },
+        },
         { provide: BoardService, useValue: board },
       ],
     });

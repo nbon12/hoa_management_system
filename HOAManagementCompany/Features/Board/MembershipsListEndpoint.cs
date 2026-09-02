@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FastEndpoints;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -32,8 +31,7 @@ public class MembershipsListEndpoint(
         // record the access (actor, community, resource, UTC) as a sensitive event.
         logger.LogInformation(
             "BoardAssociationDataAccess: Actor={ActorId} Community={CommunityId} Resource={Resource} At={UtcNow:o}",
-            User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown",
-            req.CommunityId, "communities/memberships", DateTimeOffset.UtcNow);
+            BoardHttp.ActorId(User), req.CommunityId, "communities/memberships", DateTimeOffset.UtcNow);
 
         var (limit, offset) = Paging.Normalize(req.Limit, req.Offset);
         var baseQuery = db.CommunityMemberships.Where(m => m.CommunityId == req.CommunityId);

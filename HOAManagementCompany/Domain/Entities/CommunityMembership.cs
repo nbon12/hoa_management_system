@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using HOAManagementCompany.Domain.Enums;
 
 namespace HOAManagementCompany.Domain.Entities;
@@ -22,4 +23,17 @@ public class CommunityMembership
 
     public ApplicationUser User { get; set; } = null!;
     public Community Community { get; set; } = null!;
+
+    /// <summary>
+    /// The single definition of the effective-permission rule (data-model.md): a membership
+    /// confers permission only while it is Active, its term has not ended (open-ended, or
+    /// EndDate on/after <paramref name="today"/> UTC), and its community is itself Active —
+    /// an inactive/offboarded community confers no access to anyone (spec Edge Cases).
+    /// Returned as an <see cref="Expression"/> so EF Core translates it into SQL; callers
+    /// AND their own conditions on with additional <c>Where</c> clauses.
+    /// </summary>
+    public static Expression<Func<CommunityMembership, bool>> IsEffectiveAsOf(DateOnly today) =>
+        m => m.Status == MembershipStatus.Active
+          && (m.EndDate == null || m.EndDate >= today)
+          && m.Community.Status == CommunityStatus.Active;
 }

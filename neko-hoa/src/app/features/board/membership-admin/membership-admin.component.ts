@@ -1,6 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../../core/services/auth.service';
 import { BoardNavigationService } from '../../../core/services/board-navigation.service';
 import { BoardService, Membership } from '../../../core/services/board.service';
 
@@ -101,7 +100,6 @@ import { BoardService, Membership } from '../../../core/services/board.service';
   styles: [`.ma-error { color: var(--warn); font-size: 12px; }`]
 })
 export class MembershipAdminComponent implements OnInit {
-  private auth = inject(AuthService);
   private nav = inject(BoardNavigationService);
   private board = inject(BoardService);
 
@@ -114,12 +112,7 @@ export class MembershipAdminComponent implements OnInit {
 
   form = { userId: '', role: 'BoardMember', status: 'Active', startDate: '', endDate: '' };
 
-  readonly communityId = computed(() => {
-    const memberships = this.auth.user()?.memberships ?? [];
-    const active = this.nav.activeCommunityId();
-    if (active) return active;
-    return memberships.length ? memberships[0].communityId : null;
-  });
+  readonly communityId = this.nav.effectiveCommunityId;
 
   async ngOnInit(): Promise<void> {
     await this.reload();

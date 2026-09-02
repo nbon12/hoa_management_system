@@ -1,5 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
-import { AuthService } from '../../../core/services/auth.service';
+import { Component, inject } from '@angular/core';
 import { BoardNavigationService } from '../../../core/services/board-navigation.service';
 import { MetricsPanelComponent } from './metrics-panel.component';
 
@@ -19,13 +18,7 @@ import { MetricsPanelComponent } from './metrics-panel.component';
   `
 })
 export class BoardMetricsPageComponent {
-  private auth = inject(AuthService);
   private nav = inject(BoardNavigationService);
 
-  readonly communityId = computed(() => {
-    const memberships = this.auth.user()?.memberships ?? [];
-    const active = this.nav.activeCommunityId();
-    if (active) return active;
-    return memberships.length ? memberships[0].communityId : null;
-  });
+  readonly communityId = this.nav.effectiveCommunityId;
 }

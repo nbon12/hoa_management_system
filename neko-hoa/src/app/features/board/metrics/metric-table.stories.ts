@@ -10,17 +10,17 @@ import { MetricDescriptor } from '../../../core/services/board.service';
 
 // A community-metrics surface: values with status + emphasis + detail lines.
 const COMMUNITY_METRICS: MetricDescriptor[] = [
-  { id: 'over30', label: 'Over 30-Days Delinquent', definitionText: 'Share of homeowners more than 30 days past due.', value: '10%', detail: '37 homeowners', status: 'warn', emphasis: 'warn' },
-  { id: 'over60', label: 'Over 60-Days Delinquent', definitionText: 'Share of homeowners more than 60 days past due.', value: '4%',  detail: '15 homeowners', status: 'warn', emphasis: 'warn' },
-  { id: 'ach',    label: 'Registered ACH Owners',   definitionText: 'Owners enrolled in automatic bank draft.',       value: '60%', detail: null,           status: 'ok',   emphasis: 'ok' },
-  { id: 'reserve',label: 'Reserve Funding',         definitionText: 'Reserve balance vs. the funding target.',         value: '82%', detail: 'target 90%',   status: 'ok',   emphasis: 'none' },
+  { id: 'over30', label: 'Over 30-Days Delinquent', definitionText: 'Share of homeowners more than 30 days past due.', value: '10%', detail: '37 homeowners', status: 'Watch', emphasis: 'Highlight' },
+  { id: 'over60', label: 'Over 60-Days Delinquent', definitionText: 'Share of homeowners more than 60 days past due.', value: '4%',  detail: '15 homeowners', status: 'Watch', emphasis: 'Highlight' },
+  { id: 'ach',    label: 'Registered ACH Owners',   definitionText: 'Owners enrolled in automatic bank draft.',       value: '60%', detail: null,           status: 'Ok',    emphasis: 'Normal' },
+  { id: 'reserve',label: 'Reserve Funding',         definitionText: 'Reserve balance vs. the funding target.',         value: '82%', detail: 'target 90%',   status: 'Ok',    emphasis: 'Normal' },
 ];
 
 // A "work processed" hero surface: headline counts, no status column (showStatus off).
 const HERO_STATS: MetricDescriptor[] = [
-  { id: 'arc',      label: 'Architectural Applications', definitionText: 'ARC requests processed in the last 30 days.', value: 24,  detail: '6 pending',   status: 'ok', emphasis: 'link' },
-  { id: 'approvals',label: 'Board Approvals',            definitionText: 'Board approvals recorded in the last 30 days.', value: 11, detail: null,          status: 'ok', emphasis: 'none' },
-  { id: 'violations',label: 'Violations Opened',         definitionText: 'New violations opened in the last 30 days.',   value: 8,  detail: '3 resolved',  status: 'ok', emphasis: 'none' },
+  { id: 'arc',      label: 'Architectural Applications', definitionText: 'ARC requests processed in the last 30 days.', value: 24,  detail: '6 pending',   status: 'Ok', emphasis: 'Highlight' },
+  { id: 'approvals',label: 'Board Approvals',            definitionText: 'Board approvals recorded in the last 30 days.', value: 11, detail: null,          status: 'Ok', emphasis: 'Normal' },
+  { id: 'violations',label: 'Violations Opened',         definitionText: 'New violations opened in the last 30 days.',   value: 8,  detail: '3 resolved',  status: 'Ok', emphasis: 'Normal' },
 ];
 
 const meta: Meta<MetricTableComponent> = {
@@ -50,7 +50,7 @@ export const Empty: Story = {
 export const WithUnavailableRow: Story = {
   args: {
     rows: [
-      { id: 'broken', label: 'External Balance Feed', definitionText: 'Balance pulled from the accounting system.', value: null, detail: null, status: 'Unavailable', emphasis: 'none' },
+      { id: 'broken', label: 'External Balance Feed', definitionText: 'Balance pulled from the accounting system.', value: null, detail: null, status: 'Unavailable', emphasis: 'Normal' },
       ...COMMUNITY_METRICS,
     ],
     metricHead: 'Metric', valueHead: 'Value', showStatus: true,

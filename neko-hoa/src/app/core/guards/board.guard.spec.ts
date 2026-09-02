@@ -62,7 +62,12 @@ describe('boardGuard (US3 scenario 5 / FR-028)', () => {
         { provide: AuthService, useValue: { user: userSig.asReadonly() } },
         {
           provide: BoardNavigationService,
-          useValue: { activeCommunityId: activeCommunitySig.asReadonly() },
+          useValue: {
+            activeCommunityId: activeCommunitySig.asReadonly(),
+            // The guard delegates its role derivation to the service; wire the real
+            // implementation (a pure function of its arguments) so the stub cannot drift.
+            rolesForCommunity: BoardNavigationService.prototype.rolesForCommunity,
+          },
         },
       ],
     });

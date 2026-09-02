@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FastEndpoints;
 
 namespace HOAManagementCompany.Features.Board;
@@ -33,13 +32,28 @@ public class BoardMetricsEndpoint(
         // resource, UTC timestamp — as a structured sensitive event (constitution §7).
         logger.LogInformation(
             "BoardAssociationDataAccess: Actor={ActorId} Community={CommunityId} Resource={Resource} At={UtcNow:o}",
-            ActorId(), req.CommunityId, $"board/metrics/{req.Surface}", DateTimeOffset.UtcNow);
+            BoardHttp.ActorId(User), req.CommunityId, $"board/metrics/{req.Surface}", DateTimeOffset.UtcNow);
+
+        // CommunityCapability is a small fixed enum, so many descriptors on a surface share
+        // one required capability. Resolve each capability at most once per request; the gate
+        // above already answered ViewAssociationData (it returned 403 when false), so seed it.
+        var allowedByCapability = new Dictionary<CommunityCapability, bool>
+        {
+            [CommunityCapability.ViewAssociationData] = true
+        };
 
         var rows = new List<MetricRowDto>();
         foreach (var d in registry.Where(d => d.Surface == req.Surface))
         {
             // FR-035: silently omit descriptors the caller lacks the capability for.
-            if (!await scope.CanAccessAsync(User, req.CommunityId, d.RequiredCapability, ct))
+            // Still evaluated per descriptor — only the repeat DB round trip is avoided.
+            if (!allowedByCapability.TryGetValue(d.RequiredCapability, out var allowed))
+            {
+                allowed = await scope.CanAccessAsync(User, req.CommunityId, d.RequiredCapability, ct);
+                allowedByCapability[d.RequiredCapability] = allowed;
+            }
+
+            if (!allowed)
                 continue;
 
             MetricValue value;
@@ -63,7 +77,4 @@ public class BoardMetricsEndpoint(
         var page = rows.Skip(offset).Take(limit).ToList();
         await SendOkAsync(new PagedResponse<MetricRowDto>(page, rows.Count, limit, offset), ct);
     }
-
-    private string ActorId() =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown";
 }

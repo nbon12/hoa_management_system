@@ -9,6 +9,15 @@ import { CommunityMembershipSummary } from '../models';
 /** Backend `CommunityRole` names (data-model.md). `Resident` confers no board capability. */
 export const RESIDENT_ROLE = 'Resident';
 
+/**
+ * Board eligibility: the user holds at least one active non-resident membership. The single
+ * rule behind the mode toggle (FR-020), the landing decision (FR-026) and `boardGuard`
+ * (FR-028), so those three can never disagree about who is a board user.
+ */
+export function isBoardEligible(memberships: CommunityMembershipSummary[]): boolean {
+  return memberships.some(m => m.role !== RESIDENT_ROLE);
+}
+
 /** A single sidebar entry, already resolved for the acting user's role set. */
 export interface BoardNavItem {
   label: string;
@@ -87,6 +96,20 @@ export class BoardNavigationService {
   /** Distinct communities the user holds an active membership in (FR-025). */
   readonly communityCount = computed(() => this.distinctCommunityIds(this.memberships()).length);
 
+  /**
+   * The community a board *page* should load data for: the explicitly selected one, or —
+   * before anything is selected — the user's first membership so the page has something to
+   * query. Deliberately looser than the `nav` fallback below, which only assumes a community
+   * when the user has exactly one; a multi-community user landing here is corrected as soon
+   * as they pick from My Communities.
+   */
+  readonly effectiveCommunityId = computed<string | null>(() => {
+    const memberships = this.memberships();
+    const active = this._activeCommunityId();
+    if (active) return active;
+    return memberships.length ? memberships[0].communityId : null;
+  });
+
   /** The nav set for the current user + active community, ready to render. */
   readonly nav = computed<BoardNavGroup[]>(() => {
     const memberships = this.memberships();
@@ -109,8 +132,11 @@ export class BoardNavigationService {
    * The union of the user's active roles in the given community (Clarifications 2026-08-23).
    * When no community is selected, unions roles across every membership so a multi-community
    * user still sees a sensible superset until they pick one.
+   *
+   * Public because `boardGuard` scopes its role check the same way — one derivation, so the
+   * guard and the sidebar cannot disagree about which roles are in play.
    */
-  private rolesForCommunity(memberships: CommunityMembershipSummary[], communityId: string | null): string[] {
+  rolesForCommunity(memberships: CommunityMembershipSummary[], communityId: string | null): string[] {
     const relevant = communityId
       ? memberships.filter(m => m.communityId === communityId)
       : memberships;

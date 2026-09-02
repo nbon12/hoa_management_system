@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FastEndpoints;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Auth;
@@ -70,7 +69,7 @@ public class MembershipUpdateEndpoint(
 
             logger.LogInformation(
                 "BoardMembershipChange edit: Actor={ActorId} Community={CommunityId} Membership={MembershipId} TargetUser={TargetUserId} Role={Role} Status={Status} EndDate={EndDate} At={UtcNow:o}",
-                ActorId(), req.CommunityId, m.Id, m.UserId, m.Role, m.Status, m.EndDate, DateTimeOffset.UtcNow);
+                BoardHttp.ActorId(User), req.CommunityId, m.Id, m.UserId, m.Role, m.Status, m.EndDate, DateTimeOffset.UtcNow);
 
             await SendOkAsync(new MembershipDto(
                 m.Id, m.UserId, m.User.FirstName + " " + m.User.LastName, m.Role.ToString(),
@@ -82,7 +81,4 @@ public class MembershipUpdateEndpoint(
             await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
         }
     }
-
-    private string ActorId() =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown";
 }

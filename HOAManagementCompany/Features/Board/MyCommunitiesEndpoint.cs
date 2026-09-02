@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using FastEndpoints;
-using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,10 +28,8 @@ public class MyCommunitiesEndpoint(ApplicationDbContext db)
         var (limit, offset) = Paging.Normalize(req.Limit, req.Offset);
 
         var rows = await db.CommunityMemberships
-            .Where(m => m.UserId == userId
-                     && m.Status == MembershipStatus.Active
-                     && (m.EndDate == null || m.EndDate >= today)
-                     && m.Community.Status == CommunityStatus.Active)
+            .Where(CommunityMembership.IsEffectiveAsOf(today))
+            .Where(m => m.UserId == userId)
             .Select(m => new { m.CommunityId, m.Community.CommunityName, m.Role, m.Community.Status })
             .ToListAsync(ct);
 

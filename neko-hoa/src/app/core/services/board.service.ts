@@ -43,6 +43,15 @@ export interface UpdateMembershipRequest {
   endDate?: string | null;
 }
 
+/**
+ * Wire values of the backend `MetricStatus` enum (`Features/Board/MetricDescriptor.cs`),
+ * serialized with `.ToString()` by `BoardMetricsEndpoint` — so these names are exact.
+ */
+export type MetricStatus = 'Ok' | 'Watch' | 'Unavailable';
+
+/** Wire values of the backend `MetricEmphasis` enum, likewise serialized by name. */
+export type MetricEmphasis = 'Normal' | 'Highlight';
+
 /** Registry-driven metric row (FR-029). Mirrors the backend `MetricDescriptor` projection. */
 export interface MetricDescriptor {
   id: string;
@@ -50,8 +59,8 @@ export interface MetricDescriptor {
   definitionText: string;
   value: string | number | null;
   detail?: string | null;
-  status: string;      // e.g. 'ok' | 'warn' | 'Unavailable'
-  emphasis: string;    // e.g. 'link' | 'warn' | 'ok' | 'none'
+  status: MetricStatus;
+  emphasis: MetricEmphasis;
 }
 
 @Injectable({ providedIn: 'root' })

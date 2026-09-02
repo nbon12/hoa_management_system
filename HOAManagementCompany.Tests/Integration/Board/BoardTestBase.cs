@@ -5,6 +5,7 @@ using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
+using HOAManagementCompany.Tests.Factories;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,13 +62,15 @@ public abstract class BoardTestBase(TestDatabaseFixture fixture) : IntegrationTe
         var user = NewUser(userId, email);
         db.Users.Add(user);
 
-        var propertyId = Guid.NewGuid();
-        db.Properties.Add(NewProperty(propertyId, communityId));
+        // Account number carries the isolation guarantee (it is uniquely indexed, and
+        // ResidentScopeUnchangedTests distinguishes properties by it), so keep it per-row unique.
+        var property = PropertyFactory.Create(communityId, $"BT-{Guid.NewGuid():N}");
+        db.Properties.Add(property);
         await db.SaveChangesAsync();
 
-        db.UserProperties.Add(new UserProperty { Id = Guid.NewGuid(), UserId = userId, PropertyId = propertyId });
+        db.UserProperties.Add(new UserProperty { Id = Guid.NewGuid(), UserId = userId, PropertyId = property.Id });
         await db.SaveChangesAsync();
-        return (userId, email, propertyId);
+        return (userId, email, property.Id);
     }
 
     /// <summary>Creates a user with NO property link (cannot log in; used for resolver-only tests).</summary>
@@ -138,26 +141,4 @@ public abstract class BoardTestBase(TestDatabaseFixture fixture) : IntegrationTe
         user.PasswordHash = new PasswordHasher<ApplicationUser>().HashPassword(user, Password);
         return user;
     }
-
-    private static Domain.Entities.Property NewProperty(Guid id, Guid communityId) => new()
-    {
-        Id = id,
-        AccountNumber = $"BT-{id:N}",
-        CommunityId = communityId,
-        Address = "1 Test Lane",
-        City = "San Jose",
-        State = "CA",
-        Zip = "95101",
-        Lot = "T1",
-        Section = "1",
-        FiscalYear = 2026,
-        YearBuilt = 2005,
-        Status = "active",
-        MonthlyAssessment = 250m,
-        AnnualAssessment = 3000m,
-        AssessmentDueDay = 1,
-        LateFeeAmount = 50m,
-        LateFeeGraceDays = 15,
-        FinanceChargeRate = 0.015m,
-    };
 }

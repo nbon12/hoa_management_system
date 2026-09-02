@@ -3,9 +3,9 @@ import { GlossaryPanelComponent } from './glossary-panel.component';
 import { MetricDescriptor } from '../../../core/services/board.service';
 
 const DESCRIPTORS: MetricDescriptor[] = [
-  { id: 'over30', label: 'Over 30-Days Delinquent', definitionText: 'Share unpaid > 30 days.', value: '10%', status: 'warn', emphasis: 'warn' },
-  { id: 'over60', label: 'Over 60-Days Delinquent', definitionText: 'Unpaid > 60 days.',       value: '8%',  status: 'warn', emphasis: 'warn' },
-  { id: 'ach',    label: 'Registered ACH Owners',   definitionText: 'Owners paying by draft.', value: '60%', status: 'ok',   emphasis: 'ok' },
+  { id: 'over30', label: 'Over 30-Days Delinquent', definitionText: 'Share unpaid > 30 days.', value: '10%', status: 'Watch', emphasis: 'Highlight' },
+  { id: 'over60', label: 'Over 60-Days Delinquent', definitionText: 'Unpaid > 60 days.',       value: '8%',  status: 'Watch', emphasis: 'Highlight' },
+  { id: 'ach',    label: 'Registered ACH Owners',   definitionText: 'Owners paying by draft.', value: '60%', status: 'Ok',    emphasis: 'Normal' },
 ];
 
 describe('GlossaryPanelComponent', () => {

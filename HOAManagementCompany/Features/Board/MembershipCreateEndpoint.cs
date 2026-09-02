@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FastEndpoints;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
@@ -38,7 +37,15 @@ public class MembershipCreateEndpoint(
                 throw new DomainException("VALIDATION_ERROR", "Role must not be Resident.", 422);
             if (req.EndDate is { } end && end < req.StartDate)
                 throw new DomainException("VALIDATION_ERROR", "End date cannot precede start date.", 422);
-            if (!await db.Users.AnyAsync(u => u.Id == req.UserId, ct))
+            // One round trip does double duty: the display name for the response, and —
+            // when no row comes back — the "unknown user" rejection, in its original
+            // position in the validation order. This relies on FirstName/LastName being
+            // NOT NULL (both are IsRequired): the projection concatenates them without a
+            // COALESCE, so a nullable name column would make an existing user's name come
+            // back null and be misreported as "Unknown user."
+            var name = await db.Users.Where(u => u.Id == req.UserId)
+                .Select(u => u.FirstName + " " + u.LastName).FirstOrDefaultAsync(ct);
+            if (name is null)
                 throw new DomainException("VALIDATION_ERROR", "Unknown user.", 422);
             if (await db.CommunityMemberships.AnyAsync(
                     m => m.UserId == req.UserId && m.CommunityId == req.CommunityId && m.Role == req.Role, ct))
@@ -59,10 +66,8 @@ public class MembershipCreateEndpoint(
             // FR-042 / §7 sensitive event.
             logger.LogInformation(
                 "BoardMembershipChange grant: Actor={ActorId} Community={CommunityId} TargetUser={TargetUserId} Role={Role} At={UtcNow:o}",
-                ActorId(), req.CommunityId, req.UserId, req.Role, DateTimeOffset.UtcNow);
+                BoardHttp.ActorId(User), req.CommunityId, req.UserId, req.Role, DateTimeOffset.UtcNow);
 
-            var name = await db.Users.Where(u => u.Id == req.UserId)
-                .Select(u => u.FirstName + " " + u.LastName).FirstAsync(ct);
             await SendAsync(new MembershipDto(
                 membership.Id, membership.UserId, name, membership.Role.ToString(),
                 membership.Status.ToString(), membership.StartDate, membership.EndDate), 201, ct);
@@ -73,7 +78,4 @@ public class MembershipCreateEndpoint(
             await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
         }
     }
-
-    private string ActorId() =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown";
 }

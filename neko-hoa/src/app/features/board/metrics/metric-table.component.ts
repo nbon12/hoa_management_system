@@ -5,7 +5,8 @@ import { MetricDescriptor } from '../../../core/services/board.service';
 // descriptors. The help affordance is the right-most column of every row (FR-032). An
 // empty descriptor list renders an explicit empty state, not a headers-only table; a
 // descriptor whose status is 'Unavailable' renders an explicit per-row unavailable state
-// without blanking its siblings (FR-036).
+// without blanking its siblings (FR-036). Status and emphasis are compared against the
+// backend enum names exactly as serialized (`MetricStatus` / `MetricEmphasis`).
 @Component({
   selector: 'app-metric-table',
   standalone: true,
@@ -34,9 +35,9 @@ import { MetricDescriptor } from '../../../core/services/board.service';
                 <td>
                   @if (isUnavailable(m)) {
                     <span class="pill pill--warn">unavailable</span>
-                  } @else if (m.status === 'ok') {
+                  } @else if (m.status === 'Ok') {
                     <span style="color:var(--ok);font-weight:600;">✓</span>
-                  } @else if (m.status === 'warn') {
+                  } @else if (m.status === 'Watch') {
                     <span class="pill pill--warn">watch</span>
                   } @else {
                     <span style="color:var(--ink-mute);">—</span>
@@ -47,8 +48,8 @@ import { MetricDescriptor } from '../../../core/services/board.service';
                 @if (isUnavailable(m)) {
                   <span style="color:var(--ink-mute);">unavailable</span>
                 } @else {
-                  <span [style.color]="m.emphasis === 'link' ? 'var(--rose)' : 'var(--ink)'"
-                        [style.font-weight]="m.emphasis === 'warn' ? 600 : 400">{{ m.value }}</span>
+                  <span [style.color]="m.emphasis === 'Highlight' ? 'var(--rose)' : 'var(--ink)'"
+                        [style.font-weight]="m.emphasis === 'Highlight' ? 600 : 400">{{ m.value }}</span>
                   @if (m.detail) { <div class="muted" style="font-size:10.5px;">{{ m.detail }}</div> }
                 }
               </td>

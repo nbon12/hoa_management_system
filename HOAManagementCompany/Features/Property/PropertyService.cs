@@ -14,26 +14,23 @@ public class PropertyService(ApplicationDbContext db)
 {
     public async Task<PropertyDto> GetPropertyAsync(Guid propertyId, CancellationToken ct = default)
     {
-        var p = await db.Properties.Include(x => x.Community).FirstOrDefaultAsync(x => x.Id == propertyId, ct)
-            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
-        return MapProperty(p);
+        var row = await FetchPropertyAsync(propertyId, ct);
+        return MapProperty(row.Property, row.CommunityName);
     }
 
     public async Task<OwnerDto> GetOwnerAsync(Guid propertyId, CancellationToken ct = default)
     {
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct)
             ?? throw new DomainException("NOT_FOUND", "Owner not found.", 404);
-        var property = await db.Properties.Include(x => x.Community).FirstOrDefaultAsync(x => x.Id == propertyId, ct)
-            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
-        return MapOwner(owner, property);
+        var row = await FetchPropertyAsync(propertyId, ct);
+        return MapOwner(owner, row.Property, row.CommunityName);
     }
 
     public async Task<OwnerDto> PatchOwnerAsync(Guid propertyId, OwnerPatchRequest req, CancellationToken ct = default)
     {
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct)
             ?? throw new DomainException("NOT_FOUND", "Owner not found.", 404);
-        var property = await db.Properties.Include(x => x.Community).FirstOrDefaultAsync(x => x.Id == propertyId, ct)
-            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
+        var row = await FetchPropertyAsync(propertyId, ct);
 
         var mailingChanged = req.MailingAddress is not null && req.MailingAddress != owner.MailingAddress;
 
@@ -58,7 +55,7 @@ public class PropertyService(ApplicationDbContext db)
             });
 
         await db.SaveChangesAsync(ct);
-        return MapOwner(owner, property);
+        return MapOwner(owner, row.Property, row.CommunityName);
     }
 
     public async Task<IEnumerable<AddressHistoryDto>> GetAddressHistoryAsync(Guid propertyId, CancellationToken ct = default)
@@ -88,11 +85,24 @@ public class PropertyService(ApplicationDbContext db)
         return new DirectoryFieldDto(field.Id, field.FieldKey, field.Label, field.Shared);
     }
 
-    private static PropertyDto MapProperty(Domain.Entities.Property p) => new(p.Id, p.AccountNumber, p.CommunityId.ToString(), p.Community.CommunityName, p.Address, p.City, p.State, p.Zip, p.Lot, p.Phase, p.Section, p.Block, p.FiscalYear, p.YearBuilt, p.Status, p.MonthlyAssessment, p.AnnualAssessment, p.AssessmentDueDay, p.LateFeeAmount, p.LateFeeGraceDays, p.FinanceChargeRate);
+    // The community name is the only field either mapper reads off the Community, so it is
+    // fetched as a single joined column instead of materializing the whole related entity.
+    private async Task<(Domain.Entities.Property Property, string CommunityName)> FetchPropertyAsync(
+        Guid propertyId, CancellationToken ct)
+    {
+        var row = await db.Properties
+            .Where(x => x.Id == propertyId)
+            .Select(x => new { Property = x, x.Community.CommunityName })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new DomainException("NOT_FOUND", "Property not found.", 404);
+        return (row.Property, row.CommunityName);
+    }
 
-    private static OwnerDto MapOwner(Owner o, Domain.Entities.Property p) => new(
+    private static PropertyDto MapProperty(Domain.Entities.Property p, string communityName) => new(p.Id, p.AccountNumber, p.CommunityId.ToString(), communityName, p.Address, p.City, p.State, p.Zip, p.Lot, p.Phase, p.Section, p.Block, p.FiscalYear, p.YearBuilt, p.Status, p.MonthlyAssessment, p.AnnualAssessment, p.AssessmentDueDay, p.LateFeeAmount, p.LateFeeGraceDays, p.FinanceChargeRate);
+
+    private static OwnerDto MapOwner(Owner o, Domain.Entities.Property p, string communityName) => new(
         o.Id, o.FirstName, o.LastName, o.OwnerName2, o.Email, o.Phone,
         o.MailingToProperty, o.MailingAddress, o.PaperlessStatements, o.SmsReminders, o.VotingRights,
-        p.AccountNumber, p.Community.CommunityName, $"{p.Address}, {p.City}, {p.State} {p.Zip}",
+        p.AccountNumber, communityName, $"{p.Address}, {p.City}, {p.State} {p.Zip}",
         p.CreatedAt.ToString("yyyy-MM-dd"));
 }
