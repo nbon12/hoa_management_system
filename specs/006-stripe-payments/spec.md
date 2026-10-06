@@ -572,7 +572,7 @@ masked content; confirm no alert is sent when the resident has not opted in.
 
 ## Assumptions
 
-- Stripe is the payment processor and Twilio (SMS) + Twilio SendGrid (email) are the alert
+- Stripe is the payment processor and Twilio (SMS) + Amazon SES (email; replaced SendGrid per spec 026) are the alert
   providers, per the tech-stack direction; secret keys and signing secrets are supplied via
   configuration and not committed.
 - ACH/bank collection uses the processor's hosted bank-collection flow (manual entry or
