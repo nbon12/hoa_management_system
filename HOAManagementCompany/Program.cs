@@ -191,8 +191,8 @@ builder.Services.AddValidatedOptions<RefreshCookieOptions, RefreshCookieOptionsV
     builder.Configuration, RefreshCookieOptions.SectionName);
 builder.Services.AddValidatedOptions<TwilioOptions, TwilioOptionsValidator>(
     builder.Configuration, TwilioOptions.SectionName);
-builder.Services.AddValidatedOptions<SendGridOptions, SendGridOptionsValidator>(
-    builder.Configuration, SendGridOptions.SectionName);
+builder.Services.AddValidatedOptions<SesOptions, SesOptionsValidator>(
+    builder.Configuration, SesOptions.SectionName);
 builder.Services.AddValidatedOptions<ObservabilityOptions, ObservabilityOptionsValidator>(
     builder.Configuration, ObservabilityOptions.SectionName);
 builder.Services.AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsValidator>(
@@ -341,8 +341,8 @@ if (startupOptions.EnableSwagger)
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.AuthService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.EmailVerificationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Auth.ClaimCodeService>();
-// Verification/claim-code delivery: SendGrid email when configured, otherwise audit-log only
-// (local dev / CI, where no SendGrid credentials exist). When e2e test support is enabled
+// Verification/claim-code delivery: SES email when configured, otherwise audit-log only
+// (local dev / CI, where no SES credentials exist). When e2e test support is enabled
 // (Dev/PR/Test — never Production/Staging), the notifier is decorated so delivered codes are
 // also captured in the in-memory AuthCodeVault for the gated /e2e/auth-codes seam (020-D FR-D11).
 builder.Services.AddSingleton<HOAManagementCompany.Features.DevTools.AuthCodeVault>();
@@ -384,10 +384,12 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Statements.Sta
 // US3 failure alerts (006-stripe-payments): transactional outbox + opt-in alerting.
 builder.Services.AddMetrics(); // ensures IMeterFactory is available for PaymentMetrics.
 builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Observability.PaymentMetrics>();
+builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.Alerts.ISesClientFactory,
+    HOAManagementCompany.Infrastructure.Payments.Alerts.SesClientFactory>();
 builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.Alerts.IAlertProvider,
     HOAManagementCompany.Infrastructure.Payments.Alerts.TwilioSmsProvider>();
 builder.Services.AddSingleton<HOAManagementCompany.Infrastructure.Payments.Alerts.IAlertProvider,
-    HOAManagementCompany.Infrastructure.Payments.Alerts.SendGridEmailProvider>();
+    HOAManagementCompany.Infrastructure.Payments.Alerts.SesEmailProvider>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Alerts.AlertService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Alerts.OutboxDispatcher>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.PropertyService>();

@@ -46,9 +46,11 @@ public class StartupValidationTests
         // Explicitly blank the optional alert providers so a developer-local
         // appsettings.Secrets.json can't complete a deliberately-partial config
         // and mask the abort-on-startup behavior under test.
-        ["SendGrid:ApiKey"] = "",
-        ["SendGrid:FromEmail"] = "",
-        ["SendGrid:FromName"] = "",
+        ["Ses:Region"] = "",
+        ["Ses:FromEmail"] = "",
+        ["Ses:FromName"] = "",
+        ["Ses:AccessKeyId"] = "",
+        ["Ses:SecretAccessKey"] = "",
         ["Twilio:AccountSid"] = "",
         ["Twilio:ApiKeySid"] = "",
         ["Twilio:ApiKeySecret"] = "",
@@ -131,11 +133,39 @@ public class StartupValidationTests
         Assert.Contains(ex.Failures, f => f.Contains("Twilio", StringComparison.OrdinalIgnoreCase));
     }
 
+    // ── 026 US3: SES email configuration ───────────────────────────────────────────────────
+
     [Fact]
-    public void PartiallyConfiguredSendGrid_AbortsStartup()
+    public void PartiallyConfiguredSes_AbortsStartup()
     {
-        var ex = AssertStartupThrows(new Dictionary<string, string?> { ["SendGrid:ApiKey"] = "SG.test" });
-        Assert.Contains(ex.Failures, f => f.Contains("SendGrid", StringComparison.OrdinalIgnoreCase));
+        // Region set but no sender → would fail at send time.
+        var ex = AssertStartupThrows(new Dictionary<string, string?> { ["Ses:Region"] = "us-east-1" });
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:FromEmail is required", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void InvalidSesSender_AbortsStartup()
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?>
+        {
+            ["Ses:Region"] = "us-east-1",
+            ["Ses:FromEmail"] = "not-an-email",
+        });
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:FromEmail must be a valid email address", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UnpairedSesCredentials_AbortStartup_WithoutEchoingTheKey()
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?>
+        {
+            ["Ses:Region"] = "us-east-1",
+            ["Ses:FromEmail"] = "no-reply@mail.nekohoa.com",
+            ["Ses:AccessKeyId"] = "AKIASECRETVALUE1",
+        });
+        var combined = string.Join("\n", ex.Failures);
+        Assert.Contains("must be set together", combined);
+        Assert.DoesNotContain("AKIASECRETVALUE1", combined);
     }
 
     // ── FR-019: failure messages never echo secret values ──────────────────────────────────

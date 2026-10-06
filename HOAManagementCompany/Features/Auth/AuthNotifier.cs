@@ -9,7 +9,7 @@ public interface IAuthNotifier
     Task SendClaimCodeAsync(string contact, string code, CancellationToken ct = default);
 }
 
-// Email delivery via the SendGrid alert provider. Delivery failures are logged (code withheld)
+// Email delivery via the SES alert provider. Delivery failures are logged (code withheld)
 // and swallowed: verification/claim endpoints must return uniform responses regardless of
 // delivery outcome (FR-A1), so an SMTP-level failure can never become an enumeration oracle.
 public sealed class EmailAuthNotifier(

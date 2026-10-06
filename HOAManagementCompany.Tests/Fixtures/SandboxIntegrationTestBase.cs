@@ -38,11 +38,13 @@ public abstract class SandboxIntegrationTestBase : IntegrationTestBase
             ["Stripe:SecretKey"] = Env("Stripe__SecretKey"),
             ["Stripe:WebhookSigningSecret"] = Env("Stripe__WebhookSigningSecret"),
 
-            ["SendGrid:ApiKey"] = Env("SendGrid__ApiKey"),
-            ["SendGrid:FromEmail"] = Env("SendGrid__FromEmail"),
-            ["SendGrid:FromName"] = "NekoHOA Sandbox",
-            // Default sandbox ON — the sole no-deliver guardrail for email.
-            ["SendGrid:Sandbox"] = Env("SendGrid__Sandbox") ?? "true",
+            ["Ses:Region"] = Env("Ses__Region"),
+            ["Ses:FromEmail"] = Env("Ses__FromEmail"),
+            ["Ses:AccessKeyId"] = Env("Ses__AccessKeyId"),
+            ["Ses:SecretAccessKey"] = Env("Ses__SecretAccessKey"),
+            ["Ses:FromName"] = "NekoHOA Sandbox",
+            // Default SimulatorOnly ON — the sole no-deliver guardrail for email.
+            ["Ses:SimulatorOnly"] = Env("Ses__SimulatorOnly") ?? "true",
 
             ["Twilio:AccountSid"] = Env("Twilio__AccountSid"),
             ["Twilio:AuthToken"] = Env("Twilio__AuthToken"),
@@ -73,15 +75,20 @@ public abstract class SandboxIntegrationTestBase : IntegrationTestBase
             "Stripe webhook signing secret not configured");
     }
 
-    /// <summary>FR-009: SendGrid keys have no test/live form — sandbox mode is the only guardrail.</summary>
-    protected void RequireSendGrid()
+    /// <summary>
+    /// 026 FR-006/FR-012: skip when SES isn't configured. SES keys have no test/live form, so
+    /// <c>Ses:SimulatorOnly</c> (recipients limited to the SES mailbox simulator) is the only guardrail.
+    /// </summary>
+    protected void RequireSes()
     {
-        Skip.If(string.IsNullOrWhiteSpace(Config["SendGrid:ApiKey"])
-                || string.IsNullOrWhiteSpace(Config["SendGrid:FromEmail"]),
-            "SendGrid not configured");
-        if (!Config.GetValue<bool>("SendGrid:Sandbox"))
+        Skip.If(string.IsNullOrWhiteSpace(Config["Ses:Region"])
+                || string.IsNullOrWhiteSpace(Config["Ses:FromEmail"])
+                || string.IsNullOrWhiteSpace(Config["Ses:AccessKeyId"])
+                || string.IsNullOrWhiteSpace(Config["Ses:SecretAccessKey"]),
+            "SES not configured");
+        if (!Config.GetValue<bool>("Ses:SimulatorOnly"))
             throw new InvalidOperationException(
-                "Refusing to send: SendGrid:Sandbox must be true in Stage 2 (sole no-deliver guardrail).");
+                "Refusing to send: Ses:SimulatorOnly must be true in Stage 2 (sole no-deliver guardrail).");
     }
 
     /// <summary>FR-009: Twilio test SIDs look like live SIDs, so require an explicit acknowledgement.</summary>
