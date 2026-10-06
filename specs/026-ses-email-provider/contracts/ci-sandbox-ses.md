@@ -45,7 +45,10 @@ Each test calls `RequireSes()` first.
 | `Simulator_success_send_is_accepted` | send to `success@simulator.amazonses.com` through the DI email provider | `SkipIfUnavailable`; `Success == true`; `ProviderMessageId` not empty | US1-1, FR-011a |
 | `Malformed_sender_is_reported_as_a_handled_failure` | provider built with `FromEmail = "not-a-valid-email-address"`, real keys, `SimulatorOnly = true`; send to the success simulator | `SkipIfUnavailable`; `Success == false`; `Error` starts with `SES rejected:` | US1-2, FR-011b |
 | `Guard_refuses_real_recipient_without_calling_ses` | send to `resident@nekohoa.dev` through the DI provider | `Success == false`; `Error` mentions `SimulatorOnly` | US2-1, FR-011c |
+| `Invalid_credentials_are_a_rejection_not_an_outage` | provider built with bogus keys plus the real region and sender | `Success == false`; `Error` starts with `SES rejected:` (no `SkipIfUnavailable`) | US1-4, FR-012 |
 | `Bounce_simulator_send_is_accepted` | send to `bounce@simulator.amazonses.com` | `SkipIfUnavailable`; `Success == true` (bounce is asynchronous; see the Edge Cases) | Edge case |
+
+Harness behavior (missing secret skips; guard off hard-fails) is covered by `SesHarnessTests.cs`, which has **no** `Sandbox` trait and so runs in the PR `test` job (US1-3, US2-3).
 
 ## README: `HOAManagementCompany.Tests/Integration/Sandbox/README.md`
 

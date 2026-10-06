@@ -106,7 +106,8 @@ HOAManagementCompany.Tests/
 │   ├── SandboxResult.cs                                # + SkipIfUnavailable; doc comment
 │   └── AlertTestBase.cs                                # doc comment: SendGrid → SES
 ├── Unit/
-│   ├── Configuration/TwilioSendGridOptionsValidatorTests.cs  # RENAME → TwilioSesOptionsValidatorTests.cs; SES theory
+│   ├── Configuration/TwilioSendGridOptionsValidatorTests.cs  # RENAME → TwilioOptionsValidatorTests.cs (SendGrid theory removed)
+│   ├── Configuration/SesOptionsValidatorTests.cs       # NEW
 │   └── Alerts/
 │       ├── SimulatorRecipientGuardTests.cs             # NEW
 │       ├── SesErrorMapperTests.cs                      # NEW
@@ -116,6 +117,7 @@ HOAManagementCompany.Tests/
     └── Sandbox/
         ├── SendGridSandboxTests.cs                     # DELETE
         ├── SesSandboxTests.cs                          # NEW
+        ├── SesHarnessTests.cs                          # NEW (no Sandbox trait; skip + guard-off harness checks)
         └── README.md                                   # SES invariant + quickstart link
 
 .github/workflows/test.yml                              # integration-sandbox env: SendGrid__* → Ses__*; comment
