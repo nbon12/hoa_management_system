@@ -12,9 +12,13 @@ public class SesHarnessUnconfiguredTests(TestDatabaseFixture fixture) : SandboxI
 {
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
         base.ExtraConfiguration()
-            .Where(kv => !kv.Key.StartsWith("Ses:", StringComparison.Ordinal))
+            // Drop Ses:* and Twilio:* — the base defaults Twilio:FromNumber, which without Twilio
+            // secrets (the PR job) would leave Twilio half-configured and abort host startup.
+            .Where(kv => !kv.Key.StartsWith("Ses:", StringComparison.Ordinal)
+                         && !kv.Key.StartsWith("Twilio:", StringComparison.Ordinal))
             .Concat(new Dictionary<string, string?>
             {
+                ["Twilio:FromNumber"] = "",
                 ["Ses:Region"] = "",
                 ["Ses:FromEmail"] = "",
                 ["Ses:AccessKeyId"] = "",
@@ -36,9 +40,13 @@ public class SesHarnessGuardOffTests(TestDatabaseFixture fixture) : SandboxInteg
 {
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
         base.ExtraConfiguration()
-            .Where(kv => !kv.Key.StartsWith("Ses:", StringComparison.Ordinal))
+            // Drop Ses:* and Twilio:* — the base defaults Twilio:FromNumber, which without Twilio
+            // secrets (the PR job) would leave Twilio half-configured and abort host startup.
+            .Where(kv => !kv.Key.StartsWith("Ses:", StringComparison.Ordinal)
+                         && !kv.Key.StartsWith("Twilio:", StringComparison.Ordinal))
             .Concat(new Dictionary<string, string?>
             {
+                ["Twilio:FromNumber"] = "",
                 ["Ses:Region"] = "us-east-1",
                 ["Ses:FromEmail"] = "no-reply@mail.nekohoa.com",
                 ["Ses:AccessKeyId"] = "test-access-key-id",

@@ -143,7 +143,7 @@ Passed (not Skipped), a green `integration-sandbox` job, and `docker-push` and `
   - `Bounce_simulator_send_is_accepted`: target `bounce@simulator.amazonses.com`; assert `Success` (the bounce arrives asynchronously; spec Edge Cases).
 - [X] T016 [P] [US1] Create `HOAManagementCompany.Tests/Integration/Sandbox/SesHarnessTests.cs`. **No** `Sandbox` trait, so it runs in the PR `test` job. Add a nested class deriving `SandboxIntegrationTestBase` that overrides `ExtraConfiguration()` to return the base entries with `Ses:Region`, `Ses:FromEmail`, `Ses:AccessKeyId` and `Ses:SecretAccessKey` set to `""`. Add a `[Fact]` asserting `Assert.Throws<SkipException>(() => RequireSes())`, which proves a missing secret skips instead of failing (US1-3, FR-012). Expose `RequireSes` through a public wrapper on the nested class.
 - [X] T017 [US1] In `.github/workflows/test.yml`, job `integration-sandbox`, step "Sandbox integration tests", add `Ses__Region: ${{ secrets.SES_REGION }}`, `Ses__FromEmail: ${{ secrets.SES_FROM_EMAIL }}`, `Ses__AccessKeyId: ${{ secrets.SES_ACCESS_KEY_ID }}`, `Ses__SecretAccessKey: ${{ secrets.SES_SECRET_ACCESS_KEY }}` and `Ses__SimulatorOnly: 'true'` to `env:`. Don't use the `AWS_*` names (research R8). Leave the `SendGrid__*` lines for T032.
-- [ ] T018 [US1] Run `dotnet build` and `dotnet test --filter "Category!=Sandbox"` from the repo root; all tests pass. If SES credentials are available locally (quickstart.md "Local run"), also run `dotnet test --filter "FullyQualifiedName~SesSandboxTests"` and confirm 4 Passed. Otherwise confirm they report Skipped "SES not configured".
+- [X] T018 [US1] Run `dotnet build` and `dotnet test --filter "Category!=Sandbox"` from the repo root; all tests pass. If SES credentials are available locally (quickstart.md "Local run"), also run `dotnet test --filter "FullyQualifiedName~SesSandboxTests"` and confirm 4 Passed. Otherwise confirm they report Skipped "SES not configured".
 
 **Checkpoint**: The email channel runs on SES, the sandbox suite exercises the real SES API, and CI is wired to the new secrets.
 
@@ -221,7 +221,7 @@ with credentials present throws `InvalidOperationException`.
   - In `specs/006-stripe-payments/spec.md` (around line 575), change "Twilio (SMS) + Twilio SendGrid (email)" to "Twilio (SMS) + Amazon SES (email; superseded SendGrid per spec 026)".
   - In `specs/007-integration-ci-tests/spec.md`, change every reference to SendGrid credentials or SendGrid sandbox mode (Input line, Clarifications line 15, and any FR/SC/story text found with `grep -n -i sendgrid`) to SES / the SES mailbox simulator, with "(superseded by 026)" noted once.
   - In `specs/013-ephemeral-pr-envs/spec.md` (lines around 25, 89 and 111), change "SendGrid sandbox" to "SES mailbox simulator (spec 026)".
-- [ ] T036 [US4] Verify removal (SC-006). `grep -rni sendgrid HOAManagementCompany HOAManagementCompany.Tests .github --include=*.cs --include=*.csproj --include=*.json --include=*.yml --include=*.md` must return nothing (excluding `bin/` and `obj/`). Then run `dotnet build` (no warnings about missing SendGrid types) and `dotnet test --filter "Category!=Sandbox"`; all green.
+- [X] T036 [US4] Verify removal (SC-006). `grep -rni sendgrid HOAManagementCompany HOAManagementCompany.Tests .github --include=*.cs --include=*.csproj --include=*.json --include=*.yml --include=*.md` must return nothing (excluding `bin/` and `obj/`). Then run `dotnet build` (no warnings about missing SendGrid types) and `dotnet test --filter "Category!=Sandbox"`; all green.
 
 **Checkpoint**: SendGrid is gone and the spec corpus is consistent.
 
@@ -252,7 +252,7 @@ with credentials present throws `InvalidOperationException`.
   | US4-2, US4-3 | review of quickstart.md / T035 |
 
   Update `spec.md` if any scenario wording drifted from the implementation.
-- [ ] T040 Mark completed tasks `[X]` in `specs/026-ses-email-provider/tasks.md`, set `**Status**: Implemented` in `specs/026-ses-email-provider/spec.md`, and run the full local suite one more time (`dotnet build && dotnet test --filter "Category!=Sandbox"`) before pushing.
+- [X] T040 Mark completed tasks `[X]` in `specs/026-ses-email-provider/tasks.md`, set `**Status**: Implemented` in `specs/026-ses-email-provider/spec.md`, and run the full local suite one more time (`dotnet build && dotnet test --filter "Category!=Sandbox"`) before pushing.
 
 ---
 
