@@ -18,6 +18,12 @@ flat-fee plan (about $20/month) is out of proportion to that volume. Amazon SES 
 (about $0.10 per 1,000) and the owner already has an established AWS account. This feature swaps the
 email provider to SES and keeps every existing behavior and safety guarantee.
 
+## Clarifications
+
+### Session 2026-10-06
+
+- Q: How should the main-push CI job authenticate to AWS to call SES? → A: Static access keys for a send-only IAM user, stored as GitHub repository secrets. GitHub OIDC federation is a documented future improvement and is not built here.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Main-branch releases flow again (Priority: P1)
@@ -193,8 +199,9 @@ and find none. Follow the owner checklist on a fresh AWS account and reach a pas
 **CI provider-sandbox stage**
 
 - **FR-010**: The main-push provider-sandbox CI job MUST run the SES email sandbox tests with SES
-  credentials, region and sender supplied from repository secrets. PR jobs MUST still receive no
-  provider secrets.
+  credentials, region and sender supplied from repository secrets. The credentials MUST be a static
+  access key ID and secret access key for an IAM user whose only permission is sending email. PR
+  jobs MUST still receive no provider secrets.
 - **FR-011**: The SES sandbox tests MUST cover at least: (a) a send to the success simulator
   returns success; (b) a malformed sender returns a handled failure; (c) a send to an ordinary
   address with the guard on returns a handled failure without contacting SES.
@@ -278,8 +285,9 @@ and find none. Follow the owner checklist on a fresh AWS account and reach a pas
 
 - The owner verifies a sending domain they control, with DNS in Cloudflare, and creates CI
   credentials before the first main push. Until then, SES tests skip and do not block, per FR-012.
-- Static access keys for a send-only IAM user are acceptable for CI. Keyless federation (GitHub OIDC
-  to AWS) is a possible later improvement, not required here.
+- CI uses static access keys for a send-only IAM user (see Clarifications). Keyless federation
+  (GitHub OIDC to AWS) is a later improvement and is out of scope. The owner checklist MUST
+  recommend rotating the keys periodically.
 - One SES region is used for all sends. `us-east-1` is the documented default, but any region works
   if the sender is verified there.
 - SES production access is requested but not required for this feature to pass, because simulator
