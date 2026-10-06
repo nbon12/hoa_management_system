@@ -1,4 +1,5 @@
 using HOAManagementCompany.Tests.Fixtures;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace HOAManagementCompany.Tests.Integration.Sandbox;
@@ -61,4 +62,53 @@ public class SesHarnessGuardOffTests(TestDatabaseFixture fixture) : SandboxInteg
         var ex = Assert.Throws<InvalidOperationException>(() => RequireSes());
         Assert.Contains("Ses:SimulatorOnly must be true", ex.Message);
     }
+}
+
+/// <summary>
+/// 026 FR-012 / FR-006 (US1-3, US2-3): the <c>RequireSes</c> decision for each individual gap, so the
+/// "credentials secret absent" scenario is proven on its own and not only with every setting blank.
+/// Pure configuration checks; no host, database or SES call.
+/// </summary>
+public class SesHarnessRequireSesTests
+{
+    private static IConfiguration Config(params (string Key, string? Value)[] overrides)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Ses:Region"] = "us-east-1",
+            ["Ses:FromEmail"] = "no-reply@mail.nekohoa.com",
+            ["Ses:AccessKeyId"] = "test-access-key-id",
+            ["Ses:SecretAccessKey"] = "test",
+            ["Ses:SimulatorOnly"] = "true",
+        };
+        foreach (var (key, value) in overrides) values[key] = value;
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    [Fact]
+    public void Missing_credentials_skip_even_with_region_and_sender_set() =>
+        Assert.Throws<SkipException>(() => SandboxIntegrationTestBase.RequireSes(
+            Config(("Ses:AccessKeyId", null), ("Ses:SecretAccessKey", null))));
+
+    [Theory]
+    [InlineData("Ses:AccessKeyId")]
+    [InlineData("Ses:SecretAccessKey")]
+    [InlineData("Ses:Region")]
+    [InlineData("Ses:FromEmail")]
+    public void Any_single_missing_setting_skips(string missing) =>
+        Assert.Throws<SkipException>(() => SandboxIntegrationTestBase.RequireSes(Config((missing, "  "))));
+
+    [Theory]
+    [InlineData("false")]
+    [InlineData(null)]
+    public void Credentials_present_without_the_guard_hard_fail(string? simulatorOnly)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            SandboxIntegrationTestBase.RequireSes(Config(("Ses:SimulatorOnly", simulatorOnly))));
+        Assert.Contains("Ses:SimulatorOnly must be true", ex.Message);
+    }
+
+    [Fact]
+    public void Full_configuration_with_the_guard_on_runs() =>
+        Assert.Null(Record.Exception(() => SandboxIntegrationTestBase.RequireSes(Config())));
 }

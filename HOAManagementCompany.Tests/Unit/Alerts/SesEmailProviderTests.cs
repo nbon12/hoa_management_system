@@ -5,6 +5,7 @@ using Amazon.SimpleEmailV2;
 using Amazon.SimpleEmailV2.Model;
 using HOAManagementCompany.Features.Payments;
 using HOAManagementCompany.Infrastructure.Payments.Alerts;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -55,7 +56,31 @@ public class SesEmailProviderTests
     }
 
     [Fact]
-    public async Task Guard_off_by_default_delivers_with_the_expected_request()
+    public async Task Production_config_without_the_guard_setting_defaults_off_and_delivers()
+    {
+        // 026 US2-4: bind the section the way the app does, with SimulatorOnly not set at all.
+        var options = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Ses:Region"] = "us-east-1",
+                ["Ses:FromEmail"] = From,
+            })
+            .Build()
+            .GetSection(SesOptions.SectionName)
+            .Get<SesOptions>()!;
+        var client = new FakeSesClient();
+        var (provider, _) = Create(options, client);
+
+        var result = await provider.SendAsync(
+            new AlertMessage("resident@nekohoa.dev", "NekoHOA payment receipt", "Your autopay of $25.00 was received."));
+
+        Assert.False(options.SimulatorOnly);
+        Assert.True(result.Success);
+        Assert.Equal(["resident@nekohoa.dev"], Assert.Single(client.Requests).Destination.ToAddresses);
+    }
+
+    [Fact]
+    public async Task Guard_off_delivers_with_the_expected_request()
     {
         var client = new FakeSesClient();
         var (provider, factory) = Create(Configured(), client);
@@ -89,12 +114,14 @@ public class SesEmailProviderTests
     [Fact]
     public async Task Guard_allows_a_simulator_recipient()
     {
-        var (provider, factory) = Create(Configured(simulatorOnly: true));
+        var client = new FakeSesClient();
+        var (provider, factory) = Create(Configured(simulatorOnly: true), client);
 
         var result = await provider.SendAsync(Message("success@simulator.amazonses.com"));
 
         Assert.True(result.Success);
         Assert.Equal(1, factory.CreateCount);
+        Assert.Equal(["success@simulator.amazonses.com"], Assert.Single(client.Requests).Destination.ToAddresses);
     }
 
     [Fact]

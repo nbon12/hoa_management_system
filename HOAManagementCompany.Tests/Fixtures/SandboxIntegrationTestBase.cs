@@ -79,14 +79,17 @@ public abstract class SandboxIntegrationTestBase : IntegrationTestBase
     /// 026 FR-006/FR-012: skip when SES isn't configured. SES keys have no test/live form, so
     /// <c>Ses:SimulatorOnly</c> (recipients limited to the SES mailbox simulator) is the only guardrail.
     /// </summary>
-    protected void RequireSes()
+    protected void RequireSes() => RequireSes(Config);
+
+    /// <summary>The <see cref="RequireSes()"/> check against any configuration, so it can be unit-tested.</summary>
+    internal static void RequireSes(IConfiguration config)
     {
-        Skip.If(string.IsNullOrWhiteSpace(Config["Ses:Region"])
-                || string.IsNullOrWhiteSpace(Config["Ses:FromEmail"])
-                || string.IsNullOrWhiteSpace(Config["Ses:AccessKeyId"])
-                || string.IsNullOrWhiteSpace(Config["Ses:SecretAccessKey"]),
+        Skip.If(string.IsNullOrWhiteSpace(config["Ses:Region"])
+                || string.IsNullOrWhiteSpace(config["Ses:FromEmail"])
+                || string.IsNullOrWhiteSpace(config["Ses:AccessKeyId"])
+                || string.IsNullOrWhiteSpace(config["Ses:SecretAccessKey"]),
             "SES not configured");
-        if (!Config.GetValue<bool>("Ses:SimulatorOnly"))
+        if (!config.GetValue<bool>("Ses:SimulatorOnly"))
             throw new InvalidOperationException(
                 "Refusing to send: Ses:SimulatorOnly must be true in Stage 2 (sole no-deliver guardrail).");
     }

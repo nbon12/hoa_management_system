@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Infrastructure.Payments.Alerts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -136,6 +140,21 @@ public class StartupValidationTests
     // ── 026 US3: SES email configuration ───────────────────────────────────────────────────
 
     [Fact]
+    public void NoSesConfig_StartsWithEmailDisabled_AndAuthCodesFallBackToAuditLog()
+    {
+        // The baseline blanks every Ses:* key. Keep the e2e vault decorator off so the resolved
+        // notifier is the bare fallback.
+        using var factory = CreateFactory(new Dictionary<string, string?> { ["DevTools:E2ECleanupEnabled"] = "false" });
+
+        var email = factory.Services.GetServices<IAlertProvider>().Single(p => p.Channel == "email");
+        using var scope = factory.Services.CreateScope();
+        var notifier = scope.ServiceProvider.GetRequiredService<IAuthNotifier>();
+
+        Assert.False(email.IsConfigured);
+        Assert.IsType<LoggingAuthNotifier>(notifier);
+    }
+
+    [Fact]
     public void PartiallyConfiguredSes_AbortsStartup()
     {
         // Region set but no sender → would fail at send time.
@@ -155,17 +174,31 @@ public class StartupValidationTests
     }
 
     [Fact]
-    public void UnpairedSesCredentials_AbortStartup_WithoutEchoingTheKey()
+    public void SesWithOnlyCredentials_AbortsStartup_ListingEachMissingSetting()
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?>
+        {
+            ["Ses:AccessKeyId"] = "AKIAEXAMPLE",
+            ["Ses:SecretAccessKey"] = "example-secret",
+        });
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:Region is required", StringComparison.Ordinal));
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:FromEmail is required", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Ses:AccessKeyId", "AKIASECRETVALUE1")]
+    [InlineData("Ses:SecretAccessKey", "DO_NOT_LEAK_SES_SECRET")]
+    public void UnpairedSesCredentials_AbortStartup_WithoutEchoingTheValue(string key, string value)
     {
         var ex = AssertStartupThrows(new Dictionary<string, string?>
         {
             ["Ses:Region"] = "us-east-1",
             ["Ses:FromEmail"] = "no-reply@mail.nekohoa.com",
-            ["Ses:AccessKeyId"] = "AKIASECRETVALUE1",
+            [key] = value,
         });
         var combined = string.Join("\n", ex.Failures);
         Assert.Contains("must be set together", combined);
-        Assert.DoesNotContain("AKIASECRETVALUE1", combined);
+        Assert.DoesNotContain(value, combined);
     }
 
     // ── FR-019: failure messages never echo secret values ──────────────────────────────────
