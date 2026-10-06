@@ -23,6 +23,7 @@ email provider to SES and keeps every existing behavior and safety guarantee.
 ### Session 2026-10-06
 
 - Q: How should the main-push CI job authenticate to AWS to call SES? → A: Static access keys for a send-only IAM user, stored as GitHub repository secrets. GitHub OIDC federation is a documented future improvement and is not built here.
+- Q: Which domain should SES verify and send from? → A: The dedicated subdomain `mail.nekohoa.com`, with DKIM records in Cloudflare. The sender address is `no-reply@mail.nekohoa.com`. This keeps transactional sender reputation separate from the root `nekohoa.com` domain.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -127,7 +128,7 @@ and find none. Follow the owner checklist on a fresh AWS account and reach a pas
    for SendGrid references, **Then** no package, option, adapter, validator, secret or test
    references remain.
 2. **Given** the owner checklist, **When** the owner follows it, **Then** it covers choosing a region,
-   verifying the sending domain with DKIM records in Cloudflare, creating a least-privilege identity
+   verifying the sending domain `mail.nekohoa.com` with DKIM records in Cloudflare, creating a least-privilege identity
    allowed only to send email, adding the CI secrets, enabling the account-level suppression list,
    requesting production access, and removing the old SendGrid secrets.
 3. **Given** earlier specs that describe SendGrid as the email provider, **When** this feature
@@ -283,7 +284,8 @@ and find none. Follow the owner checklist on a fresh AWS account and reach a pas
 
 ## Assumptions
 
-- The owner verifies a sending domain they control, with DNS in Cloudflare, and creates CI
+- The owner verifies the sending subdomain `mail.nekohoa.com` (DNS in Cloudflare; sender
+  `no-reply@mail.nekohoa.com`, see Clarifications) and creates CI
   credentials before the first main push. Until then, SES tests skip and do not block, per FR-012.
 - CI uses static access keys for a send-only IAM user (see Clarifications). Keyless federation
   (GitHub OIDC to AWS) is a later improvement and is out of scope. The owner checklist MUST
