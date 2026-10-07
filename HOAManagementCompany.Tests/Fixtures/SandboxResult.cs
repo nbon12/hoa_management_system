@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using HOAManagementCompany.Infrastructure.Payments.Alerts;
 using Stripe;
 using Twilio.Exceptions;
 using Xunit;
@@ -18,10 +19,11 @@ namespace HOAManagementCompany.Tests.Fixtures;
 /// </para>
 ///
 /// <para>
-/// The SendGrid and Twilio adapters swallow exceptions into <c>AlertSendResult.Fail</c>, so an
+/// The SES and Twilio adapters swallow exceptions into <c>AlertSendResult.Fail</c>, so an
 /// outage there surfaces as a failed result, not a thrown exception; this classifier is the concrete
 /// home for the providers that throw (notably <see cref="StripeGateway"/>) and for any SDK exception
-/// that escapes an adapter. Failure messages never include secret values (FR-010).
+/// that escapes an adapter. SES outages are classified from the result via
+/// <see cref="SkipIfUnavailable"/> (026 research R5). Failure messages never include secret values (FR-010).
 /// </para>
 /// </summary>
 public static class SandboxResult
@@ -51,6 +53,17 @@ public static class SandboxResult
 
         // Retries exhausted on a transport/availability error → Skip, do not Fail (SC-005).
         throw new SkipException($"provider unavailable after {retries} attempts: {Describe(last!)}");
+    }
+
+    /// <summary>
+    /// Skips the test when an SES send failed for a transient reason (throttling, 5xx, transport),
+    /// so an SES outage reports Skipped rather than Failed. Any other result is left to the asserts.
+    /// </summary>
+    public static void SkipIfUnavailable(AlertSendResult result)
+    {
+        if (!result.Success
+            && result.Error?.StartsWith(SesErrorMapper.UnavailablePrefix, StringComparison.Ordinal) == true)
+            throw new SkipException($"provider unavailable: {result.Error}");
     }
 
     private static bool IsTransient(Exception ex) => ex switch

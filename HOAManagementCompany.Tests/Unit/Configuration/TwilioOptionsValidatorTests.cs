@@ -5,13 +5,12 @@ using Xunit;
 namespace HOAManagementCompany.Tests.Unit.Configuration;
 
 /// <summary>
-/// Optional alert providers (008 FR-012): all-empty disables them (valid); a partially-configured
+/// Optional Twilio SMS provider (008 FR-012; SES is covered by SesOptionsValidatorTests): all-empty disables it (valid); a partially-configured
 /// provider that would fail at send time is rejected.
 /// </summary>
-public class TwilioSendGridOptionsValidatorTests
+public class TwilioOptionsValidatorTests
 {
     private static readonly TwilioOptionsValidator Twilio = new();
-    private static readonly SendGridOptionsValidator SendGrid = new();
 
     // ── Twilio ──────────────────────────────────────────────────────────────────────────
     // account, apiKeySid, apiKeySecret, authToken, from, expectedValid
@@ -35,24 +34,5 @@ public class TwilioSendGridOptionsValidatorTests
             FromNumber = from,
         };
         Assert.Equal(expectedValid, Twilio.Validate(o).IsValid);
-    }
-
-    // ── SendGrid ────────────────────────────────────────────────────────────────────────
-    // apiKey, fromEmail, expectedValid
-    [Theory]
-    [InlineData("", "", true)]                              // fully empty → disabled, valid
-    [InlineData("SG.key", "alerts@nekohoa.com", true)]      // fully configured, valid email
-    [InlineData("SG.key", "", false)]                       // api key without from-email
-    [InlineData("", "alerts@nekohoa.com", false)]           // from-email without api key
-    [InlineData("SG.key", "not-an-email", false)]           // invalid from-email
-    public void SendGrid_PartialConfig_RejectedFullOrEmptyAccepted(
-        string apiKey, string fromEmail, bool expectedValid)
-    {
-        var o = new SendGridOptions
-        {
-            ApiKey = apiKey,
-            FromEmail = fromEmail,
-        };
-        Assert.Equal(expectedValid, SendGrid.Validate(o).IsValid);
     }
 }

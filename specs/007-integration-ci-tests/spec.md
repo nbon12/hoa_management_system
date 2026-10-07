@@ -5,6 +5,10 @@
 **Status**: Draft
 **Input**: User description: "Stage 2 — Integration CI (runs on merge to main). Use each service's test/sandbox mode. Real HTTP calls, real responses, no real charges or messages. Stripe test-mode key + webhook trigger, SendGrid sandbox mode, Twilio test credentials with magic numbers. Testcontainers for the database. Secrets stored in CI."
 
+> **Note (2026-10-06, spec 026):** The email provider is now **Amazon SES**. For email, "sandbox /
+> no-deliver mode" below means the SES mailbox simulator (`@simulator.amazonses.com`) enforced by the
+> `Ses:SimulatorOnly` guard. SendGrid mentions in the Input and Clarifications are historical.
+
 ## Clarifications
 
 ### Session 2026-06-11
