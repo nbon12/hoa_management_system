@@ -97,18 +97,28 @@ public class AttachmentUrlEndpointTests(TestDatabaseFixture fixture) : ArcTestBa
 
 /// <summary>
 /// US3-S3: "Given an attachment link was issued more than 15 minutes ago, When anyone requests it, Then the
-/// request fails." Uses a test-only storage that signs with a 1-second lifetime, then waits it out.
+/// request fails." Uses a test-only storage that signs links as if they were issued 16 minutes ago with
+/// the production 15-minute lifetime, so the link is already expired when requested (no wall-clock wait).
 /// </summary>
 public class AttachmentLinkExpiryTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
 {
-    private sealed class ShortLivedStorage(IAmazonS3 s3, IOptions<StorageOptions> opts) : S3DocumentStorage(s3, opts), IDocumentStorage
+    private sealed class ShortLivedStorage : S3DocumentStorage, IDocumentStorage
     {
+        private readonly IAmazonS3 _s3;
+        private readonly string _bucket;
+
+        public ShortLivedStorage(IAmazonS3 s3, IOptions<StorageOptions> opts) : base(s3, opts)
+        {
+            _s3 = s3;
+            _bucket = opts.Value.BucketName;
+        }
+
         Task<string> IDocumentStorage.GetPreSignedUrlAsync(string storageKey, CancellationToken ct)
         {
-            var url = s3.GetPreSignedURL(new GetPreSignedUrlRequest
+            var url = _s3.GetPreSignedURL(new GetPreSignedUrlRequest
             {
-                BucketName = opts.Value.BucketName, Key = storageKey,
-                Expires = DateTime.UtcNow.AddSeconds(1), Verb = HttpVerb.GET
+                BucketName = _bucket, Key = storageKey,
+                Expires = DateTime.UtcNow.AddMinutes(15).AddMinutes(-16), Verb = HttpVerb.GET
             });
             return Task.FromResult(url.Replace("https://", "http://"));
         }
@@ -135,7 +145,6 @@ public class AttachmentLinkExpiryTests(TestDatabaseFixture fixture) : ArcTestBas
         var link = (await (await Client.GetAsync(
             $"/api/v1/communities/{s.CommunityId}/architectural-applications/{appId}/attachments/{attachmentId}/url"))
             .Content.ReadFromJsonAsync<ArcAttachmentUrlDto>(Json))!;
-        await Task.Delay(TimeSpan.FromSeconds(2));
 
         using var plain = new HttpClient();
         var res = await plain.GetAsync(link.Url);
