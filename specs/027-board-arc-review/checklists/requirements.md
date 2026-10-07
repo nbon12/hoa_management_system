@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,4 +32,4 @@
 ## Notes
 
 - Technology names appear only in the template-mandated "Constitution Requirements" section (and in "Grounding", which records what exists today). User stories, functional requirements and success criteria stay technology-agnostic.
-- 3 open [NEEDS CLARIFICATION] markers, awaiting the user: FR-028 (intake scope), FR-026 (owner notification), FR-027 (deadline lapse).
+- All 3 clarifications resolved 2026-10-07 (intake split into a separate spec; owner emails on outcome; per-community lapse rule with board email). Notification opt-out and resident submission are separate sibling specs.

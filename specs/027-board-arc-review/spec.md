@@ -20,6 +20,8 @@ This is spec 3 of 6 in the board member effort described in `specs/025-board-ove
 | 5 | Accounting | Not started |
 | 6 | Reports | Not started |
 
+Two sibling specs come out of this one: **Resident Architectural Application Submission** (how homeowners file applications) and **Notification Settings** (per-user email opt-outs). Neither blocks this spec.
+
 ## Grounding: what exists today
 
 Verified against `main` at commit `fb6be6b`:
@@ -33,7 +35,11 @@ Verified against `main` at commit `fb6be6b`:
 
 ## Clarifications
 
-_None yet. Open questions are marked inline with [NEEDS CLARIFICATION]._
+### Session 2026-10-07
+
+- Q: How do applications get into the system? → A: Homeowners submit them in the app, but that's a **separate spec** (Resident Architectural Application Submission), with its own mockups. This spec does not build intake. It reads applications created by that spec, and is built and tested against seeded applications, so it doesn't depend on that spec landing first.
+- Q: How is the owner told the outcome? → A: When the manager records the outcome, the product emails the owner automatically through the existing transactional email. There are two templates, approved and denied, designed separately.
+- Q: What happens when the review period passes without a decision? → A: It follows the association's governing documents, so it is **configurable per community**: flag as overdue only, deemed approved, or deemed denied. The review period length is configurable per community too. Whatever the rule, the community's board is emailed when the deadline lapses. Board members will be able to opt out of that email in a separate Notification Settings spec.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -134,19 +140,24 @@ As a board member landing on Community Home, I see a "Needs your vote" card list
 
 ### User Story 6 - Reach a decision (Priority: P2)
 
-When enough board members vote the same way, the application has a board decision. The manager records the outcome and notifies the owner, after which the application moves to Closed.
+When enough board members vote the same way, the application has a board decision. The manager records the outcome, the owner is emailed, and the application moves to Closed. If the review period runs out first, the community's own rule (from its governing documents) decides what happens, and the board is emailed.
 
 **Why this priority**: Without a decision rule, votes pile up with no result. It is P2 because the board can still see and vote without it.
 
-**Independent Test**: In a community with 5 active board members, cast 3 approve votes on one application. Confirm it shows "decision reached: approve" and refuses further votes. Have the manager record the outcome and confirm the application moves to Closed.
+**Independent Test**: In a community with 5 active board members, cast 3 approve votes on one application. Confirm it shows "decision reached: approve" and refuses further votes. Have the manager record the outcome and confirm the application moves to Closed and the owner is sent the approved email. Separately, set each lapse rule on a test community, let an application pass its due date, and confirm the rule's outcome and the board email.
 
 **Acceptance Scenarios**:
 
 1. **Given** a community with 5 active, non-recused board members and an application with 2 approve votes, **When** a third board member votes approve, **Then** the application shows "decision reached: approve" and refuses further votes.
 2. **Given** the same community, **When** 3 board members vote deny, **Then** the application shows "decision reached: deny".
 3. **Given** 2 approve and 2 deny votes out of 5, **When** the row renders, **Then** no decision is shown and voting stays open.
-4. **Given** an application with a reached decision, **When** the community manager records the outcome, **Then** the application moves to Closed with that outcome and the date recorded, and [NEEDS CLARIFICATION: how is the owner notified — is sending the owner notification in scope here (for example an email through the existing transactional email), or does the manager notify the owner outside the product and only record that they did?]
-5. **Given** an application whose due date has passed with no decision, **When** it renders, **Then** it is shown as overdue, and [NEEDS CLARIFICATION: what happens when the review deadline passes without a decision? Many CC&Rs treat it as deemed approved; others just flag it for the manager. Options: (a) flag overdue only, manager decides; (b) deemed approved automatically; (c) deemed denied automatically.]
+4. **Given** an application with a reached decision of approve, **When** the community manager records the outcome, **Then** the application moves to Closed with outcome "approved" and the closing date, and the owner is sent the "application approved" email naming the application ID, property and project.
+5. **Given** an application with a reached decision of deny and board comments, **When** the community manager records the outcome with a reason for the owner, **Then** the application closes with outcome "denied", and the owner is sent the "application denied" email containing that reason. Board-only vote comments are not included.
+6. **Given** a community whose lapse rule is "flag overdue only", **When** an open application passes its due date with no decision, **Then** it is shown as overdue, voting stays open, nothing is decided automatically, and every active board member of the community is emailed that the application is overdue.
+7. **Given** a community whose lapse rule is "deemed approved", **When** an open application passes its due date with no decision, **Then** the application shows "decision reached: approved by default (review period lapsed)", refuses further votes, and every active board member of the community is emailed that the application was approved by default.
+8. **Given** a community whose lapse rule is "deemed denied", **When** an open application passes its due date with no decision, **Then** the application shows "decision reached: denied by default (review period lapsed)", refuses further votes, and every active board member is emailed that the application was denied by default.
+9. **Given** a community with a review period of 45 days, **When** an application received on 05/01/26 is shown, **Then** its due date is 06/15/26.
+10. **Given** I am a community manager, **When** I set my community's review period and lapse rule, **Then** the new values are saved and apply to applications received afterwards. A board member or resident who tries to change them is refused.
 
 ---
 
@@ -204,30 +215,37 @@ When enough board members vote the same way, the application has a board decisio
 
 - **FR-023**: An application MUST reach a decision when one side (approve or deny) holds more than half of its eligible board members' votes. Concurrent votes MUST NOT produce two decisions. *[design: `WFb` "Three of five votes decide."]*
 - **FR-024**: Once a decision is reached, the application MUST show "decision reached: approve" or "decision reached: deny" and refuse further votes.
-- **FR-025**: A Community Manager MUST be able to record the outcome of an application with a reached decision, which closes it with the outcome and closing date. *[design: `WFb` "The manager records the outcome…"; manager screen is `[no WFb]`.]*
-- **FR-026**: Owner notification of the outcome MUST be handled as [NEEDS CLARIFICATION: see User Story 6, scenario 4].
-- **FR-027**: An open application past its due date without a decision MUST be shown as overdue, and [NEEDS CLARIFICATION: see User Story 6, scenario 5].
+- **FR-025**: A Community Manager MUST be able to record the outcome of an application with a reached decision, which closes it with the outcome and closing date. A denial MUST carry a reason for the owner (required, up to 2,000 characters). *[design: `WFb` "The manager records the outcome…"; manager screen is `[no WFb]`.]*
+- **FR-026**: Recording the outcome MUST send the owner an email through the existing transactional email: the "application approved" template for approvals, the "application denied" template (including the manager's reason) for denials. Board vote comments MUST NOT appear in owner emails. If the email can't be sent, the outcome is still recorded and the failure is logged and shown to the manager so they can resend. *(Templates are being designed separately; see Assumptions.)* `[no WFb]`
+- **FR-027**: An open application past its due date without a decision MUST be shown as overdue, and the community's lapse rule MUST then apply: **flag overdue only** (nothing decided automatically), **deemed approved**, or **deemed denied** (the application moves to Decision Reached with an outcome marked "by default (review period lapsed)"). A deemed outcome goes through FR-025/FR-026 like any other decision. The lapse rule MUST apply exactly once per application. `[no WFb]`
+- **FR-028**: When an application's review period lapses, every active board member of the community MUST be emailed what happened (overdue, approved by default, or denied by default), with the application ID, property, project and a link to it. In this spec the email goes to all active board members. Opting out is added by the separate Notification Settings spec, which MUST be honored once it exists. `[no WFb]`
+
+### Community ARC settings
+
+- **FR-029**: Each community MUST have an architectural review period in days (default 30, range 1–365) and a lapse rule (default "flag overdue only"). An application's due date is its received date plus the community's review period at the time it was received. `[no WFb]`
+- **FR-030**: Only a Community Manager of that community MAY change these settings, so they can match the association's governing documents. Each change is logged as a sensitive event with the old and new values. Changes don't alter the due date or rule of applications already received. `[no WFb]`
 
 ### Intake
 
-- **FR-028**: Applications MUST enter the system through [NEEDS CLARIFICATION: is homeowner submission in scope? The wireframes only show the board side. Options: (a) a resident-side "Submit an architectural application" form with attachment upload is part of this spec; (b) the community manager enters applications on the owner's behalf in this spec, and resident submission is a later spec; (c) applications are seeded/imported only for now, and both intake paths are later specs.] `[no WFb]`
+- **FR-031**: This spec does not create applications. Homeowner submission is the separate Resident Architectural Application Submission spec. This spec MUST work with applications that spec creates, and is built and tested against seeded applications. `[no WFb]`
 
 ### Community Home card
 
-- **FR-029**: Community Home MUST show a "Needs your vote" card listing open applications the current board member may vote on but hasn't, with a count pill ("N open"), and per row: ID, project, address · owner, attachment count, tally, due date, and Approve and Deny buttons. *[design: `WFb NeedsYourVote`.]*
-- **FR-030**: The card MUST include an "All architectural applications →" link to the Architectural Applications page and MUST show an empty state when nothing needs the user's vote. *[design: `WFb NeedsYourVote` header link; empty state is `[no WFb]`.]*
+- **FR-032**: Community Home MUST show a "Needs your vote" card listing open applications the current board member may vote on but hasn't, with a count pill ("N open"), and per row: ID, project, address · owner, attachment count, tally, due date, and Approve and Deny buttons. *[design: `WFb NeedsYourVote`.]*
+- **FR-033**: The card MUST include an "All architectural applications →" link to the Architectural Applications page and MUST show an empty state when nothing needs the user's vote. *[design: `WFb NeedsYourVote` header link; empty state is `[no WFb]`.]*
 
 ### Key Entities
 
 - **Architectural Application**: A homeowner's request to change the exterior of a property. Belongs to one property (and through it, one community). Has a community-unique `ARC-` ID, project description, owner, received date, due date, status (Open, Decision Reached, Closed), and, when closed, the recorded outcome and closing date.
 - **Application Attachment**: A file supporting an application (plans, photos, surveys). Holds file name, size, content type and a private storage key. The file itself lives in private object storage; only metadata is stored with the application.
 - **Board Vote**: One board member's vote on one application: Approve or Deny, optional comment, voter, and UTC timestamp. At most one per member per application.
+- **Community ARC Settings**: Per-community review period (days) and lapse rule (flag overdue only, deemed approved, deemed denied). Set by the community manager to match the association's governing documents.
 - **Information Request**: A board member's request for more information on an application: message, sender, UTC timestamp. Does not count as a vote.
 
 ### Constitution Requirements *(mandatory when applicable)*
 
 - **Tenant boundary**: Applications, attachments, votes and info requests are community-scoped through the application's property. Every read and write goes through the spec 025 community-scope resolver. Cross-community access is denied by default and fails closed without revealing whether the community or application exists (025 FR-016). No endpoint in this spec spans communities.
-- **Authorization**: Viewing the list, details and attachments requires an active Board Member or Community Manager membership in the community. Voting and requesting info require Board Member. Recording the outcome requires Community Manager. Every check is server-side from persisted membership; the client's board mode is never an input (025 FR-014).
+- **Authorization**: Viewing the list, details and attachments requires an active Board Member or Community Manager membership in the community. Voting and requesting info require Board Member. Recording the outcome and changing the community's ARC settings require Community Manager. Every check is server-side from persisted membership; the client's board mode is never an input (025 FR-014).
 - **Ownership and moderation**: Votes, comments and info requests belong to the board member who wrote them and can't be edited or deleted once submitted, so the record is an honest history. The application belongs to the owner.
 - **API contract**: Uses the existing response and error shapes. Collections take `limit`/`offset` (default 25, max 100). All timestamps are UTC. Entity IDs are GUIDs; the `ARC-` number is a display handle only. No breaking changes to existing endpoints.
 - **API implementation and docs**: New endpoints are FastEndpoints. Swagger stays available only in Development/Dev and is disabled in Production.
@@ -239,7 +257,7 @@ When enough board members vote the same way, the application has a board decisio
 - **Quality gates**: 95% coverage on new backend and frontend files. Sonar analysis passes. xUnit integration tests run on Testcontainers PostgreSQL and MinIO, use isolated per-test communities so they're safe in parallel and after prior runs, and use `[Theory]` data for the majority rule (board sizes 3, 4, 5 and 6, with and without a recused member). Serilog sensitive-events are asserted where the spec requires them. Repowise docs are refreshed for the PR. The PR is a focused vertical slice.
 - **Frontend testing**: Jasmine/Karma for tally and majority-text logic. Angular Testing Library for the applications table, tabs, search, detail panel and Needs-your-vote card. Playwright for the vote journey and refusal of a Resident on the route. Cypress E2E for sign-in → board mode → Architectural Applications → vote. Storybook visual regression for the table, tally, detail panel and card.
 - **Executable & living spec**: Every acceptance scenario and Independent Test above maps to an automated test that runs on demand and passes before merge. This `spec.md` and `tasks.md` are updated before the PR. This spec fills in 025's placeholder Community Home and its "Architectural Applications" nav entry without contradicting 025.
-- **Spec independence & parallelism**: Hard dependency on spec 025 (merged) for community scope, roles, the board shell and the pre-signed URL primitive. No dependency on specs 2, 4, 5 or 6. The "Needs your vote" card is added to Community Home as its own section, so spec 2 (Community Overview & Metrics) can fill the rest of that page in parallel.
+- **Spec independence & parallelism**: Hard dependency on spec 025 (merged) for community scope, roles, the board shell and the pre-signed URL primitive. No dependency on specs 2, 4, 5 or 6. Two sibling specs come out of this one's clarifications, and neither blocks it: **Resident Architectural Application Submission** creates applications (this spec uses seeded ones until it lands), and **Notification Settings** adds the board opt-out for the lapse email (this spec emails all active board members until it lands). They can be built in parallel. The "Needs your vote" card is added to Community Home as its own section, so spec 2 (Community Overview & Metrics) can fill the rest of that page in parallel.
 
 ## Success Criteria *(mandatory)*
 
@@ -251,13 +269,17 @@ When enough board members vote the same way, the application has a board decisio
 - **SC-004**: 0 votes are accepted from non-board members, recused owners, or on closed or decided applications, across the automated suite.
 - **SC-005**: Every application with a majority of eligible votes on one side shows exactly one decision, including when the deciding votes arrive simultaneously.
 - **SC-006**: The applications page shows the first page of results within 2 seconds for a community with 500 applications.
+- **SC-007**: Every recorded outcome produces exactly one owner email (or a visible, resendable failure), and every lapsed application produces exactly one board email per active board member.
+- **SC-008**: 100% of lapsed applications get the outcome their community's configured rule calls for.
 
 ## Assumptions
 
 - **Majority rule**: "Three of five votes decide" generalizes to a simple majority of active, non-recused board members. The wireframe's five-member board is just the example.
 - **Votes are final**: A board member can't change or withdraw a vote. This keeps the record clean and matches how most boards minute decisions. Easy to relax later if wanted.
-- **Due date**: Defaults to 30 days after the received date, matching the wireframe (received 05/28/26, due 06/27/26). Communities can't configure this in this spec.
+- **Due date**: The review period defaults to 30 days, matching the wireframe (received 05/28/26, due 06/27/26), and the lapse rule defaults to "flag overdue only" so nothing is decided automatically until a manager sets the community's rule.
+- **Owner email templates**: The approved and denied email layouts are being designed separately in Claude Design. Until they arrive, plain-text versions with the same fields (application ID, property, project, outcome, and the reason for denials) are used.
+- **Lapse check timing**: Lapses are detected within one hour of the due date passing (end of day in the community's time zone).
 - **Manager visibility**: Community Managers can see the list, detail and comments, and record outcomes, but don't vote.
-- **Residents** see nothing from this feature in this spec beyond any intake answer chosen for FR-028.
+- **Residents** see nothing from this feature in this spec except the outcome email. Their submission and status pages come from the separate submission spec.
 - **Desktop-first**, like the rest of the board side (025). Mobile layout is out of scope.
 - **Demo data**: The dev seed gets a few sample applications (mirroring the wireframe's ARC-1036–1042) for the seeded community so `board@nekohoa.dev` can try the flow.
