@@ -184,6 +184,9 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
         Client = _factory.CreateClient();
     }
 
+    /// <summary>An additional client on the same test server (e.g. concurrent requests as different users).</summary>
+    protected HttpClient CreateClient() => _factory.CreateClient();
+
     protected async Task<IDbContextTransaction> BeginIsolatedAsync()
     {
         _transaction = await Fixture.DbContext.Database.BeginTransactionAsync();

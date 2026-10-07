@@ -57,6 +57,12 @@ public class CommunityScopeResolver(ApplicationDbContext db) : ICommunityScopeRe
                  or CommunityRole.Accountant,
         CommunityCapability.ManageMemberships =>
             role is CommunityRole.CommunityManager,
+        CommunityCapability.ViewArchitecturalApplications =>
+            role is CommunityRole.BoardMember or CommunityRole.CommunityManager,
+        CommunityCapability.VoteArchitecturalApplications =>
+            role is CommunityRole.BoardMember,
+        CommunityCapability.ManageArchitecturalReview =>
+            role is CommunityRole.CommunityManager,
         _ => false
     };
 }

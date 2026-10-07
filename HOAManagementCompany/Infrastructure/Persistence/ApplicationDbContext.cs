@@ -37,6 +37,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Community> Communities => Set<Community>();
     public DbSet<CommunityMembership> CommunityMemberships => Set<CommunityMembership>();
 
+    // ── Board architectural review (027-board-arc-review) ───────────────────
+    public DbSet<CommunityArcSettings> CommunityArcSettings => Set<CommunityArcSettings>();
+    public DbSet<ArchitecturalApplication> ArchitecturalApplications => Set<ArchitecturalApplication>();
+    public DbSet<ArchitecturalAttachment> ArchitecturalAttachments => Set<ArchitecturalAttachment>();
+    public DbSet<ArchitecturalVote> ArchitecturalVotes => Set<ArchitecturalVote>();
+    public DbSet<ArchitecturalInfoRequest> ArchitecturalInfoRequests => Set<ArchitecturalInfoRequest>();
+
     // Payments (006-stripe-payments).
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentAuthorization> PaymentAuthorizations => Set<PaymentAuthorization>();
@@ -342,7 +349,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasFilter("\"DedupKey\" IS NOT NULL");
             e.HasOne<Owner>().WithMany(o => o.OutboxMessages)
                 .HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
-            e.ToTable("OutboxMessages");
+            // 027 R5: board emails target a user instead of an owner; exactly one is set.
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.RecipientUserId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable("OutboxMessages", t => t.HasCheckConstraint(
+                "CK_OutboxMessages_SingleRecipient",
+                "(\"OwnerId\" IS NULL) <> (\"RecipientUserId\" IS NULL)"));
         });
 
         builder.Entity<HoaPaymentConfig>(e =>
@@ -407,6 +419,96 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasOne(x => x.Community).WithMany(c => c.Memberships)
                 .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Cascade);
             e.ToTable("CommunityMemberships");
+        });
+
+        // ── Board architectural review (027-board-arc-review) ───────────────
+        builder.Entity<CommunityArcSettings>(e =>
+        {
+            e.HasKey(x => x.CommunityId);
+            e.Property(x => x.LapseRule).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.DecisionRule).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.TimeZoneId).HasMaxLength(64);
+            e.Property(x => x.FormalDisapprovalStatement).HasMaxLength(1000);
+            e.HasOne(x => x.Community).WithOne()
+                .HasForeignKey<CommunityArcSettings>(x => x.CommunityId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.UpdatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.ToTable("CommunityArcSettings");
+        });
+
+        builder.Entity<ArchitecturalApplication>(e =>
+        {
+            e.HasIndex(x => new { x.CommunityId, x.ApplicationNumber, x.Revision }).IsUnique();
+            e.HasIndex(x => new { x.CommunityId, x.Status, x.DueDate });
+            e.HasIndex(x => x.PropertyId);
+            e.HasIndex(x => x.PreviousRevisionId);
+            e.Property(x => x.OwnerName).HasMaxLength(200);
+            e.Property(x => x.ProjectTitle).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(4000);
+            e.Property(x => x.TimeZoneId).HasMaxLength(64);
+            e.Property(x => x.ConditionsOfApproval).HasMaxLength(2000);
+            e.Property(x => x.OwnerReason).HasMaxLength(2000);
+            e.Property(x => x.ProjectType).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.DecisionRule).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.LapseRule).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.DecisionOutcome).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.DecisionWording).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.DecisionSource).HasConversion<string>().HasMaxLength(20);
+            e.Ignore(x => x.DisplayId);
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Property).WithMany()
+                .HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PreviousRevision).WithMany()
+                .HasForeignKey(x => x.PreviousRevisionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.SubmittedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.ClosedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.ToTable("ArchitecturalApplications", t =>
+            {
+                t.HasCheckConstraint("CK_ArchitecturalApplications_Revision", "\"Revision\" >= 1");
+                t.HasCheckConstraint("CK_ArchitecturalApplications_RevisionLink",
+                    "(\"Revision\" = 1) = (\"PreviousRevisionId\" IS NULL)");
+                t.HasCheckConstraint("CK_ArchitecturalApplications_ConditionsOnlyWhenApproved",
+                    "\"ConditionsOfApproval\" IS NULL OR \"DecisionOutcome\" = 'Approved'");
+            });
+        });
+
+        builder.Entity<ArchitecturalAttachment>(e =>
+        {
+            e.HasIndex(x => x.ApplicationId);
+            e.Property(x => x.FileName).HasMaxLength(255);
+            e.Property(x => x.ContentType).HasMaxLength(100);
+            e.Property(x => x.StorageKey).HasMaxLength(500);
+            e.HasOne(x => x.Application).WithMany(a => a.Attachments)
+                .HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable("ArchitecturalAttachments");
+        });
+
+        builder.Entity<ArchitecturalVote>(e =>
+        {
+            // FR-016: one vote per board member per application revision.
+            e.HasIndex(x => new { x.ApplicationId, x.VoterUserId }).IsUnique();
+            e.Property(x => x.Choice).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Comment).HasMaxLength(2000);
+            e.HasOne(x => x.Application).WithMany(a => a.Votes)
+                .HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Voter).WithMany()
+                .HasForeignKey(x => x.VoterUserId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable("ArchitecturalVotes");
+        });
+
+        builder.Entity<ArchitecturalInfoRequest>(e =>
+        {
+            e.HasIndex(x => x.ApplicationId);
+            e.Property(x => x.Message).HasMaxLength(2000);
+            e.HasOne(x => x.Application).WithMany(a => a.InfoRequests)
+                .HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.RequestedBy).WithMany()
+                .HasForeignKey(x => x.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable("ArchitecturalInfoRequests");
         });
     }
 }

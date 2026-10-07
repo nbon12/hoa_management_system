@@ -10,7 +10,17 @@ public enum CommunityCapability
     ViewAssociationData,
 
     // Create/edit CommunityMembership records (community managers only — FR-042).
-    ManageMemberships
+    ManageMemberships,
+
+    // 027: list, detail and attachment links for architectural applications
+    // (board members and community managers; not accountants).
+    ViewArchitecturalApplications,
+
+    // 027: cast votes and request info on architectural applications (board members only).
+    VoteArchitecturalApplications,
+
+    // 027: record outcomes, resend owner emails, edit ARC settings (community managers only).
+    ManageArchitecturalReview
 }
 
 // The single server-side community-scope resolver (spec FR-012). Every board-side

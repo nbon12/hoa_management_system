@@ -33,8 +33,8 @@ description: "Task list for 027-board-arc-review"
 
 ## Phase 1: Setup
 
-- [ ] T001 Create backend folder `HOAManagementCompany/Features/Board/Architectural/` and test folder `HOAManagementCompany.Tests/Integration/Board/Architectural/`
-- [ ] T002 [P] Create frontend folder `neko-hoa/src/app/features/board/architectural/`
+- [X] T001 Create backend folder `HOAManagementCompany/Features/Board/Architectural/` and test folder `HOAManagementCompany.Tests/Integration/Board/Architectural/`
+- [X] T002 [P] Create frontend folder `neko-hoa/src/app/features/board/architectural/`
 
 ---
 
@@ -44,15 +44,15 @@ description: "Task list for 027-board-arc-review"
 
 ### Enums and entities (data-model.md)
 
-- [ ] T003 [P] Create the 8 enums from data-model.md (`ArcApplicationStatus`, `ArcVoteChoice`, `ArcOutcome`, `ArcDenialWording`, `ArcDecisionSource`, `ArcDecisionRule`, `ArcLapseRule`, `ArcProjectType`), each in its own file `HOAManagementCompany/Domain/Enums/<Name>.cs`
-- [ ] T004 [P] Create `CommunityArcSettings` entity (fields, defaults and ranges per data-model.md, with a Repowise `domain=entities` marker) in `HOAManagementCompany/Domain/Entities/CommunityArcSettings.cs`
-- [ ] T005 [P] Create `ArchitecturalApplication` entity: all data-model.md fields, including the snapshot fields `DecisionRule`/`LapseRule`/`TimeZoneId`, `PreviousRevisionId` self-reference and navigations to Property, Community, Attachments, Votes, InfoRequests; with a Repowise marker. File: `HOAManagementCompany/Domain/Entities/ArchitecturalApplication.cs`
-- [ ] T006 [P] Create `ArchitecturalAttachment`, `ArchitecturalVote` and `ArchitecturalInfoRequest` entities in `HOAManagementCompany/Domain/Entities/ArchitecturalAttachment.cs`, `ArchitecturalVote.cs` and `ArchitecturalInfoRequest.cs`
-- [ ] T007 Modify `OutboxMessage`: `OwnerId` becomes `Guid?`, add `string? RecipientUserId`, update the doc comment listing the `arc_*` kinds and the Repowise marker. File: `HOAManagementCompany/Domain/Entities/OutboxMessage.cs`. Then fix every compile error from the nullable `OwnerId` in `HOAManagementCompany/Features/Payments/Alerts/AlertService.cs`, `OutboxDispatcher.cs` and `HOAManagementCompany/Features/Payments/Recurring/VariableNoticeService.cs`, without changing behavior.
+- [X] T003 [P] Create the 8 enums from data-model.md (`ArcApplicationStatus`, `ArcVoteChoice`, `ArcOutcome`, `ArcDenialWording`, `ArcDecisionSource`, `ArcDecisionRule`, `ArcLapseRule`, `ArcProjectType`), each in its own file `HOAManagementCompany/Domain/Enums/<Name>.cs`
+- [X] T004 [P] Create `CommunityArcSettings` entity (fields, defaults and ranges per data-model.md, with a Repowise `domain=entities` marker) in `HOAManagementCompany/Domain/Entities/CommunityArcSettings.cs`
+- [X] T005 [P] Create `ArchitecturalApplication` entity: all data-model.md fields, including the snapshot fields `DecisionRule`/`LapseRule`/`TimeZoneId`, `PreviousRevisionId` self-reference and navigations to Property, Community, Attachments, Votes, InfoRequests; with a Repowise marker. File: `HOAManagementCompany/Domain/Entities/ArchitecturalApplication.cs`
+- [X] T006 [P] Create `ArchitecturalAttachment`, `ArchitecturalVote` and `ArchitecturalInfoRequest` entities in `HOAManagementCompany/Domain/Entities/ArchitecturalAttachment.cs`, `ArchitecturalVote.cs` and `ArchitecturalInfoRequest.cs`
+- [X] T007 Modify `OutboxMessage`: `OwnerId` becomes `Guid?`, add `string? RecipientUserId`, update the doc comment listing the `arc_*` kinds and the Repowise marker. File: `HOAManagementCompany/Domain/Entities/OutboxMessage.cs`. Then fix every compile error from the nullable `OwnerId` in `HOAManagementCompany/Features/Payments/Alerts/AlertService.cs`, `OutboxDispatcher.cs` and `HOAManagementCompany/Features/Payments/Recurring/VariableNoticeService.cs`, without changing behavior.
 
 ### Persistence
 
-- [ ] T008 Register the DbSets and configure the new entities in `HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs`:
+- [X] T008 Register the DbSets and configure the new entities in `HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs`:
   - string-converted enums and max lengths per data-model.md;
   - unique `(CommunityId, ApplicationNumber, Revision)`;
   - indexes `(CommunityId, Status, DueDate)`, `(PropertyId)`, `(PreviousRevisionId)`;
@@ -60,49 +60,49 @@ description: "Task list for 027-board-arc-review"
   - unique `ArchitecturalVote (ApplicationId, VoterUserId)`;
   - cascade and restrict rules per data-model.md;
   - `OutboxMessage.RecipientUserId` FK (cascade) and the check `("OwnerId" IS NULL) <> ("RecipientUserId" IS NULL)`.
-- [ ] T009 Generate the forward-only migration `AddArchitecturalReview` with `dotnet ef migrations add AddArchitecturalReview` into `HOAManagementCompany/Infrastructure/Persistence/Migrations/`. Review it: idempotent at startup, no destructive change, and `OwnerId` altered to nullable without touching existing rows.
-- [ ] T010 Add a migration test that applies all migrations to a fresh Testcontainers database. It asserts the 5 new tables, the unique indexes and check constraints (inserting a second vote by the same voter fails; an outbox row with both or neither of `OwnerId`/`RecipientUserId` fails) and that existing payment outbox rows survive. File: `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcMigrationTests.cs`
+- [X] T009 Generate the forward-only migration `AddArchitecturalReview` with `dotnet ef migrations add AddArchitecturalReview` into `HOAManagementCompany/Infrastructure/Persistence/Migrations/`. Review it: idempotent at startup, no destructive change, and `OwnerId` altered to nullable without touching existing rows.
+- [X] T010 Add a migration test that applies all migrations to a fresh Testcontainers database. It asserts the 5 new tables, the unique indexes and check constraints (inserting a second vote by the same voter fails; an outbox row with both or neither of `OwnerId`/`RecipientUserId` fails) and that existing payment outbox rows survive. File: `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcMigrationTests.cs`
 
 ### Authorization (research R1, R2)
 
-- [ ] T011 Add `ViewArchitecturalApplications`, `VoteArchitecturalApplications` and `ManageArchitecturalReview` to `CommunityCapability` in `HOAManagementCompany/Features/Board/ICommunityScopeResolver.cs`, and map them in `HOAManagementCompany/Features/Board/CommunityScopeResolver.cs`:
+- [X] T011 Add `ViewArchitecturalApplications`, `VoteArchitecturalApplications` and `ManageArchitecturalReview` to `CommunityCapability` in `HOAManagementCompany/Features/Board/ICommunityScopeResolver.cs`, and map them in `HOAManagementCompany/Features/Board/CommunityScopeResolver.cs`:
   - View → BoardMember, CommunityManager
   - Vote → BoardMember
   - Manage → CommunityManager
-- [ ] T012 [P] Add a `[Theory]` resolver test: every role × the 3 new capabilities × active/inactive/ended membership, asserting Accountant and Resident are denied all three. File: `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcCapabilityTests.cs`
+- [X] T012 [P] Add a `[Theory]` resolver test: every role × the 3 new capabilities × active/inactive/ended membership, asserting Accountant and Resident are denied all three. File: `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcCapabilityTests.cs`
 - [ ] T013 Change `BoardScopeEnforcementStaticAnalysisTests` to scan `SearchOption.AllDirectories`. Add `ArcSweepJobEndpoint.cs` to `AllowList` with the reason "secret-authenticated scheduler job, not a user-facing community resource". The allow-list name check passes once T066 creates the file. File: `HOAManagementCompany.Tests/Integration/Board/BoardScopeEnforcementStaticAnalysisTests.cs`
 
 ### Shared logic
 
-- [ ] T014 [P] Write `ArcDecisionRulesTheoryTests` first. `[Theory]`/`MemberData` over:
+- [X] T014 [P] Write `ArcDecisionRulesTheoryTests` first. `[Theory]`/`MemberData` over:
   - both decision rules × eligible counts 3, 4, 5, 6 × vote mixes × due date passed or not × quorum met or not;
   - the wording split (RevisionsNeeded ≥ Deny gives RevisionsRequested, a tie gives RevisionsRequested, Deny > RevisionsNeeded gives Denied);
   - the early-win rule ("can't be overtaken");
   - the rule text for each rule and size: "Three of five votes decide…", "Three of four votes decide…", and "A majority of votes cast decides once three of five members have voted…".
 
   Pure unit tests in `HOAManagementCompany.Tests/Unit/Architectural/ArcDecisionRulesTheoryTests.cs`.
-- [ ] T015 Implement the pure, static `ArcDecisionRules` (`Evaluate(rule, eligible, approve, revisionsNeeded, deny, dueDatePassed)` returning a decision with outcome and wording, plus `RuleText(rule, eligible)`) with a Repowise `domain=arc-decision` marker, until T014 passes. File: `HOAManagementCompany/Features/Board/Architectural/ArcDecisionRules.cs`
-- [ ] T016 Implement `ArcQueries`, the shared read layer, in `HOAManagementCompany/Features/Board/Architectural/ArcQueries.cs`. It provides:
+- [X] T015 Implement the pure, static `ArcDecisionRules` (`Evaluate(rule, eligible, approve, revisionsNeeded, deny, dueDatePassed)` returning a decision with outcome and wording, plus `RuleText(rule, eligible)`) with a Repowise `domain=arc-decision` marker, until T014 passes. File: `HOAManagementCompany/Features/Board/Architectural/ArcDecisionRules.cs`
+- [X] T016 Implement `ArcQueries`, the shared read layer, in `HOAManagementCompany/Features/Board/Architectural/ArcQueries.cs`. It provides:
   - eligible voters (active BoardMember memberships minus users linked to the property by `UserProperty`);
   - `IsRecused(userId, application)`;
   - a batched tally for a page of applications (one grouped query);
   - `MyVoteState` (`CanVote`/`Voted`/`Recused`/`NotEligible`);
   - `IsOverdue(application, now)` using the snapshotted `TimeZoneId` (end of `DueDate` local time);
   - `DisplayId` (`ARC-{n}`).
-- [ ] T017 [P] Create DTOs matching the contract JSON exactly (list item, list response with `counts`, detail, tally, myVote, decision, attachment, vote, info request, revision summary, settings, error codes as constants) in `HOAManagementCompany/Features/Board/Architectural/ArcModels.cs`
-- [ ] T018 Register `TimeProvider.System` as a singleton and the ARC services (`ArcQueries`, the later `ArcEmailRenderer` and `ArcSweepService`, and `IArcNotificationPreferences` → `AllowAllArcNotificationPreferences`) in `HOAManagementCompany/Program.cs`
-- [ ] T019 Add the `board-writes` rate-limit policy (fixed window, partitioned by user ID claim falling back to client IP, 30 requests per minute), following the existing `payments` policy, in `HOAManagementCompany/Program.cs`
+- [X] T017 [P] Create DTOs matching the contract JSON exactly (list item, list response with `counts`, detail, tally, myVote, decision, attachment, vote, info request, revision summary, settings, error codes as constants) in `HOAManagementCompany/Features/Board/Architectural/ArcModels.cs`
+- [X] T018 Register `TimeProvider.System` as a singleton and the ARC services (`ArcQueries`, the later `ArcEmailRenderer` and `ArcSweepService`, and `IArcNotificationPreferences` → `AllowAllArcNotificationPreferences`) in `HOAManagementCompany/Program.cs`
+- [X] T019 Add the `board-writes` rate-limit policy (fixed window, partitioned by user ID claim falling back to client IP, 30 requests per minute), following the existing `payments` policy, in `HOAManagementCompany/Program.cs`
 
 ### Test harness and seed (research R11, R12)
 
-- [ ] T020 Create `ArcTestBase : BoardTestBase` in `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcTestBase.cs`. Factory helpers create only their own rows, all keyed by `Guid.NewGuid()`:
+- [X] T020 Create `ArcTestBase : BoardTestBase` in `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcTestBase.cs`. Factory helpers create only their own rows, all keyed by `Guid.NewGuid()`:
   - `CreateBoardAsync(communityId, size)` returns board user IDs;
   - `CreateManagerAsync`, `CreateResidentOwnerAsync(propertyId)`;
   - `CreateApplicationAsync(communityId, …, revision, previousRevisionId, attachments, status, dueDate, decisionRule, lapseRule)`;
   - `UploadAttachmentAsync` (MinIO);
   - `CastVoteViaApiAsync`;
   - a `TestClock : TimeProvider` (hand-written subclass overriding `GetUtcNow()`, so no `Microsoft.Extensions.TimeProvider.Testing` package is added) registered as a WebApplicationFactory override.
-- [ ] T021 Create the idempotent `ArchitecturalSeeder` in `HOAManagementCompany/Seed/ArchitecturalSeeder.cs` per research R11:
+- [X] T021 Create the idempotent `ArchitecturalSeeder` in `HOAManagementCompany/Seed/ArchitecturalSeeder.cs` per research R11:
   - ARC settings with defaults;
   - board users `board2@`…`board5@nekohoa.dev` with BoardMember memberships;
   - `manager@nekohoa.dev` with a CommunityManager membership;
@@ -111,8 +111,8 @@ description: "Task list for 027-board-arc-review"
   - one closed denied v1 ("revisions requested") plus an open v2.
 
   Insert the rows directly for now (T063 later switches the seeder to `ArcApplicationFactory`). Call it from `HOAManagementCompany/Seed/DatabaseSeeder.cs` after `EnsureBoardUserAsync`.
-- [ ] T022 [P] Add a seeder test asserting a second run creates no duplicates and the expected applications and memberships exist. File: `HOAManagementCompany.Tests/Integration/Seed/ArchitecturalSeederTests.cs`
-- [ ] T023 [P] Create a frontend `ArchitecturalService` (typed models mirroring `ArcModels`; methods `list`, `detail`, `attachmentUrl`, `vote`, `requestInfo`, `recordOutcome`, `resendOutcomeEmail`, `getSettings`, `putSettings`, following `board.service.ts`) in `neko-hoa/src/app/core/services/architectural.service.ts`, with a unit spec in `neko-hoa/src/app/core/services/architectural.service.spec.ts` (HttpTestingController: URLs, query params, bodies)
+- [X] T022 [P] Add a seeder test asserting a second run creates no duplicates and the expected applications and memberships exist. File: `HOAManagementCompany.Tests/Integration/Seed/ArchitecturalSeederTests.cs`
+- [X] T023 [P] Create a frontend `ArchitecturalService` (typed models mirroring `ArcModels`; methods `list`, `detail`, `attachmentUrl`, `vote`, `requestInfo`, `recordOutcome`, `resendOutcomeEmail`, `getSettings`, `putSettings`, following `board.service.ts`) in `neko-hoa/src/app/core/services/architectural.service.ts`, with a unit spec in `neko-hoa/src/app/core/services/architectural.service.spec.ts` (HttpTestingController: URLs, query params, bodies)
 
 **Checkpoint**: migration applies, the resolver maps the new capabilities, the decision rules pass, and the seed runs.
 
