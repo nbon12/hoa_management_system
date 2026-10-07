@@ -75,75 +75,83 @@ public sealed class ArcSweepService(
 
     private async Task<int> SendRemindersAsync(ArchitecturalApplication app, DateTimeOffset now, CancellationToken ct)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await ArcLocks.LockAndReloadAsync(db, app, ct);
-        if (app.Status != ArcApplicationStatus.Open || app.ReminderSentAt is not null)
-            return 0;
-
-        var tally = (await queries.BuildItemAsync(app, string.Empty, ct)).Tally;
         var queued = 0;
-        foreach (var (userId, email) in await BoardRecipientsAsync(app, ArcEmailKinds.BoardReminder, ct))
+        await ArcLocks.InLockedTransactionAsync(db, app, async () =>
         {
-            db.OutboxMessages.Add(ArcEmailRenderer.ToOutbox(
-                ArcEmailKinds.BoardReminder,
-                renderer.BoardReminder(app, app.Property.Address, tally, email),
-                $"arc:{app.Id}:reminder:{userId}", ownerId: null, recipientUserId: userId));
-            queued++;
-        }
+            queued = 0;
+            if (app.Status != ArcApplicationStatus.Open || app.ReminderSentAt is not null)
+                return null;
 
-        app.ReminderSentAt = now;
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+            var tally = (await queries.BuildItemAsync(app, string.Empty, ct)).Tally;
+            foreach (var (userId, email) in await BoardRecipientsAsync(app, ArcEmailKinds.BoardReminder, ct))
+            {
+                db.OutboxMessages.Add(ArcEmailRenderer.ToOutbox(
+                    ArcEmailKinds.BoardReminder,
+                    renderer.BoardReminder(app, app.Property.Address, tally, email),
+                    $"arc:{app.Id}:reminder:{userId}", ownerId: null, recipientUserId: userId));
+                queued++;
+            }
+
+            app.ReminderSentAt = now;
+            await db.SaveChangesAsync(ct);
+            return null;
+        }, ct);
         return queued;
     }
 
     private async Task<DueDateResult> ProcessDueDateAsync(ArchitecturalApplication app, DateTimeOffset now, CancellationToken ct)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await ArcLocks.LockAndReloadAsync(db, app, ct);
-        if (app.Status != ArcApplicationStatus.Open || app.LapseProcessedAt is not null)
-            return DueDateResult.None;
-
-        app.LapseProcessedAt = now;
-
-        // Votes-cast rule: a leader with quorum at the due date decides; the lapse rule doesn't apply.
-        if (app.DecisionRule == ArcDecisionRule.MajorityOfVotesCastWithQuorum)
+        var result = DueDateResult.None;
+        await ArcLocks.InLockedTransactionAsync(db, app, async () =>
         {
-            var counts = await VoteCountsAsync(app.Id, ct);
-            var eligible = await queries.EligibleCountAsync(app.CommunityId, app.PropertyId, ct);
-            var decision = ArcDecisionRules.Evaluate(
-                app.DecisionRule, eligible, counts.approve, counts.revisionsNeeded, counts.deny, dueDatePassed: true);
-            if (decision is not null)
+            result = DueDateResult.None;
+            if (app.Status != ArcApplicationStatus.Open || app.LapseProcessedAt is not null)
+                return null;
+
+            app.LapseProcessedAt = now;
+
+            // Votes-cast rule: a leader with quorum at the due date decides; the lapse rule doesn't apply.
+            if (app.DecisionRule == ArcDecisionRule.MajorityOfVotesCastWithQuorum)
             {
-                SetDecision(app, decision, ArcDecisionSource.Votes, now);
-                await db.SaveChangesAsync(ct);
-                await tx.CommitAsync(ct);
-                return DueDateResult.DecidedFromVotes;
+                var counts = await VoteCountsAsync(app.Id, ct);
+                var eligible = await queries.EligibleCountAsync(app.CommunityId, app.PropertyId, ct);
+                var decision = ArcDecisionRules.Evaluate(
+                    app.DecisionRule, eligible, counts.approve, counts.revisionsNeeded, counts.deny, dueDatePassed: true);
+                if (decision is not null)
+                {
+                    SetDecision(app, decision, ArcDecisionSource.Votes, now);
+                    await db.SaveChangesAsync(ct);
+                    result = DueDateResult.DecidedFromVotes;
+                    return null;
+                }
             }
-        }
 
-        switch (app.LapseRule)
-        {
-            case ArcLapseRule.DeemedApproved:
-                SetDecision(app, new ArcDecision(ArcOutcome.Approved, null), ArcDecisionSource.Lapse, now);
-                break;
-            case ArcLapseRule.DeemedDenied:
-                // The manager picks the owner wording when recording (FR-025); default shown until then.
-                SetDecision(app, new ArcDecision(ArcOutcome.Denied, ArcDenialWording.RevisionsRequested),
-                    ArcDecisionSource.Lapse, now);
-                break;
-        }
+            switch (app.LapseRule)
+            {
+                case ArcLapseRule.DeemedApproved:
+                    SetDecision(app, new ArcDecision(ArcOutcome.Approved, null), ArcDecisionSource.Lapse, now);
+                    break;
+                case ArcLapseRule.DeemedDenied:
+                    // The manager picks the owner wording when recording (FR-025); this default shows until then.
+                    SetDecision(app, new ArcDecision(ArcOutcome.Denied, ArcDenialWording.RevisionsRequested),
+                        ArcDecisionSource.Lapse, now);
+                    break;
+            }
 
-        foreach (var (userId, email) in await BoardRecipientsAsync(app, ArcEmailKinds.BoardLapsed, ct))
-            db.OutboxMessages.Add(ArcEmailRenderer.ToOutbox(
-                ArcEmailKinds.BoardLapsed,
-                renderer.BoardLapsed(app, app.Property.Address, app.LapseRule, email),
-                $"arc:{app.Id}:lapse:{userId}", ownerId: null, recipientUserId: userId));
+            foreach (var (userId, email) in await BoardRecipientsAsync(app, ArcEmailKinds.BoardLapsed, ct))
+                db.OutboxMessages.Add(ArcEmailRenderer.ToOutbox(
+                    ArcEmailKinds.BoardLapsed,
+                    renderer.BoardLapsed(app, app.Property.Address, app.LapseRule, email),
+                    $"arc:{app.Id}:lapse:{userId}", ownerId: null, recipientUserId: userId));
 
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        ArcLog.LapseApplied(logger, app.CommunityId, app.Id, app.LapseRule.ToString(), now);
-        return DueDateResult.LapseApplied;
+            await db.SaveChangesAsync(ct);
+            result = DueDateResult.LapseApplied;
+            return null;
+        }, ct);
+
+        if (result == DueDateResult.LapseApplied)
+            ArcLog.LapseApplied(logger, app.CommunityId, app.Id, app.LapseRule.ToString(), now);
+        return result;
     }
 
     public static void SetDecision(ArchitecturalApplication app, ArcDecision decision, ArcDecisionSource source, DateTimeOffset now)

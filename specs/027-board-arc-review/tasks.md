@@ -70,7 +70,7 @@ description: "Task list for 027-board-arc-review"
   - Vote → BoardMember
   - Manage → CommunityManager
 - [X] T012 [P] Add a `[Theory]` resolver test: every role × the 3 new capabilities × active/inactive/ended membership, asserting Accountant and Resident are denied all three. File: `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcCapabilityTests.cs`
-- [ ] T013 Change `BoardScopeEnforcementStaticAnalysisTests` to scan `SearchOption.AllDirectories`. Add `ArcSweepJobEndpoint.cs` to `AllowList` with the reason "secret-authenticated scheduler job, not a user-facing community resource". The allow-list name check passes once T066 creates the file. File: `HOAManagementCompany.Tests/Integration/Board/BoardScopeEnforcementStaticAnalysisTests.cs`
+- [X] T013 Change `BoardScopeEnforcementStaticAnalysisTests` to scan `SearchOption.AllDirectories`. Add `ArcSweepJobEndpoint.cs` to `AllowList` with the reason "secret-authenticated scheduler job, not a user-facing community resource". The allow-list name check passes once T066 creates the file. File: `HOAManagementCompany.Tests/Integration/Board/BoardScopeEnforcementStaticAnalysisTests.cs`
 
 ### Shared logic
 
@@ -126,7 +126,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Tests (write first)
 
-- [ ] T024 [P] [US1] Create `ApplicationsListEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationsListEndpointTests.cs`:
+- [X] T024 [P] [US1] Create `ApplicationsListEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationsListEndpointTests.cs`:
   - **US1-S1**: 4 open + 27 closed; default `status` returns exactly the 4 open IDs and `counts.open == 4`, `counts.closed == 27`.
   - **US1-S2**: `status=closed` returns exactly the 27 and none of the open.
   - **US1-S3**: `search=Keystone Park` and `search=Pattyam` each include the matching application and exclude a non-matching one; matching is case-insensitive.
@@ -150,7 +150,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Implementation
 
-- [ ] T028 [US1] Implement `ApplicationsListEndpoint` (`GET /communities/{communityId}/architectural-applications`) in `HOAManagementCompany/Features/Board/Architectural/ApplicationsListEndpoint.cs`:
+- [X] T028 [US1] Implement `ApplicationsListEndpoint` (`GET /communities/{communityId}/architectural-applications`) in `HOAManagementCompany/Features/Board/Architectural/ApplicationsListEndpoint.cs`:
   - `CanAccessAsync(…, ViewArchitecturalApplications)`, then `BoardHttp.NoStore`, with `BoardHttp.ForbiddenAsync` on deny;
   - validate `status`, `search` (≤ 100) and `limit`/`offset` (25/100);
   - `open` means Open + DecisionReached;
@@ -175,7 +175,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Tests (write first)
 
-- [ ] T032 [P] [US2] Create `CastVoteEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/CastVoteEndpointTests.cs`:
+- [X] T032 [P] [US2] Create `CastVoteEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/CastVoteEndpointTests.cs`:
   - **US2-S1**: an unvoted board member's list row has `myVote.state == "CanVote"`.
   - **US2-S2**: from 2/0/3, `POST votes {choice:"Approve"}` returns 201 with `myVote.state == "Voted"`, choice Approve, and tally 3 approve / 2 not voted.
   - **US2-S3**: after a Deny, the row has `myVote` Voted with choice Deny.
@@ -198,7 +198,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Implementation
 
-- [ ] T035 [US2] Implement `CastVoteEndpoint` (`POST …/{applicationId}/votes`) in `HOAManagementCompany/Features/Board/Architectural/CastVoteEndpoint.cs`:
+- [X] T035 [US2] Implement `CastVoteEndpoint` (`POST …/{applicationId}/votes`) in `HOAManagementCompany/Features/Board/Architectural/CastVoteEndpoint.cs`:
   - `CanAccessAsync(Vote)`; the application must belong to `communityId` (else 403); recusal check;
   - one transaction: `SELECT … FOR UPDATE` on the application row (raw SQL through `FromSqlInterpolated`); status checks (`APPLICATION_CLOSED`/`APPLICATION_DECIDED`); insert the vote (map a unique-violation to 409 `ALREADY_VOTED`);
   - re-count and run `ArcDecisionRules.Evaluate(snapshot rule, eligible, counts, dueDatePassed:false)`; on a decision set `Status=DecisionReached` with outcome, wording, source `Votes` and `DecisionReachedAt`;
@@ -219,7 +219,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Tests (write first)
 
-- [ ] T038 [P] [US3] Create `ApplicationDetailEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationDetailEndpointTests.cs`:
+- [X] T038 [P] [US3] Create `ApplicationDetailEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationDetailEndpointTests.cs`:
   - **US3-S1**: ARC-1042 received 2026-05-28 with owner "Praneeth Pattyam" returns the owner name, `receivedDate`, the three attachments with exact `fileName`/`sizeBytes`, and `projectTitle` "Fence replacement — 6ft cedar".
   - **US3-S5**: no attachments gives an empty `attachments` array.
   - **US3-S6**: the serialized list and detail responses contain no `http` URL and no `StorageKey`.
@@ -227,7 +227,7 @@ description: "Task list for 027-board-arc-review"
   - Votes include comments (FR-019).
   - An `ArcSensitiveAccess` event is emitted with resource `application:{id}`.
   - Cross-community gives 403.
-- [ ] T039 [P] [US3] Create `AttachmentUrlEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/AttachmentUrlEndpointTests.cs`:
+- [X] T039 [P] [US3] Create `AttachmentUrlEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/AttachmentUrlEndpointTests.cs`:
   - **US3-S2**: 200 with a `url` that downloads the exact uploaded bytes from MinIO, and `expiresAt` ≤ now + 15 minutes.
   - **US3-S3**: the production URL's `X-Amz-Expires` is ≤ 900. Then, through a test-only `IDocumentStorage` decorator that signs with a 1-second expiry, issue a link, wait 2 seconds, and assert MinIO answers 403 for it.
   - **US3-S4**: a non-member, and an attachment ID belonging to another application, both give 403 with no URL issued.
@@ -245,8 +245,8 @@ description: "Task list for 027-board-arc-review"
 
 ### Implementation
 
-- [ ] T041 [US3] Implement `ApplicationDetailEndpoint` (`GET …/{applicationId}`) in `HOAManagementCompany/Features/Board/Architectural/ApplicationDetailEndpoint.cs`: the View capability; the application in the community; attachments metadata; votes with voter names and comments; info requests; the revision chain by `(CommunityId, ApplicationNumber)` ordered by `Revision`; `ruleText` through `ArcDecisionRules.RuleText`; decision, conditions or reason; `ownerEmailStatus` read from the latest `arc:{id}:outcome*` outbox row (null when none); the `ArcSensitiveAccess` log; `no-store`.
-- [ ] T042 [US3] Implement `AttachmentUrlEndpoint` (`GET …/attachments/{attachmentId}/url`) in `HOAManagementCompany/Features/Board/Architectural/AttachmentUrlEndpoint.cs`: the View capability; the attachment must belong to the application in the community; a `HEAD` existence check (add `ExistsAsync` to `IDocumentStorage` and `S3DocumentStorage` in `HOAManagementCompany/Infrastructure/Storage/`, and update every `IDocumentStorage` test double found with `grep -rn ": IDocumentStorage" HOAManagementCompany.Tests`) returning 404 `ATTACHMENT_UNAVAILABLE`; `GetPreSignedUrlAsync`; return `{url, expiresAt = now + 5 min}`; log `ArcSensitiveAccess`.
+- [X] T041 [US3] Implement `ApplicationDetailEndpoint` (`GET …/{applicationId}`) in `HOAManagementCompany/Features/Board/Architectural/ApplicationDetailEndpoint.cs`: the View capability; the application in the community; attachments metadata; votes with voter names and comments; info requests; the revision chain by `(CommunityId, ApplicationNumber)` ordered by `Revision`; `ruleText` through `ArcDecisionRules.RuleText`; decision, conditions or reason; `ownerEmailStatus` read from the latest `arc:{id}:outcome*` outbox row (null when none); the `ArcSensitiveAccess` log; `no-store`.
+- [X] T042 [US3] Implement `AttachmentUrlEndpoint` (`GET …/attachments/{attachmentId}/url`) in `HOAManagementCompany/Features/Board/Architectural/AttachmentUrlEndpoint.cs`: the View capability; the attachment must belong to the application in the community; a `HEAD` existence check (add `ExistsAsync` to `IDocumentStorage` and `S3DocumentStorage` in `HOAManagementCompany/Infrastructure/Storage/`, and update every `IDocumentStorage` test double found with `grep -rn ": IDocumentStorage" HOAManagementCompany.Tests`) returning 404 `ATTACHMENT_UNAVAILABLE`; `GetPreSignedUrlAsync`; return `{url, expiresAt = now + 5 min}`; log `ArcSensitiveAccess`.
 - [ ] T043 [US3] Implement `ApplicationDetailPanelComponent` (title, owner, received date, attachment list with name, size and ↗ link opening on click, empty and unavailable states, votes and comments list, rule text, embedded `CastVoteCardComponent`, links to earlier revisions) in `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.ts`, plus `application-detail-panel.stories.ts`. Wire row selection in `applications-page.component.ts`, supporting the `?open={id}` query parameter.
 
 **Checkpoint**: all P1 stories are done.
@@ -261,7 +261,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Tests (write first)
 
-- [ ] T044 [P] [US4] Create `InfoRequestEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/InfoRequestEndpointTests.cs`:
+- [X] T044 [P] [US4] Create `InfoRequestEndpointTests` in `HOAManagementCompany.Tests/Integration/Board/Architectural/InfoRequestEndpointTests.cs`:
   - **US4-S2**: "Please attach a plat survey" gives 201; the detail shows the request with sender name; `infoRequested == true` in the list; the tally is unchanged; `myVote.state` is still `CanVote`; `dueDate` is unchanged in the response and the DB (FR-021).
   - **US4-S3**: an empty or whitespace message gives 422 `VALIDATION_ERROR` with a message naming the required field.
   - **US4-S4**: a CommunityManager's `GET detail` shows message, sender and `requestedAt`.
@@ -273,7 +273,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Implementation
 
-- [ ] T046 [US4] Implement `InfoRequestEndpoint` (`POST …/{applicationId}/info-requests`; Vote capability; Open status only; non-blank message ≤ 2,000; insert; return `{…, dueDate}`; `board-writes`) in `HOAManagementCompany/Features/Board/Architectural/InfoRequestEndpoint.cs`
+- [X] T046 [US4] Implement `InfoRequestEndpoint` (`POST …/{applicationId}/info-requests`; Vote capability; Open status only; non-blank message ≤ 2,000; insert; return `{…, dueDate}`; `board-writes`) in `HOAManagementCompany/Features/Board/Architectural/InfoRequestEndpoint.cs`
 - [ ] T047 [US4] Add the Request info mode to `CastVoteCardComponent` and the detail panel (Info focuses the comment box; the FR-021 notice with the due date; the marker with message, sender and time) in `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.ts` and `application-detail-panel.component.ts`. Show the "info requested" marker on rows in `applications-page.component.ts`.
 
 ---
@@ -286,7 +286,7 @@ description: "Task list for 027-board-arc-review"
 
 ### Tests (write first)
 
-- [ ] T048 [P] [US5] Add `awaitingMyVote=true` cases to `ApplicationsListEndpointTests.cs`: **US5-S1** with 1 unvoted + 3 voted, only that one is returned with all FR-032 fields; **US5-S3** after a vote it's no longer returned; **US5-S4** with everything voted, an empty list.
+- [X] T048 [P] [US5] Add `awaitingMyVote=true` cases to `ApplicationsListEndpointTests.cs`: **US5-S1** with 1 unvoted + 3 voted, only that one is returned with all FR-032 fields; **US5-S3** after a vote it's no longer returned; **US5-S4** with everything voted, an empty list.
 - [ ] T049 [P] [US5] Create the needs-your-vote-card component spec in `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.spec.ts`:
   - **US5-S1**: "Needs your vote" heading, "1 open" pill, one row with ID, project, address · owner, 📎 count, tally, due date and the Approve / Revisions needed / Deny buttons.
   - **US5-S2**: the "All architectural applications →" link points to `/app/board/architectural`.
@@ -362,7 +362,7 @@ description: "Task list for 027-board-arc-review"
 - [ ] T061 [US6] Implement `RecordOutcomeEndpoint` (`POST …/outcome`; Manage capability; row lock; requires `DecisionReached`; FR-025 validation; wording only for `Source == Lapse` denials, default RevisionsRequested; set `Closed`, `ClosedAt` and `ClosedByUserId`; if the property has an owner with an email, enqueue the owner outbox row in the same transaction with `OwnerId` = `Property.Owner.Id` (otherwise skip it and report `NoOwnerEmail`) and DedupKey `arc:{id}:outcome`; commit; dispatch through `OutboxDispatcher`; log `ArcOutcomeRecorded`; `board-writes`) in `HOAManagementCompany/Features/Board/Architectural/RecordOutcomeEndpoint.cs`
 - [ ] T062 [US6] Implement `ResendOutcomeEmailEndpoint` (`POST …/outcome/resend-email`; Manage capability; only when Closed and the email failed, else 409 `EMAIL_NOT_FAILED`; a new outbox row with DedupKey `arc:{id}:outcome:resend:{n}`; dispatch; 202) in `HOAManagementCompany/Features/Board/Architectural/ResendOutcomeEmailEndpoint.cs`
 - [ ] T063 [US6] Implement `ArcApplicationFactory.CreateFromSettings` (allocates `ApplicationNumber` with `UPDATE "CommunityArcSettings" SET "NextApplicationNumber" = "NextApplicationNumber" + 1 … RETURNING`, computes `DueDate`, snapshots the rules and time zone, and creates a revision with `PreviousRevisionId` and carried-over attachment metadata when given a prior revision; it refuses a revision unless the previous one is Closed and Denied) in `HOAManagementCompany/Features/Board/Architectural/ArcApplicationFactory.cs`. Switch `ArchitecturalSeeder` (T021) from direct inserts to the factory. Add factory tests (revision of an open or approved application is refused; carried-over attachments share the `StorageKey`) in `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcApplicationFactoryTests.cs`.
-- [ ] T064 [US6] Implement `ArcSettingsGetEndpoint` and `ArcSettingsPutEndpoint` (GET returns defaults without writing when no row exists, under the View capability; the row is created on the first PUT or by `ArcApplicationFactory` on first application; PUT needs the Manage capability, FluentValidation per data-model.md, `TimeZoneInfo.FindSystemTimeZoneById` validation, `ArcSettingsChanged` log with old and new values, `board-writes`) in `HOAManagementCompany/Features/Board/Architectural/ArcSettingsGetEndpoint.cs` and `ArcSettingsPutEndpoint.cs`
+- [X] T064 [US6] Implement `ArcSettingsGetEndpoint` and `ArcSettingsPutEndpoint` (GET returns defaults without writing when no row exists, under the View capability; the row is created on the first PUT or by `ArcApplicationFactory` on first application; PUT needs the Manage capability, FluentValidation per data-model.md, `TimeZoneInfo.FindSystemTimeZoneById` validation, `ArcSettingsChanged` log with old and new values, `board-writes`) in `HOAManagementCompany/Features/Board/Architectural/ArcSettingsGetEndpoint.cs` and `ArcSettingsPutEndpoint.cs`
 - [ ] T065 [US6] Implement `ArcSweepService` (`TimeProvider`-driven, with a Repowise `domain=arc-sweep` marker) in `HOAManagementCompany/Features/Board/Architectural/ArcSweepService.cs`:
   1. Reminders per research R6, honoring `IArcNotificationPreferences`, stamping `ReminderSentAt`.
   2. Due-date decisions for the votes-cast rule.
@@ -370,7 +370,7 @@ description: "Task list for 027-board-arc-review"
   4. `OutboxDispatcher.DispatchPendingAsync`.
 
   Return the counts.
-- [ ] T066 [US6] Implement `ArcSweepJobEndpoint` (`POST /architectural/jobs/sweep`, `AllowAnonymous`, constant-time `X-Scheduler-Secret` compare against `JobsOptions.SchedulerSharedSecret` as in `Features/Payments/Jobs/RunDraftsEndpoint.cs`, calls `ArcSweepService`) in `HOAManagementCompany/Features/Board/Architectural/ArcSweepJobEndpoint.cs`
+- [X] T066 [US6] Implement `ArcSweepJobEndpoint` (`POST /architectural/jobs/sweep`, `AllowAnonymous`, constant-time `X-Scheduler-Secret` compare against `JobsOptions.SchedulerSharedSecret` as in `Features/Payments/Jobs/RunDraftsEndpoint.cs`, calls `ArcSweepService`) in `HOAManagementCompany/Features/Board/Architectural/ArcSweepJobEndpoint.cs`
 - [ ] T067 [US6] Add an hourly `google_cloud_scheduler_job` targeting `${cloud_run_url}/api/v1/architectural/jobs/sweep` with an `X-Scheduler-Secret` header from the existing `scheduler-secret` Secret Manager value. Create `infra/modules/environment/scheduler.tf`, add any needed variables in `infra/modules/environment/variables.tf`, and follow the pinned provider in `versions.tf`. Don't add it to `infra/modules/pr-environment/`. Run `tofu validate` for `infra/environments/dev` and `infra/environments/staging`.
 - [ ] T068 [US6] Implement `RecordOutcomeComponent` (manager only, shown in the detail panel when `DecisionReached`: reason field with the prompt, conditions field for approvals, wording picker for lapse denials, submit, email status and Resend) in `neko-hoa/src/app/features/board/architectural/record-outcome.component.ts`. Embed it in `application-detail-panel.component.ts`.
 - [ ] T069 [US6] Show decisions in the UI: decision labels, Closed-tab wording, the "v2" badge and revision links in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts` and `application-detail-panel.component.ts`

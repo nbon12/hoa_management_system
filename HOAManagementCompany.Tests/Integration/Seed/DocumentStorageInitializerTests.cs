@@ -137,6 +137,9 @@ public class DocumentStorageInitializerTests(TestDatabaseFixture fixture)
         public Task<string> GetPreSignedUrlAsync(string storageKey, CancellationToken ct = default)
             => Task.FromResult($"https://example.test/{storageKey}");
 
+        public Task<bool> ExistsAsync(string storageKey, CancellationToken ct = default)
+            => Task.FromResult(UploadedKeys.Contains(storageKey));
+
         public Task UploadAsync(string storageKey, byte[] content, string contentType = "application/pdf", CancellationToken ct = default)
         {
             UploadedKeys.Add(storageKey);
@@ -148,6 +151,9 @@ public class DocumentStorageInitializerTests(TestDatabaseFixture fixture)
     private sealed class ThrowingDocumentStorage : IDocumentStorage
     {
         public Task<string> GetPreSignedUrlAsync(string storageKey, CancellationToken ct = default)
+            => throw new NotSupportedException();
+
+        public Task<bool> ExistsAsync(string storageKey, CancellationToken ct = default)
             => throw new NotSupportedException();
 
         public Task UploadAsync(string storageKey, byte[] content, string contentType = "application/pdf", CancellationToken ct = default)
