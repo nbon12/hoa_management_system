@@ -20,7 +20,7 @@ services:
       - app_network
 
   minio:
-    image: minio/minio:latest
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z  # minio/minio is no longer published on Docker Hub
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
