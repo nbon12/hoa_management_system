@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-08-23
+Auto-generated from all feature plans. Last updated: 2026-10-06
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -26,6 +26,8 @@ Auto-generated from all feature plans. Last updated: 2026-08-23
 - N/A — no schema changes; refresh tokens already persisted hashed in PostgreSQL (020-security-hardening-subspec-d)
 - C# / .NET 9.0 (backend, `HOAManagementCompany`); TypeScript / Angular 17.3 (frontend, `neko-hoa`) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity, JWT bearer issuance, `IDocumentStorage` (all existing, reused — see research.md R3); Angular standalone components/signals, existing `AuthService` claim decoding. No new package for either project. (025-board-overall-design)
 - PostgreSQL (Neon in production, Testcontainers in CI/local). New tables: `Communities`, `CommunityMemberships`. Modified: `Properties` (`CommunityId`/`CommunityName` strings → `CommunityId` GUID FK), `Violations` (`CommunityId` string → GUID FK), `AspNetUsers` (+ `LastActiveMode`). **No audit table** — the FR-017 trail is Serilog-only (Clarifications 2026-08-23). (025-board-overall-design)
+- C# / .NET 9.0 (backend `HOAManagementCompany`, tests `HOAManagementCompany.Tests`). No frontend change. + **Add** `AWSSDK.SimpleEmailV2` 3.7.509.10. It shares `AWSSDK.Core [3.7.501.1, 4.0.0)` with the existing `AWSSDK.S3` 3.7.511.8 (research R1). **Remove** `SendGrid` 9.* and `SendGrid.Extensions.DependencyInjection` 1.*. Existing: FluentValidation via `AddValidatedOptions`, Serilog, xUnit + `Xunit.SkippableFact`. (026-ses-email-provider)
+- N/A. No schema, migration or persistence changes. (026-ses-email-provider)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -63,6 +65,7 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 026-ses-email-provider: Added C# / .NET 9.0 (backend `HOAManagementCompany`, tests `HOAManagementCompany.Tests`). No frontend change. + **Add** `AWSSDK.SimpleEmailV2` 3.7.509.10. It shares `AWSSDK.Core [3.7.501.1, 4.0.0)` with the existing `AWSSDK.S3` 3.7.511.8 (research R1). **Remove** `SendGrid` 9.* and `SendGrid.Extensions.DependencyInjection` 1.*. Existing: FluentValidation via `AddValidatedOptions`, Serilog, xUnit + `Xunit.SkippableFact`.
 - 025-board-overall-design: Added C# / .NET 9.0 (backend, `HOAManagementCompany`); TypeScript / Angular 17.3 (frontend, `neko-hoa`) + FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity, JWT bearer issuance, `IDocumentStorage` (all existing, reused — see research.md R3); Angular standalone components/signals, existing `AuthService` claim decoding. No new package for either project.
 - 020-security-hardening-subspec-d: Added TypeScript / Angular 17.3 (frontend); C# / .NET 9.0 (backend cookie endpoints) + Angular signals/standalone APIs, RxJS, ngx-stripe (CSP origins), Web Locks API + BroadcastChannel (cross-tab refresh); FastEndpoints, ASP.NET Identity/JWT (existing), FluentValidation (new `Auth:RefreshCookie` options)
 
