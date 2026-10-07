@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HOAManagementCompany.Tests.Fixtures;
 
 /// <summary>
-/// Base for US3 alert tests: swaps the real Twilio/SendGrid providers for in-memory
+/// Base for US3 alert tests: swaps the real Twilio/SES providers for in-memory
 /// <see cref="FakeAlertProvider"/>s (observable from tests, forceable to reject) on top of the
 /// <see cref="PaymentTestBase"/> Stripe fake. No external SMS/email/Stripe calls in CI.
 /// </summary>

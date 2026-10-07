@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Infrastructure.Payments.Alerts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -46,9 +50,11 @@ public class StartupValidationTests
         // Explicitly blank the optional alert providers so a developer-local
         // appsettings.Secrets.json can't complete a deliberately-partial config
         // and mask the abort-on-startup behavior under test.
-        ["SendGrid:ApiKey"] = "",
-        ["SendGrid:FromEmail"] = "",
-        ["SendGrid:FromName"] = "",
+        ["Ses:Region"] = "",
+        ["Ses:FromEmail"] = "",
+        ["Ses:FromName"] = "",
+        ["Ses:AccessKeyId"] = "",
+        ["Ses:SecretAccessKey"] = "",
         ["Twilio:AccountSid"] = "",
         ["Twilio:ApiKeySid"] = "",
         ["Twilio:ApiKeySecret"] = "",
@@ -131,11 +137,68 @@ public class StartupValidationTests
         Assert.Contains(ex.Failures, f => f.Contains("Twilio", StringComparison.OrdinalIgnoreCase));
     }
 
+    // ── 026 US3: SES email configuration ───────────────────────────────────────────────────
+
     [Fact]
-    public void PartiallyConfiguredSendGrid_AbortsStartup()
+    public void NoSesConfig_StartsWithEmailDisabled_AndAuthCodesFallBackToAuditLog()
     {
-        var ex = AssertStartupThrows(new Dictionary<string, string?> { ["SendGrid:ApiKey"] = "SG.test" });
-        Assert.Contains(ex.Failures, f => f.Contains("SendGrid", StringComparison.OrdinalIgnoreCase));
+        // The baseline blanks every Ses:* key. Keep the e2e vault decorator off so the resolved
+        // notifier is the bare fallback.
+        using var factory = CreateFactory(new Dictionary<string, string?> { ["DevTools:E2ECleanupEnabled"] = "false" });
+
+        var email = factory.Services.GetServices<IAlertProvider>().Single(p => p.Channel == "email");
+        using var scope = factory.Services.CreateScope();
+        var notifier = scope.ServiceProvider.GetRequiredService<IAuthNotifier>();
+
+        Assert.False(email.IsConfigured);
+        Assert.IsType<LoggingAuthNotifier>(notifier);
+    }
+
+    [Fact]
+    public void PartiallyConfiguredSes_AbortsStartup()
+    {
+        // Region set but no sender → would fail at send time.
+        var ex = AssertStartupThrows(new Dictionary<string, string?> { ["Ses:Region"] = "us-east-1" });
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:FromEmail is required", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void InvalidSesSender_AbortsStartup()
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?>
+        {
+            ["Ses:Region"] = "us-east-1",
+            ["Ses:FromEmail"] = "not-an-email",
+        });
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:FromEmail must be a valid email address", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SesWithOnlyCredentials_AbortsStartup_ListingEachMissingSetting()
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?>
+        {
+            ["Ses:AccessKeyId"] = "AKIAEXAMPLE",
+            ["Ses:SecretAccessKey"] = "example-secret",
+        });
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:Region is required", StringComparison.Ordinal));
+        Assert.Contains(ex.Failures, f => f.Contains("Ses:FromEmail is required", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Ses:AccessKeyId", "AKIASECRETVALUE1")]
+    [InlineData("Ses:SecretAccessKey", "DO_NOT_LEAK_SES_SECRET")]
+    public void UnpairedSesCredentials_AbortStartup_WithoutEchoingTheValue(string key, string value)
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?>
+        {
+            ["Ses:Region"] = "us-east-1",
+            ["Ses:FromEmail"] = "no-reply@mail.nekohoa.com",
+            [key] = value,
+        });
+        var combined = string.Join("\n", ex.Failures);
+        Assert.Contains("must be set together", combined);
+        Assert.DoesNotContain(value, combined);
     }
 
     // ── FR-019: failure messages never echo secret values ──────────────────────────────────

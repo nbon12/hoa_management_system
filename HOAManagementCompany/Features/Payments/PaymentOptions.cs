@@ -3,7 +3,7 @@ namespace HOAManagementCompany.Features.Payments;
 /// <summary>
 /// Strongly-typed configuration for the payments feature (006-stripe-payments).
 /// Bound from the <c>Stripe</c>, <c>Payments</c>, <c>Jobs</c>, <c>Twilio</c>, and
-/// <c>SendGrid</c> config sections. Secrets live in appsettings.Secrets.json (local) or
+/// <c>Ses</c> config sections. Secrets live in appsettings.Secrets.json (local) or
 /// environment variables (deployed); appsettings.json carries only non-secret defaults.
 /// </summary>
 public sealed class StripeOptions
@@ -99,24 +99,39 @@ public sealed class TwilioOptions
             || !string.IsNullOrWhiteSpace(AuthToken));
 }
 
-/// <summary>SendGrid email credentials (US3 alerts / receipts). Disabled when unset.</summary>
-public sealed class SendGridOptions
+/// <summary>
+/// Amazon SES (SESv2) email settings for alerts, receipts, and auth codes (026). Disabled when
+/// <see cref="Region"/> and <see cref="FromEmail"/> are unset.
+/// </summary>
+public sealed class SesOptions
 {
-    public const string SectionName = "SendGrid";
+    public const string SectionName = "Ses";
 
-    public string ApiKey { get; set; } = string.Empty;
+    /// <summary>AWS region system name the sender identity is verified in, e.g. <c>us-east-1</c>.</summary>
+    public string Region { get; set; } = string.Empty;
+
+    /// <summary>Verified sender address, e.g. <c>no-reply@mail.nekohoa.com</c>.</summary>
     public string FromEmail { get; set; } = string.Empty;
+
     public string FromName { get; set; } = "NekoHOA";
 
     /// <summary>
-    /// When true, the adapter sets <c>MailSettings.SandboxMode.Enable=true</c> so SendGrid validates
-    /// the request (auth + payload; sender verification is <b>not</b> enforced in sandbox) and returns
-    /// 2xx <b>without delivering</b> (Stage 2 sandbox, 007).
-    /// SendGrid API keys have no test/live distinction, so this flag is the sole no-deliver guardrail —
+    /// Optional static IAM access key ID (send-only user). Must be paired with
+    /// <see cref="SecretAccessKey"/>; when both are blank the AWS default credential chain is used.
+    /// </summary>
+    public string AccessKeyId { get; set; } = string.Empty;
+
+    /// <summary>Optional static IAM secret access key. Server-only; never logged.</summary>
+    public string SecretAccessKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When true, the adapter refuses any recipient outside the SES mailbox simulator domain
+    /// (<c>simulator.amazonses.com</c>) before making a network call (Stage 2 sandbox, 026 FR-005).
+    /// SES credentials have no test/live distinction, so this flag is the sole no-deliver guardrail —
     /// it is <b>false</b> in production. The Stage 2 harness refuses to send unless this is true.
     /// </summary>
-    public bool Sandbox { get; set; }
+    public bool SimulatorOnly { get; set; }
 
     public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(FromEmail);
+        !string.IsNullOrWhiteSpace(Region) && !string.IsNullOrWhiteSpace(FromEmail);
 }
