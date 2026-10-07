@@ -41,6 +41,7 @@ Verified against `main` at commit `fb6be6b`:
 - Q: How is the owner told the outcome? → A: When the manager records the outcome, the product emails the owner automatically through the existing transactional email. There are two templates, approved and denied, designed separately.
 - Q: What happens when the review period passes without a decision? → A: It follows the association's governing documents, so it is **configurable per community**: flag as overdue only, deemed approved, or deemed denied. The review period length is configurable per community too. Whatever the rule, the community's board is emailed when the deadline lapses. Board members will be able to opt out of that email in a separate Notification Settings spec.
 - Q: Can an approval carry conditions? → A: Yes. When recording an approval, the manager may add optional conditions text, which is stored with the outcome and shown to the owner in the approved email. There is no separate "approved with conditions" outcome.
+- Q: How is a decision reached: majority of all eligible members, or majority of votes cast with a quorum? → A: Configurable per community, to follow its governing documents. **Majority of members** (the default) or **majority of votes cast with a quorum**, where the quorum is more than half of the eligible members.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -149,24 +150,27 @@ When enough board members vote the same way, the application has a board decisio
 
 **Acceptance Scenarios**:
 
-1. **Given** a community with 5 active, non-recused board members and an application with 2 approve votes, **When** a third board member votes approve, **Then** the application shows "decision reached: approve" and refuses further votes.
+1. **Given** a community using the default majority-of-members rule with 5 active, non-recused board members and an application with 2 approve votes, **When** a third board member votes approve, **Then** the application shows "decision reached: approve" and refuses further votes.
 2. **Given** the same community, **When** 3 board members vote deny, **Then** the application shows "decision reached: deny".
 3. **Given** 2 approve and 2 deny votes out of 5, **When** the row renders, **Then** no decision is shown and voting stays open.
-4. **Given** an application with a reached decision of approve, **When** the community manager records the outcome, **Then** the application moves to Closed with outcome "approved" and the closing date, and the owner is sent the "application approved" email naming the application ID, property and project.
-5. **Given** an application with a reached decision of approve, **When** the manager records the outcome with the conditions "Fence must be stained to match the existing color", **Then** the application closes with outcome "approved" and those conditions, and the owner's approved email shows them in its conditions section. When no conditions are recorded, the email has no conditions section.
-6. **Given** an application with a reached decision of deny and board comments, **When** the community manager records the outcome with a reason for the owner, **Then** the application closes with outcome "denied", and the owner is sent the "application denied" email containing that reason. Board-only vote comments are not included.
-7. **Given** a community whose lapse rule is "flag overdue only", **When** an open application passes its due date with no decision, **Then** it is shown as overdue, voting stays open, nothing is decided automatically, and every active board member of the community is emailed that the application is overdue.
-8. **Given** a community whose lapse rule is "deemed approved", **When** an open application passes its due date with no decision, **Then** the application shows "decision reached: approved by default (review period lapsed)", refuses further votes, and every active board member of the community is emailed that the application was approved by default.
-9. **Given** a community whose lapse rule is "deemed denied", **When** an open application passes its due date with no decision, **Then** the application shows "decision reached: denied by default (review period lapsed)", refuses further votes, and every active board member is emailed that the application was denied by default.
-10. **Given** a community with a review period of 45 days, **When** an application received on 05/01/26 is shown, **Then** its due date is 06/15/26.
-11. **Given** I am a community manager, **When** I set my community's review period and lapse rule, **Then** the new values are saved and apply to applications received afterwards. A board member or resident who tries to change them is refused.
+4. **Given** a community using majority of votes cast with 5 eligible members, **When** 3 members have voted 3 approve / 0 deny, **Then** the decision "approve" is reached immediately, because the 2 remaining votes can't overtake it.
+5. **Given** a community using majority of votes cast with 5 eligible members and votes of 2 approve / 1 deny, **When** the due date passes with no more votes, **Then** the decision "approve" is reached and the lapse rule does not apply.
+6. **Given** a community using majority of votes cast with 5 eligible members and only 2 votes cast, **When** the due date passes, **Then** quorum isn't met, no decision is reached from votes, and the community's lapse rule applies.
+7. **Given** an application with a reached decision of approve, **When** the community manager records the outcome, **Then** the application moves to Closed with outcome "approved" and the closing date, and the owner is sent the "application approved" email naming the application ID, property and project.
+8. **Given** an application with a reached decision of approve, **When** the manager records the outcome with the conditions "Fence must be stained to match the existing color", **Then** the application closes with outcome "approved" and those conditions, and the owner's approved email shows them in its conditions section. When no conditions are recorded, the email has no conditions section.
+9. **Given** an application with a reached decision of deny and board comments, **When** the community manager records the outcome with a reason for the owner, **Then** the application closes with outcome "denied", and the owner is sent the "application denied" email containing that reason. Board-only vote comments are not included.
+10. **Given** a community whose lapse rule is "flag overdue only", **When** an open application passes its due date with no decision, **Then** it is shown as overdue, voting stays open, nothing is decided automatically, and every active board member of the community is emailed that the application is overdue.
+11. **Given** a community whose lapse rule is "deemed approved", **When** an open application passes its due date with no decision, **Then** the application shows "decision reached: approved by default (review period lapsed)", refuses further votes, and every active board member of the community is emailed that the application was approved by default.
+12. **Given** a community whose lapse rule is "deemed denied", **When** an open application passes its due date with no decision, **Then** the application shows "decision reached: denied by default (review period lapsed)", refuses further votes, and every active board member is emailed that the application was denied by default.
+13. **Given** a community with a review period of 45 days, **When** an application received on 05/01/26 is shown, **Then** its due date is 06/15/26.
+14. **Given** I am a community manager, **When** I set my community's review period, lapse rule and decision rule, **Then** the new values are saved and apply to applications received afterwards. A board member or resident who tries to change them is refused.
 
 ---
 
 ### Edge Cases
 
-- **Board size changes mid-vote**: The majority is computed against the active, non-recused board members at the time each vote is counted. A member whose membership ends keeps their already-cast vote; a newly added member can vote on any still-open application.
-- **Even-sized board**: The majority is more than half of eligible members (3 of 4, 4 of 6). A tie never reaches a decision.
+- **Board size changes mid-vote**: The majority and quorum are computed against the active, non-recused board members at the time each vote is counted. A member whose membership ends keeps their already-cast vote; a newly added member can vote on any still-open application.
+- **Even-sized board**: Under majority of members, the majority is more than half of eligible members (3 of 4, 4 of 6). A tie never reaches a decision under either rule.
 - **Board member owns the property**: They are recused. They count neither toward the denominator nor the tally.
 - **Board member votes twice**: The second attempt is refused; a vote can't be changed after it is cast. *(Assumption — see Assumptions.)*
 - **Two board members vote at the same moment as the deciding vote**: Exactly one decision is reached, and any vote after the decision is refused.
@@ -196,7 +200,7 @@ When enough board members vote the same way, the application has a board decisio
 - **FR-010**: Selecting an application MUST open a detail panel titled "<ID> · <project>" showing owner, received date and the attachment list. *[design: `WFb BoardArchApps` lower-left card "ARC-1042 · fence replacement".]*
 - **FR-011**: Each attachment MUST be listed with file name and size, and MUST open in a new browser tab. *[design: `WFb` "stored in S3, opens in a new tab".]*
 - **FR-012**: Attachments MUST be served only through short-lived pre-signed links (spec 025 FR-039) that expire within 15 minutes, issued per request after an authorization check. Durable public object URLs MUST NOT be exposed. *[design: handoff README §5.]*
-- **FR-013**: The detail panel MUST show the decision rule text: "Three of five votes decide. The manager records the outcome and notifies the owner." When the board is not five members, the text MUST show the real majority and board size (for example "Three of four votes decide."). *[design: `WFb BoardArchApps` rule text; dynamic wording is `[no WFb]`.]*
+- **FR-013**: The detail panel MUST show the decision rule text for the community's rule and real board size. For majority of members: "Three of five votes decide. The manager records the outcome and notifies the owner." (for example "Three of four votes decide." with four members). For majority of votes cast: "A majority of votes cast decides once three of five members have voted. The manager records the outcome and notifies the owner." *[design: `WFb BoardArchApps` rule text; dynamic wording is `[no WFb]`.]*
 
 ### Voting
 
@@ -215,7 +219,9 @@ When enough board members vote the same way, the application has a board decisio
 
 ### Decision and closing
 
-- **FR-023**: An application MUST reach a decision when one side (approve or deny) holds more than half of its eligible board members' votes. Concurrent votes MUST NOT produce two decisions. *[design: `WFb` "Three of five votes decide."]*
+- **FR-023**: An application MUST reach a decision according to its community's decision rule (FR-029). Concurrent votes MUST NOT produce two decisions. *[design: `WFb` "Three of five votes decide."]*
+  - **Majority of members** (default): a decision is reached as soon as one side (approve or deny) holds more than half of the eligible board members.
+  - **Majority of votes cast with a quorum**: a decision is reached early once quorum is met (more than half of eligible members have voted) and the leading side can no longer be overtaken by the remaining eligible votes. Otherwise, at the due date, if quorum is met and one side leads, that side is the decision. If quorum isn't met or the votes are tied at the due date, the lapse rule (FR-027) applies.
 - **FR-024**: Once a decision is reached, the application MUST show "decision reached: approve" or "decision reached: deny" and refuse further votes.
 - **FR-025**: A Community Manager MUST be able to record the outcome of an application with a reached decision, which closes it with the outcome and closing date. A denial MUST carry a reason for the owner (required, up to 2,000 characters). An approval MAY carry conditions of approval (optional, up to 2,000 characters). Conditions are not allowed on a denial. *[design: `WFb` "The manager records the outcome…"; manager screen is `[no WFb]`.]*
 - **FR-026**: Recording the outcome MUST send the owner an email through the existing transactional email: the "application approved" template for approvals (including the conditions section only when conditions were recorded), the "application denied" template (including the manager's reason) for denials. Board vote comments MUST NOT appear in owner emails. If the email can't be sent, the outcome is still recorded and the failure is logged and shown to the manager so they can resend. *(Templates are being designed separately; see Assumptions.)* `[no WFb]`
@@ -224,8 +230,8 @@ When enough board members vote the same way, the application has a board decisio
 
 ### Community ARC settings
 
-- **FR-029**: Each community MUST have an architectural review period in days (default 30, range 1–365) and a lapse rule (default "flag overdue only"). An application's due date is its received date plus the community's review period at the time it was received. `[no WFb]`
-- **FR-030**: Only a Community Manager of that community MAY change these settings, so they can match the association's governing documents. Each change is logged as a sensitive event with the old and new values. Changes don't alter the due date or rule of applications already received. `[no WFb]`
+- **FR-029**: Each community MUST have an architectural review period in days (default 30, range 1–365), a lapse rule (default "flag overdue only"), and a decision rule (default "majority of members"; alternative "majority of votes cast with a quorum"). An application's due date is its received date plus the community's review period at the time it was received. `[no WFb]`
+- **FR-030**: Only a Community Manager of that community MAY change these settings, so they can match the association's governing documents. Each change is logged as a sensitive event with the old and new values. Changes don't alter the due date, lapse rule or decision rule of applications already received. `[no WFb]`
 
 ### Intake
 
@@ -241,7 +247,7 @@ When enough board members vote the same way, the application has a board decisio
 - **Architectural Application**: A homeowner's request to change the exterior of a property. Belongs to one property (and through it, one community). Has a community-unique `ARC-` ID, project description, owner, received date, due date, status (Open, Decision Reached, Closed), and, when closed, the recorded outcome, closing date, and either the owner-facing denial reason or the optional conditions of approval.
 - **Application Attachment**: A file supporting an application (plans, photos, surveys). Holds file name, size, content type and a private storage key. The file itself lives in private object storage; only metadata is stored with the application.
 - **Board Vote**: One board member's vote on one application: Approve or Deny, optional comment, voter, and UTC timestamp. At most one per member per application.
-- **Community ARC Settings**: Per-community review period (days) and lapse rule (flag overdue only, deemed approved, deemed denied). Set by the community manager to match the association's governing documents.
+- **Community ARC Settings**: Per-community review period (days), lapse rule (flag overdue only, deemed approved, deemed denied) and decision rule (majority of members, majority of votes cast with a quorum). Set by the community manager to match the association's governing documents.
 - **Information Request**: A board member's request for more information on an application: message, sender, UTC timestamp. Does not count as a vote.
 
 ### Constitution Requirements *(mandatory when applicable)*
@@ -256,7 +262,7 @@ When enough board members vote the same way, the application has a board decisio
 - **Security and abuse controls**: Comments and info requests are untrusted input: length-limited and rendered as text, never HTML. Vote and info-request endpoints use the existing rate limiting. Each board access to an application's attachments or owner details emits the 025 FR-017 structured sensitive-event (actor, community, resource, UTC timestamp). Each vote and outcome recording is logged as a sensitive event too.
 - **Observability**: Errors go to Sentry with environment and release tags. Trace context flows from frontend to backend. Comment text, owner names and storage keys are excluded from telemetry.
 - **Accessibility**: All row actions, tabs, the search box and the detail panel are keyboard-reachable and labeled. The tally exposes its counts as text, not color alone. Approve and deny states don't rely on color. Everything meets WCAG 2.1 AA.
-- **Quality gates**: 95% coverage on new backend and frontend files. Sonar analysis passes. xUnit integration tests run on Testcontainers PostgreSQL and MinIO, use isolated per-test communities so they're safe in parallel and after prior runs, and use `[Theory]` data for the majority rule (board sizes 3, 4, 5 and 6, with and without a recused member). Serilog sensitive-events are asserted where the spec requires them. Repowise docs are refreshed for the PR. The PR is a focused vertical slice.
+- **Quality gates**: 95% coverage on new backend and frontend files. Sonar analysis passes. xUnit integration tests run on Testcontainers PostgreSQL and MinIO, use isolated per-test communities so they're safe in parallel and after prior runs, and use `[Theory]` data for both decision rules (board sizes 3, 4, 5 and 6, with and without a recused member, quorum met and not met at the due date). Serilog sensitive-events are asserted where the spec requires them. Repowise docs are refreshed for the PR. The PR is a focused vertical slice.
 - **Frontend testing**: Jasmine/Karma for tally and majority-text logic. Angular Testing Library for the applications table, tabs, search, detail panel and Needs-your-vote card. Playwright for the vote journey and refusal of a Resident on the route. Cypress E2E for sign-in → board mode → Architectural Applications → vote. Storybook visual regression for the table, tally, detail panel and card.
 - **Executable & living spec**: Every acceptance scenario and Independent Test above maps to an automated test that runs on demand and passes before merge. This `spec.md` and `tasks.md` are updated before the PR. This spec fills in 025's placeholder Community Home and its "Architectural Applications" nav entry without contradicting 025.
 - **Spec independence & parallelism**: Hard dependency on spec 025 (merged) for community scope, roles, the board shell and the pre-signed URL primitive. No dependency on specs 2, 4, 5 or 6. Two sibling specs come out of this one's clarifications, and neither blocks it: **Resident Architectural Application Submission** creates applications (this spec uses seeded ones until it lands), and **Notification Settings** adds the board opt-out for the lapse email (this spec emails all active board members until it lands). They can be built in parallel. The "Needs your vote" card is added to Community Home as its own section, so spec 2 (Community Overview & Metrics) can fill the rest of that page in parallel.
@@ -269,14 +275,14 @@ When enough board members vote the same way, the application has a board decisio
 - **SC-002**: A board member can open any attachment of an application within 3 seconds of selecting it.
 - **SC-003**: 100% of attachment links issued by the product stop working within 15 minutes, and no page or response contains a durable public object URL.
 - **SC-004**: 0 votes are accepted from non-board members, recused owners, or on closed or decided applications, across the automated suite.
-- **SC-005**: Every application with a majority of eligible votes on one side shows exactly one decision, including when the deciding votes arrive simultaneously.
+- **SC-005**: Every application that meets its community's decision rule shows exactly one decision, including when the deciding votes arrive simultaneously.
 - **SC-006**: The applications page shows the first page of results within 2 seconds for a community with 500 applications.
 - **SC-007**: Every recorded outcome produces exactly one owner email (or a visible, resendable failure), and every lapsed application produces exactly one board email per active board member.
 - **SC-008**: 100% of lapsed applications get the outcome their community's configured rule calls for.
 
 ## Assumptions
 
-- **Majority rule**: "Three of five votes decide" generalizes to a simple majority of active, non-recused board members. The wireframe's five-member board is just the example.
+- **Majority rule**: The default rule, "Three of five votes decide", generalizes to a simple majority of active, non-recused board members. The wireframe's five-member board is just the example.
 - **Votes are final**: A board member can't change or withdraw a vote. This keeps the record clean and matches how most boards minute decisions. Easy to relax later if wanted.
 - **Due date**: The review period defaults to 30 days, matching the wireframe (received 05/28/26, due 06/27/26), and the lapse rule defaults to "flag overdue only" so nothing is decided automatically until a manager sets the community's rule.
 - **Owner email templates**: The approved and denied email layouts are being designed separately in Claude Design. Until they arrive, plain-text versions with the same fields (application ID, property, project, outcome, and the reason for denials) are used.
