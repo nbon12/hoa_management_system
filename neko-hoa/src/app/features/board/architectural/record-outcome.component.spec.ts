@@ -64,4 +64,21 @@ describe('RecordOutcomeComponent (027 US6, FR-025/FR-026)', () => {
     expect(screen.getByText('No owner email on file — notify the owner another way.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Resend email' })).toBeNull();
   });
+
+  it('records an approval with no conditions as an empty body', async () => {
+    const { recorded } = await setup(detail({}));
+    fireEvent.click(screen.getByRole('button', { name: 'Record outcome and email owner' }));
+    expect(recorded).toHaveBeenCalledWith({});
+  });
+
+  for (const [status, text] of [
+    ['Sent', 'The owner was emailed the outcome.'],
+    ['Pending', 'The owner email is queued.'],
+    ['Failed', 'The owner email could not be sent.'],
+  ] as const) {
+    it(`explains owner email status ${status}`, async () => {
+      await setup(detail({ status: 'Closed', ownerEmailStatus: status }));
+      expect(screen.getByText(text)).toBeTruthy();
+    });
+  }
 });

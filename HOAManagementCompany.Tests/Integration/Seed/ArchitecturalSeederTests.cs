@@ -70,6 +70,10 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
         Assert.True(await db.CommunityMemberships.AnyAsync(m =>
             m.CommunityId == community.Id && m.Role == CommunityRole.CommunityManager && m.User.Email == "manager@nekohoa.dev"));
 
+        // Every seeded demo user can log in (login requires a linked property).
+        foreach (var email in new[] { "board2@nekohoa.dev", "board5@nekohoa.dev", "manager@nekohoa.dev" })
+            Assert.True(await db.UserProperties.AnyAsync(up => up.User.Email == email), email);
+
         var fence = await db.ArchitecturalApplications.SingleAsync(a => a.CommunityId == community.Id && a.ApplicationNumber == 1042);
         Assert.Equal(ArcApplicationStatus.Open, fence.Status);
         Assert.Equal(3, await db.ArchitecturalAttachments.CountAsync(x => x.ApplicationId == fence.Id));

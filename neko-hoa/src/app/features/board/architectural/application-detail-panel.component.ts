@@ -131,6 +131,8 @@ export class ApplicationDetailPanelComponent {
   readonly communityId = input.required<string>();
   readonly applicationId = input.required<string>();
   readonly manager = input<boolean>(false);
+  /** US4-S1: open with the comment box focused for a Request info (set when Info is clicked on a row). */
+  readonly startWithInfo = input<boolean>(false);
   /** Emits the refreshed row after any change so the list can update in place. */
   readonly changed = output<ArcListItem>();
   readonly openRevision = output<string>();
@@ -156,9 +158,11 @@ export class ApplicationDetailPanelComponent {
       const id = this.applicationId();
       untracked(() => void this.load(cid, id));
     }, { allowSignalWrites: true });
+    // The vote card only exists once the detail has loaded, so focus is applied when it appears.
     effect(() => {
       const card = this.voteCard();
-      if (card && this.pendingInfoFocus) {
+      const wantsInfo = this.startWithInfo();
+      if (card && (wantsInfo || this.pendingInfoFocus)) {
         this.pendingInfoFocus = false;
         queueMicrotask(() => card.focusForInfo());
       }

@@ -101,8 +101,9 @@ export class NeedsYourVoteCardComponent {
       this.items.update(list => list.filter(i => i.id !== a.id));
       this.error.set(null);
     } catch (e: any) {
-      this.error.set(e?.error?.message ?? 'Your vote could not be saved.');
+      // Reload first (the application may have been decided), then show why the vote was refused.
       await this.load();
+      this.error.set(e?.error?.message ?? 'Your vote could not be saved.');
     } finally {
       this.busyId.set(null);
     }

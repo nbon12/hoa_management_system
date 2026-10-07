@@ -134,7 +134,7 @@ description: "Task list for 027-board-arc-review"
   - **US1-S5**: 2 approve + 3 not voted gives the tally `{approve:2, revisionsNeeded:0, deny:0, notVoted:3, eligible:5}`.
   - **US1-S6**: `counts.awaitingMyVote == 1` for the caller.
   - **US1-S7**: a board member of community A requesting community B, and requesting a nonexistent community, both get 403 with an identical body.
-  - Pagination: default 25, `limit=101` gives 422, and `counts` ignore search and paging.
+  - Pagination: default 25, `limit=101` is clamped to 100 (the repo's `Paging` convention), and `counts` ignore search and paging.
   - `Cache-Control: no-store`.
 - [X] T025 [P] [US1] Create the tally component spec: the accessible label equals "2 approve · 0 revisions needed · 0 deny · 3 not voted" for US1-S5 and "2 approve · 1 revisions needed · 0 deny · 2 not voted" for FR-007; the visible text reads "2/5"; the counts are exposed as text, not color only. File: `neko-hoa/src/app/features/board/architectural/tally.component.spec.ts`
 - [X] T026 [P] [US1] Create the applications-page component spec (Angular Testing Library, mocked `ArchitecturalService`) in `neko-hoa/src/app/features/board/architectural/applications-page.component.spec.ts`:
@@ -146,7 +146,7 @@ description: "Task list for 027-board-arc-review"
   - **US1-S6**: the pill reads "1 awaiting your vote" and is hidden at 0;
   - empty-search state names the term.
   - Edge case (board member of several communities): the page requests only the community from `BoardNavigationService.activeCommunityId()`, and switching the active community re-requests the new one.
-- [ ] T027 [P] [US1] Create a Playwright spec: **US1-S8**, a Resident-only user navigating to `/app/board/architectural`, is redirected to a permitted page and the table never renders. Also a board member sees the page. File: `neko-hoa/e2e/board-architectural.spec.ts`
+- [X] T027 [P] [US1] Create a Playwright spec: **US1-S8**, a Resident-only user navigating to `/app/board/architectural`, is redirected to a permitted page and the table never renders. Also a board member sees the page. File: `neko-hoa/e2e/board-architectural.spec.ts`
 
 ### Implementation
 
@@ -371,7 +371,7 @@ description: "Task list for 027-board-arc-review"
 
   Return the counts.
 - [X] T066 [US6] Implement `ArcSweepJobEndpoint` (`POST /architectural/jobs/sweep`, `AllowAnonymous`, constant-time `X-Scheduler-Secret` compare against `JobsOptions.SchedulerSharedSecret` as in `Features/Payments/Jobs/RunDraftsEndpoint.cs`, calls `ArcSweepService`) in `HOAManagementCompany/Features/Board/Architectural/ArcSweepJobEndpoint.cs`
-- [ ] T067 [US6] Add an hourly `google_cloud_scheduler_job` targeting `${cloud_run_url}/api/v1/architectural/jobs/sweep` with an `X-Scheduler-Secret` header from the existing `scheduler-secret` Secret Manager value. Create `infra/modules/environment/scheduler.tf`, add any needed variables in `infra/modules/environment/variables.tf`, and follow the pinned provider in `versions.tf`. Don't add it to `infra/modules/pr-environment/`. Run `tofu validate` for `infra/environments/dev` and `infra/environments/staging`.
+- [X] T067 [US6] Add an hourly `google_cloud_scheduler_job` targeting `${cloud_run_url}/api/v1/architectural/jobs/sweep` with an `X-Scheduler-Secret` header from the existing `scheduler-secret` Secret Manager value. Create `infra/modules/environment/scheduler.tf`, add any needed variables in `infra/modules/environment/variables.tf`, and follow the pinned provider in `versions.tf`. Don't add it to `infra/modules/pr-environment/`. Run `tofu validate` for `infra/environments/dev` and `infra/environments/staging`.
 - [X] T068 [US6] Implement `RecordOutcomeComponent` (manager only, shown in the detail panel when `DecisionReached`: reason field with the prompt, conditions field for approvals, wording picker for lapse denials, submit, email status and Resend) in `neko-hoa/src/app/features/board/architectural/record-outcome.component.ts`. Embed it in `application-detail-panel.component.ts`.
 - [X] T069 [US6] Show decisions in the UI: decision labels, Closed-tab wording, the "v2" badge and revision links in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts` and `application-detail-panel.component.ts`
 - [X] T070 [US6] Implement `ArcSettingsComponent` (manager form for the five settings plus time zone, with validation and save) in `neko-hoa/src/app/features/board/architectural/arc-settings.component.ts`. Add the route `board/arc-settings` (`requiredRoles: ['CommunityManager']`) in `neko-hoa/src/app/app.routes.ts` and an "ARC Settings" nav item (`requiredRoles: ['CommunityManager']`) in `neko-hoa/src/app/core/services/board-navigation.service.ts` with its spec update.
@@ -380,15 +380,15 @@ description: "Task list for 027-board-arc-review"
 
 ## Phase 9: Polish and cross-cutting
 
-- [ ] T071 [P] Add a Cypress journey: sign in as `board@nekohoa.dev` → Enter board mode → Architectural Applications → open ARC-1042 → Approve → "you voted approve". File: `neko-hoa/cypress/e2e/board-architectural.cy.ts`
-- [ ] T072 [P] Add a Playwright vote journey (board member votes Revisions needed with a comment and sees the formal-denial note; the info-request notice appears) to `neko-hoa/e2e/board-architectural.spec.ts`
-- [ ] T073 [P] Add a performance test (SC-006): a community with 500 applications × 5 votes; the first list page answers in under 2 s against Testcontainers. File: `HOAManagementCompany.Tests/Performance/ArcListPerformanceTests.cs`
-- [ ] T074 [P] Add accessibility checks: keyboard reachability of tabs, search, row actions and panel; labeled controls; tally text alternatives (axe through the existing Playwright setup if present, otherwise explicit role and label assertions). File: `neko-hoa/e2e/board-architectural.spec.ts`
+- [X] T071 [P] Add a Cypress journey: sign in as `board@nekohoa.dev` → Enter board mode → Architectural Applications → open ARC-1042 → Approve → "you voted approve". File: `neko-hoa/cypress/e2e/board-architectural.cy.ts`
+- [X] T072 [P] Add read-only Playwright journeys against the seeded stack (a board member sees the tabs, search and FR-002 table; the Request info notice appears with the comment box focused) to `neko-hoa/e2e/board-architectural.spec.ts`. Voting stays in the stubbed Cypress journey (T071) so the shared seed is never mutated.
+- [X] T073 [P] Add a performance test (SC-006): a community with 500 applications × 5 votes; the first list page answers in under 2 s against Testcontainers. File: `HOAManagementCompany.Tests/Performance/ArcListPerformanceTests.cs`
+- [X] T074 [P] Add accessibility checks: keyboard reachability of tabs, search, row actions and panel; labeled controls; tally text alternatives (axe through the existing Playwright setup if present, otherwise explicit role and label assertions). File: `neko-hoa/e2e/board-architectural.spec.ts`
 - [X] T075 [P] Check Storybook stories for tally, detail panel and needs-your-vote card in both themes, using tokens only, in `neko-hoa/src/app/features/board/architectural/*.stories.ts`
-- [ ] T076 Run the full backend suite (`dotnet test`) and frontend (`cd neko-hoa && npm run test:ci && npm run build`). Confirm the payment outbox tests still pass after T007 and that coverage on new files is ≥ 95%.
-- [ ] T077 Walk through `specs/027-board-arc-review/quickstart.md` against a local stack and fix any drift in the quickstart or code
-- [ ] T078 NLT audit per CLAUDE.md: for every `USn-Sm` and Independent Test in `spec.md`, confirm the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.
-- [ ] T079 Keep the spec truthful: update `specs/027-board-arc-review/spec.md` for any implementation-driven change, mark this file's tasks done, and refresh the Repowise marker regions listed in `plan.md`
+- [X] T076 Run the full backend suite (`dotnet test`) and frontend (`cd neko-hoa && npm run test:ci && npm run build`). Confirm the payment outbox tests still pass after T007 and that coverage on new files is ≥ 95%.
+- [X] T077 Walk through `specs/027-board-arc-review/quickstart.md` against a local stack and fix any drift in the quickstart or code
+- [X] T078 NLT audit per CLAUDE.md: for every `USn-Sm` and Independent Test in `spec.md`, confirm the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.
+- [X] T079 Keep the spec truthful: update `specs/027-board-arc-review/spec.md` for any implementation-driven change, mark this file's tasks done, and refresh the Repowise marker regions listed in `plan.md`
 - [X] T080 [P] Add a telemetry-hygiene test: after votes, info requests, detail views and attachment links, assert that the `ArcVoteCast`/`ArcSensitiveAccess`/`ArcOutcomeRecorded` log events carry only IDs, and that none of the captured log events or OpenTelemetry span attributes (using the existing in-memory exporter or activity listener) contain the comment text, owner name or storage key used in the test. File: `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcTelemetryHygieneTests.cs`
 
 ---
@@ -451,8 +451,82 @@ T052, T053, T054, T055, T056, T057, T058, T059
    5. revisions view (T055, T069).
 4. **Polish**: then the NLT audit (T078) and telemetry-hygiene test (T080) before opening the PR for review.
 
-## NLT mapping (filled by T078)
+## Verification log (2026-10-07)
+
+- Backend, full suite: 679 passed. The 10 failures are the three `Integration/Sandbox/*` classes, which need live SES/Stripe/Twilio credentials and run only in CI's separate sandbox job (the main job filters `Category!=Sandbox`).
+- Backend, ARC + seed + scope tests after the final edits: 195 passed.
+- Frontend `npm run test:ci`: 338 passed (twice); `ng build` succeeds. New files are at 95–100% line coverage.
+- Playwright against a local stack (compose Postgres/MinIO, `dotnet run`, `ng serve`): `board-architectural`, `board-role-gate` and `board-mode` specs, 8/8 passed on two consecutive runs.
+- Quickstart walked with curl on a fresh database: seed, list counts, detail, attachment link and download, three Revisions-needed votes reaching "denied · revisions requested", manager outcome queuing the owner email, sweep auth.
+- Not run locally: Cypress (binary download blocked by the network policy) and `tofu validate` (registry blocked); CI runs both.
+
+## NLT mapping (T078)
+
+No test in this mapping is skipped or disabled.
 
 | Scenario | Test |
 |---|---|
-| _to be completed during implementation_ | |
+| US1-S1 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationsListEndpointTests.cs` OpenAndClosedTabs_ListExactlyTheirApplications_WithStableCounts; `neko-hoa/src/app/features/board/architectural/applications-page.component.spec.ts` "shows Open · 4 / Closed · 27 with Open selected" |
+| US1-S2 | same backend test (closed tab); applications-page spec "requests status=closed when the Closed tab is selected" |
+| US1-S3 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationsListEndpointTests.cs` Search_MatchesAddressOrOwner_CaseInsensitively (Theory); applications-page spec "searches by address or owner" |
+| US1-S4 | ApplicationsListEndpointTests Row_CarriesIdAddressOwnerProjectAttachmentsDueDateAndTally; applications-page spec "renders ID, address with owner…" and "column headers in FR-002 order" |
+| US1-S5 | ApplicationsListEndpointTests Tally_CountsVotesAndNotVoted; `neko-hoa/src/app/features/board/architectural/tally.component.spec.ts` "reads 2/5 with the full accessible label"; `neko-hoa/src/app/features/board/architectural/arc-format.spec.ts` tally label |
+| US1-S6 | ApplicationsListEndpointTests Counts_AwaitingMyVote_CountsOnlyUnvotedOpenApplications; applications-page spec "shows 1 awaiting your vote and hides the pill at 0" |
+| US1-S7 | ApplicationsListEndpointTests OtherCommunity_AndNonexistentCommunity_AreRefusedIdentically |
+| US1-S8 | `neko-hoa/e2e/board-architectural.spec.ts` "a resident-only user is refused the route and redirected"; `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcCapabilityTests.cs` (Resident denied every ARC capability) |
+| US1 Independent Test | ApplicationsListEndpointTests (all); `neko-hoa/cypress/e2e/board-architectural.cy.ts`; Playwright "a board member sees tabs, search and the FR-002 table" |
+| US2-S1 | `HOAManagementCompany.Tests/Integration/Board/Architectural/CastVoteEndpointTests.cs` UnvotedBoardMember_CanVote; applications-page spec "offers Approve, Revisions needed, Deny and Info" |
+| US2-S2 | CastVoteEndpointTests Approve_IsSaved_AndTallyUpdates; applications-page spec "votes Approve from the row and re-renders it"; Cypress journey |
+| US2-S3 | CastVoteEndpointTests AfterDeny_StateIsVotedDeny_AndSecondVoteIsRefused; applications-page spec "shows you voted deny with no buttons" |
+| US2-S4 | CastVoteEndpointTests RevisionsNeeded_WithComment_IsSaved; applications-page spec "shows you voted revisions needed and the formal-denial note" |
+| US2-S5 | CastVoteEndpointTests DenyComment_IsVisibleToAnotherBoardMember_WithVoterName; `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.spec.ts` "emits Deny with the comment" |
+| US2-S6 | CastVoteEndpointTests Deny_WithoutComment_Succeeds; cast-vote-card spec "emits a vote with a null comment when empty" |
+| US2-S7 | CastVoteEndpointTests VoteOnClosedApplication_IsRefused_TallyUnchanged |
+| US2-S8 | CastVoteEndpointTests Owner_IsRecused_AndExcludedFromEligible; applications-page spec "shows recused instead of vote buttons" |
+| US2-S9 | CastVoteEndpointTests NonBoardRoles_CannotVote (Theory: CommunityManager, Accountant) |
+| US2 Independent Test | CastVoteEndpointTests (all); Cypress journey |
+| US3-S1 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationDetailEndpointTests.cs` Detail_ShowsOwnerReceivedDateAndAttachmentsWithSizes; `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.spec.ts` "shows the title, owner, received date and files with sizes" |
+| US3-S2 | `HOAManagementCompany.Tests/Integration/Board/Architectural/AttachmentUrlEndpointTests.cs` Link_DownloadsTheExactFile_ExpiresWithin15Minutes_AndIsFast; detail-panel spec "opens an attachment in a new tab through a fetched link" |
+| US3-S3 | AttachmentLinkExpiryTests ExpiredLink_IsRefusedByStorage |
+| US3-S4 | AttachmentUrlEndpointTests NonMember_AndForeignAttachmentId_AreRefusedWithoutALink |
+| US3-S5 | ApplicationDetailEndpointTests Detail_WithoutAttachments_HasEmptyAttachmentList; detail-panel spec "says there are no attachments" |
+| US3-S6 | ApplicationDetailEndpointTests ListAndDetail_NeverContainObjectUrlsOrStorageKeys; detail-panel spec "renders no storage links" |
+| US3 Independent Test | AttachmentUrlEndpointTests + AttachmentLinkExpiryTests |
+| US4-S1 | cast-vote-card spec "focusForInfo focuses the comment box"; Playwright "Request info explains…" (Info on the row → comment box focused) |
+| US4-S2 | `HOAManagementCompany.Tests/Integration/Board/Architectural/InfoRequestEndpointTests.cs` RequestInfo_MarksApplication_WithoutVotingOrMovingTheDueDate; cast-vote-card spec "emits the info request message"; detail-panel spec "shows info requests with sender" |
+| US4-S3 | InfoRequestEndpointTests EmptyMessage_IsRefused (Theory); cast-vote-card spec "refuses an empty info request" |
+| US4-S4 | InfoRequestEndpointTests Manager_SeesTheRequestWithSenderAndTime; detail-panel spec "shows info requests with sender" |
+| US4-S5 | cast-vote-card spec "…shows the review-period notice"; `neko-hoa/src/app/features/board/architectural/arc-format.spec.ts` info notice; Playwright "Request info explains…" |
+| US4 Independent Test | InfoRequestEndpointTests RequestInfo_MarksApplication_WithoutVotingOrMovingTheDueDate |
+| US5-S1 | ApplicationsListEndpointTests AwaitingMyVote_ListsOnlyUnvoted_AndEmptiesAfterVoting; `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.spec.ts` "lists what needs my vote with all FR-032 fields" |
+| US5-S2 | needs-your-vote-card spec "links to all architectural applications"; Cypress journey |
+| US5-S3 | ApplicationsListEndpointTests AwaitingMyVote_ListsOnlyUnvoted_AndEmptiesAfterVoting; needs-your-vote-card spec "approves in one click and removes the row" |
+| US5-S4 | same backend test; needs-your-vote-card spec "shows an empty state" |
+| US5 Independent Test | needs-your-vote-card spec + backend AwaitingMyVote test |
+| US6-S1 | `HOAManagementCompany.Tests/Integration/Board/Architectural/DecisionOnVoteTests.cs` ThirdApproveOfFive_DecidesApproved_AndRefusesFurtherVotes; `HOAManagementCompany.Tests/Unit/Architectural/ArcDecisionRulesTheoryTests.cs` |
+| US6-S2 | DecisionOnVoteTests ThreeDenies_DecideDenied_WithDeniedWording |
+| US6-S3 | DecisionOnVoteTests TwoAndTwoOfFive_HasNoDecision_AndVotingStaysOpen |
+| US6-S4 | DecisionOnVoteTests VotesCast_ThreeApproveOfFive_DecidesImmediately; ArcDecisionRulesTheoryTests |
+| US6-S5 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcSweepTests.cs` VotesCast_LeaderWithQuorumAtDueDate_DecidesFromVotes_NoLapse |
+| US6-S6 | ArcSweepTests VotesCast_NoQuorumAtDueDate_AppliesLapseRule |
+| US6-S7 | `HOAManagementCompany.Tests/Integration/Board/Architectural/RecordOutcomeEndpointTests.cs` Approved_ClosesAndQueuesApprovedEmailToOwner_WithoutConditionsSection |
+| US6-S8 | RecordOutcomeEndpointTests Approved_WithConditions_StoresAndEmailsThem; `neko-hoa/src/app/features/board/architectural/record-outcome.component.spec.ts` "offers conditions only for approvals" |
+| US6-S9 | DecisionOnVoteTests RevisionsNeededAndDeny_CountTogether_WordingFollowsMajorityKind |
+| US6-S10 | RecordOutcomeEndpointTests RevisionsRequested_EmailHasReasonStatementAndResubmitLink_ButNoBoardComments; record-outcome spec "requires a reason for a denial" |
+| US6-S11 | RecordOutcomeEndpointTests Denied_EmailHasReasonStatementAndResubmitLink |
+| US6-S12 | `HOAManagementCompany.Tests/Integration/Board/Architectural/RevisionHistoryTests.cs` Revision_HasOwnDatesAndNoVotes_AndLinksToV1WithItsHistory; detail-panel spec "shows the v2 badge and links to earlier versions" |
+| US6-S13 | ArcSweepTests Reminder_SentOncePerBoardMember_SevenDaysBeforeDueDate |
+| US6-S14 | ArcSweepTests FlagOverdueOnly_StaysOpenAndOverdue_VotingContinues_BoardEmailedOnce |
+| US6-S15 | ArcSweepTests DeemedRules_DecideByLapse_RefuseVotes_AndEmailBoard (DeemedApproved) |
+| US6-S16 | ArcSweepTests DeemedRules_DecideByLapse_RefuseVotes_AndEmailBoard (DeemedDenied) |
+| US6-S17 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcSettingsEndpointTests.cs` ManagerSavesSettings_NewApplicationsUseThem_OldOnesKeepSnapshots |
+| US6-S18 | ArcSettingsEndpointTests ManagerSavesSettings_… and NonManagers_CannotChangeSettings (Theory); `neko-hoa/src/app/features/board/architectural/arc-settings.component.spec.ts` |
+| US6 Independent Test | DecisionOnVoteTests + RecordOutcomeEndpointTests + ArcSweepTests |
+| Edge: board size changes mid-vote | DecisionOnVoteTests DepartedMembersVoteStillCounts_AndNewMemberCanVote; ArcDecisionRulesTheoryTests Evaluate_CountsVotesFromMembersWhoLeft… |
+| Edge: simultaneous deciding votes (SC-005) | `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcConcurrencyTests.cs` SimultaneousDecidingVotes_ProduceExactlyOneDecision |
+| Edge: property has no owner email | RecordOutcomeEndpointTests NoOwnerEmail_StillCloses_QueuesNothing_AndReportsNoOwnerEmail |
+| Edge: attachment missing from storage | AttachmentUrlEndpointTests MissingObject_Returns404AttachmentUnavailable; detail-panel spec "shows Attachment unavailable" |
+| Edge: search with no matches | applications-page spec "names the search term when nothing matches" |
+| Edge: member of several communities | applications-page spec "requests only the active community and re-requests when it changes" |
+| SC-002 / SC-006 | AttachmentUrlEndpointTests (3 s); `HOAManagementCompany.Tests/Performance/ArcListPerformanceTests.cs` (500 applications < 2 s) |
+| Observability: no sensitive data in telemetry | `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcTelemetryHygieneTests.cs` |

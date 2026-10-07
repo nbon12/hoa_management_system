@@ -18,7 +18,7 @@ The list behind the Open/Closed tabs (US1) and the Needs-your-vote card (US5).
   | `status` | `open` (Open + DecisionReached) or `closed` | `open` |
   | `search` | case-insensitive partial match on property address or owner name, ≤ 100 chars | none |
   | `awaitingMyVote` | `true` restricts to applications the caller can still vote on (US5) | `false` |
-  | `limit` | max 100 | 25 |
+  | `limit` | values above 100 are clamped to 100 (the repo's shared `Paging` helper) | 25 |
   | `offset` | | 0 |
 
 - **Response 200**:
@@ -52,7 +52,7 @@ The list behind the Open/Closed tabs (US1) and the Needs-your-vote card (US5).
   - `counts` ignores `search` and paging, so the tab labels and header pill stay stable (FR-003, FR-005).
   - No attachment URLs appear here (R8).
 
-- **Errors**: 403 `FORBIDDEN`; 422 `VALIDATION_ERROR` for a bad `status`, a `limit` over 100, or a `search` over 100 characters.
+- **Errors**: 403 `FORBIDDEN`; 422 `VALIDATION_ERROR` for a bad `status` or a `search` over 100 characters.
 
 ## GET /communities/{communityId}/architectural-applications/{applicationId}
 

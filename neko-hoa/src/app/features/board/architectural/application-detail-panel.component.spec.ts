@@ -128,4 +128,90 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
       decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } }), true);
     expect(screen.getByLabelText('What would need to change for approval?')).toBeTruthy();
   });
+
+  it('requests info, then refreshes', async () => {
+    await setup();
+    arc.requestInfo.and.returnValue(Promise.resolve({} as any));
+    fireEvent.input(screen.getByLabelText('Comment to the board'), { target: { value: 'Please attach a plat survey' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Request info' }));
+    await until(() => arc.requestInfo.calls.count() > 0 && arc.detail.calls.count() > 1);
+    expect(arc.requestInfo).toHaveBeenCalledWith('c1', 'a1', 'Please attach a plat survey');
+  });
+
+  it('shows the server message when an action fails', async () => {
+    await setup();
+    arc.vote.and.returnValue(Promise.reject({ error: { message: 'A decision has already been reached on this application.' } }));
+    fireEvent.click(screen.getByRole('button', { name: '✕ Deny' }));
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('A decision has already been reached'));
+  });
+
+  it('records the outcome and resends a failed email as a manager', async () => {
+    await setup(detail({ status: 'DecisionReached', myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Approved', wording: null, source: 'Votes' } }), true);
+    arc.recordOutcome.and.returnValue(Promise.resolve({} as any));
+    arc.detail.and.returnValue(Promise.resolve(detail({ status: 'Closed', myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Approved', wording: null, source: 'Votes' }, ownerEmailStatus: 'Failed' })));
+    fireEvent.click(screen.getByRole('button', { name: 'Record outcome and email owner' }));
+    await until(() => !!screen.queryByRole('button', { name: 'Resend email' }));
+    expect(arc.recordOutcome).toHaveBeenCalledWith('c1', 'a1', {});
+    arc.resendOutcomeEmail.and.returnValue(Promise.resolve({ ownerEmailStatus: 'Pending' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resend email' }));
+    await until(() => arc.resendOutcomeEmail.calls.count() > 0);
+  });
+
+  it('shows my recorded vote, the formal-denial note, and recusal', async () => {
+    await setup(detail({ myVote: { state: 'Voted', choice: 'RevisionsNeeded' } }));
+    expect(screen.getByText('you voted revisions needed')).toBeTruthy();
+    expect(screen.getByText('Revisions needed counts as a formal denial; the owner is invited to revise and resubmit.')).toBeTruthy();
+  });
+
+  it('explains recusal', async () => {
+    await setup(detail({ myVote: { state: 'Recused' } }));
+    expect(screen.getByText('You own this property, so you are recused.')).toBeTruthy();
+  });
+
+  it('shows decision and overdue markers, and opens an earlier version', async () => {
+    const r = await setup(detail({
+      overdue: true, status: 'DecisionReached', myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Approved', wording: null, source: 'Lapse' },
+      revisions: [
+        { id: 'v1', revision: 1, receivedDate: '2026-04-01', decision: null },
+        { id: 'a1', revision: 2, receivedDate: '2026-05-28', decision: null },
+      ],
+    }));
+    expect(screen.getByText('overdue')).toBeTruthy();
+    expect(screen.getByText('decision reached: approve (by default — review period lapsed)')).toBeTruthy();
+    const opened = jasmine.createSpy('openRevision');
+    r.fixture.componentInstance.openRevision.subscribe(opened);
+    fireEvent.click(screen.getByRole('button', { name: 'v1' }));
+    expect(opened).toHaveBeenCalledWith('v1');
+  });
+
+  it('shows an error when the application cannot be loaded', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['detail']);
+    arc.detail.and.returnValue(Promise.reject({ status: 403 }));
+    await render(ApplicationDetailPanelComponent, {
+      componentInputs: { communityId: 'c1', applicationId: 'a1' },
+      providers: [{ provide: ArchitecturalService, useValue: arc }],
+    });
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('could not be loaded'));
+  });
+
+  it('focuses the comment box when opened with startWithInfo (US4-S1)', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['detail']);
+    arc.detail.and.returnValue(Promise.resolve(detail()));
+    await render(ApplicationDetailPanelComponent, {
+      componentInputs: { communityId: 'c1', applicationId: 'a1', startWithInfo: true },
+      providers: [{ provide: ArchitecturalService, useValue: arc }],
+    });
+    await until(() => document.activeElement === screen.queryByLabelText('Comment to the board'));
+    await until(() => !!screen.queryByRole('note'));
+  });
+
+  it('queues focus for Request info until the vote card renders', async () => {
+    const r = await setup();
+    r.fixture.componentInstance.focusForInfo();
+    r.fixture.detectChanges();
+    expect(document.activeElement).toBe(screen.getByLabelText('Comment to the board'));
+  });
 });

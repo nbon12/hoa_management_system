@@ -125,16 +125,16 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
       expect(within(r).getByRole('button', { name })).toBeTruthy();
   });
 
-  // US2-S2: Approve → "you voted approve" and the new tally.
+  // US2-S2: from 1 approve / 0 deny / 4 not voted, Approve → "you voted approve" and 2 / 0 / 3.
   it('votes Approve from the row and re-renders it (US2-S2)', async () => {
-    await setup([row()]);
+    await setup([row({ tally: { approve: 1, revisionsNeeded: 0, deny: 0, notVoted: 4, eligible: 5 } })]);
     arc.vote.and.returnValue(Promise.resolve(row({
-      myVote: { state: 'Voted', choice: 'Approve' }, tally: { approve: 3, revisionsNeeded: 0, deny: 0, notVoted: 2, eligible: 5 },
+      myVote: { state: 'Voted', choice: 'Approve' }, tally: { approve: 2, revisionsNeeded: 0, deny: 0, notVoted: 3, eligible: 5 },
     })));
     fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(screen.getByText('you voted approve')).toBeTruthy());
     expect(arc.vote).toHaveBeenCalledWith('c1', 'a1', 'Approve');
-    expect(screen.getByRole('img', { name: '3 approve · 0 revisions needed · 0 deny · 2 not voted' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: '2 approve · 0 revisions needed · 0 deny · 3 not voted' })).toBeTruthy();
   });
 
   it('shows "you voted deny" with no buttons (US2-S3)', async () => {
@@ -180,5 +180,54 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
   it('opens the application from ?open=', async () => {
     const r = await setup([row()], { open: 'a1' });
     expect(r.fixture.componentInstance.selectedId()).toBe('a1');
+  });
+
+  it('shows the server message and reloads when a vote fails', async () => {
+    await setup([row()]);
+    arc.vote.and.returnValue(Promise.reject({ error: { message: 'You have already voted on this application.' } }));
+    const before = arc.list.calls.count();
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Deny' }));
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('already voted'));
+    expect(arc.list.calls.count()).toBeGreaterThan(before);
+  });
+
+  it('shows an error when the list cannot be loaded', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['list']);
+    arc.list.and.returnValue(Promise.reject({ status: 500 }));
+    await render(ApplicationsPageComponent, {
+      providers: [
+        { provide: ArchitecturalService, useValue: arc },
+        { provide: AuthService, useValue: { user: user.asReadonly() } },
+        { provide: BoardNavigationService, useValue: { activeCommunityId: signal<string | null>('c1').asReadonly() } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+      ],
+    });
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('could not be loaded'));
+  });
+
+  it('opens the detail panel from the ID and from Info', async () => {
+    const r = await setup([row()]);
+    fireEvent.click(screen.getByRole('button', { name: 'ARC-1042' }));
+    expect(r.fixture.componentInstance.selectedId()).toBe('a1');
+    r.fixture.componentInstance.selectedId.set(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Info' }));
+    expect(r.fixture.componentInstance.selectedId()).toBe('a1');
+    expect(r.fixture.componentInstance.infoFor()).toBe('a1');
+    fireEvent.click(screen.getByRole('button', { name: '📎 3 files' }));
+    r.fixture.destroy();
+  });
+
+  it('asks for a community when none is active', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['list']);
+    await render(ApplicationsPageComponent, {
+      providers: [
+        { provide: ArchitecturalService, useValue: arc },
+        { provide: AuthService, useValue: { user: signal<CurrentUser | null>(null).asReadonly() } },
+        { provide: BoardNavigationService, useValue: { activeCommunityId: signal<string | null>(null).asReadonly() } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+      ],
+    });
+    expect(screen.getByText('No active community selected.')).toBeTruthy();
+    expect(arc.list).not.toHaveBeenCalled();
   });
 });

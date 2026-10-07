@@ -17,7 +17,6 @@ export function arcContext() {
   });
   return {
     communityId,
-    isBoardMember: computed(() => roles().has('BoardMember')),
     isManager: computed(() => roles().has('CommunityManager')),
   };
 }

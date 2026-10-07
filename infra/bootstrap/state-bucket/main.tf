@@ -36,6 +36,8 @@ resource "google_project_service" "required" {
     # 013: the SC-008 cost guardrail (google_billing_budget in the Dev root) needs the Billing
     # Budget API enabled. disable_on_destroy=false (below) keeps it on for live budgets.
     "billingbudgets.googleapis.com",
+    # 027: the hourly architectural review sweep job (modules/environment/scheduler.tf).
+    "cloudscheduler.googleapis.com",
   ])
 
   project            = var.gcp_project_id

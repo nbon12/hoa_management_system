@@ -119,7 +119,7 @@ When a revision carries attachments over, it copies the metadata rows pointing a
 
 ## R9. Rate limiting
 
-**Decision**: Add a `board-writes` policy in `Program.cs`: a fixed window partitioned by user ID, 30 requests per minute. Apply it to the vote, info-request, outcome, resend and settings endpoints.
+**Decision**: Add a `board-writes` policy in `Program.cs`: a fixed window partitioned by user ID, 30 requests per minute, configurable as `RateLimiting:BoardWritesPermitsPerMinute` on the validated `RateLimitingOptions`. Apply it to the vote, info-request, outcome, resend and settings endpoints.
 
 **Rationale**: Constitution §7 requires rate limits on content-creation endpoints. Votes and info requests are user-generated content.
 

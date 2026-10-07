@@ -101,6 +101,7 @@ import { FORMAL_DENIAL_NOTE, decisionReachedLabel, fmtDate, myVoteLabel, outcome
 
       @if (selectedId(); as id) {
         <app-arc-detail-panel #panel [communityId]="ctx.communityId()!" [applicationId]="id" [manager]="ctx.isManager()"
+                              [startWithInfo]="infoFor() === id"
                               (changed)="replace($event)" (openRevision)="select($event)" />
       }
     }
@@ -139,6 +140,7 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
   readonly selectedId = signal<string | null>(null);
   readonly busyId = signal<string | null>(null);
   readonly notedId = signal<string | null>(null);
+  readonly infoFor = signal<string | null>(null);
   readonly formalNote = FORMAL_DENIAL_NOTE;
   private readonly panel = viewChild<ApplicationDetailPanelComponent>('panel');
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -176,13 +178,16 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
   }
 
   select(id: string): void {
+    this.infoFor.set(null);
     this.selectedId.set(id);
   }
 
   /** US4-S1: Info opens the panel with the comment box focused. */
   info(id: string): void {
+    const alreadyOpen = this.selectedId() === id && this.infoFor() === id;
+    this.infoFor.set(id);
     this.selectedId.set(id);
-    queueMicrotask(() => this.panel()?.focusForInfo());
+    if (alreadyOpen) this.panel()?.focusForInfo();
   }
 
   async vote(a: ArcListItem, choice: ArcVoteChoice): Promise<void> {
@@ -196,8 +201,9 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
       if (choice === 'RevisionsNeeded') this.notedId.set(a.id);
       this.counts.update(c => ({ ...c, awaitingMyVote: Math.max(0, c.awaitingMyVote - 1) }));
     } catch (e: any) {
-      this.error.set(e?.error?.message ?? 'Your vote could not be saved.');
+      // Reload first (the row's state may have changed), then show why the vote was refused.
       await this.reload();
+      this.error.set(e?.error?.message ?? 'Your vote could not be saved.');
     } finally {
       this.busyId.set(null);
     }

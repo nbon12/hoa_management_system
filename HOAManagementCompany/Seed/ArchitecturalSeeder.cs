@@ -41,10 +41,20 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
             return;
         }
 
+        // Login needs a linked property; co-home the extra demo users on board@'s property, which the
+        // seeded applications never use, so nobody is recused.
+        var homeProperty = await db.UserProperties.Where(up => up.UserId == boardUser.Id)
+            .Select(up => (Guid?)up.PropertyId).FirstOrDefaultAsync(ct);
+        if (homeProperty is null)
+        {
+            logger.LogWarning("ArchitecturalSeeder skipped — board user has no linked property.");
+            return;
+        }
+
         var boardIds = new List<string> { boardUser.Id };
         foreach (var (email, first, last) in ExtraBoard)
-            boardIds.Add(await EnsureUserWithRoleAsync(community.Id, email, first, last, CommunityRole.BoardMember, ct));
-        await EnsureUserWithRoleAsync(community.Id, ManagerEmail, "Morgan", "Manager", CommunityRole.CommunityManager, ct);
+            boardIds.Add(await EnsureUserWithRoleAsync(community.Id, homeProperty.Value, email, first, last, CommunityRole.BoardMember, ct));
+        await EnsureUserWithRoleAsync(community.Id, homeProperty.Value, ManagerEmail, "Morgan", "Manager", CommunityRole.CommunityManager, ct);
 
         if (await db.ArchitecturalApplications.AnyAsync(a => a.CommunityId == community.Id, ct))
             return;
@@ -88,10 +98,10 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
         await db.SaveChangesAsync(ct);
 
         var paintV2 = await factory.CreateRevisionAsync(paintV1.Id, new ArcNewApplication(
-            paintV1.PropertyId, "Hasan Mehdi", ArcProjectType.ExteriorPaint, "Exterior repaint — Sage 4021",
+            paintV1.PropertyId, paintV1.OwnerName, ArcProjectType.ExteriorPaint, "Exterior repaint — Sage 4021",
             "Repaint siding Sage 4021; trim now Swiss Coffee from the approved palette.",
             today.AddDays(-14), null, []), [], ct);
-        Votes(paintV2, boardIds.Skip(1).ToList(), ArcVoteChoice.Approve);
+        Votes(paintV2, boardIds, ArcVoteChoice.Approve, ArcVoteChoice.Approve);
 
         // ARC-1041: open; board@ already voted.
         var solar = await CreateAsync(factory, 1041, Property(2), "Stephanie H Ross", ArcProjectType.Solar,
@@ -126,8 +136,11 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
             attachments.Add(new ArcNewAttachment(name, bytes, contentType, key));
         }
 
+        // Snapshot the property's real owner when there is one, so emails and the board view agree.
+        var realOwner = await db.Owners.Where(o => o.PropertyId == propertyId)
+            .Select(o => o.FirstName + " " + o.LastName).FirstOrDefaultAsync(ct);
         var app = await factory.CreateFromSettingsAsync(new ArcNewApplication(
-            propertyId, owner, type, title, description, received, null, attachments), ct);
+            propertyId, string.IsNullOrWhiteSpace(realOwner) ? owner : realOwner, type, title, description, received, null, attachments), ct);
         app.ApplicationNumber = number;
         await db.SaveChangesAsync(ct);
         return app;
@@ -177,7 +190,7 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
     }
 
     private async Task<string> EnsureUserWithRoleAsync(
-        Guid communityId, string email, string first, string last, CommunityRole role, CancellationToken ct)
+        Guid communityId, Guid homePropertyId, string email, string first, string last, CommunityRole role, CancellationToken ct)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
         if (user is null)
@@ -191,6 +204,12 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
             if (!result.Succeeded)
                 throw new InvalidOperationException(
                     $"Could not create seed user {email}: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+        }
+
+        if (!await db.UserProperties.AnyAsync(up => up.UserId == user.Id, ct))
+        {
+            db.UserProperties.Add(new UserProperty { UserId = user.Id, PropertyId = homePropertyId });
+            await db.SaveChangesAsync(ct);
         }
 
         if (!await db.CommunityMemberships.AnyAsync(

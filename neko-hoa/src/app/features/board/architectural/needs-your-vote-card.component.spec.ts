@@ -73,4 +73,27 @@ describe('NeedsYourVoteCardComponent (027 US5)', () => {
     await setup([]);
     await waitFor(() => expect(screen.getByText('Nothing needs your vote right now.')).toBeTruthy());
   });
+
+  it('shows the server message and reloads when a vote fails', async () => {
+    await setup([ITEM]);
+    await until(() => !!screen.queryByText('ARC-1042'));
+    arc.vote.and.returnValue(Promise.reject({ error: { message: 'A decision has already been reached on this application.' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('decision has already been reached'));
+    expect(arc.list.calls.count()).toBeGreaterThan(1);
+  });
+
+  it('shows an error when the feed cannot be loaded', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['list', 'vote']);
+    arc.list.and.returnValue(Promise.reject({ status: 500 }));
+    await render(NeedsYourVoteCardComponent, {
+      providers: [
+        provideRouter([]),
+        { provide: ArchitecturalService, useValue: arc },
+        { provide: AuthService, useValue: { user: user.asReadonly() } },
+        { provide: BoardNavigationService, useValue: { activeCommunityId: signal<string | null>(null).asReadonly() } },
+      ],
+    });
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('could not be loaded'));
+  });
 });

@@ -46,11 +46,11 @@ As `manager@nekohoa.dev`, open **ARC Settings**:
 - Set the review period to 45 and the lapse rule to **Deemed approved**. Applications already received keep their old due date.
 - A board member calling `PUT …/architectural-settings` gets `403 FORBIDDEN`.
 
-## Reminder and lapse sweep (in deployed environments, Cloud Scheduler runs it hourly)
+## Reminder and lapse sweep (in deployed environments, the `nekohoa-arc-sweep-<env>` Cloud Scheduler job runs it hourly)
 
 ```bash
 curl -X POST http://localhost:5212/api/v1/architectural/jobs/sweep \
-  -H "X-Scheduler-Secret: dev-only-local-secret"
+  -H "X-Scheduler-Secret: dev-scheduler-shared-secret-placeholder"
 ```
 
 To force a lapse locally, set an open application's `DueDate` in the past (dev database only), run the sweep, and check:
@@ -60,7 +60,7 @@ To force a lapse locally, set an open application's `DueDate` in the past (dev d
 
 ## Email locally
 
-Without SES credentials, outbox rows are marked `Failed` with "No configured provider" (existing behavior). Inspect them:
+Links in emails use `ArchitecturalReview:AppBaseUrl` (deployed environments set it to `https://<frontend_domain>`; locally it is empty, so links are relative). Without SES credentials, outbox rows are marked `Failed` with "No configured provider" (existing behavior). Inspect them:
 
 ```sql
 SELECT "Kind", "DedupKey", "Status", "PayloadJson" FROM "OutboxMessages"

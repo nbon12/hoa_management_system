@@ -52,4 +52,32 @@ describe('ArcSettingsComponent (027 FR-029)', () => {
     await until(() => !!screen.queryByRole('alert')?.textContent?.includes('between 1 and 365'));
     expect(arc.putSettings).not.toHaveBeenCalled();
   });
+
+  it('shows the server message when saving fails', async () => {
+    await setup();
+    arc.putSettings.and.returnValue(Promise.reject({ error: { message: 'timeZoneId must be a valid IANA time zone, e.g. America/New_York.' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('valid IANA time zone'));
+  });
+
+  it('validates the time zone and reminder whole numbers', async () => {
+    const r = await setup();
+    const c = r.fixture.componentInstance;
+    expect(c.validate({ ...SETTINGS, timeZoneId: ' ' })).toContain('Time zone is required');
+    expect(c.validate({ ...SETTINGS, reminderDays: 1.5 })).toContain('between 0 and 30');
+    expect(c.validate(SETTINGS)).toBeNull();
+  });
+
+  it('shows an error when settings cannot be loaded', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['getSettings', 'putSettings']);
+    arc.getSettings.and.returnValue(Promise.reject({ status: 403 }));
+    await render(ArcSettingsComponent, {
+      providers: [
+        { provide: ArchitecturalService, useValue: arc },
+        { provide: AuthService, useValue: { user: signal({ memberships: [{ communityId: 'c1', communityName: 'One', role: 'CommunityManager' }] }).asReadonly() } },
+        { provide: BoardNavigationService, useValue: { activeCommunityId: signal<string | null>(null).asReadonly() } },
+      ],
+    });
+    await until(() => !!screen.queryByRole('alert')?.textContent?.includes('could not be loaded'));
+  });
 });

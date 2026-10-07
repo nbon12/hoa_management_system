@@ -26,16 +26,15 @@ public class CastVoteEndpointTests(TestDatabaseFixture fixture) : ArcTestBase(fi
         Assert.Equal(ArcVoteStates.CanVote, (await ListAsync(s.CommunityId)).Items.Single().MyVote.State);
     }
 
-    // US2-S2: "Given an open application I have not voted on with a tally of 2 approve / 0 deny / 3 not voted,
-    // When I click Approve on its row, Then my vote is saved, my vote column reads "you voted approve", and the
-    // tally reads 3 approve / 0 deny / 2 not voted."
+    // US2-S2: "Given a five-member board and an open application I have not voted on with a tally of 1 approve /
+    // 0 deny / 4 not voted, When I click Approve on its row, Then my vote is saved, my vote column reads "you voted
+    // approve", and the tally reads 2 approve / 0 deny / 3 not voted."
     [Fact]
     public async Task Approve_IsSaved_AndTallyUpdates()
     {
-        // 6-member board so a third approve does not yet reach a decision (majority is 4).
-        var s = await CreateScenarioAsync(6);
+        var s = await CreateScenarioAsync(5);
         var appId = await CreateApplicationAsync(s);
-        await AddVotesAsync(appId, (s.Board[1], ArcVoteChoice.Approve), (s.Board[2], ArcVoteChoice.Approve));
+        await AddVotesAsync(appId, (s.Board[1], ArcVoteChoice.Approve));
         await LoginAsAsync(s.Board[0]);
 
         var res = await VoteAsync(s.CommunityId, appId, "Approve");
@@ -43,9 +42,8 @@ public class CastVoteEndpointTests(TestDatabaseFixture fixture) : ArcTestBase(fi
         Assert.Equal(HttpStatusCode.Created, res.StatusCode);
         var row = (await res.Content.ReadFromJsonAsync<ArcListItemDto>(Json))!;
         Assert.Equal(new ArcMyVoteDto(ArcVoteStates.Voted, "Approve"), row.MyVote);
-        Assert.Equal(3, row.Tally.Approve);
-        Assert.Equal(0, row.Tally.Deny);
-        Assert.Equal(3, row.Tally.NotVoted);
+        Assert.Equal(new ArcTallyDto(2, 0, 0, 3, 5), row.Tally);
+        Assert.Null(row.Decision);
         Assert.True(await WithDbAsync(db => db.ArchitecturalVotes.AnyAsync(v =>
             v.ApplicationId == appId && v.VoterUserId == s.Board[0].UserId && v.Choice == ArcVoteChoice.Approve)));
         Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("ArcVoteCast")

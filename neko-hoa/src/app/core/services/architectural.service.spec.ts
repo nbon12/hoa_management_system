@@ -58,6 +58,12 @@ describe('ArchitecturalService (027)', () => {
     await p;
   });
 
+  it('detail() calls the application endpoint', async () => {
+    const p = svc.detail(C, A);
+    http.expectOne(`${BASE}/communities/${C}/architectural-applications/${A}`).flush({ id: A });
+    expect((await p).id).toBe(A);
+  });
+
   it('attachmentUrl() calls the per-attachment url endpoint', async () => {
     const p = svc.attachmentUrl(C, A, 'f1');
     http.expectOne(`${BASE}/communities/${C}/architectural-applications/${A}/attachments/f1/url`)

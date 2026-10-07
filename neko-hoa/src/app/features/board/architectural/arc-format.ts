@@ -5,8 +5,8 @@ import { ArcDecision, ArcTally } from '../../../core/services/architectural.serv
 /** "2026-06-27" → "06/27/26". Parsed by hand so no time-zone shift can move the day. */
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—';
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return y && m && d ? `${m}/${d}/${y.slice(2)}` : iso;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[2]}/${m[3]}/${m[1].slice(2)}` : iso;
 }
 
 /** 1258291 → "1.2 MB", 860160 → "840 KB", 512 → "512 B". */

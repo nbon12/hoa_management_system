@@ -42,4 +42,10 @@ describe('arc-format (027)', () => {
     expect(infoNotice('2026-06-27')).toBe(
       "Questions don't pause the review period (due 06/27/26). To require changes before approval, vote Revisions needed — it counts as a formal denial and invites the owner to resubmit.");
   });
+
+  it('handles odd inputs', () => {
+    expect(fmtDate('not-a-date')).toBe('not-a-date');
+    expect(myVoteLabel(null)).toBe('');
+    expect(shortProject('Detached shed, 10x12')).toBe('detached shed, 10x12');
+  });
 });
