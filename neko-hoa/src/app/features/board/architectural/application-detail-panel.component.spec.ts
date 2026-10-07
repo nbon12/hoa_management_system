@@ -1,0 +1,131 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/angular';
+import { until } from './arc-testing';
+import { ApplicationDetailPanelComponent } from './application-detail-panel.component';
+import { ArcDetail, ArchitecturalService } from '../../../core/services/architectural.service';
+
+function detail(over: Partial<ArcDetail> = {}): ArcDetail {
+  return {
+    id: 'a1', displayId: 'ARC-1042', revision: 1, propertyAddress: '711 Keystone Park Dr #29', ownerName: 'Praneeth Pattyam',
+    projectTitle: 'Fence replacement — 6ft cedar', projectType: 'Fence', description: 'Rear fence', attachmentCount: 3,
+    receivedDate: '2026-05-28', dueDate: '2026-06-27', overdue: false, status: 'Open', decision: null, infoRequested: false,
+    tally: { approve: 2, revisionsNeeded: 0, deny: 0, notVoted: 3, eligible: 5 }, myVote: { state: 'CanVote' },
+    attachments: [
+      { id: 'f1', fileName: 'fence-plan.pdf', sizeBytes: 1_258_291, contentType: 'application/pdf' },
+      { id: 'f2', fileName: 'elevation.jpg', sizeBytes: 860_160, contentType: 'image/jpeg' },
+      { id: 'f3', fileName: 'plat-survey.pdf', sizeBytes: 2_202_009, contentType: 'application/pdf' },
+    ],
+    votes: [], infoRequests: [],
+    ruleText: 'Three of five votes decide. The manager records the outcome and notifies the owner.',
+    conditionsOfApproval: null, ownerReason: null, closedAt: null, ownerEmailStatus: null, revisions: [],
+    ...over,
+  };
+}
+
+describe('ApplicationDetailPanelComponent (027 US3)', () => {
+  let arc: jasmine.SpyObj<ArchitecturalService>;
+
+  async function setup(d: ArcDetail = detail(), manager = false) {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService',
+      ['detail', 'attachmentUrl', 'vote', 'requestInfo', 'recordOutcome', 'resendOutcomeEmail']);
+    arc.detail.and.returnValue(Promise.resolve(d));
+    const r = await render(ApplicationDetailPanelComponent, {
+      componentInputs: { communityId: 'c1', applicationId: 'a1', manager },
+      providers: [{ provide: ArchitecturalService, useValue: arc }],
+    });
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toBeTruthy());
+    return r;
+  }
+
+  // US3-S1: title "ARC-1042 · fence replacement", owner, received date, three files with sizes.
+  it('shows the title, owner, received date and files with sizes (US3-S1)', async () => {
+    await setup();
+    expect(screen.getByRole('heading', { level: 2 }).textContent!.trim()).toBe('ARC-1042 · fence replacement');
+    expect(screen.getByText('Praneeth Pattyam')).toBeTruthy();
+    expect(screen.getByText('05/28/26')).toBeTruthy();
+    expect(screen.getByText('fence-plan.pdf')).toBeTruthy();
+    expect(screen.getByText('1.2 MB')).toBeTruthy();
+    expect(screen.getByText('840 KB')).toBeTruthy();
+    expect(screen.getByText('2.1 MB')).toBeTruthy();
+  });
+
+  // US3-S2: opening a file fetches a short-lived link and opens it in a new tab.
+  it('opens an attachment in a new tab through a fetched link (US3-S2)', async () => {
+    await setup();
+    arc.attachmentUrl.and.returnValue(Promise.resolve({ url: 'https://signed.example/x', expiresAt: '' }));
+    const open = spyOn(window, 'open');
+    fireEvent.click(screen.getByRole('button', { name: 'Open fence-plan.pdf in a new tab' }));
+    await until(() => open.calls.count() > 0);
+    expect(open).toHaveBeenCalledWith('https://signed.example/x', '_blank', 'noopener');
+    expect(arc.attachmentUrl).toHaveBeenCalledWith('c1', 'a1', 'f1');
+  });
+
+  it('says there are no attachments (US3-S5)', async () => {
+    await setup(detail({ attachments: [], attachmentCount: 0 }));
+    expect(screen.getByText('No attachments.')).toBeTruthy();
+  });
+
+  // US3-S6: no storage URL is ever rendered before a click.
+  it('renders no storage links (US3-S6)', async () => {
+    const r = await setup();
+    const html = (r.fixture.nativeElement as HTMLElement).innerHTML;
+    expect(html).not.toContain('http');
+    expect(r.fixture.nativeElement.querySelectorAll('a[href]').length).toBe(0);
+  });
+
+  it('shows "Attachment unavailable" when the link fails', async () => {
+    await setup();
+    arc.attachmentUrl.and.returnValue(Promise.reject({ status: 404 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open fence-plan.pdf in a new tab' }));
+    await waitFor(() => expect(screen.getByText('Attachment unavailable')).toBeTruthy());
+  });
+
+  it('shows the rule text and renders a comment as text, never HTML', async () => {
+    const r = await setup(detail({
+      votes: [{ voterName: 'Aaliyah Brooks', choice: 'Deny', comment: '<script>alert(1)</script>', castAt: '2026-06-01T00:00:00Z' }],
+    }));
+    expect(screen.getByText('Three of five votes decide. The manager records the outcome and notifies the owner.')).toBeTruthy();
+    expect(screen.getByText('<script>alert(1)</script>')).toBeTruthy();
+    expect(r.fixture.nativeElement.querySelector('script')).toBeNull();
+  });
+
+  // US4-S2 / US4-S4: the info-requested marker with message, sender and time.
+  it('shows info requests with sender (US4-S2, US4-S4)', async () => {
+    await setup(detail({
+      infoRequested: true,
+      infoRequests: [{ id: 'i1', requestedBy: 'Bianca Board', message: 'Please attach a plat survey', requestedAt: '2026-06-02T10:00:00Z', respondedAt: null }],
+    }));
+    expect(screen.getByText('info requested')).toBeTruthy();
+    expect(screen.getByText('Please attach a plat survey')).toBeTruthy();
+    expect(screen.getByText(/Bianca Board/)).toBeTruthy();
+    // the vote buttons stay available
+    expect(screen.getByRole('button', { name: '✓ Approve' })).toBeTruthy();
+  });
+
+  it('submits a vote and refreshes', async () => {
+    const r = await setup();
+    arc.vote.and.returnValue(Promise.resolve({} as any));
+    fireEvent.click(screen.getByRole('button', { name: '✓ Approve' }));
+    await until(() => arc.vote.calls.count() > 0 && arc.detail.calls.count() > 1);
+    expect(arc.vote).toHaveBeenCalledWith('c1', 'a1', 'Approve', null);
+    expect(r).toBeTruthy();
+  });
+
+  it('shows the v2 badge and links to earlier versions (US6-S12)', async () => {
+    await setup(detail({
+      id: 'a1', revision: 2,
+      revisions: [
+        { id: 'v1', revision: 1, receivedDate: '2026-04-01', decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } },
+        { id: 'a1', revision: 2, receivedDate: '2026-05-28', decision: null },
+      ],
+    }));
+    expect(screen.getByLabelText('version 2').textContent!.trim()).toBe('v2');
+    expect(screen.getByRole('button', { name: 'v1' })).toBeTruthy();
+    expect(screen.getByText(/Denied · revisions requested/)).toBeTruthy();
+  });
+
+  it('shows the record-outcome form to managers on a reached decision', async () => {
+    await setup(detail({ status: 'DecisionReached', myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } }), true);
+    expect(screen.getByLabelText('What would need to change for approval?')).toBeTruthy();
+  });
+});

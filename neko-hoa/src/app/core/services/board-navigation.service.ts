@@ -51,10 +51,12 @@ const BOARD_NAV: NavGroupDescriptor[] = [
     { label: 'Community Home', route: '/app/board/home' },
   ]},
   { group: 'Community management', items: [
-    { label: 'Architectural Applications', route: null, stub: true },
+    // 027: board members vote; managers record outcomes. Accountants have no ARC access.
+    { label: 'Architectural Applications', route: '/app/board/architectural', requiredRoles: ['BoardMember', 'CommunityManager'] },
     { label: 'Board Approvals',            route: null, stub: true },
     { label: 'Announcements',              route: null, stub: true },
     { label: 'Memberships',                route: '/app/board/memberships', requiredRoles: ['CommunityManager'] },
+    { label: 'ARC Settings',               route: '/app/board/arc-settings', requiredRoles: ['CommunityManager'] },
   ]},
   { group: 'Finance', items: [
     { label: 'AP Ledger',   route: null, stub: true, requiredRoles: ['CommunityManager', 'Accountant'] },

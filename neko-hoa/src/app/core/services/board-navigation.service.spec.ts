@@ -69,6 +69,24 @@ describe('BoardNavigationService.buildNav (pure derivation)', () => {
     expect(item(nav, 'Memberships')!.locked).toBeTrue();
   });
 
+  it('027: Architectural Applications is live for board members and managers, locked for accountants', () => {
+    for (const role of ['BoardMember', 'CommunityManager']) {
+      const arc = item(BoardNavigationService.buildNav({ roles: [role], communityCount: 1 }), 'Architectural Applications')!;
+      expect(arc.locked).toBeFalse();
+      expect(arc.disabled).toBeFalse();
+      expect(arc.route).toBe('/app/board/architectural');
+    }
+    const accountant = item(BoardNavigationService.buildNav({ roles: ['Accountant'], communityCount: 1 }), 'Architectural Applications')!;
+    expect(accountant.locked).toBeTrue();
+  });
+
+  it('027: ARC Settings is manager-only', () => {
+    expect(item(BoardNavigationService.buildNav({ roles: ['BoardMember'], communityCount: 1 }), 'ARC Settings')!.locked).toBeTrue();
+    const mgr = item(BoardNavigationService.buildNav({ roles: ['CommunityManager'], communityCount: 1 }), 'ARC Settings')!;
+    expect(mgr.locked).toBeFalse();
+    expect(mgr.route).toBe('/app/board/arc-settings');
+  });
+
   it('a plain resident role confers nothing board-specific (Finance stays locked)', () => {
     const nav = BoardNavigationService.buildNav({ roles: ['Resident'], communityCount: 1 });
     expect(item(nav, 'AP Ledger')!.locked).toBeTrue();

@@ -136,8 +136,8 @@ description: "Task list for 027-board-arc-review"
   - **US1-S7**: a board member of community A requesting community B, and requesting a nonexistent community, both get 403 with an identical body.
   - Pagination: default 25, `limit=101` gives 422, and `counts` ignore search and paging.
   - `Cache-Control: no-store`.
-- [ ] T025 [P] [US1] Create the tally component spec: the accessible label equals "2 approve · 0 revisions needed · 0 deny · 3 not voted" for US1-S5 and "2 approve · 1 revisions needed · 0 deny · 2 not voted" for FR-007; the visible text reads "2/5"; the counts are exposed as text, not color only. File: `neko-hoa/src/app/features/board/architectural/tally.component.spec.ts`
-- [ ] T026 [P] [US1] Create the applications-page component spec (Angular Testing Library, mocked `ArchitecturalService`) in `neko-hoa/src/app/features/board/architectural/applications-page.component.spec.ts`:
+- [X] T025 [P] [US1] Create the tally component spec: the accessible label equals "2 approve · 0 revisions needed · 0 deny · 3 not voted" for US1-S5 and "2 approve · 1 revisions needed · 0 deny · 2 not voted" for FR-007; the visible text reads "2/5"; the counts are exposed as text, not color only. File: `neko-hoa/src/app/features/board/architectural/tally.component.spec.ts`
+- [X] T026 [P] [US1] Create the applications-page component spec (Angular Testing Library, mocked `ArchitecturalService`) in `neko-hoa/src/app/features/board/architectural/applications-page.component.spec.ts`:
   - the heading is "Architectural applications";
   - **US1-S1**: tabs read "Open · 4" and "Closed · 27", Open selected, 4 rows;
   - **US1-S2**: clicking Closed requests `status=closed` and renders those rows;
@@ -159,9 +159,9 @@ description: "Task list for 027-board-arc-review"
   - `counts` computed without search or paging;
   - tally and `myVote` through `ArcQueries`;
   - `overdue` computed per row.
-- [ ] T029 [P] [US1] Implement the standalone `TallyComponent` (approve, revisions-needed, deny and not-voted segments; "{approve}/{eligible}" text; aria-label per FR-007 with zero segments kept; `styles.scss` tokens only) in `neko-hoa/src/app/features/board/architectural/tally.component.ts`, plus `tally.stories.ts`
-- [ ] T030 [US1] Implement `ApplicationsPageComponent` (header and pill, Open/Closed tabs with counts, debounced search, table with the FR-002 columns, ID shown as `ARC-n` with a "v{n}" badge when revision ≥ 2, owner name under the address, an Overdue marker, paging, empty states) in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts`
-- [ ] T031 [US1] Add the route `board/architectural` (`canActivate: [boardGuard]`, `data.requiredRoles: ['BoardMember','CommunityManager']`, lazy `ApplicationsPageComponent`) in `neko-hoa/src/app/app.routes.ts`. Change the "Architectural Applications" nav entry from a stub to `route: '/app/board/architectural'`, `requiredRoles: ['BoardMember','CommunityManager']` in `neko-hoa/src/app/core/services/board-navigation.service.ts`, and update `board-navigation.service.spec.ts` for the entry being live and hidden for Accountant.
+- [X] T029 [P] [US1] Implement the standalone `TallyComponent` (approve, revisions-needed, deny and not-voted segments; "{approve}/{eligible}" text; aria-label per FR-007 with zero segments kept; `styles.scss` tokens only) in `neko-hoa/src/app/features/board/architectural/tally.component.ts`, plus `tally.stories.ts`
+- [X] T030 [US1] Implement `ApplicationsPageComponent` (header and pill, Open/Closed tabs with counts, debounced search, table with the FR-002 columns, ID shown as `ARC-n` with a "v{n}" badge when revision ≥ 2, owner name under the address, an Overdue marker, paging, empty states) in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts`
+- [X] T031 [US1] Add the route `board/architectural` (`canActivate: [boardGuard]`, `data.requiredRoles: ['BoardMember','CommunityManager']`, lazy `ApplicationsPageComponent`) in `neko-hoa/src/app/app.routes.ts`. Change the "Architectural Applications" nav entry from a stub to `route: '/app/board/architectural'`, `requiredRoles: ['BoardMember','CommunityManager']` in `neko-hoa/src/app/core/services/board-navigation.service.ts`, and update `board-navigation.service.spec.ts` for the entry being live and hidden for Accountant.
 
 **Checkpoint**: US1 is demoable: list, tabs, search, tally and scope denial.
 
@@ -188,13 +188,13 @@ description: "Task list for 027-board-arc-review"
   - A second vote gives 409 `ALREADY_VOTED`; a 2,001-character comment gives 422.
   - An `ArcVoteCast` sensitive event is emitted with Actor, Community, Application and UTC time.
   - The endpoint requires the `board-writes` rate limit (exceeding it gives 429).
-- [ ] T033 [P] [US2] Add vote-column specs to `applications-page.component.spec.ts`:
+- [X] T033 [P] [US2] Add vote-column specs to `applications-page.component.spec.ts`:
   - **US2-S1**: Approve, Revisions needed, Deny and Info buttons render when `CanVote`.
   - **US2-S2**: clicking Approve calls `vote` and the row re-renders "you voted approve" with the new tally.
   - **US2-S3**: "you voted deny" with no buttons.
   - **US2-S4**: the "you voted revisions needed" text and the formal-denial helper note.
   - **US2-S8**: a recused indicator and no buttons.
-- [ ] T034 [P] [US2] Create the cast-vote-card component spec: **US2-S5** the comment plus Deny calls `vote({choice:'Deny', comment})`; **US2-S6** an empty comment is allowed; the buttons are ✓ Approve / ↻ Revisions needed / ✕ Deny. File: `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.spec.ts`
+- [X] T034 [P] [US2] Create the cast-vote-card component spec: **US2-S5** the comment plus Deny calls `vote({choice:'Deny', comment})`; **US2-S6** an empty comment is allowed; the buttons are ✓ Approve / ↻ Revisions needed / ✕ Deny. File: `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.spec.ts`
 
 ### Implementation
 
@@ -204,8 +204,8 @@ description: "Task list for 027-board-arc-review"
   - re-count and run `ArcDecisionRules.Evaluate(snapshot rule, eligible, counts, dueDatePassed:false)`; on a decision set `Status=DecisionReached` with outcome, wording, source `Votes` and `DecisionReachedAt`;
   - commit, log `ArcVoteCast`, return the updated list item;
   - `.RequireRateLimiting("board-writes")`.
-- [ ] T036 [US2] Add vote actions to the applications page row (Approve / Revisions needed / Deny / Info buttons, voted pills, recused indicator, after-vote helper note for Revisions needed, error toast on 409/403) in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts`
-- [ ] T037 [P] [US2] Implement `CastVoteCardComponent` ("Cast your vote" heading, the comment field "Comment to the board · Optional — visible to the board and the manager", 2,000-character counter, ✓ Approve / ↻ Revisions needed / ✕ Deny, a Request info slot used by US4) in `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.ts`
+- [X] T036 [US2] Add vote actions to the applications page row (Approve / Revisions needed / Deny / Info buttons, voted pills, recused indicator, after-vote helper note for Revisions needed, error toast on 409/403) in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts`
+- [X] T037 [P] [US2] Implement `CastVoteCardComponent` ("Cast your vote" heading, the comment field "Comment to the board · Optional — visible to the board and the manager", 2,000-character counter, ✓ Approve / ↻ Revisions needed / ✕ Deny, a Request info slot used by US4) in `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.ts`
 
 **Checkpoint**: US1 + US2 make a usable voting board (MVP).
 
@@ -234,7 +234,7 @@ description: "Task list for 027-board-arc-review"
   - A missing object gives 404 `ATTACHMENT_UNAVAILABLE`.
   - An `ArcSensitiveAccess` event is emitted with resource `attachment:{id}`.
   - **SC-002**: issuing the link and downloading a 2 MB attachment together finish in under 3 seconds against Testcontainers MinIO.
-- [ ] T040 [P] [US3] Create the detail-panel component spec in `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.spec.ts`:
+- [X] T040 [P] [US3] Create the detail-panel component spec in `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.spec.ts`:
   - **US3-S1**: the title is "ARC-1042 · fence replacement", plus owner, received date and three files with sizes.
   - **US3-S2**: clicking a file calls `attachmentUrl` and opens `window.open(url, '_blank', 'noopener')`.
   - **US3-S5**: the "No attachments" text.
@@ -247,7 +247,7 @@ description: "Task list for 027-board-arc-review"
 
 - [X] T041 [US3] Implement `ApplicationDetailEndpoint` (`GET …/{applicationId}`) in `HOAManagementCompany/Features/Board/Architectural/ApplicationDetailEndpoint.cs`: the View capability; the application in the community; attachments metadata; votes with voter names and comments; info requests; the revision chain by `(CommunityId, ApplicationNumber)` ordered by `Revision`; `ruleText` through `ArcDecisionRules.RuleText`; decision, conditions or reason; `ownerEmailStatus` read from the latest `arc:{id}:outcome*` outbox row (null when none); the `ArcSensitiveAccess` log; `no-store`.
 - [X] T042 [US3] Implement `AttachmentUrlEndpoint` (`GET …/attachments/{attachmentId}/url`) in `HOAManagementCompany/Features/Board/Architectural/AttachmentUrlEndpoint.cs`: the View capability; the attachment must belong to the application in the community; a `HEAD` existence check (add `ExistsAsync` to `IDocumentStorage` and `S3DocumentStorage` in `HOAManagementCompany/Infrastructure/Storage/`, and update every `IDocumentStorage` test double found with `grep -rn ": IDocumentStorage" HOAManagementCompany.Tests`) returning 404 `ATTACHMENT_UNAVAILABLE`; `GetPreSignedUrlAsync`; return `{url, expiresAt = now + 5 min}`; log `ArcSensitiveAccess`.
-- [ ] T043 [US3] Implement `ApplicationDetailPanelComponent` (title, owner, received date, attachment list with name, size and ↗ link opening on click, empty and unavailable states, votes and comments list, rule text, embedded `CastVoteCardComponent`, links to earlier revisions) in `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.ts`, plus `application-detail-panel.stories.ts`. Wire row selection in `applications-page.component.ts`, supporting the `?open={id}` query parameter.
+- [X] T043 [US3] Implement `ApplicationDetailPanelComponent` (title, owner, received date, attachment list with name, size and ↗ link opening on click, empty and unavailable states, votes and comments list, rule text, embedded `CastVoteCardComponent`, links to earlier revisions) in `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.ts`, plus `application-detail-panel.stories.ts`. Wire row selection in `applications-page.component.ts`, supporting the `?open={id}` query parameter.
 
 **Checkpoint**: all P1 stories are done.
 
@@ -266,7 +266,7 @@ description: "Task list for 027-board-arc-review"
   - **US4-S3**: an empty or whitespace message gives 422 `VALIDATION_ERROR` with a message naming the required field.
   - **US4-S4**: a CommunityManager's `GET detail` shows message, sender and `requestedAt`.
   - A manager or accountant posting gives 403; a closed application gives 409.
-- [ ] T045 [P] [US4] Add Request-info specs to `application-detail-panel.component.spec.ts` and `applications-page.component.spec.ts`:
+- [X] T045 [P] [US4] Add Request-info specs to `application-detail-panel.component.spec.ts` and `applications-page.component.spec.ts`:
   - **US4-S1**: clicking Info on a row opens the panel with the comment box focused and Request info enabled.
   - **US4-S2**: submitting shows the info-requested marker and the vote buttons stay.
   - **US4-S5**: choosing Request info shows the notice "Questions don't pause the review period (due 06/27/26). To require changes before approval, vote Revisions needed — it counts as a formal denial and invites the owner to resubmit." with the formatted due date.
@@ -274,7 +274,7 @@ description: "Task list for 027-board-arc-review"
 ### Implementation
 
 - [X] T046 [US4] Implement `InfoRequestEndpoint` (`POST …/{applicationId}/info-requests`; Vote capability; Open status only; non-blank message ≤ 2,000; insert; return `{…, dueDate}`; `board-writes`) in `HOAManagementCompany/Features/Board/Architectural/InfoRequestEndpoint.cs`
-- [ ] T047 [US4] Add the Request info mode to `CastVoteCardComponent` and the detail panel (Info focuses the comment box; the FR-021 notice with the due date; the marker with message, sender and time) in `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.ts` and `application-detail-panel.component.ts`. Show the "info requested" marker on rows in `applications-page.component.ts`.
+- [X] T047 [US4] Add the Request info mode to `CastVoteCardComponent` and the detail panel (Info focuses the comment box; the FR-021 notice with the due date; the marker with message, sender and time) in `neko-hoa/src/app/features/board/architectural/cast-vote-card.component.ts` and `application-detail-panel.component.ts`. Show the "info requested" marker on rows in `applications-page.component.ts`.
 
 ---
 
@@ -287,7 +287,7 @@ description: "Task list for 027-board-arc-review"
 ### Tests (write first)
 
 - [X] T048 [P] [US5] Add `awaitingMyVote=true` cases to `ApplicationsListEndpointTests.cs`: **US5-S1** with 1 unvoted + 3 voted, only that one is returned with all FR-032 fields; **US5-S3** after a vote it's no longer returned; **US5-S4** with everything voted, an empty list.
-- [ ] T049 [P] [US5] Create the needs-your-vote-card component spec in `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.spec.ts`:
+- [X] T049 [P] [US5] Create the needs-your-vote-card component spec in `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.spec.ts`:
   - **US5-S1**: "Needs your vote" heading, "1 open" pill, one row with ID, project, address · owner, 📎 count, tally, due date and the Approve / Revisions needed / Deny buttons.
   - **US5-S2**: the "All architectural applications →" link points to `/app/board/architectural`.
   - **US5-S3**: Approve calls `vote` and the row disappears. This is the one-click path for SC-001.
@@ -295,8 +295,8 @@ description: "Task list for 027-board-arc-review"
 
 ### Implementation
 
-- [ ] T050 [US5] Implement `NeedsYourVoteCardComponent` (loads `list({awaitingMyVote:true, limit:25})`; rows and buttons per FR-032; the link; empty state; `needs-your-vote-card.stories.ts`) in `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.ts`
-- [ ] T051 [US5] Render `<app-needs-your-vote-card>` as its own section above the metrics panels, only when the user's roles include BoardMember in the active community, in `neko-hoa/src/app/features/board/community-home/community-home.component.ts`. Leave the rest of the page untouched for spec 2.
+- [X] T050 [US5] Implement `NeedsYourVoteCardComponent` (loads `list({awaitingMyVote:true, limit:25})`; rows and buttons per FR-032; the link; empty state; `needs-your-vote-card.stories.ts`) in `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.ts`
+- [X] T051 [US5] Render `<app-needs-your-vote-card>` as its own section above the metrics panels, only when the user's roles include BoardMember in the active community, in `neko-hoa/src/app/features/board/community-home/community-home.component.ts`. Leave the rest of the page untouched for spec 2.
 
 ---
 
@@ -351,7 +351,7 @@ description: "Task list for 027-board-arc-review"
   - Validation `[Theory]`: review period 0 and 366, reminder −1 and 31, time zone "Mars/Olympus", blank statement, 1,001-character statement, each giving 422.
   - GET with no row returns the defaults (30 / FlagOverdueOnly / MajorityOfMembers / 7 / America/New_York / default statement) and writes nothing.
   - An `ArcSettingsChanged` event with old and new values.
-- [ ] T059 [P] [US6] Create the frontend specs:
+- [X] T059 [P] [US6] Create the frontend specs:
   - in `applications-page.component.spec.ts`: "decision reached: approve", "decision reached: denied · revisions requested" and "decision reached: denied" render; the Closed tab shows "Denied · revisions requested"; the "v2" badge and the Overdue marker render.
   - `neko-hoa/src/app/features/board/architectural/record-outcome.component.spec.ts`: the reason field is required for denials, with the prompt "What would need to change for approval?"; conditions are only for approvals; the wording picker appears only for lapse denials; there's a resend button on a failed email.
   - `neko-hoa/src/app/features/board/architectural/arc-settings.component.spec.ts`: field validation messages; save calls `putSettings`.
@@ -372,9 +372,9 @@ description: "Task list for 027-board-arc-review"
   Return the counts.
 - [X] T066 [US6] Implement `ArcSweepJobEndpoint` (`POST /architectural/jobs/sweep`, `AllowAnonymous`, constant-time `X-Scheduler-Secret` compare against `JobsOptions.SchedulerSharedSecret` as in `Features/Payments/Jobs/RunDraftsEndpoint.cs`, calls `ArcSweepService`) in `HOAManagementCompany/Features/Board/Architectural/ArcSweepJobEndpoint.cs`
 - [ ] T067 [US6] Add an hourly `google_cloud_scheduler_job` targeting `${cloud_run_url}/api/v1/architectural/jobs/sweep` with an `X-Scheduler-Secret` header from the existing `scheduler-secret` Secret Manager value. Create `infra/modules/environment/scheduler.tf`, add any needed variables in `infra/modules/environment/variables.tf`, and follow the pinned provider in `versions.tf`. Don't add it to `infra/modules/pr-environment/`. Run `tofu validate` for `infra/environments/dev` and `infra/environments/staging`.
-- [ ] T068 [US6] Implement `RecordOutcomeComponent` (manager only, shown in the detail panel when `DecisionReached`: reason field with the prompt, conditions field for approvals, wording picker for lapse denials, submit, email status and Resend) in `neko-hoa/src/app/features/board/architectural/record-outcome.component.ts`. Embed it in `application-detail-panel.component.ts`.
-- [ ] T069 [US6] Show decisions in the UI: decision labels, Closed-tab wording, the "v2" badge and revision links in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts` and `application-detail-panel.component.ts`
-- [ ] T070 [US6] Implement `ArcSettingsComponent` (manager form for the five settings plus time zone, with validation and save) in `neko-hoa/src/app/features/board/architectural/arc-settings.component.ts`. Add the route `board/arc-settings` (`requiredRoles: ['CommunityManager']`) in `neko-hoa/src/app/app.routes.ts` and an "ARC Settings" nav item (`requiredRoles: ['CommunityManager']`) in `neko-hoa/src/app/core/services/board-navigation.service.ts` with its spec update.
+- [X] T068 [US6] Implement `RecordOutcomeComponent` (manager only, shown in the detail panel when `DecisionReached`: reason field with the prompt, conditions field for approvals, wording picker for lapse denials, submit, email status and Resend) in `neko-hoa/src/app/features/board/architectural/record-outcome.component.ts`. Embed it in `application-detail-panel.component.ts`.
+- [X] T069 [US6] Show decisions in the UI: decision labels, Closed-tab wording, the "v2" badge and revision links in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts` and `application-detail-panel.component.ts`
+- [X] T070 [US6] Implement `ArcSettingsComponent` (manager form for the five settings plus time zone, with validation and save) in `neko-hoa/src/app/features/board/architectural/arc-settings.component.ts`. Add the route `board/arc-settings` (`requiredRoles: ['CommunityManager']`) in `neko-hoa/src/app/app.routes.ts` and an "ARC Settings" nav item (`requiredRoles: ['CommunityManager']`) in `neko-hoa/src/app/core/services/board-navigation.service.ts` with its spec update.
 
 ---
 
@@ -384,7 +384,7 @@ description: "Task list for 027-board-arc-review"
 - [ ] T072 [P] Add a Playwright vote journey (board member votes Revisions needed with a comment and sees the formal-denial note; the info-request notice appears) to `neko-hoa/e2e/board-architectural.spec.ts`
 - [ ] T073 [P] Add a performance test (SC-006): a community with 500 applications × 5 votes; the first list page answers in under 2 s against Testcontainers. File: `HOAManagementCompany.Tests/Performance/ArcListPerformanceTests.cs`
 - [ ] T074 [P] Add accessibility checks: keyboard reachability of tabs, search, row actions and panel; labeled controls; tally text alternatives (axe through the existing Playwright setup if present, otherwise explicit role and label assertions). File: `neko-hoa/e2e/board-architectural.spec.ts`
-- [ ] T075 [P] Check Storybook stories for tally, detail panel and needs-your-vote card in both themes, using tokens only, in `neko-hoa/src/app/features/board/architectural/*.stories.ts`
+- [X] T075 [P] Check Storybook stories for tally, detail panel and needs-your-vote card in both themes, using tokens only, in `neko-hoa/src/app/features/board/architectural/*.stories.ts`
 - [ ] T076 Run the full backend suite (`dotnet test`) and frontend (`cd neko-hoa && npm run test:ci && npm run build`). Confirm the payment outbox tests still pass after T007 and that coverage on new files is ≥ 95%.
 - [ ] T077 Walk through `specs/027-board-arc-review/quickstart.md` against a local stack and fix any drift in the quickstart or code
 - [ ] T078 NLT audit per CLAUDE.md: for every `USn-Sm` and Independent Test in `spec.md`, confirm the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.

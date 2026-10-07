@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { AuthService } from '../../../core/services/auth.service';
 import { BoardNavigationService } from '../../../core/services/board-navigation.service';
 import { MetricsPanelComponent } from '../metrics/metrics-panel.component';
+import { NeedsYourVoteCardComponent } from '../architectural/needs-your-vote-card.component';
 
 // 025 FR-026: the single-community landing page. Real content ships in spec 2 (Community
 // Overview & Metrics); this placeholder establishes the route and renders the registry-driven
@@ -9,11 +10,16 @@ import { MetricsPanelComponent } from '../metrics/metrics-panel.component';
 @Component({
   selector: 'app-community-home',
   standalone: true,
-  imports: [MetricsPanelComponent],
+  imports: [MetricsPanelComponent, NeedsYourVoteCardComponent],
   template: `
     <div class="page-header">
       <h1 class="page-title">{{ communityName() }} <span class="hand">at a glance</span></h1>
     </div>
+
+    <!-- 027 US5: its own section; spec 2 owns the rest of this page. -->
+    @if (isBoardMember()) {
+      <app-arc-needs-your-vote-card />
+    }
 
     <div class="card">
       <div class="field-label">Work Processed — last 30 days</div>
@@ -44,6 +50,12 @@ export class CommunityHomeComponent {
     const active = this.nav.activeCommunityId();
     if (active) return active;
     return memberships.length ? memberships[0].communityId : null;
+  });
+
+  /** 027 FR-032: the Needs-your-vote card is for board members of the active community. */
+  readonly isBoardMember = computed(() => {
+    const id = this.communityId();
+    return (this.auth.user()?.memberships ?? []).some(m => m.communityId === id && m.role === 'BoardMember');
   });
 
   readonly communityName = computed(() => {
