@@ -28,6 +28,10 @@ public class TestDatabaseFixture : IAsyncLifetime
             .Build();
 
         _minio = new MinioBuilder()
+            // minio/minio is no longer pullable from Docker Hub (MinIO stopped publishing community
+            // images), which breaks every Testcontainers run. pgsty/minio is a maintained, drop-in
+            // community build of the same server; pinned for reproducibility.
+            .WithImage("pgsty/minio:RELEASE.2026-08-04T00-00-00Z")
             .WithUsername(MinioAccessKey)
             .WithPassword(MinioSecretKey)
             .Build();
