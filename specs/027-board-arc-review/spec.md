@@ -150,7 +150,7 @@ When enough board members vote the same way, the application has a board decisio
 
 **Why this priority**: Without a decision rule, votes pile up with no result. It is P2 because the board can still see and vote without it.
 
-**Independent Test**: In a community with 5 active board members, cast 3 approve votes on one application. Confirm it shows "decision reached: approve" and refuses further votes. Have the manager record the outcome and confirm the application moves to Closed and the owner is sent the approved email. Separately, set each lapse rule on a test community, let an application pass its due date, and confirm the rule's outcome and the board email.
+**Independent Test**: In a community with 5 active board members, cast 3 approve votes on one application. Confirm it shows "decision reached: approve" and refuses further votes. Have the manager record the outcome and confirm the application moves to Closed and the approved email is queued for the owner (actual delivery needs email credentials, which CI doesn't have). Separately, set each lapse rule on a test community, let an application pass its due date, and confirm the rule's outcome and the board email.
 
 **Acceptance Scenarios**:
 
@@ -185,6 +185,7 @@ When enough board members vote the same way, the application has a board decisio
 - **Application with no attachments**: The row shows "none" and the panel shows an empty-state message.
 - **Info requested close to the deadline**: The due date doesn't move. The reminder (FR-028a) and lapse emails still go out on schedule.
 - **Revision submitted while an earlier revision is still open**: Not possible. Only a closed, denied revision can be revised.
+- **Property has no owner email**: The outcome is still recorded and the application closes. No email is queued, and the manager sees "no owner email on file" so they can notify the owner another way.
 - **Attachment missing from storage**: Opening it shows an "attachment unavailable" message; the rest of the application still renders.
 - **Search with no matches**: The table shows an empty state naming the search term.
 - **Board member of several communities**: The page only shows applications for the community that is active in board mode.
@@ -246,7 +247,7 @@ When enough board members vote the same way, the application has a board decisio
 
 ### Revisions
 
-- **FR-034**: After a denial (either wording), the owner MUST be able to revise and resubmit. The result is a new **revision** of the same application (shown as "ARC-1042" with a "v2" badge; the first submission is v1 and shows no badge), pre-filled from the previous revision. All fields are editable, and previously uploaded attachments carry over without re-uploading, can be removed, and more can be added. Removing an attachment from a revision MUST NOT remove it from earlier revisions, which stay unchanged. The owner-side form belongs to the Resident Architectural Application Submission spec. This spec owns the revision link and what the board sees. `[no WFb]`
+- **FR-034**: After a denial (either wording), the owner can revise and resubmit. The owner-side action and form belong to the Resident Architectural Application Submission spec. This spec MUST provide the revision data model, a factory that creates a revision from a closed denied one, and the board's view. A revision is a new **revision** of the same application (shown as "ARC-1042" with a "v2" badge; the first submission is v1 and shows no badge), pre-filled from the previous revision. All fields are editable, and previously uploaded attachments carry over without re-uploading, can be removed, and more can be added. Removing an attachment from a revision MUST NOT remove it from earlier revisions, which stay unchanged. `[no WFb]`
 - **FR-035**: Each revision is a new submission: its own received date, due date, votes and decision. Nothing carries over from the previous revision's votes. Board members and managers MUST see the revision number and a link to every earlier revision with its decision, reason and board comments. `[no WFb]`
 
 ### Intake

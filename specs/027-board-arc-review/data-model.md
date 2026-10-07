@@ -65,7 +65,6 @@ All new tables are added in one forward-only EF Core migration (`<timestamp>_Add
 | `ClosedByUserId` | string? FK → `AspNetUsers` | |
 | `ReminderSentAt` | timestamptz? | Sweep idempotency (R6) |
 | `LapseProcessedAt` | timestamptz? | Sweep idempotency (R6) |
-| `OwnerEmailStatus` | string(20)? | `Pending`, `Sent`, `Failed`; mirrors the latest outcome outbox row for the manager's resend UI |
 | `CreatedAt` | timestamptz | |
 
 **Indexes**
@@ -158,6 +157,7 @@ Add `ViewArchitecturalApplications` (BoardMember, CommunityManager), `VoteArchit
 | Tally | Counts per `ArcVoteChoice` + not voted (eligible minus votes from current eligible members) |
 | Awaiting my vote | Open, caller eligible, caller not recused, no vote by caller |
 | Info requested | Any `ArchitecturalInfoRequest` with `RespondedAt` null |
+| Owner email status | From the latest outbox row with DedupKey `arc:{id}:outcome*`: its `Status` (`Pending`/`Sent`/`Failed`); `NoOwnerEmail` when the outcome was recorded but the property has no owner email; null before an outcome |
 | Rule text | From the snapshotted `DecisionRule` and the eligible count (FR-013), e.g. "Three of five votes decide." |
 
 ## Validation summary

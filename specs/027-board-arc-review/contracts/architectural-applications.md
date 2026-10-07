@@ -127,7 +127,7 @@ The manager records the outcome (FR-025) and the owner is emailed (FR-026).
 - **Auth**: `ManageArchitecturalReview`. Rate-limited.
 - **Request**: `{ "ownerReason": "required if denied", "conditionsOfApproval": "approved only, optional", "wording": "RevisionsRequested | Denied (deemed denials only, default RevisionsRequested)" }`
 - **Behavior**: Under the row lock: requires `DecisionReached`, sets `Closed`/`ClosedAt`/`ClosedByUserId`, and enqueues the owner email outbox row (`arc_owner_*`, DedupKey `arc:{id}:outcome`) in the same transaction, then dispatches after commit (R5). Logs `ArcOutcomeRecorded`.
-- **Response 200**: the detail response, with `ownerEmailStatus` set to `Sent`, `Pending` or `Failed`.
+- **Response 200**: the detail response, with `ownerEmailStatus` set to `Sent`, `Pending`, `Failed`, or `NoOwnerEmail` when the property has no owner email (the outcome is still recorded and no email is queued). The status is always read from the outbox, so it stays correct when the sweep delivers the email later.
 - **Errors**:
 
   | Status | Code | When |
@@ -148,7 +148,7 @@ Resend a failed owner email (FR-026).
 
 ## GET /communities/{communityId}/architectural-settings
 
-- **Auth**: `ViewArchitecturalApplications`, so board members can see the rules. Creates the row with defaults on first read.
+- **Auth**: `ViewArchitecturalApplications`, so board members can see the rules. Returns the defaults when no row exists yet, without writing one (the row is created on the first PUT or the first application).
 - **Response 200**: `{ reviewPeriodDays, lapseRule, decisionRule, reminderDays, timeZoneId, formalDisapprovalStatement, updatedAt }`
 
 ## PUT /communities/{communityId}/architectural-settings

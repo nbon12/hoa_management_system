@@ -73,6 +73,7 @@ The list query is index-backed on `(CommunityId, Status, DueDate)`. Tallies come
   - User text is length-capped and rendered as text, never HTML.
   - A new `board-writes` rate limit applies to all writes (R9).
   - Production error shape is unchanged (`DomainException` pattern).
+  - Observability: new endpoints are covered by the existing Sentry and OpenTelemetry instrumentation (request traces, errors, environment and release tags). Sensitive events and spans carry IDs only, never comment text, owner names or storage keys, which a dedicated test checks (tasks T080).
 - **File storage**: ✅ Objects in R2 (hosted) and MinIO (local/CI); PostgreSQL holds metadata and keys only; access is only through `IDocumentStorage` pre-signed URLs (5-minute expiry).
 - **Caching/edge**: ✅ Every endpoint is `no-store`.
 - **Testing discipline**: ✅
@@ -144,8 +145,10 @@ HOAManagementCompany/
 │   │       ├── ArcSettingsGetEndpoint.cs
 │   │       ├── ArcSettingsPutEndpoint.cs
 │   │       ├── ArcSweepJobEndpoint.cs              # X-Scheduler-Secret; static-analysis allow-list
+│   │       ├── ArcApplicationFactory.cs            # number allocation, due date, snapshots, revisions
 │   │       └── ArcModels.cs                        # request/response DTOs
 │   └── Payments/Alerts/                            # touched only for OwnerId nullability
+├── Infrastructure/Storage/                         # IDocumentStorage + S3DocumentStorage: + ExistsAsync
 ├── Seed/ArchitecturalSeeder.cs                     # new (R11); DatabaseSeeder calls it
 ├── Infrastructure/Persistence/
 │   ├── ApplicationDbContext.cs                     # new DbSets + configuration
@@ -153,6 +156,8 @@ HOAManagementCompany/
 └── Program.cs                                      # board-writes policy, TimeProvider.System, DI
 
 HOAManagementCompany.Tests/
+├── Unit/Architectural/                             # ArcDecisionRulesTheoryTests
+├── Performance/ArcListPerformanceTests.cs
 └── Integration/Board/
     ├── BoardScopeEnforcementStaticAnalysisTests.cs # modified: AllDirectories + sweep allow-list
     └── Architectural/                              # new: one class per user story,
@@ -171,6 +176,7 @@ neko-hoa/src/app/
     │   ├── application-detail-panel.component.ts (+ .stories)
     │   ├── cast-vote-card.component.ts
     │   ├── needs-your-vote-card.component.ts (+ .stories)
+    │   ├── record-outcome.component.ts
     │   └── arc-settings.component.ts
     └── community-home/community-home.component.ts  # + <app-needs-your-vote-card>
 
