@@ -114,6 +114,7 @@ public abstract class ArcTestBase(TestDatabaseFixture fixture) : BoardTestBase(f
         public string TimeZoneId { get; init; } = "America/New_York";
         public ArcOutcome? Outcome { get; init; }
         public ArcDenialWording? Wording { get; init; }
+        public ArcDecisionSource Source { get; init; } = ArcDecisionSource.Votes;
         public (string Name, long Size)[] Attachments { get; init; } = [];
     }
 
@@ -145,7 +146,7 @@ public abstract class ArcTestBase(TestDatabaseFixture fixture) : BoardTestBase(f
             Status = spec.Status,
             DecisionOutcome = spec.Outcome,
             DecisionWording = spec.Wording,
-            DecisionSource = spec.Outcome is null ? null : ArcDecisionSource.Votes,
+            DecisionSource = spec.Outcome is null ? null : spec.Source,
             DecisionReachedAt = spec.Outcome is null ? null : DateTimeOffset.UtcNow,
             ClosedAt = spec.Status == ArcApplicationStatus.Closed ? DateTimeOffset.UtcNow : null,
         };

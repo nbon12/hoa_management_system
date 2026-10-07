@@ -69,13 +69,25 @@ public sealed class ScrubbingPolicy
 /// </summary>
 public sealed class TelemetryScrubbingProcessor : BaseProcessor<Activity>
 {
+    private static readonly string[] UrlKeys = { "url.full", "http.url" };
+    private static readonly string[] PathKeys = { "url.path", "http.target" };
+
     private readonly ScrubbingPolicy _policy;
     private readonly bool _captureSqlText;
+    private readonly HashSet<string> _objectStorageAuthorities;
 
-    public TelemetryScrubbingProcessor(ScrubbingPolicy policy, bool captureSqlText)
+    /// <param name="objectStorageUrls">
+    /// Object-storage endpoints (027): outbound spans to these hosts carry object keys in their URL path,
+    /// so the path is redacted. Storage keys never reach telemetry.
+    /// </param>
+    public TelemetryScrubbingProcessor(ScrubbingPolicy policy, bool captureSqlText, IEnumerable<string?>? objectStorageUrls = null)
     {
         _policy = policy;
         _captureSqlText = captureSqlText;
+        _objectStorageAuthorities = (objectStorageUrls ?? [])
+            .Where(u => Uri.TryCreate(u, UriKind.Absolute, out _))
+            .Select(u => new Uri(u!).Authority.ToLowerInvariant())
+            .ToHashSet();
     }
 
     public override void OnEnd(Activity activity)
@@ -96,9 +108,26 @@ public sealed class TelemetryScrubbingProcessor : BaseProcessor<Activity>
                 (updates ??= new()).Add(new(tag.Key, ScrubbingPolicy.Redacted));
         }
 
+        if (activity.Kind == ActivityKind.Client && _objectStorageAuthorities.Count > 0)
+            RedactObjectStoragePaths(activity, ref updates);
+
         if (updates is null) return;
         foreach (var update in updates)
             activity.SetTag(update.Key, update.Value); // null value removes the tag
+    }
+
+    private void RedactObjectStoragePaths(Activity activity, ref List<KeyValuePair<string, object?>>? updates)
+    {
+        var full = UrlKeys.Select(k => (Key: k, Value: activity.GetTagItem(k) as string))
+            .FirstOrDefault(t => t.Value is not null);
+        if (full.Value is null || !Uri.TryCreate(full.Value, UriKind.Absolute, out var uri)
+            || !_objectStorageAuthorities.Contains(uri.Authority.ToLowerInvariant()))
+            return;
+
+        foreach (var key in UrlKeys.Where(k => activity.GetTagItem(k) is not null))
+            (updates ??= new()).Add(new(key, $"{uri.Scheme}://{uri.Authority}/{ScrubbingPolicy.Redacted}"));
+        foreach (var key in PathKeys.Where(k => activity.GetTagItem(k) is not null))
+            (updates ??= new()).Add(new(key, ScrubbingPolicy.Redacted));
     }
 }
 
