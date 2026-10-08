@@ -47,6 +47,7 @@ public class RecordOutcomeEndpointTests(TestDatabaseFixture fixture) : ArcTestBa
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var detail = (await res.Content.ReadFromJsonAsync<ArcDetailDto>(Json))!;
         Assert.Equal("Closed", detail.Status);
+        Assert.Equal(new ArcDecisionDto("Approved", null, "Votes"), detail.Decision);
         Assert.NotNull(detail.ClosedAt);
         var row = (await OutcomeRowAsync(appId))!;
         Assert.Equal(ArcEmailKinds.OwnerApproved, row.Kind);
@@ -123,14 +124,24 @@ public class RecordOutcomeEndpointTests(TestDatabaseFixture fixture) : ArcTestBa
     [Fact]
     public async Task Denied_EmailHasReasonStatementAndResubmitLink()
     {
-        var (s, _) = await ArrangeAsync();
-        var appId = await CreateApplicationAsync(s, new AppSpec
-        {
-            Status = ArcApplicationStatus.DecisionReached, Outcome = ArcOutcome.Denied, Wording = ArcDenialWording.Denied
-        });
+        var (s, manager) = await ArrangeAsync();
+        var appId = await CreateApplicationAsync(s);
+        // Given: 1 revisions needed + 2 deny already cast; the third deny reaches the decision on the denial side.
+        await AddVotesAsync(appId,
+            (s.Board[0], ArcVoteChoice.RevisionsNeeded), (s.Board[1], ArcVoteChoice.Deny), (s.Board[2], ArcVoteChoice.Deny));
+        await LoginAsAsync(s.Board[3]);
+        var decided = (await (await VoteAsync(s.CommunityId, appId, "Deny")).Content.ReadFromJsonAsync<ArcListItemDto>(Json))!;
+        Assert.Equal(new ArcTallyDto(0, 1, 3, 1, 5), decided.Tally);
+        Assert.Equal(new ArcDecisionDto("Denied", "Denied", "Votes"), decided.Decision);
 
-        (await RecordAsync(s.CommunityId, appId, new { ownerReason = "Exceeds the height limit." })).EnsureSuccessStatusCode();
+        await LoginAsAsync(manager);
+        var res = await RecordAsync(s.CommunityId, appId, new { ownerReason = "Exceeds the height limit." });
 
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var detail = (await res.Content.ReadFromJsonAsync<ArcDetailDto>(Json))!;
+        Assert.Equal("Closed", detail.Status);
+        Assert.Equal(new ArcDecisionDto("Denied", "Denied", "Votes"), detail.Decision);
+        Assert.Equal("Exceeds the height limit.", detail.OwnerReason);
         var row = (await OutcomeRowAsync(appId))!;
         Assert.Equal(ArcEmailKinds.OwnerDenied, row.Kind);
         var body = Payload(row).Body;

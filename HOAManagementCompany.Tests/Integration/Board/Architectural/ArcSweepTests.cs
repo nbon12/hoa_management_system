@@ -52,10 +52,12 @@ public class ArcSweepTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
     {
         var s = await CreateScenarioAsync(3);
         var appId = await ArrangeAsync(s);
+        await AddVotesAsync(appId, (s.Board[0], ArcVoteChoice.Approve));
         var decided = await CreateApplicationAsync(s, new AppSpec
         {
             Due = Due, Status = ArcApplicationStatus.DecisionReached, Outcome = ArcOutcome.Approved
         });
+        var app = await AppAsync(appId);
 
         Clock.UtcNow = new DateTimeOffset(2026, 6, 19, 16, 0, 0, TimeSpan.Zero);
         await SweepAsync();
@@ -68,8 +70,15 @@ public class ArcSweepTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
         var rows = await RowsAsync(appId, ArcEmailKinds.BoardReminder);
         Assert.Equal(s.Board.Select(b => b.UserId).OrderBy(x => x), rows.Select(r => r.RecipientUserId!).OrderBy(x => x));
         Assert.All(rows, r => Assert.Null(r.OwnerId));
-        Assert.Contains("Decision due 06/27/26", rows[0].PayloadJson);
-        Assert.Contains("not voted", rows[0].PayloadJson);
+        Assert.All(rows, r =>
+        {
+            var msg = System.Text.Json.JsonSerializer.Deserialize<Infrastructure.Payments.Alerts.AlertMessage>(r.PayloadJson)!;
+            Assert.Equal($"Decision due 06/27/26: {app.DisplayId}", msg.Subject);
+            Assert.Contains($"A decision on {app.DisplayId} is due 06/27/26.", msg.Body);
+            Assert.Contains(app.ProjectTitle, msg.Body);
+            Assert.Contains("Votes so far: 1 approve, 0 revisions needed, 0 deny, 2 not voted.", msg.Body);
+            Assert.Contains($"/app/board/architectural?open={appId}", msg.Body);
+        });
         Assert.Empty(await RowsAsync(decided, ArcEmailKinds.BoardReminder));
     }
 

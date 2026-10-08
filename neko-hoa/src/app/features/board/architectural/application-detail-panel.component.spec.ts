@@ -101,6 +101,23 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
     expect(screen.getByRole('button', { name: '✓ Approve' })).toBeTruthy();
   });
 
+  // US4-S5: "…When I choose Request info, Then I see the notice "Questions don't pause the review period
+  // (due <date>)…" and the info-requested marker shows the unchanged due date."
+  it('shows the review-period notice on Request info and the unchanged due date on the marker (US4-S5)', async () => {
+    const r = await setup(detail({
+      infoRequested: true,
+      infoRequests: [{ id: 'i1', requestedBy: 'Bianca Board', message: 'Please attach a plat survey', requestedAt: '2026-06-02T10:00:00Z', respondedAt: null }],
+    }));
+    r.fixture.componentInstance.focusForInfo();
+    await until(() => !!r.fixture.nativeElement.querySelector('[role="note"]'));
+    r.fixture.detectChanges();
+    expect(screen.getByRole('note').textContent!.trim()).toBe(
+      "Questions don't pause the review period (due 06/27/26). To require changes before approval, vote Revisions needed — it counts as a formal denial and invites the owner to resubmit.");
+    const marker = r.fixture.nativeElement.querySelector('.adp__info') as HTMLElement;
+    expect(marker.textContent).toContain('info requested');
+    expect(marker.textContent).toContain('review still due 06/27/26');
+  });
+
   it('submits a vote and refreshes', async () => {
     const r = await setup();
     arc.vote.and.returnValue(Promise.resolve({} as any));
@@ -110,17 +127,51 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
     expect(r).toBeTruthy();
   });
 
+  // US6-S12 (v2 side): "…it is shown as "ARC-1042" with a "v2" badge, a new received date and due date, no
+  // votes, and a link to v1 showing its decision…"
   it('shows the v2 badge and links to earlier versions (US6-S12)', async () => {
-    await setup(detail({
+    const r = await setup(detail({
       id: 'a1', revision: 2,
       revisions: [
         { id: 'v1', revision: 1, receivedDate: '2026-04-01', decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } },
         { id: 'a1', revision: 2, receivedDate: '2026-05-28', decision: null },
       ],
     }));
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toContain('ARC-1042');
     expect(screen.getByLabelText('version 2').textContent!.trim()).toBe('v2');
+    expect(screen.getByText('05/28/26')).toBeTruthy();
+    expect(screen.getByText(/06\/27\/26/)).toBeTruthy();
+    expect(r.fixture.nativeElement.querySelector('.adp__votes')).toBeNull();
     expect(screen.getByRole('button', { name: 'v1' })).toBeTruthy();
     expect(screen.getByText(/Denied · revisions requested/)).toBeTruthy();
+  });
+
+  // US6-S12 (v1 side): following the link, v1 shows "its decision, reason and board comments".
+  it('shows an earlier version with its decision, reason and board comments (US6-S12)', async () => {
+    await setup(detail({
+      id: 'v1', revision: 1, status: 'Closed', myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' },
+      ownerReason: 'Lower the fence to 5ft per Guideline 4.2',
+      votes: [{ voterName: 'Bianca Board', choice: 'RevisionsNeeded', comment: 'Fence must be 5ft max per Guideline 4.2', castAt: '2026-04-10T10:00:00Z' }],
+      revisions: [
+        { id: 'v1', revision: 1, receivedDate: '2026-04-01', decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } },
+        { id: 'a1', revision: 2, receivedDate: '2026-05-28', decision: null },
+      ],
+    }));
+    expect(screen.getByText('Denied · revisions requested')).toBeTruthy();
+    expect(screen.getByText('Lower the fence to 5ft per Guideline 4.2')).toBeTruthy();
+    expect(screen.getByText('Fence must be 5ft max per Guideline 4.2')).toBeTruthy();
+    expect(screen.getByText('Bianca Board')).toBeTruthy();
+  });
+
+  it('shows the conditions of an approval', async () => {
+    await setup(detail({
+      status: 'Closed', myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Approved', wording: null, source: 'Votes' },
+      conditionsOfApproval: 'Fence must be stained to match the existing color',
+    }));
+    expect(screen.getByText('Approved')).toBeTruthy();
+    expect(screen.getByText('Fence must be stained to match the existing color')).toBeTruthy();
   });
 
   it('shows the record-outcome form to managers on a reached decision', async () => {
@@ -180,7 +231,7 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
       ],
     }));
     expect(screen.getByText('overdue')).toBeTruthy();
-    expect(screen.getByText('decision reached: approve (by default — review period lapsed)')).toBeTruthy();
+    expect(screen.getByText('decision reached: approved by default (review period lapsed)')).toBeTruthy();
     const opened = jasmine.createSpy('openRevision');
     r.fixture.componentInstance.openRevision.subscribe(opened);
     fireEvent.click(screen.getByRole('button', { name: 'v1' }));

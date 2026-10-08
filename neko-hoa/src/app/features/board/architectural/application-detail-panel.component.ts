@@ -53,6 +53,12 @@ import { FORMAL_DENIAL_NOTE, decisionReachedLabel, fmtDate, fmtSize, myVoteLabel
           @if (d.decision) {
             <p class="adp__decision"><b>{{ d.status === 'Closed' ? outcome(d) : decided(d) }}</b></p>
           }
+          @if (d.ownerReason) {
+            <p class="adp__reason"><span class="field-label">Reason</span> {{ d.ownerReason }}</p>
+          }
+          @if (d.conditionsOfApproval) {
+            <p class="adp__reason"><span class="field-label">Conditions</span> {{ d.conditionsOfApproval }}</p>
+          }
           @if (d.votes.length) {
             <ul class="adp__votes">
               @for (v of d.votes; track $index) {
@@ -66,6 +72,7 @@ import { FORMAL_DENIAL_NOTE, decisionReachedLabel, fmtDate, fmtSize, myVoteLabel
               <span class="pill pill--warn">info requested</span>
               <span>{{ r.message }}</span>
               <span class="muted">— {{ r.requestedBy }}, {{ date(r.requestedAt) }}</span>
+              <span class="muted adp__due">· review still due {{ date(d.dueDate) }}</span>
             </div>
           }
 
@@ -119,6 +126,7 @@ import { FORMAL_DENIAL_NOTE, decisionReachedLabel, fmtDate, fmtSize, myVoteLabel
     .adp__size { font-size: 10.5px; }
     .adp__decision { margin: 8px 0; }
     .adp__comment { white-space: pre-wrap; }
+    .adp__reason { margin: 4px 0 0; font-size: 13px; }
     .adp__info { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-top: 8px; font-size: 12px; }
     .adp__rev { background: none; border: none; padding: 0; font: inherit; cursor: pointer; }
     .adp__error { color: var(--warn); font-size: 12px; }

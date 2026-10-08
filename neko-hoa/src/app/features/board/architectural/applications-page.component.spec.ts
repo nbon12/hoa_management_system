@@ -32,9 +32,10 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     ],
   });
 
-  async function setup(items: ArcListItem[] = [row(), row({ id: 'a2', displayId: 'ARC-1041', attachmentCount: 0 })], query: Record<string, string> = {}) {
+  async function setup(items: ArcListItem[] = [row(), row({ id: 'a2', displayId: 'ARC-1041', attachmentCount: 0 })], query: Record<string, string> = {},
+                       counts = { open: 4, closed: 27, awaitingMyVote: 1 }) {
     arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['list', 'vote', 'detail', 'attachmentUrl', 'requestInfo']);
-    arc.list.and.returnValue(Promise.resolve(page(items)));
+    arc.list.and.returnValue(Promise.resolve(page(items, counts)));
     arc.detail.and.returnValue(new Promise(() => {}));
     active.set('c1');
     const result = await render(ApplicationsPageComponent, {
@@ -126,8 +127,11 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
   });
 
   // US2-S2: from 1 approve / 0 deny / 4 not voted, Approve → "you voted approve" and 2 / 0 / 3.
+  // US2 Independent Test: "…and the "awaiting your vote" count went down by one."
   it('votes Approve from the row and re-renders it (US2-S2)', async () => {
-    await setup([row({ tally: { approve: 1, revisionsNeeded: 0, deny: 0, notVoted: 4, eligible: 5 } })]);
+    await setup([row({ tally: { approve: 1, revisionsNeeded: 0, deny: 0, notVoted: 4, eligible: 5 } })], {},
+      { open: 4, closed: 27, awaitingMyVote: 2 });
+    expect(screen.getByText('2 awaiting your vote')).toBeTruthy();
     arc.vote.and.returnValue(Promise.resolve(row({
       myVote: { state: 'Voted', choice: 'Approve' }, tally: { approve: 2, revisionsNeeded: 0, deny: 0, notVoted: 3, eligible: 5 },
     })));
@@ -135,6 +139,7 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     await waitFor(() => expect(screen.getByText('you voted approve')).toBeTruthy());
     expect(arc.vote).toHaveBeenCalledWith('c1', 'a1', 'Approve');
     expect(screen.getByRole('img', { name: '2 approve · 0 revisions needed · 0 deny · 3 not voted' })).toBeTruthy();
+    expect(screen.getByText('1 awaiting your vote')).toBeTruthy();
   });
 
   it('shows "you voted deny" with no buttons (US2-S3)', async () => {
@@ -167,13 +172,17 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
       row({ id: 'd3', status: 'DecisionReached', decision: { outcome: 'Denied', wording: 'Denied', source: 'Votes' } }),
       row({ id: 'c1', status: 'Closed', decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } }),
       row({ id: 'v2', revision: 2, overdue: true, infoRequested: true }),
+      row({ id: 'l1', status: 'DecisionReached', overdue: true, decision: { outcome: 'Approved', wording: null, source: 'Lapse' } }),
+      row({ id: 'l2', status: 'DecisionReached', overdue: true, decision: { outcome: 'Denied', wording: 'Denied', source: 'Lapse' } }),
     ]);
+    expect(screen.getByText('decision reached: approved by default (review period lapsed)')).toBeTruthy();
+    expect(screen.getByText('decision reached: denied by default (review period lapsed)')).toBeTruthy();
     expect(screen.getByText('decision reached: approve')).toBeTruthy();
     expect(screen.getByText('decision reached: denied · revisions requested')).toBeTruthy();
     expect(screen.getByText('decision reached: denied')).toBeTruthy();
     expect(screen.getByText('Denied · revisions requested')).toBeTruthy();
     expect(screen.getByLabelText('version 2').textContent!.trim()).toBe('v2');
-    expect(screen.getByText('overdue')).toBeTruthy();
+    expect(screen.getAllByText('overdue').length).toBe(3);
     expect(screen.getByText('info requested')).toBeTruthy();
   });
 

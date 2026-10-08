@@ -24,8 +24,13 @@ describe('arc-format (027)', () => {
     expect(decisionReachedLabel({ outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' }))
       .toBe('decision reached: denied · revisions requested');
     expect(decisionReachedLabel({ outcome: 'Denied', wording: 'Denied', source: 'Votes' })).toBe('decision reached: denied');
+    // US6-S15 / US6-S16: deemed approved / deemed denied.
     expect(decisionReachedLabel({ outcome: 'Approved', wording: null, source: 'Lapse' }))
-      .toBe('decision reached: approve (by default — review period lapsed)');
+      .toBe('decision reached: approved by default (review period lapsed)');
+    expect(decisionReachedLabel({ outcome: 'Denied', wording: 'Denied', source: 'Lapse' }))
+      .toBe('decision reached: denied by default (review period lapsed)');
+    expect(decisionReachedLabel({ outcome: 'Denied', wording: 'RevisionsRequested', source: 'Lapse' }))
+      .toBe('decision reached: denied by default (review period lapsed)');
     expect(outcomeLabel({ outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' })).toBe('Denied · revisions requested');
     expect(outcomeLabel({ outcome: 'Denied', wording: 'Denied', source: 'Votes' })).toBe('Denied');
     expect(outcomeLabel({ outcome: 'Approved', wording: null, source: 'Votes' })).toBe('Approved');

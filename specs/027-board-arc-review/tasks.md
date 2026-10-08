@@ -484,10 +484,10 @@ No test in this mapping is skipped or disabled.
 | US2-S7 | CastVoteEndpointTests VoteOnClosedApplication_IsRefused_TallyUnchanged |
 | US2-S8 | CastVoteEndpointTests Owner_IsRecused_AndExcludedFromEligible; applications-page spec "shows recused instead of vote buttons" |
 | US2-S9 | CastVoteEndpointTests NonBoardRoles_CannotVote (Theory: CommunityManager, Accountant) |
-| US2 Independent Test | CastVoteEndpointTests (all); Cypress journey |
+| US2 Independent Test | CastVoteEndpointTests (all); applications-page spec "votes Approve from the row and re-renders it" (awaiting pill 2 → 1); Cypress journey |
 | US3-S1 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationDetailEndpointTests.cs` Detail_ShowsOwnerReceivedDateAndAttachmentsWithSizes; `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.spec.ts` "shows the title, owner, received date and files with sizes" |
 | US3-S2 | `HOAManagementCompany.Tests/Integration/Board/Architectural/AttachmentUrlEndpointTests.cs` Link_DownloadsTheExactFile_ExpiresWithin15Minutes_AndIsFast; detail-panel spec "opens an attachment in a new tab through a fetched link" |
-| US3-S3 | AttachmentLinkExpiryTests ExpiredLink_IsRefusedByStorage |
+| US3-S3 | AttachmentLinkExpiryTests ExpiredLink_IsRefusedByStorage (link signed as if issued 16 minutes ago with the 15-minute lifetime; storage returns 403) |
 | US3-S4 | AttachmentUrlEndpointTests NonMember_AndForeignAttachmentId_AreRefusedWithoutALink |
 | US3-S5 | ApplicationDetailEndpointTests Detail_WithoutAttachments_HasEmptyAttachmentList; detail-panel spec "says there are no attachments" |
 | US3-S6 | ApplicationDetailEndpointTests ListAndDetail_NeverContainObjectUrlsOrStorageKeys; detail-panel spec "renders no storage links" |
@@ -496,7 +496,7 @@ No test in this mapping is skipped or disabled.
 | US4-S2 | `HOAManagementCompany.Tests/Integration/Board/Architectural/InfoRequestEndpointTests.cs` RequestInfo_MarksApplication_WithoutVotingOrMovingTheDueDate; cast-vote-card spec "emits the info request message"; detail-panel spec "shows info requests with sender" |
 | US4-S3 | InfoRequestEndpointTests EmptyMessage_IsRefused (Theory); cast-vote-card spec "refuses an empty info request" |
 | US4-S4 | InfoRequestEndpointTests Manager_SeesTheRequestWithSenderAndTime; detail-panel spec "shows info requests with sender" |
-| US4-S5 | cast-vote-card spec "…shows the review-period notice"; `neko-hoa/src/app/features/board/architectural/arc-format.spec.ts` info notice; Playwright "Request info explains…" |
+| US4-S5 | detail-panel spec "shows the review-period notice on Request info and the unchanged due date on the marker"; cast-vote-card spec "…shows the review-period notice"; `neko-hoa/src/app/features/board/architectural/arc-format.spec.ts` info notice; Playwright "Request info explains…" |
 | US4 Independent Test | InfoRequestEndpointTests RequestInfo_MarksApplication_WithoutVotingOrMovingTheDueDate |
 | US5-S1 | ApplicationsListEndpointTests AwaitingMyVote_ListsOnlyUnvoted_AndEmptiesAfterVoting; `neko-hoa/src/app/features/board/architectural/needs-your-vote-card.component.spec.ts` "lists what needs my vote with all FR-032 fields" |
 | US5-S2 | needs-your-vote-card spec "links to all architectural applications"; Cypress journey |
@@ -514,11 +514,11 @@ No test in this mapping is skipped or disabled.
 | US6-S9 | DecisionOnVoteTests RevisionsNeededAndDeny_CountTogether_WordingFollowsMajorityKind |
 | US6-S10 | RecordOutcomeEndpointTests RevisionsRequested_EmailHasReasonStatementAndResubmitLink_ButNoBoardComments; record-outcome spec "requires a reason for a denial" |
 | US6-S11 | RecordOutcomeEndpointTests Denied_EmailHasReasonStatementAndResubmitLink |
-| US6-S12 | `HOAManagementCompany.Tests/Integration/Board/Architectural/RevisionHistoryTests.cs` Revision_HasOwnDatesAndNoVotes_AndLinksToV1WithItsHistory; detail-panel spec "shows the v2 badge and links to earlier versions" |
+| US6-S12 | `HOAManagementCompany.Tests/Integration/Board/Architectural/RevisionHistoryTests.cs` Revision_HasOwnDatesAndNoVotes_AndLinksToV1WithItsHistory; detail-panel spec "shows the v2 badge and links to earlier versions" and "shows an earlier version with its decision, reason and board comments" |
 | US6-S13 | ArcSweepTests Reminder_SentOncePerBoardMember_SevenDaysBeforeDueDate |
 | US6-S14 | ArcSweepTests FlagOverdueOnly_StaysOpenAndOverdue_VotingContinues_BoardEmailedOnce |
-| US6-S15 | ArcSweepTests DeemedRules_DecideByLapse_RefuseVotes_AndEmailBoard (DeemedApproved) |
-| US6-S16 | ArcSweepTests DeemedRules_DecideByLapse_RefuseVotes_AndEmailBoard (DeemedDenied) |
+| US6-S15 | ArcSweepTests DeemedRules_DecideByLapse_RefuseVotes_AndEmailBoard (DeemedApproved); arc-format spec "labels decisions for the open and closed tabs"; applications-page spec "labels decisions, the v2 badge, overdue and info requested" |
+| US6-S16 | ArcSweepTests DeemedRules_DecideByLapse_RefuseVotes_AndEmailBoard (DeemedDenied); arc-format spec "labels decisions for the open and closed tabs"; applications-page spec "labels decisions, the v2 badge, overdue and info requested" |
 | US6-S17 | `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcSettingsEndpointTests.cs` ManagerSavesSettings_NewApplicationsUseThem_OldOnesKeepSnapshots |
 | US6-S18 | ArcSettingsEndpointTests ManagerSavesSettings_… and NonManagers_CannotChangeSettings (Theory); `neko-hoa/src/app/features/board/architectural/arc-settings.component.spec.ts` |
 | US6 Independent Test | DecisionOnVoteTests + RecordOutcomeEndpointTests + ArcSweepTests |

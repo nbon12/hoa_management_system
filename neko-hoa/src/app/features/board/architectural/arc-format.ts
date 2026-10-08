@@ -21,12 +21,17 @@ export function tallyLabel(t: ArcTally): string {
   return `${t.approve} approve · ${t.revisionsNeeded} revisions needed · ${t.deny} deny · ${t.notVoted} not voted`;
 }
 
-/** FR-024 open-tab label, e.g. "decision reached: denied · revisions requested". */
+/**
+ * FR-024 open-tab label, e.g. "decision reached: denied · revisions requested". A lapse decision
+ * (FR-027, US6-S15/S16) reads "decision reached: approved by default (review period lapsed)".
+ */
 export function decisionReachedLabel(d: ArcDecision): string {
+  if (d.source === 'Lapse')
+    return `decision reached: ${d.outcome === 'Approved' ? 'approved' : 'denied'} by default (review period lapsed)`;
   const base = d.outcome === 'Approved'
     ? 'approve'
     : d.wording === 'RevisionsRequested' ? 'denied · revisions requested' : 'denied';
-  return `decision reached: ${base}${d.source === 'Lapse' ? ' (by default — review period lapsed)' : ''}`;
+  return `decision reached: ${base}`;
 }
 
 /** Closed-tab label (FR-025): the legal outcome, with the owner wording for denials. */
