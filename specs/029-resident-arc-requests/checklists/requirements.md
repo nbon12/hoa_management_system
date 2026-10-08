@@ -35,8 +35,13 @@
   mechanisms (R2/MinIO, pre-signed URLs, FastEndpoints, EF Core) because the repo's
   constitution template mandates those sections; the user-facing scenarios, user stories,
   and success criteria remain technology-agnostic.
-- Attachment size/count limits and the `ARC-<number>` display format are documented as
-  Assumptions with reasonable defaults; `/speckit.clarify` or `/speckit.plan` may tune them
-  without changing feature scope.
-- Shared data model with 027 is documented (Key Entities + Spec independence) so both specs
-  can proceed in parallel.
+- Clarifications resolved 2026-10-08: attachment limits (50 MB/file · 20 files · 250 MB,
+  environment-configurable); revise-and-resubmit is in scope (US6/FR-026); withdrawn requests
+  are hidden from the board's default views with an opt-in "show withdrawn" filter.
+- Spec aligned with the in-progress `027-board-arc-review` (PR #209), which lands first and
+  introduces the shared entities. 029 extends them additively (Draft/Withdrawn states,
+  resident-authored fields, info-request reply, submission-confirmation email `Kind`). Canonical
+  enum names, `ARC-<n>` numbering (from 1001), due-date snapshotting, 15-min link expiry, and
+  pagination all follow 027. These cross-references are reconciliation, not implementation leak.
+- `ARC-<number>` numbering and review-period defaults are now pinned to 027 (no longer open
+  assumptions).
