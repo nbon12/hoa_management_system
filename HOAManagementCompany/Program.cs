@@ -270,6 +270,17 @@ builder.Services.AddRateLimiter(o =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
+    // Board writes (027 research R9): votes, info requests, outcomes and ARC settings are
+    // user-generated content, partitioned per authenticated user like `payments`.
+    o.AddPolicy("board-writes", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ClientIdentityResolver.ResolvePaymentsPartition(httpContext),
+            partitionKey => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = PermitsFor(partitionKey, rateLimitingOptions.BoardWritesPermitsPerMinute, rateLimitingOptions),
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
     // Browser telemetry proxy limiter — keyed by client IP so a single noisy client
     // cannot exhaust the window for everyone (FR-031). Permit count is env-tunable.
     var telemetryPermits = builder.Configuration.GetValue<int?>("Observability:TelemetryProxyRateLimitPerMinute") ?? 120;
@@ -395,6 +406,17 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Payments.Alerts.OutboxD
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.PropertyService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.CommunityService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Community.PollService>();
+
+// ── Board architectural review (027-board-arc-review) ──────────────────────
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.Configure<HOAManagementCompany.Features.Board.Architectural.ArchitecturalReviewOptions>(
+    builder.Configuration.GetSection(HOAManagementCompany.Features.Board.Architectural.ArchitecturalReviewOptions.SectionName));
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.ArcQueries>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.ArcApplicationFactory>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.ArcEmailRenderer>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.ArcSweepService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.IArcNotificationPreferences,
+    HOAManagementCompany.Features.Board.Architectural.AllowAllArcNotificationPreferences>();
 
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();

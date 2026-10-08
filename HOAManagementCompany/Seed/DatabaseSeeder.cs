@@ -39,5 +39,8 @@ public class DatabaseSeeder(
         // 025: runs on every startup, including a pre-seeded fork (pr-env) where the full
         // seed above is skipped — ensures the board-eligible E2E user exists. Idempotent.
         await authSeeder.EnsureBoardUserAsync(ct);
+
+        // 027: demo board, manager and architectural applications. Idempotent, every startup.
+        await new ArchitecturalSeeder(db, services, logger).SeedAsync(ct);
     }
 }

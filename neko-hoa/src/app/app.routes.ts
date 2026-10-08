@@ -42,6 +42,8 @@ export const routes: Routes = [
       { path: 'board/home',        canActivate: [boardGuard], loadComponent: () => import('./features/board/community-home/community-home.component').then(m => m.CommunityHomeComponent) },
       { path: 'board/communities', canActivate: [boardGuard], loadComponent: () => import('./features/board/communities/communities.component').then(m => m.CommunitiesComponent) },
       { path: 'board/metrics',     canActivate: [boardGuard], loadComponent: () => import('./features/board/metrics/metrics-page.component').then(m => m.BoardMetricsPageComponent) },
+      { path: 'board/architectural', canActivate: [boardGuard], data: { requiredRoles: ['BoardMember', 'CommunityManager'] }, loadComponent: () => import('./features/board/architectural/applications-page.component').then(m => m.ApplicationsPageComponent) },
+      { path: 'board/arc-settings',  canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'] }, loadComponent: () => import('./features/board/architectural/arc-settings.component').then(m => m.ArcSettingsComponent) },
       { path: 'board/memberships', canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'] }, loadComponent: () => import('./features/board/membership-admin/membership-admin.component').then(m => m.MembershipAdminComponent) },
     ]
   },

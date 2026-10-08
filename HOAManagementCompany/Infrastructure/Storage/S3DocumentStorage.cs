@@ -31,6 +31,19 @@ public class S3DocumentStorage(IAmazonS3 s3Client, IOptions<StorageOptions> opts
         return Task.FromResult(url);
     }
 
+    public async Task<bool> ExistsAsync(string storageKey, CancellationToken ct = default)
+    {
+        try
+        {
+            await s3Client.GetObjectMetadataAsync(_opts.BucketName, storageKey, ct);
+            return true;
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+    }
+
     public async Task UploadAsync(string storageKey, byte[] content, string contentType = "application/pdf", CancellationToken ct = default)
     {
         await using var stream = new MemoryStream(content);

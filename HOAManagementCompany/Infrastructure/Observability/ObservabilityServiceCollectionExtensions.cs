@@ -49,7 +49,10 @@ public static class ObservabilityServiceCollectionExtensions
                 // runtime options so the SQL-text gate (FR-010) honors the resolved config.
                 tracing.AddProcessor(sp => new TelemetryScrubbingProcessor(
                     sp.GetRequiredService<ScrubbingPolicy>(),
-                    sp.GetRequiredService<ObservabilityOptions>().CaptureSqlText));
+                    sp.GetRequiredService<ObservabilityOptions>().CaptureSqlText,
+                    // 027: object keys in outbound storage URLs never reach telemetry.
+                    [sp.GetRequiredService<IConfiguration>()["Storage:ServiceUrl"],
+                     sp.GetRequiredService<IConfiguration>()["Storage:PublicServiceUrl"]]));
 
                 // Instrumentations are added by their user stories:
                 //   US1 → AddAspNetCoreInstrumentation / AddHttpClientInstrumentation

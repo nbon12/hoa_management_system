@@ -20,10 +20,13 @@ public class BoardScopeEnforcementStaticAnalysisTests
     //  • BoardModeEndpoint      — an auth/mode endpoint, not a community-scoped resource;
     //                             its server-side board-eligibility check lives in
     //                             AuthService.SwitchModeAsync (FR-014/FR-020).
+    //  • ArcSweepJobEndpoint    — secret-authenticated scheduler job, not a user-facing
+    //                             community resource (027 research R6).
     private static readonly string[] AllowList =
     [
         "MyCommunitiesEndpoint.cs",
         "BoardModeEndpoint.cs",
+        "ArcSweepJobEndpoint.cs",
     ];
 
     [Fact]
@@ -32,7 +35,7 @@ public class BoardScopeEnforcementStaticAnalysisTests
         var boardDir = LocateBoardFeatureDirectory();
 
         var endpoints = boardDir
-            .GetFiles("*Endpoint.cs", SearchOption.TopDirectoryOnly)
+            .GetFiles("*Endpoint.cs", SearchOption.AllDirectories)
             .OrderBy(f => f.Name, StringComparer.Ordinal)
             .ToList();
 

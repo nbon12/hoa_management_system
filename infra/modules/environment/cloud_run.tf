@@ -64,6 +64,11 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "Storage__ForcePathStyle"
         value = "true"
       }
+      # 027: absolute frontend origin for links in architectural review emails.
+      env {
+        name  = "ArchitecturalReview__AppBaseUrl"
+        value = "https://${var.frontend_domain}"
+      }
 
       # The nine secret-backed env vars, each pointing at its Secret Manager secret's latest version.
       dynamic "env" {
