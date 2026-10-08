@@ -160,9 +160,10 @@ public class FileRequestTests(TestDatabaseFixture fixture) : ResidentArcTestBase
 
     // US1 AS6 / FR-004: Given a resident filling out a request, When they enter a planned completion date
     // earlier than the planned start date, Then submission is refused with a validation error. The API refuses
-    // to save those dates at all (create or edit), so a request carrying them can never be submitted.
+    // those dates wherever they are entered (create or edit), so a request carrying them never reaches submit:
+    // the draft keeps its earlier valid dates and no application is created with the bad ones.
     [Fact]
-    public async Task Submit_CompletionBeforeStart_Refused()
+    public async Task CompletionBeforeStart_IsRefused_AndCanNeverBeSubmitted()
     {
         var r = await CreateResidentAsync();
         var bad = CompleteDraft();
@@ -172,16 +173,14 @@ public class FileRequestTests(TestDatabaseFixture fixture) : ResidentArcTestBase
 
         var create = await r.Http.PostAsJsonAsync($"{Base}/drafts", bad);
         var edit = await r.Http.PutAsJsonAsync($"{Base}/drafts/{draft.Id}", bad);
-        var submit = await SubmitAsync(r, draft.Id);
 
         await AssertErrorAsync(create, HttpStatusCode.UnprocessableEntity, ResidentArcErrorCodes.ValidationError);
         await AssertErrorAsync(edit, HttpStatusCode.UnprocessableEntity, ResidentArcErrorCodes.ValidationError);
-        // The refused edit left the draft's valid dates in place, so this submit is of the original request.
-        var submitted = await ReadAsync<ResidentArcDetailDto>(submit);
-        Assert.Equal(Start, submitted.PlannedStartDate);
-        Assert.Equal(Finish, submitted.PlannedCompletionDate);
-        Assert.False(await WithDbAsync(db => db.ArchitecturalApplications.AnyAsync(a =>
-            a.PropertyId == r.PropertyId && a.PlannedCompletionDate < a.PlannedStartDate)));
+        var stored = await WithDbAsync(db => db.ArchitecturalApplicationDrafts.SingleAsync(d => d.Id == draft.Id));
+        Assert.Equal(Start, stored.PlannedStartDate);
+        Assert.Equal(Finish, stored.PlannedCompletionDate);
+        Assert.Equal(1, await WithDbAsync(db => db.ArchitecturalApplicationDrafts.CountAsync(d => d.PropertyId == r.PropertyId)));
+        Assert.False(await WithDbAsync(db => db.ArchitecturalApplications.AnyAsync(a => a.PropertyId == r.PropertyId)));
     }
 
     // US1 AS7 / FR-025: Given a request was just submitted, Then the submitting resident is sent a plain-template

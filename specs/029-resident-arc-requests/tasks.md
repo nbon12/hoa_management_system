@@ -112,7 +112,7 @@
   3. `EditDraft_PersistsUpdatedValues_AndStaysDraft` (AS3): PUT new values, then GET returns them; no application row exists.
   4. `DeleteDraft_RemovesDraftAndItsObjects` (AS4): after uploading a file and deleting the draft, the draft and attachment rows are gone, `IDocumentStorage.ExistsAsync(key)` is false, and the list doesn't contain it.
   5. `Submit_WithoutAcknowledgement_Refused_NoNumberAllocated` (AS5): 422 `ACKNOWLEDGEMENT_REQUIRED`; no application row; `NextApplicationNumber` is unchanged; the draft still exists.
-  6. `Submit_CompletionBeforeStart_Refused` (AS6): 422 `VALIDATION_ERROR`; no application row.
+  6. `CompletionBeforeStart_IsRefused_AndCanNeverBeSubmitted` (AS6): 422 `VALIDATION_ERROR`; no application row.
   7. `Submit_EnqueuesConfirmationEmailToSubmitter` (AS7): exactly one `OutboxMessages` row with `Kind == "arc_owner_submitted"`, `RecipientUserId` == the caller, `OwnerId == null` and `DedupKey == $"arc:{id}:submitted"`. Its payload subject and body contain `ARC-{N}`; the body has no "vote" text.
   8. `Submit_AppearsInBoardOpenList` (AS8): a board member's `GET …?status=open` contains the item with the same `id` and `displayId`. For SC-007, the resident's own `GET /property/architectural-applications`, sent right after the submit response, contains it with `status == "Submitted"`; a `Stopwatch` from the submit request to the list response must read under 5 s.
   9. `ConcurrentSubmits_GetDistinctSequentialNumbers` (SC-002 / edge case): 5 drafts in one community submitted in parallel get 5 distinct numbers that form a contiguous range.
@@ -393,7 +393,7 @@
 | Edge: non-owner / board-member / cross-community / co-owner | `ResidentArcAuthorizationTests` (T040) |
 | Edge: concurrent submits | `FileRequestTests.ConcurrentSubmits_GetDistinctSequentialNumbers` |
 | Edge: delete draft with attachments | `FileRequestTests.DeleteDraft_RemovesDraftAndItsObjects` |
-| Edge: expired link | `AttachmentTests.AttachmentUrl_IsShortLived_AndNeverEmbedded` |
+| Edge: expired link | `AttachmentLinkExpiryTests.ExpiredLink_StopsWorking_AndANewRequestIssuesAWorkingLink` (+ `AttachmentTests.AttachmentUrl_IsShortLived_AndNeverEmbedded`) |
 | Edge: storage unavailable during upload | `AttachmentStorageFailureTests.Upload_StorageUnavailable_FailsCleanlyAndCanRetry` |
 | Edge / FR-008: submitted content not editable | `TrackRequestsTests.SubmittedApplication_CannotBeEdited` |
 | SC-007: in the list within 5 s | `FileRequestTests.Submit_AppearsInBoardOpenList` (resident list + stopwatch) |

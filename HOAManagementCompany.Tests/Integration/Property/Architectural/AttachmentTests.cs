@@ -95,6 +95,7 @@ public class AttachmentTests(TestDatabaseFixture fixture) : ResidentArcTestBase(
         Assert.Equal(HttpStatusCode.Created, atLimit.StatusCode);
         await AssertErrorAsync(overLimit, HttpStatusCode.UnprocessableEntity, ResidentArcErrorCodes.FileTooLarge);
         Assert.Equal(1, await WithDbAsync(db => db.ArchitecturalDraftAttachments.CountAsync(a => a.DraftId == draft.Id)));
+        await AssertOnlyAcceptedFilesStoredAsync(r, draft.Id, expected: 1); // SC-003: the refused bytes were never stored
     }
 
     // US5 AS4 (count): Given a request already at the per-application attachment count, When the resident adds
@@ -112,6 +113,7 @@ public class AttachmentTests(TestDatabaseFixture fixture) : ResidentArcTestBase(
 
         await AssertErrorAsync(res, HttpStatusCode.UnprocessableEntity, ResidentArcErrorCodes.AttachmentLimitReached);
         Assert.Equal(MaxFiles, await WithDbAsync(db => db.ArchitecturalDraftAttachments.CountAsync(a => a.DraftId == draft.Id)));
+        await AssertOnlyAcceptedFilesStoredAsync(r, draft.Id, expected: MaxFiles);
     }
 
     // US5 AS4 (total): Given a request at the per-application total-size limit, When the resident adds another
@@ -128,6 +130,7 @@ public class AttachmentTests(TestDatabaseFixture fixture) : ResidentArcTestBase(
 
         await AssertErrorAsync(res, HttpStatusCode.UnprocessableEntity, ResidentArcErrorCodes.AttachmentLimitReached);
         Assert.Equal(2, await WithDbAsync(db => db.ArchitecturalDraftAttachments.CountAsync(a => a.DraftId == draft.Id)));
+        await AssertOnlyAcceptedFilesStoredAsync(r, draft.Id, expected: 2);
     }
 
     // FR-013 / SC-004 / edge case "expired link": files are reached only through a link that expires within
@@ -197,6 +200,10 @@ public class AttachmentTests(TestDatabaseFixture fixture) : ResidentArcTestBase(
             && e.Properties["Reason"].ToString().Contains(ResidentArcErrorCodes.UnsupportedFileType));
         Assert.DoesNotContain(LogSink.Events, e => e.RenderMessage().Contains("secret-blueprints"));
     }
+
+    /// <summary>SC-003: the bucket holds exactly the accepted files — nothing from a refused upload.</summary>
+    private async Task AssertOnlyAcceptedFilesStoredAsync(Resident r, Guid draftId, int expected) =>
+        Assert.Equal(expected, await ListKeysAsync($"arc/{r.CommunityId}/drafts/{draftId}/"));
 
     private async Task<bool> AnyObjectUnderDraftAsync(Resident r, Guid draftId)
     {
