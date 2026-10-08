@@ -18,6 +18,8 @@ public sealed class RateLimitingOptionsValidator : AbstractValidator<RateLimitin
             .WithMessage("RateLimiting:PaymentsPermitsPerMinute must be at least 1.");
         RuleFor(x => x.BoardWritesPermitsPerMinute).GreaterThanOrEqualTo(1)
             .WithMessage("RateLimiting:BoardWritesPermitsPerMinute must be at least 1.");
+        RuleFor(x => x.ResidentWritesPermitsPerMinute).GreaterThanOrEqualTo(1)
+            .WithMessage("RateLimiting:ResidentWritesPermitsPerMinute must be at least 1.");
         RuleFor(x => x.UnknownPermitsPerMinute).GreaterThanOrEqualTo(1)
             .WithMessage("RateLimiting:UnknownPermitsPerMinute must be at least 1.");
 

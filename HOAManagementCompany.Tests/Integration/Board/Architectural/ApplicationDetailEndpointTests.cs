@@ -106,4 +106,36 @@ public class ApplicationDetailEndpointTests(TestDatabaseFixture fixture) : ArcTe
 
         Assert.Equal("NotEligible", (await DetailAsync(s.CommunityId, appId)).MyVote.State);
     }
+
+    // 029 T049 / US3 AS2: the owner's reply to an info request, and a file sent with it, appear in the board detail.
+    [Fact]
+    public async Task Detail_ShowsOwnersReplyAndReplyFile_ToBoard()
+    {
+        var s = await CreateScenarioAsync(3);
+        var appId = await CreateApplicationAsync(s);
+        var infoId = await WithDbAsync(async db =>
+        {
+            var info = new Domain.Entities.ArchitecturalInfoRequest
+            {
+                ApplicationId = appId, RequestedByUserId = s.Board[0].UserId, Message = "Please attach a plat survey",
+                RespondedAt = DateTimeOffset.UtcNow, ResponseMessage = "Survey attached"
+            };
+            db.ArchitecturalInfoRequests.Add(info);
+            db.ArchitecturalAttachments.Add(new Domain.Entities.ArchitecturalAttachment
+            {
+                ApplicationId = appId, InfoRequestId = info.Id, FileName = "plat-survey.pdf", SizeBytes = 10,
+                ContentType = "application/pdf", StorageKey = $"arc/{s.CommunityId}/x/{Guid.NewGuid()}"
+            });
+            await db.SaveChangesAsync();
+            return info.Id;
+        });
+        await LoginAsAsync(s.Board[1]);
+
+        var detail = await DetailAsync(s.CommunityId, appId);
+
+        var info = Assert.Single(detail.InfoRequests);
+        Assert.Equal("Survey attached", info.ResponseMessage);
+        Assert.NotNull(info.RespondedAt);
+        Assert.Equal(infoId, Assert.Single(detail.Attachments, a => a.FileName == "plat-survey.pdf").InfoRequestId);
+    }
 }

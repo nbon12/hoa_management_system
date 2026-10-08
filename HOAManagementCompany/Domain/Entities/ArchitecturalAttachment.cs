@@ -13,5 +13,9 @@ public class ArchitecturalAttachment
     public string StorageKey { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>Set when the file was added with a resident's info-request reply (029).</summary>
+    public Guid? InfoRequestId { get; set; }
+    public string? UploadedByUserId { get; set; }
+
     public ArchitecturalApplication Application { get; set; } = null!;
 }

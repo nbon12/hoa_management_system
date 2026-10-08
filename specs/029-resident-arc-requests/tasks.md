@@ -23,72 +23,72 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Create the folders `HOAManagementCompany/Features/Property/Architectural/`, `HOAManagementCompany.Tests/Integration/Property/Architectural/`, `HOAManagementCompany.Tests/Unit/Architectural/` (if absent) and `neko-hoa/src/app/features/property/architectural/`
-- [ ] T002 [P] Add `ArcUploadOptions` (`SectionName = "Architectural:Uploads"`; `MaxFileBytes` = 52_428_800, `MaxFilesPerApplication` = 20, `MaxTotalBytes` = 262_144_000) and a FluentValidation `ArcUploadOptionsValidator` (all > 0; `MaxFileBytes` ≤ `MaxTotalBytes`) in `HOAManagementCompany/Infrastructure/Configuration/ArcUploadOptions.cs`; register with `AddValidatedOptions` in `HOAManagementCompany/Program.cs`; add the defaults under `Architectural:Uploads` in `HOAManagementCompany/appsettings.json`
-- [ ] T003 [P] Add `ResidentWritesPermitsPerMinute` (default 30, validated > 0) to `HOAManagementCompany/Infrastructure/Configuration/RateLimitingOptions.cs` and a `resident-writes` policy beside `board-writes` in `HOAManagementCompany/Program.cs`, partitioned the same way (`ClientIdentityResolver.ResolvePaymentsPartition`)
-- [ ] T004 [P] Add `ArcUploadOptionsValidatorTests` (`[Theory]`: defaults valid; zero/negative values invalid; per-file > total invalid) in `HOAManagementCompany.Tests/Unit/Architectural/ArcUploadOptionsValidatorTests.cs`
+- [X] T001 Create the folders `HOAManagementCompany/Features/Property/Architectural/`, `HOAManagementCompany.Tests/Integration/Property/Architectural/`, `HOAManagementCompany.Tests/Unit/Architectural/` (if absent) and `neko-hoa/src/app/features/property/architectural/`
+- [X] T002 [P] Add `ArcUploadOptions` (`SectionName = "Architectural:Uploads"`; `MaxFileBytes` = 52_428_800, `MaxFilesPerApplication` = 20, `MaxTotalBytes` = 262_144_000) and a FluentValidation `ArcUploadOptionsValidator` (all > 0; `MaxFileBytes` ≤ `MaxTotalBytes`) in `HOAManagementCompany/Infrastructure/Configuration/ArcUploadOptions.cs`; register with `AddValidatedOptions` in `HOAManagementCompany/Program.cs`; add the defaults under `Architectural:Uploads` in `HOAManagementCompany/appsettings.json`
+- [X] T003 [P] Add `ResidentWritesPermitsPerMinute` (default 30, validated > 0) to `HOAManagementCompany/Infrastructure/Configuration/RateLimitingOptions.cs` and a `resident-writes` policy beside `board-writes` in `HOAManagementCompany/Program.cs`, partitioned the same way (`ClientIdentityResolver.ResolvePaymentsPartition`)
+- [X] T004 [P] Add `ArcUploadOptionsValidatorTests` (`[Theory]`: defaults valid; zero/negative values invalid; per-file > total invalid) in `HOAManagementCompany.Tests/Unit/Architectural/ArcUploadOptionsValidatorTests.cs`
 
 ---
 
 ## Phase 2: Foundational (blocks every user story)
 
-- [ ] T005 Add `Withdrawn` to `HOAManagementCompany/Domain/Enums/ArcOutcome.cs` (update the comment: resident-initiated close, not a board decision). Then audit every `ArcOutcome` switch and conditional, backend and frontend (`grep -rn "ArcOutcome\|DecisionOutcome" HOAManagementCompany neko-hoa/src`), so `Withdrawn` never falls into a denial or approval branch:
+- [X] T005 Add `Withdrawn` to `HOAManagementCompany/Domain/Enums/ArcOutcome.cs` (update the comment: resident-initiated close, not a board decision). Then audit every `ArcOutcome` switch and conditional, backend and frontend (`grep -rn "ArcOutcome\|DecisionOutcome" HOAManagementCompany neko-hoa/src`), so `Withdrawn` never falls into a denial or approval branch:
   - `ArcEmailRenderer.OwnerKind` throws for `Withdrawn`.
   - `ArcQueries` decision mapping yields `{ outcome: "Withdrawn", wording: null, source: null }`.
   - The `DecisionOutcome` union type and `arc-format.ts` labels in `neko-hoa` show "Withdrawn".
-- [ ] T006 [P] Create entity `ArchitecturalApplicationDraft` (fields per data-model.md, `RemovedCarriedAttachmentIds` as `List<Guid>`, navigation `Attachments`, `Property`, `PreviousRevision`) in `HOAManagementCompany/Domain/Entities/ArchitecturalApplicationDraft.cs`, with a `REPOWISE:START domain=entities` marker
-- [ ] T007 [P] Create entity `ArchitecturalDraftAttachment` in `HOAManagementCompany/Domain/Entities/ArchitecturalDraftAttachment.cs`
-- [ ] T008 [P] Add nullable properties to the 027 entities:
+- [X] T006 [P] Create entity `ArchitecturalApplicationDraft` (fields per data-model.md, `RemovedCarriedAttachmentIds` as `List<Guid>`, navigation `Attachments`, `Property`, `PreviousRevision`) in `HOAManagementCompany/Domain/Entities/ArchitecturalApplicationDraft.cs`, with a `REPOWISE:START domain=entities` marker
+- [X] T007 [P] Create entity `ArchitecturalDraftAttachment` in `HOAManagementCompany/Domain/Entities/ArchitecturalDraftAttachment.cs`
+- [X] T008 [P] Add nullable properties to the 027 entities:
   - `PlannedStartDate`, `PlannedCompletionDate`, `ContractorName`, `ContractorContact`, `AcknowledgedAt`, `WithdrawnAt`, `WithdrawnByUserId` in `HOAManagementCompany/Domain/Entities/ArchitecturalApplication.cs`.
   - `ResponseMessage`, `RespondedByUserId` in `ArchitecturalInfoRequest.cs`.
   - `InfoRequestId`, `UploadedByUserId` in `ArchitecturalAttachment.cs`.
-- [ ] T009 Configure the new and extended entities in `HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs`:
+- [X] T009 Configure the new and extended entities in `HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs`:
   - DbSets `ArchitecturalApplicationDrafts` and `ArchitecturalDraftAttachments`.
   - String enum conversion for `ProjectType`.
   - Max lengths per data-model.md; a `uuid[]` column for `RemovedCarriedAttachmentIds`.
   - FKs and delete behaviors per data-model.md; index `(PropertyId)` on drafts; a filtered unique index on `PreviousRevisionId WHERE "PreviousRevisionId" IS NOT NULL`.
   - Check constraint "completion ≥ start" on drafts.
   - FK `ArchitecturalAttachments.InfoRequestId` → `ArchitecturalInfoRequests`, set null.
-- [ ] T010 Generate the migration with `dotnet ef migrations add AddResidentArcSubmission --project HOAManagementCompany` into `HOAManagementCompany/Infrastructure/Persistence/Migrations/`. Review it: it must only create the two tables and add nullable columns, FKs and indexes, and must not alter any existing column's nullability or the `(CommunityId, ApplicationNumber, Revision)` index. `Down` must reverse it cleanly.
-- [ ] T011 [P] Add `ResidentArcMigrationTests` (the new tables and columns exist; a 027-shaped seeded application round-trips unchanged; the drafts check constraint rejects completion < start; the unique `PreviousRevisionId` index rejects a second revision draft) in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcMigrationTests.cs`, modeled on `ArcMigrationTests.cs`
-- [ ] T012 Extend `ArcNewApplication` in `HOAManagementCompany/Features/Board/Architectural/ArcApplicationFactory.cs` with optional trailing parameters `DateOnly? PlannedStartDate = null, DateOnly? PlannedCompletionDate = null, string? ContractorName = null, string? ContractorContact = null, DateTimeOffset? AcknowledgedAt = null`, and copy them in `NewRow`. 027 callers and `Seed/ArchitecturalSeeder.cs` must compile unchanged.
-- [ ] T013 [P] Extend `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcApplicationFactoryTests.cs`: `CreateFromSettingsAsync` and `CreateRevisionAsync` persist the new resident fields, and leave them null when omitted
-- [ ] T014 Add `Task DeleteAsync(string storageKey, CancellationToken ct = default)` to `HOAManagementCompany/Infrastructure/Storage/IDocumentStorage.cs`. Implement it in `S3DocumentStorage.cs` (`DeleteObjectAsync`; a missing object is not an error) and in any other `IDocumentStorage` implementation or test double (`grep -rn ": IDocumentStorage" HOAManagementCompany HOAManagementCompany.Tests --include=*.cs`).
-- [ ] T015 [P] Write `ArcAttachmentValidatorTests` FIRST in `HOAManagementCompany.Tests/Unit/Architectural/ArcAttachmentValidatorTests.cs`. It must cover:
+- [X] T010 Generate the migration with `dotnet ef migrations add AddResidentArcSubmission --project HOAManagementCompany` into `HOAManagementCompany/Infrastructure/Persistence/Migrations/`. Review it: it must only create the two tables and add nullable columns, FKs and indexes, and must not alter any existing column's nullability or the `(CommunityId, ApplicationNumber, Revision)` index. `Down` must reverse it cleanly.
+- [X] T011 [P] Add `ResidentArcMigrationTests` (the new tables and columns exist; a 027-shaped seeded application round-trips unchanged; the drafts check constraint rejects completion < start; the unique `PreviousRevisionId` index rejects a second revision draft) in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcMigrationTests.cs`, modeled on `ArcMigrationTests.cs`
+- [X] T012 Extend `ArcNewApplication` in `HOAManagementCompany/Features/Board/Architectural/ArcApplicationFactory.cs` with optional trailing parameters `DateOnly? PlannedStartDate = null, DateOnly? PlannedCompletionDate = null, string? ContractorName = null, string? ContractorContact = null, DateTimeOffset? AcknowledgedAt = null`, and copy them in `NewRow`. 027 callers and `Seed/ArchitecturalSeeder.cs` must compile unchanged.
+- [X] T013 [P] Extend `HOAManagementCompany.Tests/Integration/Board/Architectural/ArcApplicationFactoryTests.cs`: `CreateFromSettingsAsync` and `CreateRevisionAsync` persist the new resident fields, and leave them null when omitted
+- [X] T014 Add `Task DeleteAsync(string storageKey, CancellationToken ct = default)` to `HOAManagementCompany/Infrastructure/Storage/IDocumentStorage.cs`. Implement it in `S3DocumentStorage.cs` (`DeleteObjectAsync`; a missing object is not an error) and in any other `IDocumentStorage` implementation or test double (`grep -rn ": IDocumentStorage" HOAManagementCompany HOAManagementCompany.Tests --include=*.cs`).
+- [X] T015 [P] Write `ArcAttachmentValidatorTests` FIRST in `HOAManagementCompany.Tests/Unit/Architectural/ArcAttachmentValidatorTests.cs`. It must cover:
   - `[Theory]` over valid bytes for each allowed type, each mapped to its canonical content type: `%PDF-` → `application/pdf`; `FF D8 FF` → `image/jpeg`; `89 50 4E 47 0D 0A 1A 0A` → `image/png`; an ISO-BMFF `ftyp` box with brand `heic`/`heix`/`mif1`/`heif` → `image/heic`.
   - `[Theory]` over rejected content: a Windows PE (`MZ`) named `plan.pdf`, plain text named `photo.jpg`, a GIF, an empty file, and an `ftyp` box with brand `mp42` (MP4 video). Each yields `UNSUPPORTED_FILE_TYPE`.
   - `[Theory]` over limits with small options:
     - size = `MaxFileBytes` is accepted; `MaxFileBytes + 1` → `FILE_TOO_LARGE`;
     - existing count = `Max - 1` is accepted; `= Max` → `ATTACHMENT_LIMIT_REACHED`;
     - existing total + new = `MaxTotalBytes` is accepted; `+1` → `ATTACHMENT_LIMIT_REACHED`.
-- [ ] T016 Implement `ArcAttachmentValidator` in `HOAManagementCompany/Features/Property/Architectural/ArcAttachmentValidator.cs`:
+- [X] T016 Implement `ArcAttachmentValidator` in `HOAManagementCompany/Features/Property/Architectural/ArcAttachmentValidator.cs`:
   - `Sniff(ReadOnlySpan<byte> header)` returns the canonical content type or null.
   - `Validate(long size, byte[] header, int existingCount, long existingTotalBytes)` returns `(contentType, errorCode)` using `IOptions<ArcUploadOptions>`.
   - Add a `REPOWISE:START domain=resident-arc-uploads` marker.
   - T015 must pass.
-- [ ] T017 [P] Create `ResidentArcErrorCodes` (`NOT_FOUND`, `ACKNOWLEDGEMENT_REQUIRED`, `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `ATTACHMENT_LIMIT_REACHED`, `INFO_ALREADY_ANSWERED`; reuse `ArcErrorCodes` for `FORBIDDEN`, `VALIDATION_ERROR`, `APPLICATION_DECIDED`, `APPLICATION_CLOSED`, `ATTACHMENT_UNAVAILABLE`, and the factory's `REVISION_NOT_ALLOWED`) and all request/response DTOs from the contract in `HOAManagementCompany/Features/Property/Architectural/ResidentArcModels.cs`. Resident DTOs MUST NOT declare any vote, voter, tally or vote-comment property.
-- [ ] T018 Create `ResidentArcScope` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcScope.cs`:
+- [X] T017 [P] Create `ResidentArcErrorCodes` (`NOT_FOUND`, `ACKNOWLEDGEMENT_REQUIRED`, `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `ATTACHMENT_LIMIT_REACHED`, `INFO_ALREADY_ANSWERED`; reuse `ArcErrorCodes` for `FORBIDDEN`, `VALIDATION_ERROR`, `APPLICATION_DECIDED`, `APPLICATION_CLOSED`, `ATTACHMENT_UNAVAILABLE`, and the factory's `REVISION_NOT_ALLOWED`) and all request/response DTOs from the contract in `HOAManagementCompany/Features/Property/Architectural/ResidentArcModels.cs`. Resident DTOs MUST NOT declare any vote, voter, tally or vote-comment property.
+- [X] T018 Create `ResidentArcScope` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcScope.cs`:
   - `LoadDraftAsync(db, draftId, propertyId)` and `LoadApplicationAsync(db, id, propertyId)` return the entity, or null when it is missing **or** on another property.
   - `ForbiddenAsync(HttpContext)` writes the non-disclosing `403 FORBIDDEN` body from the contract.
 
   The same 403 is returned for "not yours" and "doesn't exist", so existence is never revealed.
-- [ ] T019 [P] Create `ResidentArcLog` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcLog.cs`. Use the `[LoggerMessage]` pattern from `ArcLog.cs` with the `SensitiveEvent` scope. It covers:
+- [X] T019 [P] Create `ResidentArcLog` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcLog.cs`. Use the `[LoggerMessage]` pattern from `ArcLog.cs` with the `SensitiveEvent` scope. It covers:
   - `ArcResidentAttachmentAccess` and `ArcResidentAccessDenied`;
   - `ArcUploadRejected`, with the reason code only, never the file name or bytes;
   - `ArcSubmitted`, `ArcWithdrawn`, `ArcInfoReplied` and `ArcRevisionDraftCreated`.
 
   Every event carries IDs only.
-- [ ] T020 Create `ResidentArcTestBase : ArcTestBase` in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcTestBase.cs`. It provides:
+- [X] T020 Create `ResidentArcTestBase : ArcTestBase` in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcTestBase.cs`. It provides:
   - `CreateResidentAsync(communityId)`: a property + `Owner` row + `ApplicationUser` linked by `UserProperty`; returns the user, property and an `HttpClient` authenticated with that `propertyId` claim, built with `BoardTestBase.CreateUserWithPropertyAsync` (login-capable user linked by `UserProperty`) plus an `Owner` row, then authenticated with `BoardTestBase.LoginAsync(email)` so the bearer token carries that `propertyId` claim.
   - `AddCoOwnerAsync(propertyId)`.
   - `CreateBoardMemberClientAsync(communityId)`, reusing `ArcTestBase`.
   - `ExtraConfiguration` overrides for small upload limits.
   - Byte fixtures: `ValidPdf`, `ValidPng`, `ValidJpeg`, `ValidHeic`, `ExeRenamedPdf`, `TextRenamedJpg`.
   - `MultipartFile(bytes, name)`.
-- [ ] T021 [P] Add the frontend models (`ResidentArcDraft`, `ResidentArcListItem`, `ResidentArcDetail`, `ResidentArcStatus` = `'Draft'|'Submitted'|'MoreInfoRequested'|'Approved'|'Denied'|'Withdrawn'`, `ArcProjectType`) in `neko-hoa/src/app/core/models/resident-arc.models.ts`. Export them from `core/models/index.ts`.
-- [ ] T022 [P] Create `ResidentArchitecturalService` with one method per contract endpoint, using the same `HttpClient` patterns and base URL as `architectural.service.ts`. Upload uses `FormData`. Put it in `neko-hoa/src/app/core/services/resident-architectural.service.ts`, with `resident-architectural.service.spec.ts` (`HttpTestingController`: each method hits the exact URL and verb from the contract).
-- [ ] T023 [P] Create `resident-arc-format.ts`: status labels, project-type labels ("Exterior paint", "Shed / outbuilding", "Windows / doors"), and the error-code-to-message map. Add `resident-arc-format.spec.ts` covering every status and error code. Both go in `neko-hoa/src/app/features/property/architectural/`.
-- [ ] T024 Add the routes to `neko-hoa/src/app/app.routes.ts` beside `property/owner`: `property/architectural` (list), `property/architectural/new`, `property/architectural/drafts/:draftId`, `property/architectural/:id` and `property/architectural/:id/revise`. All are lazy standalone components, so they match the owner links in 027's emails. Add an "Architectural requests" nav entry in `neko-hoa/src/app/shell/shell.component.ts` with the existing `property/*` entries. Update the shell spec if it asserts nav entries.
+- [X] T021 [P] Add the frontend models (`ResidentArcDraft`, `ResidentArcListItem`, `ResidentArcDetail`, `ResidentArcStatus` = `'Draft'|'Submitted'|'MoreInfoRequested'|'Approved'|'Denied'|'Withdrawn'`, `ArcProjectType`) in `neko-hoa/src/app/core/models/resident-arc.models.ts`. Export them from `core/models/index.ts`.
+- [X] T022 [P] Create `ResidentArchitecturalService` with one method per contract endpoint, using the same `HttpClient` patterns and base URL as `architectural.service.ts`. Upload uses `FormData`. Put it in `neko-hoa/src/app/core/services/resident-architectural.service.ts`, with `resident-architectural.service.spec.ts` (`HttpTestingController`: each method hits the exact URL and verb from the contract).
+- [X] T023 [P] Create `resident-arc-format.ts`: status labels, project-type labels ("Exterior paint", "Shed / outbuilding", "Windows / doors"), and the error-code-to-message map. Add `resident-arc-format.spec.ts` covering every status and error code. Both go in `neko-hoa/src/app/features/property/architectural/`.
+- [X] T024 Add the routes to `neko-hoa/src/app/app.routes.ts` beside `property/owner`: `property/architectural` (list), `property/architectural/new`, `property/architectural/drafts/:draftId`, `property/architectural/:id` and `property/architectural/:id/revise`. All are lazy standalone components, so they match the owner links in 027's emails. Add an "Architectural requests" nav entry in `neko-hoa/src/app/shell/shell.component.ts` with the existing `property/*` entries. Update the shell spec if it asserts nav entries.
 
 **Checkpoint**: migration applies; `dotnet build` and `npm run build` are green; T004, T011, T013 and T015 pass.
 
@@ -101,7 +101,7 @@
 
 ### Tests (write first; they must fail)
 
-- [ ] T025 [P] [US1] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/FileRequestTests.cs` with one test per acceptance scenario, named after it:
+- [X] T025 [P] [US1] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/FileRequestTests.cs` with one test per acceptance scenario, named after it:
   1. `Submit_CompleteDraft_CreatesOpenApplicationWithNumberDatesAndSnapshots` (AS1). Read `NextApplicationNumber` = N before submitting. Assert:
      - 201 with `displayId == $"ARC-{N}"`;
      - the DB row has `Status == Open`, `ReceivedDate == today` in the community time zone (from `TestClock`), and `DueDate == ReceivedDate + ReviewPeriodDays`;
@@ -117,17 +117,17 @@
   8. `Submit_AppearsInBoardOpenList` (AS8): a board member's `GET …?status=open` contains the item with the same `id` and `displayId`. For SC-007, the resident's own `GET /property/architectural-applications`, sent right after the submit response, contains it with `status == "Submitted"`; a `Stopwatch` from the submit request to the list response must read under 5 s.
   9. `ConcurrentSubmits_GetDistinctSequentialNumbers` (SC-002 / edge case): 5 drafts in one community submitted in parallel get 5 distinct numbers that form a contiguous range.
   10. `Submit_DraftWithAttachment_CarriesAttachmentToApplication` (Independent Test / SC-001): the application's attachment row points at the draft's storage key, and the object still exists.
-- [ ] T026 [P] [US1] Add `OwnerSubmitted_RendersDisplayIdDatesAndNoBoardData` in a new `HOAManagementCompany.Tests/Unit/Architectural/ArcEmailRendererSubmittedTests.cs` (no renderer test class exists yet). It asserts the subject "We received your architectural request ARC-1042", that the body contains the received date, due date, project title, the "work may not begin until approved" reminder and the request link, and that a revision shows "v2".
+- [X] T026 [P] [US1] Add `OwnerSubmitted_RendersDisplayIdDatesAndNoBoardData` in a new `HOAManagementCompany.Tests/Unit/Architectural/ArcEmailRendererSubmittedTests.cs` (no renderer test class exists yet). It asserts the subject "We received your architectural request ARC-1042", that the body contains the received date, due date, project title, the "work may not begin until approved" reminder and the request link, and that a revision shows "v2".
 
 ### Implementation
 
-- [ ] T027 [US1] Add `ArcEmailKinds.OwnerSubmitted = "arc_owner_submitted"` and `ArcEmailRenderer.OwnerSubmitted(app, propertyAddress, ownerFirstName, recipientEmail, communityName)` returning an `AlertMessage`. Both go in `HOAManagementCompany/Features/Board/Architectural/ArcEmailRenderer.cs`. Add the kind to the `OutboxMessage.Kind` doc comment in `Domain/Entities/OutboxMessage.cs`.
-- [ ] T028 [US1] Implement `ResidentArcDraftService` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcDraftService.cs`:
+- [X] T027 [US1] Add `ArcEmailKinds.OwnerSubmitted = "arc_owner_submitted"` and `ArcEmailRenderer.OwnerSubmitted(app, propertyAddress, ownerFirstName, recipientEmail, communityName)` returning an `AlertMessage`. Both go in `HOAManagementCompany/Features/Board/Architectural/ArcEmailRenderer.cs`. Add the kind to the `OutboxMessage.Kind` doc comment in `Domain/Entities/OutboxMessage.cs`.
+- [X] T028 [US1] Implement `ResidentArcDraftService` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcDraftService.cs`:
   - `CreateAsync`, `GetAsync`, `UpdateAsync`, `DeleteAsync`. Delete removes the draft-attachment objects via `IDocumentStorage.DeleteAsync` and then the rows.
   - Field validation per data-model.md: the project type parses to `ArcProjectType`; the length limits; completion ≥ start when both are present.
   - `CommunityId` comes from the property.
   - Add a `REPOWISE:START domain=resident-arc` marker.
-- [ ] T029 [US1] Implement `ResidentArcSubmitService.SubmitAsync(draftId, propertyId, userId)` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcSubmitService.cs`:
+- [X] T029 [US1] Implement `ResidentArcSubmitService.SubmitAsync(draftId, propertyId, userId)` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcSubmitService.cs`:
   - Validate the required fields and the acknowledgement.
   - Inside the db execution strategy and a transaction, build `ArcNewApplication`:
     - `OwnerName` = `Owner.FirstName + " " + Owner.LastName` for the property, falling back to the user's name;
@@ -139,13 +139,13 @@
   - Add the outbox row via `ArcEmailRenderer.ToOutbox(ArcEmailKinds.OwnerSubmitted, …, $"arc:{id}:submitted", ownerId: null, recipientUserId: userId)` and `SaveChanges`; commit.
   - After commit: `OutboxDispatcher.DispatchPendingAsync` and `ResidentArcLog.ArcSubmitted`.
   - Let the factory's `DomainException` (`REVISION_NOT_ALLOWED`) surface as 409.
-- [ ] T030 [US1] Create the endpoints in `HOAManagementCompany/Features/Property/Architectural/`: `CreateDraftEndpoint.cs`, `GetDraftEndpoint.cs`, `UpdateDraftEndpoint.cs`, `DeleteDraftEndpoint.cs` and `SubmitDraftEndpoint.cs`, with the routes from the contract.
+- [X] T030 [US1] Create the endpoints in `HOAManagementCompany/Features/Property/Architectural/`: `CreateDraftEndpoint.cs`, `GetDraftEndpoint.cs`, `UpdateDraftEndpoint.cs`, `DeleteDraftEndpoint.cs` and `SubmitDraftEndpoint.cs`, with the routes from the contract.
   - Each one: `RequirePropertyId()` → `ResidentArcScope` → service.
   - Writes use `Options(x => x.RequireRateLimiting("resident-writes"))`.
   - Every response is `no-store`, and `DomainException` maps to `{code,message}` with its status.
   - Tag them `WithTags("Architectural (resident)")`.
-- [ ] T031 [US1] Register `ResidentArcDraftService`, `ResidentArcSubmitService`, `ArcAttachmentValidator` and the reply/withdraw/query services as scoped next to the ARC registrations (~line 412) in `HOAManagementCompany/Program.cs`
-- [ ] T032 [P] [US1] Create the `request-form` component in `neko-hoa/src/app/features/property/architectural/request-form.component.ts`: The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
+- [X] T031 [US1] Register `ResidentArcDraftService`, `ResidentArcSubmitService`, `ArcAttachmentValidator` and the reply/withdraw/query services as scoped next to the ARC registrations (~line 412) in `HOAManagementCompany/Program.cs`
+- [X] T032 [P] [US1] Create the `request-form` component in `neko-hoa/src/app/features/property/architectural/request-form.component.ts`: The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
   - The fields from the contract; the project-type `<select>` uses the labels from `resident-arc-format.ts`.
   - A completion ≥ start validator.
   - A required acknowledgement checkbox with the label "I understand work may not begin until this request is approved".
@@ -153,13 +153,13 @@
   - Server error codes are mapped to messages; every control has a label, and errors are linked with `aria-describedby` (WCAG 2.1 AA).
   - Modes: `new`, `edit draft` (`drafts/:draftId`) and `revise`.
   - After submit, navigate to `property/architectural/:id`.
-- [ ] T033 [P] [US1] Add `request-form.component.spec.ts` (Angular Testing Library) in the same folder:
+- [X] T033 [P] [US1] Add `request-form.component.spec.ts` (Angular Testing Library) in the same folder:
   - Submit is disabled without the acknowledgement.
   - Completion < start shows the date error and blocks submit.
   - Save draft calls `createDraft` then `updateDraft`.
   - Submit calls `submitDraft` and navigates.
   - A 422 `ACKNOWLEDGEMENT_REQUIRED` from the server shows the mapped message.
-- [ ] T034 [US1] Add the Cypress journey `neko-hoa/cypress/e2e/resident-arc-submit.cy.ts`: sign in as a resident (reuse `cypress/e2e/helpers`), open Architectural requests → New, fill the form, **Save draft**, reload and see the draft, check the acknowledgement, **Submit**, then assert the detail shows `ARC-` and "Submitted" and the list contains it. Follow `board-architectural.cy.ts` for setup.
+- [X] T034 [US1] Add the Cypress journey `neko-hoa/cypress/e2e/resident-arc-submit.cy.ts`: sign in as a resident (reuse `cypress/e2e/helpers`), open Architectural requests → New, fill the form, **Save draft**, reload and see the draft, check the acknowledgement, **Submit**, then assert the detail shows `ARC-` and "Submitted" and the list contains it. Follow `board-architectural.cy.ts` for setup.
 
 **Checkpoint**: T025–T026 and T033 pass; a resident can file a request end to end.
 
@@ -172,7 +172,7 @@
 
 ### Tests (write first)
 
-- [ ] T035 [P] [US5] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/AttachmentTests.cs`, with small limits via `ExtraConfiguration`:
+- [X] T035 [P] [US5] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/AttachmentTests.cs`, with small limits via `ExtraConfiguration`:
   1. `Upload_ValidFile_IsStoredPrivatelyWithSniffedMetadata` (AS1), a `[Theory]` over PDF, PNG, JPEG and HEIC fixtures. Assert:
      - 201 with `contentType` == the canonical sniffed type;
      - a row with `StorageKey` matching `arc/{communityId}/drafts/{draftId}/` and `SizeBytes` == the byte count;
@@ -188,15 +188,15 @@
 
 ### Implementation
 
-- [ ] T036 [US5] Create `UploadDraftAttachmentEndpoint.cs` (multipart; read the `IFormFile` stream, reject an over-limit `Length` before buffering, read the header bytes, validate with `ArcAttachmentValidator` against the draft's existing and carried-over count and total, then `UploadAsync` **before** writing the row, so a storage failure leaves no row; storage exceptions return 503 `STORAGE_UNAVAILABLE`, a code added to `ResidentArcErrorCodes`), `DeleteDraftAttachmentEndpoint.cs` and `DraftAttachmentUrlEndpoint.cs` in `HOAManagementCompany/Features/Property/Architectural/`. Set a per-endpoint request body size limit of `MaxFileBytes` plus 1 MB multipart overhead (`[RequestSizeLimit]`-equivalent via `IHttpMaxRequestBodySizeFeature` or FastEndpoints `MaxRequestBodySize`). Rate-limit the writes. Log rejections.
-- [ ] T037 [P] [US5] Add attachment handling to `request-form.component.ts`:
+- [X] T036 [US5] Create `UploadDraftAttachmentEndpoint.cs` (multipart; read the `IFormFile` stream, reject an over-limit `Length` before buffering, read the header bytes, validate with `ArcAttachmentValidator` against the draft's existing and carried-over count and total, then `UploadAsync` **before** writing the row, so a storage failure leaves no row; storage exceptions return 503 `STORAGE_UNAVAILABLE`, a code added to `ResidentArcErrorCodes`), `DeleteDraftAttachmentEndpoint.cs` and `DraftAttachmentUrlEndpoint.cs` in `HOAManagementCompany/Features/Property/Architectural/`. Set a per-endpoint request body size limit of `MaxFileBytes` plus 1 MB multipart overhead (`[RequestSizeLimit]`-equivalent via `IHttpMaxRequestBodySizeFeature` or FastEndpoints `MaxRequestBodySize`). Rate-limit the writes. Log rejections.
+- [X] T037 [P] [US5] Add attachment handling to `request-form.component.ts`:
   - A file input with `accept=".pdf,.jpg,.jpeg,.png,.heic,application/pdf,image/jpeg,image/png,image/heic"`.
   - A client-side size and count pre-check, with a comment that it is UX only.
   - A list of uploaded files with Remove buttons and per-file error messages.
   - Opening a file calls the URL endpoint, then `window.open(url, '_blank', 'noopener')`.
 
   Extend `request-form.component.spec.ts`: upload calls the service with `FormData`; a 422 `UNSUPPORTED_FILE_TYPE` shows its message; Remove calls `deleteDraftAttachment`.
-- [ ] T038 [US5] Add the Playwright spec `neko-hoa/e2e/resident-arc-attachments.spec.ts`. In a real browser, uploading a real PDF succeeds and lists it; uploading a `.txt` renamed `.pdf` shows the unsupported-type error. Follow `board-architectural.spec.ts` for setup.
+- [X] T038 [US5] Add the Playwright spec `neko-hoa/e2e/resident-arc-attachments.spec.ts`. In a real browser, uploading a real PDF succeeds and lists it; uploading a `.txt` renamed `.pdf` shows the unsupported-type error. Follow `board-architectural.spec.ts` for setup.
 
 **Checkpoint**: T035 and T038 pass.
 
@@ -209,7 +209,7 @@
 
 ### Tests (write first)
 
-- [ ] T039 [P] [US2] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/TrackRequestsTests.cs`:
+- [X] T039 [P] [US2] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/TrackRequestsTests.cs`:
   1. `List_ShowsEachRequestWithProjectedStatus` (AS1), a `[Theory]` over (seeded state → expected status):
      - a draft → `Draft`;
      - Open → `Submitted`;
@@ -226,7 +226,7 @@
   5. `ListAndDetail_NeverExposeVotesVotersOrComments` (AS5 / SC-005): seed two board votes whose comments contain the sentinels "SECRET-COMMENT" and the voter "Board Voter". The raw list and detail JSON must not contain `SECRET-COMMENT`, `Board Voter`, the voter user IDs, or the keys `votes`, `tally` or `voterName`.
   6. `DecisionReached_NotYetRecorded_ShowsSubmittedWithNoDecision`: the decision isn't official until the manager records it.
   7. `SubmittedApplication_CannotBeEdited` (FR-008 / edge case): `PUT`, `PATCH` and `DELETE` on `/property/architectural-applications/{id}` return 404 or 405, and every field of the DB row (title, description, dates, contractor, attachments) is unchanged. The only routes that change an application are reply, withdraw and revise.
-- [ ] T040 [P] [US2] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcAuthorizationTests.cs` (FR-022–FR-024 / SC-006 / edge cases):
+- [X] T040 [P] [US2] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcAuthorizationTests.cs` (FR-022–FR-024 / SC-006 / edge cases):
   1. `NonOwner_EveryEndpoint_Forbidden`, a `[Theory]` over every resident route and verb: for a draft or application on property A, a resident whose active property is B gets 403 `FORBIDDEN` with the exact contract body. For writes, assert the target is unchanged.
   2. `Forbidden_BodyIdentical_ForNonexistentId`: a random GUID returns the same 403 body, so existence isn't revealed.
   3. `CoOwner_CanViewWithdrawReplyAndRevise`: a second user linked to the same property can GET a request another owner created and can withdraw it.
@@ -237,22 +237,22 @@
 
 ### Implementation
 
-- [ ] T041 [US2] Implement `ResidentArcQueries` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcQueries.cs`. Add a `REPOWISE:START domain=resident-arc` marker. It provides:
+- [X] T041 [US2] Implement `ResidentArcQueries` in `HOAManagementCompany/Features/Property/Architectural/ResidentArcQueries.cs`. Add a `REPOWISE:START domain=resident-arc` marker. It provides:
   - `ListAsync(propertyId, limit, offset)`: drafts, then the latest revision per `ApplicationNumber` ordered by `ReceivedDate` desc, using the shared `Paging` helper (default 25, max 100).
   - `ProjectStatus(app, hasUnansweredInfo)`, implementing the data-model table.
   - `BuildDetailAsync(app)`: fields, attachments, info requests (no requester identity), timeline, the decision block, `formalDisapprovalStatement` from `CommunityArcSettings` (only when Denied), `canWithdraw` and `canRevise`, and the revisions.
 
   It never projects `ArchitecturalVote`.
-- [ ] T042 [US2] Create `MyApplicationsListEndpoint.cs`, `MyApplicationDetailEndpoint.cs` and `ApplicationAttachmentUrlEndpoint.cs` in `HOAManagementCompany/Features/Property/Architectural/`. Scope through `ResidentArcScope`; the attachment URL returns 404 `ATTACHMENT_UNAVAILABLE` via `ExistsAsync`, logs `ArcResidentAttachmentAccess`, and is `no-store`.
-- [ ] T043 [P] [US2] Create `my-requests-page.component.ts`: a table of requests with a status chip (text label, not color alone), a "New request" button, drafts linking to `drafts/:draftId` and applications to `:id`, pagination, and an empty state. Add `my-requests-page.component.spec.ts` (ATL: renders each status label; the empty state; links) and `my-requests-page.stories.ts`, all in `neko-hoa/src/app/features/property/architectural/`. The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
-- [ ] T044 [P] [US2] Create `request-detail.component.ts`: The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
+- [X] T042 [US2] Create `MyApplicationsListEndpoint.cs`, `MyApplicationDetailEndpoint.cs` and `ApplicationAttachmentUrlEndpoint.cs` in `HOAManagementCompany/Features/Property/Architectural/`. Scope through `ResidentArcScope`; the attachment URL returns 404 `ATTACHMENT_UNAVAILABLE` via `ExistsAsync`, logs `ArcResidentAttachmentAccess`, and is `no-store`.
+- [X] T043 [P] [US2] Create `my-requests-page.component.ts`: a table of requests with a status chip (text label, not color alone), a "New request" button, drafts linking to `drafts/:draftId` and applications to `:id`, pagination, and an empty state. Add `my-requests-page.component.spec.ts` (ATL: renders each status label; the empty state; links) and `my-requests-page.stories.ts`, all in `neko-hoa/src/app/features/property/architectural/`. The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
+- [X] T044 [P] [US2] Create `request-detail.component.ts`: The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
   - It shows the header (`displayId`, the `v{n}` badge, status), the submitted fields, the timeline list and the attachments (opened on demand through the URL endpoint).
   - The decision block shows the wording, reason and formal statement when Denied, or the conditions when Approved.
   - There is no vote, tally or comment UI.
   - The Withdraw and Revise buttons follow `canWithdraw` and `canRevise`.
 
   Add `request-detail.component.spec.ts` (ATL: denied shows the reason and statement; approved shows conditions; buttons follow the flags; nothing vote-related renders even when a fixture sneaks in a `votes` field) and `request-detail.stories.ts`, both in the same folder.
-- [ ] T045 [US2] Add a Cypress assertion to `neko-hoa/cypress/e2e/resident-arc-submit.cy.ts`: after submitting, the list shows the request as "Submitted / Under review" and the detail opens.
+- [X] T045 [US2] Add a Cypress assertion to `neko-hoa/cypress/e2e/resident-arc-submit.cy.ts`: after submitting, the list shows the request as "Submitted / Under review" and the detail opens.
 
 **Checkpoint**: T039–T040 pass; tracking works with seeded data in every state.
 
@@ -265,7 +265,7 @@
 
 ### Tests (write first)
 
-- [ ] T046 [P] [US3] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/InfoReplyTests.cs`:
+- [X] T046 [P] [US3] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/InfoReplyTests.cs`:
   1. `InfoRequested_ShownOnRequestAndDashboard` (AS1): a board member `POST`s 027's `…/info-requests` with "Please attach a plat survey". The resident detail's `infoRequests[0].message` equals it and the status is `MoreInfoRequested`. The resident `GET /dashboard` has `architecturalInfoRequested.count == 1` and `applicationId` == the application.
   2. `Reply_StoresReply_ClearsMarker_VisibleToBoard` (AS2): the resident uploads a reply attachment and replies "Survey attached". Then:
      - the DB `RespondedAt`, `ResponseMessage` and `RespondedByUserId` are set;
@@ -277,19 +277,19 @@
   5. `Reply_Blank_Refused`: 422 `VALIDATION_ERROR`.
   6. `Reply_OnClosedApplication_Refused`: 409 `APPLICATION_CLOSED`.
   7. `ReplyAttachment_DisallowedType_Refused`: 422 `UNSUPPORTED_FILE_TYPE`.
-- [ ] T047 [P] [US3] Extend `HOAManagementCompany.Tests/Integration/Dashboard/DashboardTests.cs`: `architecturalInfoRequested.count` is 0 with no ARC data, counts only the active property's Open applications with an unanswered request, and ignores other properties.
+- [X] T047 [P] [US3] Add `HOAManagementCompany.Tests/Integration/Dashboard/DashboardArchitecturalAlertTests.cs` (built on `ResidentArcTestBase`, since the alert needs a resident with ARC data; the existing `DashboardTests.cs` uses the shared seed resident): `architecturalInfoRequested.count` is 0 with no ARC data, counts only the active property's Open applications with an unanswered request, and ignores other properties.
 
 ### Implementation
 
-- [ ] T048 [US3] Create `ReplyInfoRequestEndpoint.cs` (under `ArcLocks.InLockedTransactionAsync`: requires `Status == Open` and `RespondedAt == null`; sets the reply fields and `RespondedAt` from `TimeProvider`; logs `ArcInfoReplied`) and `UploadReplyAttachmentEndpoint.cs` (the same validator; counts against the application's existing attachments; key `arc/{communityId}/{applicationNumber}/{guid}`; `InfoRequestId` and `UploadedByUserId` set) in `HOAManagementCompany/Features/Property/Architectural/`
-- [ ] T049 [US3] In the 027 code:
+- [X] T048 [US3] Create `ReplyInfoRequestEndpoint.cs` (under `ArcLocks.InLockedTransactionAsync`: requires `Status == Open` and `RespondedAt == null`; sets the reply fields and `RespondedAt` from `TimeProvider`; logs `ArcInfoReplied`) and `UploadReplyAttachmentEndpoint.cs` (the same validator; counts against the application's existing attachments; key `arc/{communityId}/{applicationNumber}/{guid}`; `InfoRequestId` and `UploadedByUserId` set) in `HOAManagementCompany/Features/Property/Architectural/`
+- [X] T049 [US3] In the 027 code:
   - Add `ResponseMessage` and `RespondedAt` to the board info-request DTO in `HOAManagementCompany/Features/Board/Architectural/ArcModels.cs`, and add `InfoRequestId` to the board attachment DTO.
   - Populate both in `ArcQueries.BuildDetailAsync`.
   - Extend `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationDetailEndpointTests.cs` with a case asserting the reply fields appear for board members.
-- [ ] T050 [US3] Add `ArchitecturalInfoRequestedSummary(int Count, Guid? ApplicationId)` to `HOAManagementCompany/Features/Dashboard/Models/` and the `DashboardResponse` record. Compute it in `DashboardService.GetDashboardAsync`: `Open` applications for `propertyId` with any `InfoRequests.RespondedAt == null`, oldest first.
-- [ ] T051 [P] [US3] Create `info-reply.component.ts`: it shows each unanswered question, has a reply textarea (labeled, required, 2000 max with a counter) and an optional file upload through the reply-attachment endpoint, and sends the reply. Embed it in `request-detail.component.ts` when the status is `MoreInfoRequested`. Add `info-reply.component.spec.ts` (ATL: blank is blocked; a successful reply refreshes the detail; 409 shows its message). All in `neko-hoa/src/app/features/property/architectural/`. The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
-- [ ] T052 [P] [US3] Add a dashboard alert to `neko-hoa/src/app/features/dashboard/dashboard.component.ts`: "The board needs more information about your architectural request" with a link to `/app/property/architectural/{applicationId}`, shown when `count > 0` with `role="status"`. Add the field to the dashboard model in `core/services/dashboard.service.ts`. Extend `dashboard.component.spec.ts`: the alert shows for count 1 and is absent for 0.
-- [ ] T053 [P] [US3] Show the resident's reply and reply attachments in the board detail panel. In `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.ts`, render "Owner replied: …" under each answered info request. Extend `application-detail-panel.component.spec.ts`.
+- [X] T050 [US3] Add `ArchitecturalInfoRequestedSummary(int Count, Guid? ApplicationId)` to `HOAManagementCompany/Features/Dashboard/Models/` and the `DashboardResponse` record. Compute it in `DashboardService.GetDashboardAsync`: `Open` applications for `propertyId` with any `InfoRequests.RespondedAt == null`, oldest first.
+- [X] T051 [P] [US3] Create `info-reply.component.ts`: it shows each unanswered question, has a reply textarea (labeled, required, 2000 max with a counter) and an optional file upload through the reply-attachment endpoint, and sends the reply. Embed it in `request-detail.component.ts` when the status is `MoreInfoRequested`. Add `info-reply.component.spec.ts` (ATL: blank is blocked; a successful reply refreshes the detail; 409 shows its message). All in `neko-hoa/src/app/features/property/architectural/`. The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
+- [X] T052 [P] [US3] Add a dashboard alert to `neko-hoa/src/app/features/dashboard/dashboard.component.ts`: "The board needs more information about your architectural request" with a link to `/app/property/architectural/{applicationId}`, shown when `count > 0` with `role="status"`. Add the field to the dashboard model in `core/services/dashboard.service.ts`. Extend `dashboard.component.spec.ts`: the alert shows for count 1 and is absent for 0.
+- [X] T053 [P] [US3] Show the resident's reply and reply attachments in the board detail panel. In `neko-hoa/src/app/features/board/architectural/application-detail-panel.component.ts`, render "Owner replied: …" under each answered info request. Extend `application-detail-panel.component.spec.ts`.
 
 **Checkpoint**: T046, T047 and T049's board test pass.
 
@@ -302,7 +302,7 @@
 
 ### Tests (write first)
 
-- [ ] T054 [P] [US4] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/WithdrawTests.cs`:
+- [X] T054 [P] [US4] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/WithdrawTests.cs`:
   1. `Withdraw_Undecided_ClosesAsWithdrawn_HiddenFromBoardByDefault` (AS1). Assert:
      - 200 with `status == "Withdrawn"`;
      - the DB has `Status == Closed`, `DecisionOutcome == Withdrawn`, and `WithdrawnAt`/`WithdrawnByUserId` set;
@@ -314,17 +314,17 @@
   3. `Withdraw_Closed_Refused`, a `[Theory]` over Approved, Denied and already-Withdrawn (AS2): 409 `APPLICATION_CLOSED`; the state is unchanged.
   4. `Withdraw_RacingDecidingVote_ExactlyOneWins`: on a 3-member board with 1 approve vote, fire the withdraw and the deciding approve vote concurrently. The final state is either Withdrawn (and the vote got 409 `APPLICATION_CLOSED`) or DecisionReached (and the withdraw got 409 `APPLICATION_DECIDED`), never both.
   5. `Sweep_IgnoresWithdrawn`: a withdrawn application past its due date gets no lapse or reminder (027 `ArcSweepService` via the job endpoint).
-- [ ] T055 [P] [US4] Extend `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationsListEndpointTests.cs`: `includeWithdrawn` is optional, and omitting it leaves the previous behavior for non-withdrawn data unchanged (regression).
+- [X] T055 [P] [US4] Extend `HOAManagementCompany.Tests/Integration/Board/Architectural/ApplicationsListEndpointTests.cs`: `includeWithdrawn` is optional, and omitting it leaves the previous behavior for non-withdrawn data unchanged (regression).
 
 ### Implementation
 
-- [ ] T056 [US4] Create `WithdrawApplicationEndpoint.cs` in `HOAManagementCompany/Features/Property/Architectural/`. Under `ArcLocks.InLockedTransactionAsync`:
+- [X] T056 [US4] Create `WithdrawApplicationEndpoint.cs` in `HOAManagementCompany/Features/Property/Architectural/`. Under `ArcLocks.InLockedTransactionAsync`:
   - `DecisionReached` → `APPLICATION_DECIDED`; `Closed` → `APPLICATION_CLOSED`.
   - Otherwise set `Status = Closed` and `DecisionOutcome = Withdrawn`; set `WithdrawnAt`/`ClosedAt` to now and `WithdrawnByUserId`/`ClosedByUserId` to the caller.
   - Log `ArcWithdrawn`; send no outbox row.
-- [ ] T057 [US4] Add `bool? IncludeWithdrawn` to the request in `HOAManagementCompany/Features/Board/Architectural/ApplicationsListEndpoint.cs`. When it is not true, the `closed` filter and `counts.closed` exclude `DecisionOutcome == ArcOutcome.Withdrawn`. Withdrawn rows are `Closed`, so the open tab is already unaffected. Update the 027 contract doc `specs/027-board-arc-review/contracts/architectural-applications.md` with the new parameter.
-- [ ] T058 [P] [US4] Add a "Show withdrawn" toggle on the Closed tab in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts`. It passes `includeWithdrawn=true` through `core/services/architectural.service.ts`, and the row shows "Withdrawn". Extend `applications-page.component.spec.ts` and `architectural.service.spec.ts`.
-- [ ] T059 [P] [US4] Create `withdraw-dialog.component.ts`: an accessible confirm dialog (focus trap, Escape cancels, explains that it can't be undone) that calls `withdraw` and refreshes the detail. Wire it into `request-detail.component.ts`. Add `withdraw-dialog.component.spec.ts`. All in `neko-hoa/src/app/features/property/architectural/`. The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
+- [X] T057 [US4] Add `bool? IncludeWithdrawn` to the request in `HOAManagementCompany/Features/Board/Architectural/ApplicationsListEndpoint.cs`. When it is not true, the `closed` filter and `counts.closed` exclude `DecisionOutcome == ArcOutcome.Withdrawn`. Withdrawn rows are `Closed`, so the open tab is already unaffected. Update the 027 contract doc `specs/027-board-arc-review/contracts/architectural-applications.md` with the new parameter.
+- [X] T058 [P] [US4] Add a "Show withdrawn" toggle on the Closed tab in `neko-hoa/src/app/features/board/architectural/applications-page.component.ts`. It passes `includeWithdrawn=true` through `core/services/architectural.service.ts`, and the row shows "Withdrawn". Extend `applications-page.component.spec.ts` and `architectural.service.spec.ts`.
+- [X] T059 [P] [US4] Create `withdraw-dialog.component.ts`: an accessible confirm dialog (focus trap, Escape cancels, explains that it can't be undone) that calls `withdraw` and refreshes the detail. Wire it into `request-detail.component.ts`. Add `withdraw-dialog.component.spec.ts`. All in `neko-hoa/src/app/features/property/architectural/`. The layout MUST be responsive (FR-027): one column under 600 px, tables become stacked cards on phones, and no fixed width may overflow 375 px.
 
 **Checkpoint**: T054 and T055 pass.
 
@@ -337,7 +337,7 @@
 
 ### Tests (write first)
 
-- [ ] T060 [P] [US6] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/ReviseTests.cs`:
+- [X] T060 [P] [US6] Create `HOAManagementCompany.Tests/Integration/Property/Architectural/ReviseTests.cs`:
   1. `Revise_Denied_CreatesPrefilledDraftWithCarriedAttachments` (AS1): for a seeded `ARC-N` v1 that is Closed/Denied with 2 attachments, revise returns 201. The draft's `previousRevisionId` == v1, its fields equal v1's, and `carriedAttachments` lists both files.
   2. `RemoveCarriedAttachment_DoesNotTouchEarlierRevision` (AS2): PUT `removedCarriedAttachmentIds` with one ID and submit. v1 still has 2 attachment rows and both objects exist; v2 has 1 carried attachment plus any new upload.
   3. `SubmitRevision_CreatesOpenV2WithNewDatesAndNoVotes` (AS3): v2 has the same `ApplicationNumber`, `Revision == 2`, `PreviousRevisionId == v1`, `Status == Open`, `ReceivedDate` == today, a `DueDate` computed from the current settings, and 0 votes. The resident detail `revisions` lists v1 and v2. 027's board detail shows the v2 revision history, and the board list shows v2 as Open.
@@ -348,8 +348,8 @@
 
 ### Implementation
 
-- [ ] T061 [US6] Create `ReviseApplicationEndpoint.cs`. It checks that the application is the latest revision, is Closed with `DecisionOutcome == Denied`, and has no draft with that `PreviousRevisionId` (all → 409 `REVISION_NOT_ALLOWED`). It then creates the draft, pre-filled from the application, and logs `ArcRevisionDraftCreated`. In `ResidentArcDraftService` (`HOAManagementCompany/Features/Property/Architectural/`), add `carriedAttachments` (previous revision's attachments minus the removed IDs) to the draft GET, include carried files in the limit counts in `UploadDraftAttachmentEndpoint`, and let `DraftAttachmentUrlEndpoint` serve carried attachments.
-- [ ] T062 [P] [US6] Add revise mode to `request-form.component.ts`:
+- [X] T061 [US6] Create `ReviseApplicationEndpoint.cs`. It checks that the application is the latest revision, is Closed with `DecisionOutcome == Denied`, and has no draft with that `PreviousRevisionId` (all → 409 `REVISION_NOT_ALLOWED`). It then creates the draft, pre-filled from the application, and logs `ArcRevisionDraftCreated`. In `ResidentArcDraftService` (`HOAManagementCompany/Features/Property/Architectural/`), add `carriedAttachments` (previous revision's attachments minus the removed IDs) to the draft GET, include carried files in the limit counts in `UploadDraftAttachmentEndpoint`, and let `DraftAttachmentUrlEndpoint` serve carried attachments.
+- [X] T062 [P] [US6] Add revise mode to `request-form.component.ts`:
   - The `property/architectural/:id/revise` route calls `revise(id)`, or reopens the existing revision draft, and loads it.
   - Carried attachments get "Remove" buttons, which update `removedCarriedAttachmentIds`.
   - A "Revision of ARC-N" banner is shown.
@@ -362,15 +362,15 @@
 
 ## Phase 9: Polish & cross-cutting
 
-- [ ] T063 [P] Add `ResidentArcTelemetryHygieneTests` in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcTelemetryHygieneTests.cs`, modeled on `ArcTelemetryHygieneTests.cs`. Across a submit, upload, reply and withdraw flow, no log or span may contain the file name, the owner name, a storage key, or the reply or description text.
-- [ ] T064 [P] Add `ResidentArcScopeStaticAnalysisTests` in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcScopeStaticAnalysisTests.cs`. Every `*Endpoint.cs` in `Features/Property/Architectural/` must call `RequirePropertyId()` and use `ResidentArcScope`, and none may reference `ICommunityScopeResolver` (resident scope only, FR-023).
-- [ ] T065 [P] Extend `HOAManagementCompany/Seed/ArchitecturalSeeder.cs`, keeping it idempotent and Dev-only: give the seeded resident's property one Open application with an unanswered info request, and one Closed/Denied application, so the quickstart's US3 and US6 steps work. Extend the seeder test if one asserts counts.
-- [ ] T066 [P] Make sure Storybook stories exist for `my-requests-page`, `request-detail`, `request-form`, `info-reply` and `withdraw-dialog` (`*.stories.ts`, built from fixtures in `neko-hoa/src/app/features/property/architectural/resident-arc-fixtures.ts`)
-- [ ] T067 [P] Add the responsive check (FR-027) as Playwright spec `neko-hoa/e2e/resident-arc-responsive.spec.ts`. At 375×812, 768×1024 and 1280×800 it visits the my-requests list, the new-request form with one uploaded file, a request detail with an info request, and the withdraw dialog. It asserts `document.documentElement.scrollWidth <= window.innerWidth` and that Save draft, Submit, Reply and Withdraw are visible and clickable.
-- [ ] T068 [P] Add the rate-limit test as `HOAManagementCompany.Tests/Integration/RateLimiting/ResidentWritesRateLimitTests.cs`, modeled on `RateLimitingIsolationTests.cs`. With `RateLimiting:ResidentWritesPermitsPerMinute=2`, a resident's third `POST /property/architectural-applications/drafts` in the window returns 429, a second resident is unaffected, and `GET /property/architectural-applications` (a read) is never limited.
-- [ ] T069 Add Repowise markers to the files listed in plan.md §Repowise (`ResidentArcDraftService`/`ResidentArcSubmitService`/`ResidentArcQueries` `domain=resident-arc`; `ArcAttachmentValidator` `domain=resident-arc-uploads`; `ArcUploadOptions` `domain=configuration`; `spec.md` `section=summary`)
-- [ ] T070 Bring `specs/029-resident-arc-requests/spec.md`, `quickstart.md`, `contracts/` and `data-model.md` into line with what was built (no drift), and mark completed tasks `[X]` in this file
-- [ ] T071 Run the full gates: `dotnet build`; `dotnet test`; in `neko-hoa`, `npm run test:ci` and `npm run build`; `npx playwright test e2e/resident-arc-attachments.spec.ts`; `npm run e2e:ci` where the environment allows. Fix any failures and record any that can't run locally, with the reason.
+- [X] T063 [P] Add `ResidentArcTelemetryHygieneTests` in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcTelemetryHygieneTests.cs`, modeled on `ArcTelemetryHygieneTests.cs`. Across a submit, upload, reply and withdraw flow, no log or span may contain the file name, the owner name, a storage key, or the reply or description text.
+- [X] T064 [P] Add `ResidentArcScopeStaticAnalysisTests` in `HOAManagementCompany.Tests/Integration/Property/Architectural/ResidentArcScopeStaticAnalysisTests.cs`. Every `*Endpoint.cs` in `Features/Property/Architectural/` must call `RequirePropertyId()` and use `ResidentArcScope`, and none may reference `ICommunityScopeResolver` (resident scope only, FR-023).
+- [X] T065 [P] Extend `HOAManagementCompany/Seed/ArchitecturalSeeder.cs`, keeping it idempotent and Dev-only: give the seeded resident's property one Open application with an unanswered info request, and one Closed/Denied application, so the quickstart's US3 and US6 steps work. Extend the seeder test if one asserts counts.
+- [X] T066 [P] Make sure Storybook stories exist for `my-requests-page`, `request-detail`, `request-form`, `info-reply` and `withdraw-dialog` (`*.stories.ts`, built from fixtures in `neko-hoa/src/app/features/property/architectural/resident-arc-fixtures.ts`)
+- [X] T067 [P] Add the responsive check (FR-027) as Playwright spec `neko-hoa/e2e/resident-arc-responsive.spec.ts`. At 375×812, 768×1024 and 1280×800 it visits the my-requests list, the new-request form with one uploaded file, a request detail with an info request, and the withdraw dialog. It asserts `document.documentElement.scrollWidth <= window.innerWidth` and that Save draft, Submit, Reply and Withdraw are visible and clickable.
+- [X] T068 [P] Add the rate-limit test as `HOAManagementCompany.Tests/Integration/RateLimiting/ResidentWritesRateLimitTests.cs`, modeled on `RateLimitingIsolationTests.cs`. With `RateLimiting:ResidentWritesPermitsPerMinute=2`, a resident's third `POST /property/architectural-applications/drafts` in the window returns 429, a second resident is unaffected, and `GET /property/architectural-applications` (a read) is never limited.
+- [X] T069 Add Repowise markers to the files listed in plan.md §Repowise (`ResidentArcDraftService`/`ResidentArcSubmitService`/`ResidentArcQueries` `domain=resident-arc`; `ArcAttachmentValidator` `domain=resident-arc-uploads`; `ArcUploadOptions` `domain=configuration`; `spec.md` `section=summary`)
+- [X] T070 Bring `specs/029-resident-arc-requests/spec.md`, `quickstart.md`, `contracts/` and `data-model.md` into line with what was built (no drift), and mark completed tasks `[X]` in this file
+- [X] T071 Run the full gates: `dotnet build`; `dotnet test`; in `neko-hoa`, `npm run test:ci` and `npm run build`; `npx playwright test e2e/resident-arc-attachments.spec.ts`; `npm run e2e:ci` where the environment allows. Fix any failures and record any that can't run locally, with the reason.
 
 ---
 

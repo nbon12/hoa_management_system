@@ -129,7 +129,7 @@ New `Kind` value `arc_owner_submitted` (`ArcEmailKinds.OwnerSubmitted`, 19 chars
 |---|---|---|
 | Project type | One of the 8 `ArcProjectType` values | 422 `VALIDATION_ERROR` |
 | Project title | Required at submit, ≤ 200 | 422 `VALIDATION_ERROR` |
-| Description | ≤ 4000 | 422 `VALIDATION_ERROR` |
+| Description | Required at submit, ≤ 4000 | 422 `VALIDATION_ERROR` |
 | Contractor fields | ≤ 200 each | 422 `VALIDATION_ERROR` |
 | Planned dates | Both required at submit; completion ≥ start | 422 `VALIDATION_ERROR` |
 | Acknowledgement | `true` required at submit | 422 `ACKNOWLEDGEMENT_REQUIRED` |

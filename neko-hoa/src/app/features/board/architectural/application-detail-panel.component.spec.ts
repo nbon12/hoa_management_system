@@ -265,4 +265,12 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
     r.fixture.detectChanges();
     expect(document.activeElement).toBe(screen.getByLabelText('Comment to the board'));
   });
+
+  // 029 US3 AS2: the owner's reply to an info request is visible to the board.
+  it("shows the owner's reply under an answered info request (029)", async () => {
+    await setup(detail({ infoRequests: [{ id: 'q1', requestedBy: 'Nicholas Board', message: 'Please attach a plat survey',
+      requestedAt: '2026-06-01T12:00:00Z', respondedAt: '2026-06-02T12:00:00Z', responseMessage: 'Survey attached' }] }));
+    await waitFor(() => expect(screen.getByText(/Owner replied/)).toBeTruthy());
+    expect(screen.getByText(/Owner replied/).textContent).toContain('Survey attached');
+  });
 });

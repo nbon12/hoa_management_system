@@ -40,7 +40,7 @@ The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` 
 - Withdrawn requests excluded from the board's default Closed view; surfaced only via an opt-in `includeWithdrawn` filter.
 - Resident pages render correctly at phone (375 px), tablet (768 px) and desktop (1280 px) widths (constitution §6, spec FR-027).
 
-**Scale/Scope**: Hundreds of applications per community per year; a resident typically has a handful. 16 resident endpoints (9 draft, 7 application); 2 new tables + 1 additive migration; 1 new backend subfolder (`Features/Property/Architectural/`); 1 new frontend feature folder (`features/property/architectural/`), 1 service, 3 routes, 1 nav entry; a dashboard-alert addition; small additive edits to four 027-owned files (list query, `IDocumentStorage`, `OutboxMessage` kind, email renderer).
+**Scale/Scope**: Hundreds of applications per community per year; a resident typically has a handful. 15 resident endpoints (8 draft, 7 application); 2 new tables + 1 additive migration; 1 new backend subfolder (`Features/Property/Architectural/`); 1 new frontend feature folder (`features/property/architectural/`), 1 service, 3 routes, 1 nav entry; a dashboard-alert addition; small additive edits to four 027-owned files (list query, `IDocumentStorage`, `OutboxMessage` kind, email renderer).
 
 ## Constitution Check
 
@@ -96,12 +96,11 @@ HOAManagementCompany/
 │   ├── ResidentArcScope.cs                    # active-property scoping + non-disclosing 403
 │   ├── ResidentArcLog.cs                      # sensitive events (IDs only)
 │   ├── ArcAttachmentValidator.cs              # content sniffing + env-level limits
-│   ├── CreateDraftEndpoint.cs  GetDraftEndpoint.cs  UpdateDraftEndpoint.cs  DeleteDraftEndpoint.cs
-│   ├── SubmitDraftEndpoint.cs
-│   ├── UploadDraftAttachmentEndpoint.cs  DeleteDraftAttachmentEndpoint.cs  DraftAttachmentUrlEndpoint.cs
-│   ├── MyApplicationsListEndpoint.cs  MyApplicationDetailEndpoint.cs  ApplicationAttachmentUrlEndpoint.cs
-│   ├── UploadReplyAttachmentEndpoint.cs  ReplyInfoRequestEndpoint.cs
-│   ├── WithdrawApplicationEndpoint.cs  ReviseApplicationEndpoint.cs
+│   ├── ResidentArcActionsService.cs           # withdraw, info reply (+ reply files), attachment keys
+│   ├── ResidentArcHttp.cs                     # no-store, multipart file reading, short-lived links
+│   ├── DraftEndpoints.cs                      # Create/Get/Update/Delete/Submit draft endpoints
+│   ├── DraftAttachmentEndpoints.cs            # Upload/Delete draft file, draft file link
+│   ├── ApplicationEndpoints.cs                # List, Detail, file link, reply file, Reply, Withdraw, Revise
 │   └── ResidentArcModels.cs                   # DTOs + ResidentArcErrorCodes (no vote fields)
 ├── Features/Board/Architectural/
 │   ├── ApplicationsListEndpoint.cs            # 027-owned; + includeWithdrawn (default excludes Withdrawn)
@@ -118,11 +117,15 @@ HOAManagementCompany/
 └── Program.cs                                 # resident-writes rate policy, ArcUploadOptions, DI
 
 HOAManagementCompany.Tests/
-├── Unit/Architectural/ArcAttachmentValidatorTests.cs        # content sniffing + limits
-└── Integration/Property/Architectural/                      # one class per user story:
-    ├── CreateSubmitTests.cs   TrackTests.cs   AttachmentTests.cs
-    ├── InfoReplyTests.cs      WithdrawTests.cs  ReviseTests.cs
-    └── ResidentArcAuthorizationTests.cs                     # non-owner / cross-property 403s
+├── Unit/Architectural/                                      # ArcAttachmentValidatorTests, ArcUploadOptionsValidatorTests,
+│                                                            # ArcEmailRendererSubmittedTests
+├── Integration/Dashboard/DashboardArchitecturalAlertTests.cs
+├── Integration/RateLimiting/ResidentWritesRateLimitTests.cs
+└── Integration/Property/Architectural/                      # ResidentArcTestBase + one class per user story:
+    ├── FileRequestTests.cs  TrackRequestsTests.cs  AttachmentTests.cs  AttachmentStorageFailureTests.cs
+    ├── InfoReplyTests.cs    WithdrawTests.cs       ReviseTests.cs
+    ├── ResidentArcAuthorizationTests.cs                     # every route's non-disclosing 403, co-owner, board role
+    └── ResidentArcMigrationTests.cs  ResidentArcTelemetryHygieneTests.cs  ResidentArcScopeStaticAnalysisTests.cs
 
 neko-hoa/src/app/
 ├── app.routes.ts                              # + property/architectural (list), /:id (detail), /:id/revise
@@ -154,7 +157,6 @@ neko-hoa/src/app/
 | `Features/Property/Architectural/ArcAttachmentValidator.cs` | `domain=resident-arc-uploads` | Content sniffing and env-level limit enforcement |
 | `Features/Property/Architectural/ResidentArcQueries.cs` | `domain=resident-arc` | Resident-safe projection (status map, no votes/comments) |
 | `Infrastructure/Configuration/ArcUploadOptions.cs` | `domain=configuration` | Environment-level attachment limits |
-| `specs/029-resident-arc-requests/spec.md` | `section=summary` | Feature summary for the index |
 
 ### Marker syntax
 

@@ -37,6 +37,7 @@ export function decisionReachedLabel(d: ArcDecision): string {
 /** Closed-tab label (FR-025): the legal outcome, with the owner wording for denials. */
 export function outcomeLabel(d: ArcDecision): string {
   if (d.outcome === 'Approved') return 'Approved';
+  if (d.outcome === 'Withdrawn') return 'Withdrawn';
   return d.wording === 'RevisionsRequested' ? 'Denied · revisions requested' : 'Denied';
 }
 

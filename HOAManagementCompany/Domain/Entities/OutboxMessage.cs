@@ -20,7 +20,8 @@ public class OutboxMessage
     /// <c>sms_alert</c>, <c>email_alert</c>, <c>receipt_email</c>, the variable-amount advance
     /// notices <c>variable_notice_sms</c> / <c>variable_notice_email</c> (FR-011c), or the
     /// architectural review emails <c>arc_owner_approved</c>, <c>arc_owner_revisions_requested</c>,
-    /// <c>arc_owner_denied</c>, <c>arc_board_reminder</c>, <c>arc_board_lapsed</c> (027).
+    /// <c>arc_owner_denied</c>, <c>arc_board_reminder</c>, <c>arc_board_lapsed</c> (027), and the resident
+    /// submission confirmation <c>arc_owner_submitted</c> (029).
     /// </summary>
     public string Kind { get; set; } = string.Empty;
 

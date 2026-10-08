@@ -66,4 +66,9 @@ public class S3DocumentStorage(IAmazonS3 s3Client, IOptions<StorageOptions> opts
             UseChunkEncoding = false,
         }, ct);
     }
+
+    // S3 DeleteObject is idempotent: deleting a key that doesn't exist succeeds (204), so a retried
+    // draft discard never fails on an object that is already gone.
+    public Task DeleteAsync(string storageKey, CancellationToken ct = default) =>
+        s3Client.DeleteObjectAsync(_opts.BucketName, storageKey, ct);
 }

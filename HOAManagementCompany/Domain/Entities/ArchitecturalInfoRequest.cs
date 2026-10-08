@@ -11,6 +11,10 @@ public class ArchitecturalInfoRequest
     public DateTimeOffset RequestedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? RespondedAt { get; set; }
 
+    // The resident's reply (029 FR-018), visible to the board and manager.
+    public string? ResponseMessage { get; set; }
+    public string? RespondedByUserId { get; set; }
+
     public ArchitecturalApplication Application { get; set; } = null!;
     public ApplicationUser RequestedBy { get; set; } = null!;
 }

@@ -32,6 +32,13 @@ export const routes: Routes = [
       { path: 'property/owner',     loadComponent: () => import('./features/property/owner/owner.component').then(m => m.OwnerComponent) },
       { path: 'property/directory', loadComponent: () => import('./features/property/directory/directory.component').then(m => m.DirectoryComponent) },
 
+      // Architectural requests (029). These paths match the owner links in 027's outcome emails.
+      { path: 'property/architectural',                 loadComponent: () => import('./features/property/architectural/my-requests-page.component').then(m => m.MyRequestsPageComponent) },
+      { path: 'property/architectural/new',             loadComponent: () => import('./features/property/architectural/request-form.component').then(m => m.RequestFormComponent) },
+      { path: 'property/architectural/drafts/:draftId', loadComponent: () => import('./features/property/architectural/request-form.component').then(m => m.RequestFormComponent) },
+      { path: 'property/architectural/:id/revise',      loadComponent: () => import('./features/property/architectural/request-form.component').then(m => m.RequestFormComponent) },
+      { path: 'property/architectural/:id',             loadComponent: () => import('./features/property/architectural/request-detail.component').then(m => m.RequestDetailComponent) },
+
       // Community
       { path: 'community/announcements', loadComponent: () => import('./features/community/announcements/announcements.component').then(m => m.AnnouncementsComponent) },
       { path: 'community/calendar',      loadComponent: () => import('./features/community/calendar/calendar.component').then(m => m.CalendarComponent) },

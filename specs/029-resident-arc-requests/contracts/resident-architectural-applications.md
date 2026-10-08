@@ -8,6 +8,8 @@ All routes carry the global `api/v1` prefix and live under `/property/architectu
 
 **Residents never receive board votes, voter identities or board vote comments** (FR-016). Resident DTOs have no such fields at all.
 
+Submit, withdraw and revise are bodiless `POST`s (no request body or content type needed).
+
 Two resources: **drafts** (`ArchitecturalApplicationDrafts`, editable, invisible to the board) and **applications** (027's `ArchitecturalApplications`, created by submitting a draft).
 
 ---
