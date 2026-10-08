@@ -72,7 +72,7 @@ Drafts never appear in any board query (they aren't in `ArchitecturalApplication
 
 ## R7. Submission-confirmation email via the outbox
 
-**Decision**: On submit, enqueue one `OutboxMessage` with `Kind = arc_owner_submitted`, `RecipientUserId = SubmittedByUserId`, `DedupKey = arc:{applicationId}:submitted`, and a plain-text payload (display ID, project title, received/due dates, a link to `/app/property/architectural/{id}`) rendered by a small `ArcSubmissionEmail` helper, written in the same transaction as the submit and dispatched after commit — the exact pattern 027 uses for owner/board emails (R5). Addressing is by `RecipientUserId` (the nullable recipient 027 added), not `OwnerId`.
+**Decision**: On submit, enqueue one `OutboxMessage` with `Kind = arc_owner_submitted`, `RecipientUserId = SubmittedByUserId`, `DedupKey = arc:{applicationId}:submitted`, and a plain-text payload (display ID, project title, received/due dates, a link to `/app/property/architectural/{id}`) rendered by `ArcEmailRenderer.OwnerSubmitted` (beside 027's owner emails, kind `ArcEmailKinds.OwnerSubmitted`), written in the same transaction as the submit and dispatched after commit — the exact pattern 027 uses for owner/board emails (R5). Addressing is by `RecipientUserId` (the nullable recipient 027 added), not `OwnerId`.
 
 **Rationale**: The outbox gives atomic enqueue, dedup and terminal-failure handling, and `RecipientUserId` already exists. A confirmation lost on a rolled-back submit (or sent for one that failed) is exactly what the outbox prevents.
 

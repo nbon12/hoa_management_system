@@ -34,20 +34,20 @@ Sign in as a resident who owns a seeded property (the existing resident seed use
    - Reply with a message and an attachment → the marker clears, the due date is unchanged, and the board/manager can see your reply.
 4. **Withdraw (US4)**: on an undecided request, **Withdraw** → it becomes **Withdrawn** in your list and leaves the board's Open list.
    - It is absent from the board's default Closed tab; a board member enabling **Show withdrawn** (`?includeWithdrawn=true`) sees it.
-   - Withdrawing an already-decided request returns `409 APPLICATION_DECIDED`.
+   - Withdrawing a decided request returns `409 APPLICATION_DECIDED` (or `409 APPLICATION_CLOSED` once closed).
 5. **Revise and resubmit (US6)**: on a **Denied** request, click **Revise and resubmit**.
    - A new **Draft** revision (v2) opens, pre-filled, with the old attachments carried over; remove one and confirm v1 still has it.
    - Add a file, submit → the board sees `ARC-<n>` v2, Open, with a link back to v1.
-   - Revising a non-denied request returns `409 NOT_DENIED`.
+   - Revising a non-denied request returns `409 REVISION_NOT_ALLOWED`.
 
 ## Attachments: validation and limits
 
 ```bash
 # Rename a non-PDF to .pdf and upload → rejected by content sniffing
 cp some.txt fake.pdf
-# (upload fake.pdf via the form) → 422 VALIDATION_ERROR
+# (upload fake.pdf via the form) → 422 UNSUPPORTED_FILE_TYPE
 
-# Over the per-file limit (default 50 MB), or past 20 files / 250 MB total → 422 VALIDATION_ERROR
+# Over the per-file limit (default 50 MB) → 422 FILE_TOO_LARGE; past 20 files / 250 MB total → 422 ATTACHMENT_LIMIT_REACHED
 ```
 
 Limits are environment-level (`Architectural:Uploads` → `ArcUploadOptions`: `MaxFileBytes`, `MaxFilesPerApplication`, `MaxTotalBytes`). Override per deployment via configuration/env.

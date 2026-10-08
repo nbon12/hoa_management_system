@@ -137,4 +137,5 @@ New `Kind` value `arc_owner_submitted` (`ArcEmailKinds.OwnerSubmitted`, 19 chars
 | Attachment size | ≤ `MaxFileBytes` (default 50 MB) | 422 `FILE_TOO_LARGE` |
 | Attachment count / total | ≤ `MaxFilesPerApplication` (20) and `MaxTotalBytes` (250 MB), counting carried-over files on a revision draft | 422 `ATTACHMENT_LIMIT_REACHED` |
 | Reply message | Required, non-blank, ≤ 2000 | 422 `VALIDATION_ERROR` |
+| Object storage failure on upload | Upload happens before the metadata row is written | 503 `STORAGE_UNAVAILABLE` (no row; retryable) |
 | Anything outside the caller's active property | Same body as 025/027 | 403 `FORBIDDEN` |

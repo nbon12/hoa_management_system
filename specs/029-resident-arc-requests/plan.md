@@ -7,7 +7,7 @@
 
 Let homeowners file and track architectural (ARC) requests, extending the shared data model introduced by `027-board-arc-review` (PR #209, lands first). Residents create and edit drafts, submit them (number/received/due dates assigned, confirmation email sent), track status on a "My architectural requests" list and detail page, reply to board "Request info" questions, withdraw undecided requests, and revise-and-resubmit after a denial. All endpoints are **resident property-scoped** through the existing active-property `propertyId` JWT claim — no board resolver, no board capabilities. Attachments are validated by content, size- and count-limited at the environment level, stored privately via `IDocumentStorage`, and served only through ≤15-minute pre-signed links.
 
-The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` / `ArchitecturalInfoRequest` tables, its `ArcApplicationFactory` (number allocation, due-date and rule snapshots, revision factory), and the `OutboxMessage` transactional-email pipeline. It extends them **additively**: a `Draft` lifecycle state, a `Withdrawn` outcome, resident-authored fields (planned dates, contractor, acknowledgement), the info-request reply (body + attachments), the `arc_owner_submitted` email kind, and a board "show withdrawn" list filter.
+The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` / `ArchitecturalInfoRequest` tables, its `ArcApplicationFactory` (number allocation, due-date and rule snapshots, revision factory), and the `OutboxMessage` transactional-email pipeline. It extends them **additively, never loosening 027's columns or indexes**: a separate drafts table that feeds 027's factory on submit, a `Withdrawn` outcome, resident-authored fields (planned dates, contractor, acknowledgement), the info-request reply (body + attachments), the `arc_owner_submitted` email kind, and a board "show withdrawn" list filter.
 
 ## Technical Context
 
@@ -38,8 +38,9 @@ The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` 
 - `ARC-<number>` allocated atomically from 027's `CommunityArcSettings.NextApplicationNumber` at submission.
 - Submission-confirmation and all state changes enqueue outbox rows in the same transaction (exactly-once via DedupKey), dispatched after commit.
 - Withdrawn requests excluded from the board's default Closed view; surfaced only via an opt-in `includeWithdrawn` filter.
+- Resident pages render correctly at phone (375 px), tablet (768 px) and desktop (1280 px) widths (constitution §6, spec FR-027).
 
-**Scale/Scope**: Hundreds of applications per community per year; a resident typically has a handful. 15 resident endpoints (8 draft, 7 application); 2 new tables + 1 additive migration; 1 new backend subfolder (`Features/Property/Architectural/`); 1 new frontend feature folder (`features/property/architectural/`), 1 service, 3 routes, 1 nav entry; a dashboard-alert addition; small additive edits to four 027-owned files (list query, `IDocumentStorage`, `OutboxMessage` kind, email renderer).
+**Scale/Scope**: Hundreds of applications per community per year; a resident typically has a handful. 16 resident endpoints (9 draft, 7 application); 2 new tables + 1 additive migration; 1 new backend subfolder (`Features/Property/Architectural/`); 1 new frontend feature folder (`features/property/architectural/`), 1 service, 3 routes, 1 nav entry; a dashboard-alert addition; small additive edits to four 027-owned files (list query, `IDocumentStorage`, `OutboxMessage` kind, email renderer).
 
 ## Constitution Check
 
@@ -47,7 +48,7 @@ The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` 
 
 - **Technology fit**: ✅ Angular, FastEndpoints, PostgreSQL/Neon, Identity + JWT, Cloudflare, Cloud Run, Sentry, Swashbuckle (dev only), GitHub Actions — all reused. No new packages, no new infra.
 - **HOA tenancy**: ✅ Every request is community-scoped through its property (`ArchitecturalApplication.CommunityId` denormalized = `Property.CommunityId`, per 027). Resident endpoints additionally pin to the caller's **active property** (`propertyId` claim); cross-property / cross-community access is denied by default with the 025 non-disclosing 403.
-- **API contracts**: ✅ The contract documents auth, property-scope, `limit`/`offset` (25/100), error codes (`FORBIDDEN`, `VALIDATION_ERROR`, `NOT_DRAFT`, `APPLICATION_DECIDED`, `NOT_DENIED`, `ALREADY_WITHDRAWN`, `INFO_ALREADY_ANSWERED`), `no-store`, and the confirmation-email payload. No existing endpoint changes shape; the board list gains an **optional** `includeWithdrawn` param (backward-compatible).
+- **API contracts**: ✅ The contract documents auth, property-scope, `limit`/`offset` (25/100), error codes (`FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `ACKNOWLEDGEMENT_REQUIRED`, `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `ATTACHMENT_LIMIT_REACHED`, `APPLICATION_DECIDED`, `APPLICATION_CLOSED`, `REVISION_NOT_ALLOWED`, `INFO_ALREADY_ANSWERED`, `ATTACHMENT_UNAVAILABLE`), `no-store`, and the confirmation-email payload. No existing endpoint changes shape; the board list gains an **optional** `includeWithdrawn` param (backward-compatible).
 - **Security and operations**: ✅ No new secrets. Authorization is server-side from the property claim. Uploads validate content type by bytes and enforce env-level size/count limits before persisting. A `resident-writes` rate limit covers create/submit/upload/reply/withdraw/revise. Non-owner access and rejected uploads are logged as 025 FR-017 sensitive events (IDs only, never file bytes or owner PII). Production error shape unchanged (`DomainException`).
 - **File storage**: ✅ Objects in R2 (hosted) / MinIO (local/CI); PostgreSQL holds metadata + keys only; access only via `IDocumentStorage` pre-signed URLs. This spec is the first to **delete** objects (draft discard), so `IDocumentStorage` gains an additive `DeleteAsync`.
 - **Caching/edge**: ✅ Every endpoint is `no-store` (authenticated, user-specific).
@@ -89,25 +90,23 @@ HOAManagementCompany/
 │   │   └── Enums/ArcOutcome.cs                # 027-owned; + Withdrawn
 │   └── Entities/OutboxMessage.cs              # 027-owned; + arc_owner_submitted kind
 ├── Features/Property/Architectural/           # new (resident ARC slice)
-│   ├── ResidentArcService.cs                  # draft CRUD, submit, withdraw, revise, reply
-│   ├── ResidentArcQueries.cs                  # my-list + resident-safe detail projection (no votes/comments)
-│   ├── ArcAttachmentValidator.cs              # content sniffing + env-level limit checks
-│   ├── ArcSubmissionEmail.cs                  # arc_owner_submitted outbox payload (plain text)
-│   ├── CreateDraftEndpoint.cs
-│   ├── UpdateDraftEndpoint.cs
-│   ├── DeleteDraftEndpoint.cs
-│   ├── SubmitApplicationEndpoint.cs
-│   ├── UploadAttachmentEndpoint.cs
-│   ├── DeleteAttachmentEndpoint.cs
-│   ├── MyApplicationsListEndpoint.cs
-│   ├── MyApplicationDetailEndpoint.cs
-│   ├── AttachmentUrlEndpoint.cs               # resident-scoped pre-signed link
-│   ├── ReplyInfoRequestEndpoint.cs
-│   ├── WithdrawApplicationEndpoint.cs
-│   ├── ReviseApplicationEndpoint.cs
-│   └── ResidentArcModels.cs                   # request/response DTOs
+│   ├── ResidentArcDraftService.cs             # draft create/get/update/delete (+ revision drafts)
+│   ├── ResidentArcSubmitService.cs            # draft → ArcApplicationFactory, outbox confirmation
+│   ├── ResidentArcQueries.cs                  # my-list + resident-safe detail (no votes/comments)
+│   ├── ResidentArcScope.cs                    # active-property scoping + non-disclosing 403
+│   ├── ResidentArcLog.cs                      # sensitive events (IDs only)
+│   ├── ArcAttachmentValidator.cs              # content sniffing + env-level limits
+│   ├── CreateDraftEndpoint.cs  GetDraftEndpoint.cs  UpdateDraftEndpoint.cs  DeleteDraftEndpoint.cs
+│   ├── SubmitDraftEndpoint.cs
+│   ├── UploadDraftAttachmentEndpoint.cs  DeleteDraftAttachmentEndpoint.cs  DraftAttachmentUrlEndpoint.cs
+│   ├── MyApplicationsListEndpoint.cs  MyApplicationDetailEndpoint.cs  ApplicationAttachmentUrlEndpoint.cs
+│   ├── UploadReplyAttachmentEndpoint.cs  ReplyInfoRequestEndpoint.cs
+│   ├── WithdrawApplicationEndpoint.cs  ReviseApplicationEndpoint.cs
+│   └── ResidentArcModels.cs                   # DTOs + ResidentArcErrorCodes (no vote fields)
 ├── Features/Board/Architectural/
-│   ├── ArcQueries.cs                          # 027-owned; + default exclude Withdrawn, includeWithdrawn param
+│   ├── ApplicationsListEndpoint.cs            # 027-owned; + includeWithdrawn (default excludes Withdrawn)
+│   ├── ArcQueries.cs / ArcModels.cs           # 027-owned; Withdrawn decision mapping, info-reply fields in board detail
+│   ├── ArcEmailRenderer.cs                    # 027-owned; + OwnerSubmitted / arc_owner_submitted
 │   └── ArcApplicationFactory.cs               # 027-owned; reused (number, due date, snapshots, revision)
 ├── Features/Dashboard/DashboardService.cs     # + architecturalInfoRequested alert count
 ├── Infrastructure/Storage/IDocumentStorage.cs # 027-owned; + DeleteAsync
@@ -151,7 +150,7 @@ neko-hoa/src/app/
 
 | File | Region ID | Purpose |
 |------|-----------|---------|
-| `Features/Property/Architectural/ResidentArcService.cs` | `domain=resident-arc` | Draft lifecycle, submit, withdraw, revise, info reply |
+| `Features/Property/Architectural/ResidentArcDraftService.cs`, `ResidentArcSubmitService.cs` | `domain=resident-arc` | Draft lifecycle, revision drafts, submit via 027's factory |
 | `Features/Property/Architectural/ArcAttachmentValidator.cs` | `domain=resident-arc-uploads` | Content sniffing and env-level limit enforcement |
 | `Features/Property/Architectural/ResidentArcQueries.cs` | `domain=resident-arc` | Resident-safe projection (status map, no votes/comments) |
 | `Infrastructure/Configuration/ArcUploadOptions.cs` | `domain=configuration` | Environment-level attachment limits |

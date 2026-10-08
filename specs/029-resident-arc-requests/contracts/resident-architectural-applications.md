@@ -46,7 +46,7 @@ Upload one file (`multipart/form-data`, field `file`).
   2. Enforce the `ArcUploadOptions` limits. On a revision draft, the count and total include carried-over files.
   3. Upload to `arc/{communityId}/drafts/{draftId}/{guid}` and write an `ArchitecturalDraftAttachment` row with the sniffed content type.
 - **Response 201**: `{ id, fileName, sizeBytes, contentType }`.
-- **Errors**: 403 `FORBIDDEN`; 404 `NOT_FOUND`; 422 `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `ATTACHMENT_LIMIT_REACHED`.
+- **Errors**: 403 `FORBIDDEN`; 404 `NOT_FOUND`; 422 `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE`, `ATTACHMENT_LIMIT_REACHED`; 503 `STORAGE_UNAVAILABLE` when object storage fails (no row is written, so the upload can simply be retried).
 
 ### DELETE /property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}
 
@@ -170,6 +170,7 @@ Upload a reply attachment (`multipart/form-data`, field `file`) while the info r
   - 403 `FORBIDDEN`; 404 `NOT_FOUND`.
   - 409 `INFO_ALREADY_ANSWERED` or `APPLICATION_CLOSED`.
   - 422 `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE` or `ATTACHMENT_LIMIT_REACHED`.
+  - 503 `STORAGE_UNAVAILABLE` when object storage fails; nothing is written.
 
 ### POST /property/architectural-applications/{id}/info-requests/{infoRequestId}/reply
 
