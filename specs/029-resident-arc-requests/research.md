@@ -18,37 +18,37 @@ Each item records a decision, its rationale, and alternatives considered. Checke
 
 **Alternatives considered**: A new resident-scope resolver (rejected: the claim already encodes the scope and the `Features/Property` endpoints prove the pattern). Scoping "my requests" across *all* of a user's properties regardless of the active one (rejected: inconsistent with the rest of the resident app, which shows one active property; switching property re-scopes naturally).
 
-## R2. Shared model: extend 027's tables additively
+## R2. Shared model: extend 027's tables additively, never loosen them
 
-**Decision**: 027 creates `ArchitecturalApplication`, `ArchitecturalAttachment`, `ArchitecturalInfoRequest`, `ArchitecturalVote`, `CommunityArcSettings` and the `Arc*` enums. 029 adds one forward-only migration `<ts>_AddResidentArcSubmission` that extends them (full column list in [data-model.md](./data-model.md)):
+**Decision**: 027 (merged in #209, migration `20261007011110_AddArchitecturalReview`) owns `ArchitecturalApplication`, `ArchitecturalAttachment`, `ArchitecturalInfoRequest`, `ArchitecturalVote`, `CommunityArcSettings` and the `Arc*` enums. 029's migration `<ts>_AddResidentArcSubmission` only **adds nullable columns** to them (resident fields, `AcknowledgedAt`, withdrawal stamps, info-reply fields, `InfoRequestId`/`UploadedByUserId` on attachments) and one enum value (`ArcOutcome.Withdrawn`). It changes no existing column's nullability and no 027 index. `ArcNewApplication` gains optional trailing parameters so 027's callers and seeder compile unchanged. Full list in [data-model.md](./data-model.md).
 
-- `ArchitecturalApplication`: resident-authored fields (`PlannedStartDate`, `PlannedCompletionDate`, `ContractorName`, `ContractorContact`, `AcknowledgedNoWorkUntilApproved`), withdrawal stamps (`WithdrawnAt`, `WithdrawnByUserId`), and `ReceivedDate`/`DueDate` made **nullable** (null while Draft).
-- `ArchitecturalInfoRequest`: `ResponseMessage`, `RespondedByUserId` (027 already has `RespondedAt`, which 029 sets on reply).
-- `ArchitecturalAttachment`: `InfoRequestId?` (tags a reply attachment) and `UploadedByUserId?`.
-- Enum string values: `ArcApplicationStatus.Draft`, `ArcOutcome.Withdrawn` (stored as strings — no DB enum type to alter).
+**Rationale**: The merged code reads `ApplicationNumber`, `ReceivedDate` and `DueDate` as non-null in the list/detail queries, the sweep, the email renderer and the seeder. Loosening them would ripple through every 027 read path and its tests; adding nullable columns ripples through none.
 
-**Rationale**: The issue and 027's plan both commit to one shared model, with whichever spec lands first introducing the tables. 027 is fully implemented, so 029 extends. Additive, nullable columns are safe on existing (seeded) rows and keep 027's board reads working unchanged.
+**Alternatives considered**: Making `ApplicationNumber`/`ReceivedDate`/`DueDate` nullable for drafts (rejected after 027 merged: touches every 027 query, the unique index and the sweep). Parallel resident tables for submitted requests (rejected: forks the entity the board reads and breaks the `ARC-<n>`/revision lineage).
 
-**Alternatives considered**: Parallel resident-only tables (rejected: forks the entity the board reads, breaks the single `ARC-<n>`/revision lineage, and duplicates the attachment model). A `ResidentArcDraft` side table merged at submission (rejected: duplicates the whole application shape for no gain; nullable dates are simpler).
+## R3. Drafts live in their own table; submit calls 027's factory
 
-## R3. Drafts and number/date allocation
+**Decision**: Drafts are rows in a new `ArchitecturalApplicationDrafts` table (plus `ArchitecturalDraftAttachments`). A draft holds exactly the fields of the factory's `ArcNewApplication` input plus the resident extras, so:
 
-**Decision**: A draft is an `ArchitecturalApplication` row with `Status = Draft`, `Revision = 1`, no `ApplicationNumber` yet (allocated at submission), and null `ReceivedDate`/`DueDate`. Drafts are editable and deletable, are filtered out of every board query (027 lists `Open`/`DecisionReached`/`Closed`, never `Draft`), and are the resident's own.
+- **Submit (new request)** → `ArcApplicationFactory.CreateFromSettingsAsync(input)`, which already allocates `ApplicationNumber` atomically from `CommunityArcSettings.NextApplicationNumber` (`UPDATE … +1 … RETURNING`, starting at 1001), computes `DueDate` from the community review period and snapshots the decision rule, lapse rule and time zone.
+- **Revise and resubmit** → `POST …/{id}/revise` creates a draft with `PreviousRevisionId`; submitting it calls `ArcApplicationFactory.CreateRevisionAsync(previousId, input, removedCarriedAttachmentIds)`, which already enforces "closed + denied, no newer revision" (`REVISION_NOT_ALLOWED`), carries attachments over on shared keys and links the revision.
+- The draft rows are deleted in the same transaction as the submit; the uploaded objects stay, referenced by the new `ArchitecturalAttachment` rows (same keys).
+- `ReceivedDate` is "today" in the community's ARC time zone (from `CommunityArcSettings.TimeZoneId`), matching how 027 reasons about due dates (027 R7).
 
-On **submit**, 029 calls 027's `ArcApplicationFactory`: it allocates `ApplicationNumber` atomically from `CommunityArcSettings.NextApplicationNumber` (`UPDATE … +1 … RETURNING`, starting at 1001), sets `ReceivedDate = today`, `DueDate = ReceivedDate + ReviewPeriodDays`, and snapshots `DecisionRule`/`LapseRule`/`TimeZoneId`, then flips `Status → Open` and sets `SubmittedByUserId` + the `OwnerName` snapshot. If the factory's submission path does not already exist (027 built it for the *revision* case and seeding), 029 adds a `SubmitFromDraft` method on the factory so the allocation logic stays in one place.
+Drafts never appear in any board query (they aren't in `ArchitecturalApplications`), cost no `ARC-` number, and can be edited and deleted freely.
 
-**Rationale**: Keeping number/date/snapshot allocation inside the single factory (027 R3) preserves the race-free guarantee (SC-002) and the one-source-of-truth for the `ARC-<n>`/revision invariants.
+**Rationale**: The merged factory has no draft state and creates rows directly as `Open`. A draft table that feeds it reuses all of its tested allocation, snapshot and revision logic with zero changes to 027's invariants. Draft-only attachment rows keep the "delete a draft → delete its objects" rule (FR-014) from ever touching application attachments.
 
-**Alternatives considered**: Allocating the number at draft creation (rejected: drafts may never be submitted, leaving gaps and leaking a community-visible counter). `MAX()+1` at submit (rejected: races, as 027 R3 found).
+**Alternatives considered**: A `Draft` status on `ArchitecturalApplication` (rejected after 027 merged: needs nullable number/dates and a filtered unique index, and every board query would have to exclude it). Allocating the number at draft creation (rejected: drafts may never be submitted).
 
 ## R4. Attachments: content validation, env-level limits, private storage
 
 **Decision**:
-- **Allowed types**: PDF, JPG, PNG, HEIC. Validation is by **content**, not extension: an `ArcAttachmentValidator` sniffs magic bytes — `%PDF` (PDF), `FF D8 FF` (JPEG), `89 50 4E 47` (PNG), and the ISO-BMFF `ftyp` box with a `heic`/`heix`/`mif1`/`heif` brand (HEIC). A declared content-type/extension that disagrees with the sniffed type is rejected (`VALIDATION_ERROR`).
+- **Allowed types**: PDF, JPG, PNG, HEIC. Validation is by **content**, not extension: an `ArcAttachmentValidator` sniffs magic bytes and returns the canonical content type — `%PDF-` (PDF), `FF D8 FF` (JPEG), `89 50 4E 47` (PNG), and the ISO-BMFF `ftyp` box with a `heic`/`heix`/`mif1`/`heif` brand (HEIC). The stored `ContentType` is the sniffed type, never the client's declared one; anything that doesn't sniff as an allowed type is rejected (`UNSUPPORTED_FILE_TYPE`), whatever its extension.
 - **Limits** are environment-level via a validated `ArcUploadOptions` (section `Architectural:Uploads`), defaulting to 50 MB/file, 20 files/application, 250 MB total/application, registered with the existing `AddValidatedOptions` + FluentValidation `ValidateOnStart` pattern (`Infrastructure/Configuration`). Per-file size is checked from the stream length; count and total are checked against existing attachments on the application in the same transaction.
-- **Storage**: bytes go through `IDocumentStorage.UploadAsync` to R2/MinIO. Submitted-application objects use 027's `arc/{communityId}/{applicationNumber}/{guid}` key; draft objects (no number yet) use `arc/{communityId}/draft/{applicationId}/{guid}` and are re-keyed or left in place at submission (left in place — the stored key is authoritative; no object copy needed, the metadata row keeps whatever key was written). Metadata rows are `ArchitecturalAttachment`.
+- **Storage**: bytes go through `IDocumentStorage.UploadAsync` to R2/MinIO. Draft uploads go to `arc/{communityId}/drafts/{draftId}/{guid}` (`ArchitecturalDraftAttachment` rows) and keep that key after submit (the new `ArchitecturalAttachment` row points at it — no object copy). Info-reply uploads on a submitted application go to 027's `arc/{communityId}/{applicationNumber}/{guid}`.
 - **Serving**: only via `GET …/attachments/{id}/url` → `IDocumentStorage.GetPreSignedUrlAsync` (5-min expiry, within the 15-min cap). No durable URLs in any list/detail response.
-- **Deletion**: deleting a draft (or removing a carried-over attachment on a revision draft) deletes the object via a new `IDocumentStorage.DeleteAsync`, but **only** when no other `ArchitecturalAttachment` row references the same `StorageKey` (revisions share keys per 027 R8).
+- **Deletion**: deleting a draft or one of its uploads deletes the object via a new `IDocumentStorage.DeleteAsync`. Only draft-owned keys (`…/drafts/{draftId}/…`) are ever deleted; removing a carried-over attachment on a revision draft just records its ID in `RemovedCarriedAttachmentIds` — the earlier revision keeps its object (027 R8).
 
 **Rationale**: Content sniffing is the spec's explicit requirement (FR-010) and the only defense against a renamed executable. Env-level limits (the user's clarification) keep upload cost a deployment concern, not a per-community governing-document concern. Reusing `IDocumentStorage` keeps the private-link guarantee intact.
 
@@ -56,7 +56,7 @@ On **submit**, 029 calls 027's `ArcApplicationFactory`: it allocates `Applicatio
 
 ## R5. Withdraw representation and the board "show withdrawn" filter
 
-**Decision**: Withdrawing an undecided `Open` application sets `Status = Closed`, `DecisionOutcome = Withdrawn`, `WithdrawnAt`, `WithdrawnByUserId`, and `ClosedAt` — a resident-initiated close that bypasses `DecisionReached` and the manager outcome path, and enqueues **no** email. The board's list query (`ArcQueries`/`ApplicationsListEndpoint`) gets an additive, backward-compatible `includeWithdrawn` (default `false`): the default `closed` tab filters `DecisionOutcome != 'Withdrawn'`, and `includeWithdrawn=true` includes them. The resident projection maps this state to "Withdrawn".
+**Decision**: Withdrawing an undecided `Open` application (under 027's `ArcLocks` row lock, so it can't race a deciding vote) sets `Status = Closed`, `DecisionOutcome = Withdrawn`, `WithdrawnAt`, `WithdrawnByUserId`, `ClosedAt`, and `ClosedByUserId` — a resident-initiated close that bypasses `DecisionReached` and the manager outcome path, and enqueues **no** email. The board's list query (`ArcQueries`/`ApplicationsListEndpoint`) gets an additive, backward-compatible `includeWithdrawn` (default `false`): the default `closed` tab filters `DecisionOutcome != 'Withdrawn'`, and `includeWithdrawn=true` includes them. The resident projection maps this state to "Withdrawn".
 
 **Rationale**: Matches the spec's "moves to Closed with outcome withdrawn" wording and the 2026-10-08 clarification (hidden from the board by default, opt-in filter, record retained). Representing it as an outcome rather than a new status touches the fewest 027 read paths — only the one list filter — and withdraw never triggers 027's outcome-email code because that path requires `DecisionReached` and is manager-only.
 

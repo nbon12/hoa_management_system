@@ -15,13 +15,13 @@ The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` 
 
 **Primary Dependencies**: All existing — FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity/JWT, `IDocumentStorage` (R2/MinIO), `OutboxMessage` + `OutboxDispatcher` + `SesEmailProvider`, `Microsoft.AspNetCore.RateLimiting`, Serilog, FluentValidation via `AddValidatedOptions`; Angular standalone components + signals, existing `AuthService` active-property claim. From 027 (shared, lands first): `ArchitecturalApplication` et al., `ArcApplicationFactory`, `Arc*` enums. **No new packages.**
 
-**Storage**: PostgreSQL (Neon prod; Testcontainers CI/local). No new tables — one additive forward-only migration `<ts>_AddResidentArcSubmission` that extends 027's tables:
-- `ArchitecturalApplications`: + `PlannedStartDate date?`, `PlannedCompletionDate date?`, `ContractorName varchar(200)?`, `ContractorContact varchar(200)?`, `AcknowledgedNoWorkUntilApproved bool`, `WithdrawnAt timestamptz?`, `WithdrawnByUserId text?`; make `ReceivedDate`/`DueDate` nullable (null while Draft).
-- `ArchitecturalInfoRequests`: + `ResponseMessage varchar(2000)?`, `RespondedByUserId text?` (027 already has `RespondedAt`).
-- `ArchitecturalAttachments`: + `InfoRequestId uuid?` (FK → info request; set for reply attachments), `UploadedByUserId text?`.
-- Enum string values: `ArcApplicationStatus` + `Draft`; `ArcOutcome` + `Withdrawn` (stored as strings, so no DB enum change).
-- `OutboxMessages.Kind`: new value `arc_owner_submitted` (18 chars, within the 30-char limit).
-- Attachment objects live under `arc/{communityId}/{applicationNumber}/{guid}` (draft objects use a `draft/{applicationId}` prefix until a number is allocated at submission).
+**Storage**: PostgreSQL (Neon prod; Testcontainers CI/local). One additive forward-only migration `<ts>_AddResidentArcSubmission`:
+- New tables: `ArchitecturalApplicationDrafts`, `ArchitecturalDraftAttachments` (drafts never touch 027's tables — research R3).
+- `ArchitecturalApplications` (027): + nullable `PlannedStartDate`, `PlannedCompletionDate`, `ContractorName`, `ContractorContact`, `AcknowledgedAt`, `WithdrawnAt`, `WithdrawnByUserId`. No nullability or index changes.
+- `ArchitecturalInfoRequests` (027): + `ResponseMessage`, `RespondedByUserId` (027 already has `RespondedAt`).
+- `ArchitecturalAttachments` (027): + `InfoRequestId?`, `UploadedByUserId?`.
+- Enum string value `ArcOutcome.Withdrawn`; outbox kind `arc_owner_submitted`.
+- Objects: drafts under `arc/{communityId}/drafts/{draftId}/{guid}` (kept after submit), reply attachments under 027's `arc/{communityId}/{applicationNumber}/{guid}`.
 
 **Testing**: Backend xUnit + Testcontainers (PostgreSQL + MinIO), one integration class per user story, `[Theory]` over attachment-type/size/count boundaries, content-sniffing unit tests, Serilog `LogSink` for sensitive events, outbox assertions on the `arc_owner_submitted` kind/recipient. Frontend Karma/Jasmine, Angular Testing Library, Playwright (real upload + non-owner refusal), Cypress (submit→track journey), Storybook.
 
@@ -39,7 +39,7 @@ The feature reuses 027's `ArchitecturalApplication` / `ArchitecturalAttachment` 
 - Submission-confirmation and all state changes enqueue outbox rows in the same transaction (exactly-once via DedupKey), dispatched after commit.
 - Withdrawn requests excluded from the board's default Closed view; surfaced only via an opt-in `includeWithdrawn` filter.
 
-**Scale/Scope**: Hundreds of applications per community per year; a resident typically has a handful. ~11 resident endpoints; 1 additive migration; 1 new backend subfolder (`Features/Property/Architectural/`); 1 new frontend feature folder (`features/property/architectural/`), 1 service, 3 routes, 1 nav entry; a dashboard-alert addition; small additive edits to four 027-owned files (list query, `IDocumentStorage`, `OutboxMessage` kind, email renderer).
+**Scale/Scope**: Hundreds of applications per community per year; a resident typically has a handful. 15 resident endpoints (8 draft, 7 application); 2 new tables + 1 additive migration; 1 new backend subfolder (`Features/Property/Architectural/`); 1 new frontend feature folder (`features/property/architectural/`), 1 service, 3 routes, 1 nav entry; a dashboard-alert addition; small additive edits to four 027-owned files (list query, `IDocumentStorage`, `OutboxMessage` kind, email renderer).
 
 ## Constitution Check
 
@@ -81,10 +81,12 @@ specs/029-resident-arc-requests/
 HOAManagementCompany/
 ├── Domain/
 │   ├── Entities/
-│   │   ├── ArchitecturalApplication.cs        # 027-owned; + resident fields, Draft/Withdrawn
+│   │   ├── ArchitecturalApplication.cs        # 027-owned; + nullable resident fields, withdrawal stamps
+│   │   ├── ArchitecturalApplicationDraft.cs   # new
+│   │   ├── ArchitecturalDraftAttachment.cs    # new
 │   │   ├── ArchitecturalAttachment.cs         # 027-owned; + InfoRequestId, UploadedByUserId
 │   │   ├── ArchitecturalInfoRequest.cs        # 027-owned; + ResponseMessage, RespondedByUserId
-│   │   └── Enums/ArcApplicationStatus.cs, ArcOutcome.cs   # 027-owned; + Draft / + Withdrawn
+│   │   └── Enums/ArcOutcome.cs                # 027-owned; + Withdrawn
 │   └── Entities/OutboxMessage.cs              # 027-owned; + arc_owner_submitted kind
 ├── Features/Property/Architectural/           # new (resident ARC slice)
 │   ├── ResidentArcService.cs                  # draft CRUD, submit, withdraw, revise, reply
@@ -176,7 +178,7 @@ No constitution violations. Four additive touches to 027-owned code and one new 
 | Choice | Why needed | Simpler alternative rejected because |
 |--------|------------|--------------------------------------|
 | Extend 027's `ArchitecturalApplication`/`InfoRequest`/`Attachment` + enums rather than new tables | The spec mandates one shared model with 027 (issue + 027 plan §independence) | Parallel resident tables would fork the entity the board reads and break the single `ARC-<n>`/revision lineage |
-| Make `ReceivedDate`/`DueDate` nullable + add `Draft` status | Drafts exist before a number/dates are allocated at submission | A separate draft table duplicates the application shape and the submit step would have to copy every field |
+| Separate `ArchitecturalApplicationDrafts` table instead of a `Draft` status | Merged 027 code treats number/dates as non-null everywhere and its factory only creates `Open` rows | A `Draft` status would loosen 027's columns and unique index and force every board query, the sweep and the seeder to exclude drafts |
 | Represent withdraw as `Closed` + `ArcOutcome.Withdrawn` and filter it out of the board's default Closed list (`includeWithdrawn` opt-in) | Clarification 2026-10-08: keep the record but hide it from the board by default | A standalone `Withdrawn` status would touch more 027 read paths; hard-deleting withdrawn rows loses the resident's history |
-| Add `IDocumentStorage.DeleteAsync` | Deleting a draft must not orphan uploaded objects (FR-014) | 027 deletes nothing; leaving objects behind violates FR-014 and grows storage |
+| Add `IDocumentStorage.DeleteAsync` | Deleting a draft must not orphan its uploaded objects (FR-014); only draft-owned keys are ever deleted | 027 deletes nothing; leaving objects behind violates FR-014 |
 | Add `arc_owner_submitted` outbox kind + `resident-writes` rate policy | Confirmation email reuses the exactly-once outbox; resident writes need a limit like `board-writes` | A direct SES call could send on a rolled-back submission; reusing `payments` conflates budgets |
