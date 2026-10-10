@@ -2,7 +2,10 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "types": ["cypress", "node"],
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+    // The app tsconfig uses "bundler" resolution (Angular 20+); Cypress's ts-node loader forces
+    // CommonJS, which TypeScript 5.x rejects alongside "bundler" (TS5095). Specs need nothing more.
+    "moduleResolution": "node"
   },
   "include": ["**/*.ts", "../cypress.config.ts"]
 }

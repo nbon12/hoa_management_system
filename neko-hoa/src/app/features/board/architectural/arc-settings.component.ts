@@ -76,7 +76,7 @@ export class ArcSettingsComponent {
     effect(() => {
       const cid = this.ctx.communityId();
       if (cid) untracked(() => void this.load(cid));
-    }, { allowSignalWrites: true });
+    });
   }
 
   private async load(cid: string): Promise<void> {
