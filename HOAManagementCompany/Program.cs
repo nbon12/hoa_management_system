@@ -197,6 +197,8 @@ builder.Services.AddValidatedOptions<ObservabilityOptions, ObservabilityOptionsV
     builder.Configuration, ObservabilityOptions.SectionName);
 builder.Services.AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsValidator>(
     builder.Configuration, RateLimitingOptions.SectionName);
+builder.Services.AddValidatedOptions<ArcUploadOptions, ArcUploadOptionsValidator>(
+    builder.Configuration, ArcUploadOptions.SectionName);
 // DevTools toggles are config-gated (not host-name-gated) so they evaluate correctly in the deployed
 // `Dev` environment; defaults derive from IsDevLike(env) and are forced off in Production (014 US3).
 builder.Services.AddValidatedOptions<DevToolsOptions, DevToolsOptionsValidator>(
@@ -278,6 +280,17 @@ builder.Services.AddRateLimiter(o =>
             partitionKey => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = PermitsFor(partitionKey, rateLimitingOptions.BoardWritesPermitsPerMinute, rateLimitingOptions),
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    // Resident architectural-request writes (029 research R9): drafts, uploads, submit, reply,
+    // withdraw and revise are user-generated content, partitioned per authenticated user.
+    o.AddPolicy("resident-writes", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ClientIdentityResolver.ResolvePaymentsPartition(httpContext),
+            partitionKey => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = PermitsFor(partitionKey, rateLimitingOptions.ResidentWritesPermitsPerMinute, rateLimitingOptions),
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -417,6 +430,15 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.Arc
 builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.ArcSweepService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Board.Architectural.IArcNotificationPreferences,
     HOAManagementCompany.Features.Board.Architectural.AllowAllArcNotificationPreferences>();
+
+// Resident architectural submission (029): drafts, submit, reads and actions, all scoped to the
+// caller's active property by ResidentArcScope.
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcScope>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ArcAttachmentValidator>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcDraftService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcSubmitService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcQueries>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcActionsService>();
 
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();

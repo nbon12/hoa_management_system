@@ -212,4 +212,31 @@ public class ApplicationsListEndpointTests(TestDatabaseFixture fixture) : ArcTes
 
         Assert.Empty((await ListAsync(s.CommunityId, "?awaitingMyVote=true")).Items);
     }
+
+    // 029 T055 (Clarifications 2026-10-08): resident-withdrawn applications are hidden from the closed tab and its
+    // count by default, and shown with includeWithdrawn=true; non-withdrawn closed rows are unaffected.
+    [Fact]
+    public async Task ClosedTab_HidesWithdrawnByDefault_AndShowsThemWithIncludeWithdrawn()
+    {
+        var s = await CreateScenarioAsync(3);
+        var approved = await CreateApplicationAsync(s, new AppSpec { Status = ArcApplicationStatus.Closed, Outcome = ArcOutcome.Approved });
+        var denied = await CreateApplicationAsync(s, new AppSpec { Status = ArcApplicationStatus.Closed, Outcome = ArcOutcome.Denied, Wording = ArcDenialWording.Denied });
+        var withdrawn = await CreateApplicationAsync(s, new AppSpec { Status = ArcApplicationStatus.Closed, Outcome = ArcOutcome.Withdrawn });
+        var open = await CreateApplicationAsync(s);
+        await LoginAsAsync(s.Board[0]);
+
+        var closedDefault = await ListAsync(s.CommunityId, "?status=closed");
+        var closedAll = await ListAsync(s.CommunityId, "?status=closed&includeWithdrawn=true");
+        var openTab = await ListAsync(s.CommunityId);
+
+        Assert.Equal(new[] { approved, denied }.OrderBy(x => x), closedDefault.Items.Select(i => i.Id).OrderBy(x => x));
+        Assert.Equal(2, closedDefault.Counts.Closed);
+        Assert.Equal(new[] { approved, denied, withdrawn }.OrderBy(x => x), closedAll.Items.Select(i => i.Id).OrderBy(x => x));
+        Assert.Equal(3, closedAll.Counts.Closed);
+        var item = closedAll.Items.Single(i => i.Id == withdrawn);
+        Assert.Equal("Withdrawn", item.Decision!.Outcome);
+        Assert.Null(item.Decision.Source);
+        Assert.Equal(open, Assert.Single(openTab.Items).Id);
+        Assert.Equal(1, openTab.Counts.Open);
+    }
 }

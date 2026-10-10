@@ -42,6 +42,17 @@ public class ArchitecturalApplication
     public DateTimeOffset? ClosedAt { get; set; }
     public string? ClosedByUserId { get; set; }
 
+    // Resident-authored fields (029). Null on rows created before 029 or by the seeder.
+    public DateOnly? PlannedStartDate { get; set; }
+    public DateOnly? PlannedCompletionDate { get; set; }
+    public string? ContractorName { get; set; }
+    public string? ContractorContact { get; set; }
+    public DateTimeOffset? AcknowledgedAt { get; set; }
+
+    // Resident withdrawal (029): Closed with DecisionOutcome = Withdrawn.
+    public DateTimeOffset? WithdrawnAt { get; set; }
+    public string? WithdrawnByUserId { get; set; }
+
     // Sweep idempotency stamps (027 research R6).
     public DateTimeOffset? ReminderSentAt { get; set; }
     public DateTimeOffset? LapseProcessedAt { get; set; }

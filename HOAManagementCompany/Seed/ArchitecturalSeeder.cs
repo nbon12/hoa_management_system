@@ -22,6 +22,7 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
     private const string BoardEmail = "board@nekohoa.dev";
     private const string ManagerEmail = "manager@nekohoa.dev";
     private const string RegistrationAccount = "SAKURA-003";
+    private const string ResidentEmail = "resident@nekohoa.dev";
 
     private static readonly (string Email, string First, string Last)[] ExtraBoard =
     [
@@ -56,7 +57,11 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
             boardIds.Add(await EnsureUserWithRoleAsync(community.Id, homeProperty.Value, email, first, last, CommunityRole.BoardMember, ct));
         await EnsureUserWithRoleAsync(community.Id, homeProperty.Value, ManagerEmail, "Morgan", "Manager", CommunityRole.CommunityManager, ct);
 
-        if (await db.ArchitecturalApplications.AnyAsync(a => a.CommunityId == community.Id, ct))
+        // Independent of the board demo below, so it also lands on dev databases seeded before 029.
+        await EnsureResidentDemoAsync(boardUser.Id, ct);
+
+        if (await db.ArchitecturalApplications.AnyAsync(a => a.CommunityId == community.Id
+                                                             && a.SubmittedByUserId == null, ct))
             return;
 
         // Properties the board user isn't linked to (so they aren't recused) and that aren't the
@@ -120,6 +125,51 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
         settings.NextApplicationNumber = Math.Max(settings.NextApplicationNumber, 1043);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded architectural applications for {Community}.", CommunityName);
+    }
+
+    /// <summary>
+    /// 029 quickstart demo for resident@nekohoa.dev's own property: one open request with an unanswered
+    /// board question (dashboard alert + reply flow) and one denied request (revise and resubmit).
+    /// Idempotent: skipped once the resident has any submitted request.
+    /// </summary>
+    private async Task EnsureResidentDemoAsync(string boardUserId, CancellationToken ct)
+    {
+        var resident = await db.Users.FirstOrDefaultAsync(u => u.Email == ResidentEmail, ct);
+        if (resident is null)
+            return;
+        var propertyId = await db.UserProperties.Where(up => up.UserId == resident.Id)
+            .Select(up => (Guid?)up.PropertyId).FirstOrDefaultAsync(ct);
+        if (propertyId is null
+            || await db.ArchitecturalApplications.AnyAsync(a => a.SubmittedByUserId == resident.Id, ct))
+            return;
+
+        var factory = services.GetRequiredService<ArcApplicationFactory>();
+        var managerId = await db.Users.Where(u => u.Email == ManagerEmail).Select(u => u.Id).FirstAsync(ct);
+        var ownerName = await db.Owners.Where(o => o.PropertyId == propertyId)
+            .Select(o => o.FirstName + " " + o.LastName).FirstOrDefaultAsync(ct)
+            ?? $"{resident.FirstName} {resident.LastName}";
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+
+        var open = await factory.CreateFromSettingsAsync(new ArcNewApplication(
+            propertyId.Value, ownerName, ArcProjectType.Landscaping, "Front-yard xeriscape",
+            "Replace the front lawn with drought-tolerant beds and a gravel path.", today.AddDays(-6), resident.Id, [],
+            PlannedStartDate: today.AddDays(20), PlannedCompletionDate: today.AddDays(35), AcknowledgedAt: now.AddDays(-6)), ct);
+        db.ArchitecturalInfoRequests.Add(new ArchitecturalInfoRequest
+        {
+            ApplicationId = open.Id, RequestedByUserId = boardUserId, RequestedAt = now.AddDays(-2),
+            Message = "Please attach a planting plan showing plant species and spacing."
+        });
+
+        var denied = await factory.CreateFromSettingsAsync(new ArcNewApplication(
+            propertyId.Value, ownerName, ArcProjectType.WindowsDoors, "Front door replacement — red fiberglass",
+            "Replace the front door with a red fiberglass door.", today.AddDays(-40), resident.Id, [],
+            PlannedStartDate: today.AddDays(-10), PlannedCompletionDate: today.AddDays(-5), AcknowledgedAt: now.AddDays(-40)), ct);
+        Close(denied, ArcOutcome.Denied, ArcDenialWording.RevisionsRequested,
+            "Choose a door color from the approved palette (Guideline 7.2).", managerId, today.AddDays(-25));
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seeded resident architectural demo requests.");
     }
 
     private async Task<ArchitecturalApplication> CreateAsync(

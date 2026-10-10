@@ -43,6 +43,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ArchitecturalAttachment> ArchitecturalAttachments => Set<ArchitecturalAttachment>();
     public DbSet<ArchitecturalVote> ArchitecturalVotes => Set<ArchitecturalVote>();
     public DbSet<ArchitecturalInfoRequest> ArchitecturalInfoRequests => Set<ArchitecturalInfoRequest>();
+    public DbSet<ArchitecturalApplicationDraft> ArchitecturalApplicationDrafts => Set<ArchitecturalApplicationDraft>();
+    public DbSet<ArchitecturalDraftAttachment> ArchitecturalDraftAttachments => Set<ArchitecturalDraftAttachment>();
 
     // Payments (006-stripe-payments).
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
@@ -466,6 +468,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasForeignKey(x => x.SubmittedByUserId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne<ApplicationUser>().WithMany()
                 .HasForeignKey(x => x.ClosedByUserId).OnDelete(DeleteBehavior.SetNull);
+            // Resident submission (029): nullable additions only.
+            e.Property(x => x.ContractorName).HasMaxLength(200);
+            e.Property(x => x.ContractorContact).HasMaxLength(200);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.WithdrawnByUserId).OnDelete(DeleteBehavior.SetNull);
             e.ToTable("ArchitecturalApplications", t =>
             {
                 t.HasCheckConstraint("CK_ArchitecturalApplications_Revision", "\"Revision\" >= 1");
@@ -484,6 +491,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(x => x.StorageKey).HasMaxLength(500);
             e.HasOne(x => x.Application).WithMany(a => a.Attachments)
                 .HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ArchitecturalInfoRequest>().WithMany()
+                .HasForeignKey(x => x.InfoRequestId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.SetNull);
             e.ToTable("ArchitecturalAttachments");
         });
 
@@ -508,7 +519,47 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.RequestedBy).WithMany()
                 .HasForeignKey(x => x.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.ResponseMessage).HasMaxLength(2000);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.RespondedByUserId).OnDelete(DeleteBehavior.SetNull);
             e.ToTable("ArchitecturalInfoRequests");
+        });
+
+        // ── Resident architectural submission (029-resident-arc-requests) ───
+        builder.Entity<ArchitecturalApplicationDraft>(e =>
+        {
+            e.HasIndex(x => x.PropertyId);
+            // One open revise-and-resubmit draft per denied revision.
+            e.HasIndex(x => x.PreviousRevisionId).IsUnique().HasFilter("\"PreviousRevisionId\" IS NOT NULL");
+            e.Property(x => x.ProjectType).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.ProjectTitle).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(4000);
+            e.Property(x => x.ContractorName).HasMaxLength(200);
+            e.Property(x => x.ContractorContact).HasMaxLength(200);
+            e.HasOne<Community>().WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Property).WithMany()
+                .HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.PreviousRevision).WithMany()
+                .HasForeignKey(x => x.PreviousRevisionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.ToTable("ArchitecturalApplicationDrafts", t =>
+                t.HasCheckConstraint("CK_ArchitecturalApplicationDrafts_PlannedDates",
+                    "\"PlannedCompletionDate\" IS NULL OR \"PlannedStartDate\" IS NULL OR \"PlannedCompletionDate\" >= \"PlannedStartDate\""));
+        });
+
+        builder.Entity<ArchitecturalDraftAttachment>(e =>
+        {
+            e.HasIndex(x => x.DraftId);
+            e.Property(x => x.FileName).HasMaxLength(255);
+            e.Property(x => x.ContentType).HasMaxLength(100);
+            e.Property(x => x.StorageKey).HasMaxLength(500);
+            e.HasOne(x => x.Draft).WithMany(d => d.Attachments)
+                .HasForeignKey(x => x.DraftId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.ToTable("ArchitecturalDraftAttachments");
         });
     }
 }

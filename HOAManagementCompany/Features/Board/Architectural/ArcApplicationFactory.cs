@@ -16,7 +16,13 @@ public sealed record ArcNewApplication(
     string Description,
     DateOnly ReceivedDate,
     string? SubmittedByUserId,
-    IReadOnlyList<ArcNewAttachment> Attachments);
+    IReadOnlyList<ArcNewAttachment> Attachments,
+    // Resident-authored fields (029). Optional so 027 callers and the seeder are unchanged.
+    DateOnly? PlannedStartDate = null,
+    DateOnly? PlannedCompletionDate = null,
+    string? ContractorName = null,
+    string? ContractorContact = null,
+    DateTimeOffset? AcknowledgedAt = null);
 
 /// <summary>
 /// Creates architectural application rows (027 T063): allocates the community's next ARC number
@@ -128,6 +134,11 @@ public sealed class ArcApplicationFactory(ApplicationDbContext db)
             ProjectType = input.ProjectType,
             ProjectTitle = input.ProjectTitle,
             Description = input.Description,
+            PlannedStartDate = input.PlannedStartDate,
+            PlannedCompletionDate = input.PlannedCompletionDate,
+            ContractorName = input.ContractorName,
+            ContractorContact = input.ContractorContact,
+            AcknowledgedAt = input.AcknowledgedAt,
             ReceivedDate = input.ReceivedDate,
             DueDate = input.ReceivedDate.AddDays(settings.ReviewPeriodDays),
             DecisionRule = settings.DecisionRule,
