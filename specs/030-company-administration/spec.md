@@ -11,7 +11,11 @@ Today a community can only be created by seed data. The Community Manager role (
 
 This spec adds the **Company Administrator**. This is a business role held by staff of the HOA management company, such as an owner, operations lead or portfolio manager. It is **not** an application or platform administrator. It never touches infrastructure, deployments, feature flags, secrets, other companies' data or the database. Everything it does is ordinary business setup through the product.
 
-This spec also widens what a **Community Manager** can do: add a new community (becoming its first manager), and appoint co-managers (owner clarification, 2026-10-08).
+This spec also widens what a **Community Manager** can do (owner clarifications, 2026-10-08 and 2026-10-10):
+
+- add a new community, becoming its first manager;
+- appoint and remove co-managers;
+- invite residents to a property by email, and remove them.
 
 There is one management company per deployment for now. The data model must not prevent several companies later.
 
@@ -23,6 +27,7 @@ Verified against `main` at commit `21e2491` (spec 027 merged):
 - **The community-scope resolver denies everything in a non-Active community.** `CommunityScopeResolver` returns deny for any community whose status is not `Active`, whatever the caller's membership. Its capabilities are `ViewAssociationData`, `ManageMemberships`, `ViewArchitecturalApplications`, `VoteArchitecturalApplications` and `ManageArchitecturalReview`. There is no company-level capability.
 - **Membership admin is manager-only.** The 025 membership create, update and list endpoints need `ManageMemberships`, which only a Community Manager has. A manager can already grant any non-Resident role in their community, including another Community Manager. Update refuses to leave a community with zero active managers (`LAST_MANAGER`). Creating a `Resident` membership is refused; residents reach their homes through `UserProperty` and the property claim codes from spec 016.
 - **There is no invitation mechanism.** A membership can only be granted to a user who already has an account.
+- **Residents link themselves to a home.** A resident reaches a property through a `UserProperty` link. Today the only way to create one is for the resident to redeem a single-use property claim code (spec 016), delivered to the owner's contact on file. A manager has no way to add or remove a resident.
 - **ARC settings are per community** (spec 027, `CommunityArcSettings`): review period, lapse rule, decision rule, reminder days, time zone and formal disapproval statement. They are created from hard-coded defaults and edited at `board/arc-settings` by a Community Manager only.
 - **Residents have recurring payments (autopay)** (spec 006, `RecurringPayment`) and vote in **community polls** (`Poll`, `PollVote`).
 - **There is no company entity and no company-level role.** Nothing models the management company or anyone who works across communities.
@@ -32,12 +37,17 @@ Verified against `main` at commit `21e2491` (spec 027 merged):
 ### Session 2026-10-08 (owner comment on issue #213)
 
 - Q: How do the existing roles combine? → A: A Board Member can also be a Community Manager. A Community Manager does not need to be a Board Member or a resident. A Board Member does not need to be a Community Manager. (This matches the spec 025 rule that a user's capability in a community is the union of their active roles.)
-- Q: What do Community Managers do? → A: Community Managers create resident accounts, add communities, add or remove residents, and can restrict resident rights such as voting. → This spec lets a Community Manager **add a community** (US1), which replaces the draft's "manager cannot create communities". Resident accounts and resident rights are an open scope question; see FR-024.
+- Q: What do Community Managers do? → A: Community Managers create resident accounts, add communities, add or remove residents, and can restrict resident rights such as voting. → This spec lets a Community Manager **add a community** (US1), which replaces the draft's "manager cannot create communities". For resident accounts and resident rights, see Session 2026-10-10.
 - Q: Should a new community start as Onboarding or go straight to Active? → A: A new community starts as **Onboarding**, hidden from residents until a Company Administrator marks it Active.
 - Q: Can a Community Manager appoint co-managers? → A: **Yes.** A Community Manager may appoint co-managers in their own community.
 - Q: How long do invitations last? → A: **3 days.** (Who may resend was not answered. This spec lets anyone who could make the appointment resend or revoke it; see FR-022.)
 - Q: Should archiving end everyone's memberships? → A: Owner: "if it means cancelling their payment subscriptions, yes — archiving a community should end the payment subscription." → **Archiving** means the company stops managing the community. It **cancels every resident's autopay** in that community. Access memberships are kept but confer nothing while archived, so a restore brings them back unchanged (FR-012, FR-013, FR-015).
 - Q: Should changing a company default offer to push the change to existing communities? → A: **No.** A changed default applies only to communities created afterwards.
+
+### Session 2026-10-10
+
+- Q: May a Community Manager end or downgrade **another** manager in their community? → A: **Yes.** A Community Manager may remove or downgrade co-managers in their own community, but never the last active manager (FR-019, FR-020).
+- Q: Are resident accounts, adding and removing residents, and restricting resident rights in this spec? → A: **Partly.** Managers **invite residents to a property by email** and **remove them** (US8). Restricting resident rights, such as suspending poll voting, is **not built**. The Residents page needs a Claude Design design, as do the other new screens; the briefs are in `design/` (see Design references).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -63,7 +73,7 @@ As a Company Administrator or a Community Manager, I add a new community with it
 
 ### User Story 2 - Appoint and change a community's managers (Priority: P1)
 
-As a Company Administrator, I appoint a Community Manager for any community, including its first, and I can end or replace a manager. As a Community Manager, I can appoint co-managers in my own community. If the person has no account, I invite them by email.
+As a Company Administrator, I appoint a Community Manager for any community, including its first, and I can end or replace a manager. As a Community Manager, I can appoint and remove co-managers in my own community. If the person has no account, I invite them by email.
 
 **Why this priority**: A community created by a Company Administrator has no manager, and without a manager nobody can run it day to day. A community must never silently lose its last manager.
 
@@ -80,8 +90,10 @@ As a Company Administrator, I appoint a Community Manager for any community, inc
 7. **Given** a community with exactly one active manager, **When** I end that manager without naming a replacement, **Then** it is refused with `LAST_MANAGER` and the manager stays active.
 8. **Given** a community with exactly one active manager, **When** I replace them with another user in one action, **Then** the new manager is active, the old membership is ended, and the community never had zero active managers.
 9. **Given** I am a Community Manager of A and another active manager exists in A, **When** I end my own manager membership, **Then** it succeeds.
-10. **Given** I am a Board Member, an Accountant or a Resident (and not a Community Manager there or a Company Administrator), **When** I try to create or end a Community Manager membership, **Then** I am refused.
-11. **Given** any appointment, change, end, invitation, resend, revoke or acceptance, **When** it happens, **Then** one sensitive event is logged with actor, community, target user or email, the change, and UTC time.
+10. **Given** I am a Community Manager of A and A has a co-manager, **When** I end the co-manager's manager membership or change it to Board Member, **Then** it succeeds, and the co-manager loses manager powers in A on their next request.
+11. **Given** A has exactly two active managers, **When** each tries to end the other's manager membership at the same moment, **Then** exactly one succeeds, the other is refused with `LAST_MANAGER`, and A keeps one active manager.
+12. **Given** I am a Board Member, an Accountant or a Resident (and not a Community Manager there or a Company Administrator), **When** I try to create or end a Community Manager membership, **Then** I am refused.
+13. **Given** any appointment, change, end, invitation, resend, revoke or acceptance, **When** it happens, **Then** one sensitive event is logged with actor, community, target user or email, the change, and UTC time.
 
 ---
 
@@ -136,7 +148,7 @@ Defaults cover, at minimum, architectural review (spec 027): review period in da
 As a Company Administrator or that community's Community Manager, I open one **Community settings** page with these sections:
 
 - Profile
-- Managers and memberships
+- Managers and memberships (managers, board and accountants, residents)
 - Architectural review
 - Notifications (shown only once the Notification Settings spec lands)
 
@@ -149,7 +161,7 @@ The Architectural review section is spec 027's ARC settings, moved under this pa
 **Acceptance Scenarios**:
 
 1. **Given** I am a Company Administrator, **When** I open any non-archived community's settings, **Then** every section is editable, including status, parent and "Reset architectural review to company defaults".
-2. **Given** I am the community's Community Manager, **When** I open its settings, **Then** Profile is editable except status and parent, Architectural review is editable as in spec 027, and Managers and memberships lets me grant and end Board Member and Accountant memberships and appoint co-managers (FR-019 governs ending other managers).
+2. **Given** I am the community's Community Manager, **When** I open its settings, **Then** Profile is editable except status and parent, Architectural review is editable as in spec 027, and Managers and memberships lets me grant and end Board Member and Accountant memberships, appoint and remove co-managers (never the last manager), and invite and remove residents (US8).
 3. **Given** I am a Board Member, an Accountant or a Resident of the community (and not its manager or a Company Administrator), **When** I try to open its settings, **Then** I am refused and redirected to a permitted page (spec 025 FR-028).
 4. **Given** I change any setting, **When** I save, **Then** one sensitive event is logged with the old and new values (spec 027 FR-030 pattern).
 5. **Given** a community whose ARC review period is 45 days while the company default is 30, **When** I choose "Reset architectural review to company defaults" and confirm, **Then** every ARC setting equals the current company defaults, applications already received keep their copied rules, and the reset is logged with old and new values.
@@ -198,6 +210,33 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 
 ---
 
+### User Story 8 - Invite and remove residents (Priority: P1)
+
+*(Numbered 8 so US1–US7 keep the issue's numbering; it is P1.)*
+
+As a Community Manager, or a Company Administrator, I open the **Residents** area of a community's Managers and memberships section. I see every property in the community with its residents and any invitations. I invite a resident to a property by email. The person accepts and can then see that home in resident mode. I can remove a resident from a property, for example after a sale or a move-out.
+
+**Why this priority**: A new HOA isn't useful until its residents are on it. Today residents can only join with a claim code mailed to the owner's contact on file, which needs owner records the company may not have yet. Inviting by email is how a manager brings a community's residents on board.
+
+**Independent Test**: As a manager of an Active community, invite a new email to one property. Accept within 3 days and confirm the resident sees that home. Invite to an Onboarding community and confirm nothing is sent until it is marked Active. Remove the resident and confirm they lose that home on their next request, their autopay for it is cancelled, and their other homes and roles are untouched.
+
+**Acceptance Scenarios**:
+
+1. **Given** I am the Community Manager of Active community A, which has the property "711 Keystone Park Dr #29", **When** I invite "jane@example.com" as a resident of that property, **Then** an invitation is emailed to that address. **When** Jane accepts within 3 days with an account using that email, **Then** she is linked to that property as a resident and sees it in resident mode on her next request.
+2. **Given** "sam@example.com" already has an account linked to another home, **When** I invite that email to a property in A, **Then** Sam is emailed to sign in and accept. Nothing changes until he accepts. After he accepts, he sees both homes.
+3. **Given** community A is Onboarding, **When** I invite a resident, **Then** the invitation is saved as "scheduled" and no email is sent. **When** a Company Administrator marks A Active, **Then** every scheduled invitation is emailed, each valid for 3 days from that moment.
+4. **Given** a resident invitation was sent more than 3 days ago and not accepted, **When** its link is used, **Then** it is refused with `INVITATION_EXPIRED` and no link to the property is made. **When** I resend it, **Then** a new link valid for 3 days is emailed and the old link is refused.
+5. **Given** Jane is a resident of "711 Keystone Park Dr #29", **When** I remove her from that property, **Then** she loses access to that property on her next request. Her account and her other homes are unchanged. Any autopay she set up for that property is cancelled. She is emailed that she was removed. The removal is logged.
+6. **Given** Jane is also a Board Member of A, **When** I remove her as a resident of her property, **Then** her Board Member membership is unchanged (spec 025 FR-011).
+7. **Given** "jane@example.com" is already a resident of that property, **When** I invite that email to the same property, **Then** it is refused with `ALREADY_RESIDENT`.
+8. **Given** I am a Community Manager of A only, **When** I try to invite or remove a resident of a property in community B, **Then** I am refused and the response does not reveal whether B or the property exists.
+9. **Given** I am a Board Member, an Accountant or a Resident (and not a Community Manager there or a Company Administrator), **When** I try to invite or remove a resident, **Then** I am refused.
+10. **Given** community A has 120 properties, **When** I open the Residents area, **Then** each property shows its address, its residents (name, email, resident since), and its pending, scheduled or expired invitations. I can search by address, name or email, and filter to "No resident", "Invitation pending" or "Invitation expired".
+11. **Given** a resident invitation is pending, **When** I revoke it, **Then** its link is refused and no link to the property is made.
+12. **Given** any resident invitation, resend, revoke, acceptance or removal, **When** it happens, **Then** one sensitive event is logged with actor, community, property, target user or email, the change and UTC time.
+
+---
+
 ### Edge Cases
 
 - **A user is both a Company Administrator and a Community Manager**: their capability is the union of both. Neither role is derived from the other.
@@ -212,11 +251,17 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 - **An owner's autopay is mid-charge when the community is archived**: a charge already submitted settles normally. No new charge starts after the archive.
 - **A board member's term has already ended when the community is restored**: it stays ended. Restore does not change membership end dates.
 - **A Community Manager who created a community later loses all their manager memberships**: the communities they created are unaffected.
-- **An Onboarding community is abandoned before going live**: a Company Administrator can archive it directly (same open-work rule).
+- **An Onboarding community is abandoned before going live**: a Company Administrator can archive it directly (same open-work rule). Its scheduled resident invitations are revoked without ever being sent.
+- **The same email is invited to two properties**: they are two separate invitations, each accepted on its own.
+- **A resident is removed while a payment they made is still processing**: the payment settles normally against the property. Only future autopay charges are cancelled.
+- **The last resident of a property is removed**: allowed. The property shows "No resident". The owner of record and the property's balance are unchanged.
+- **A resident who joined with a claim code is removed**: same as any resident. The claim code (spec 016) is already used and can't be used again. Claim codes keep working as a second way to join.
+- **A resident invitation is mistyped**: the manager revokes it and sends a new one. Only the invited email can accept.
+- **A claim code is redeemed for a property in an Onboarding community**: refused with `COMMUNITY_NOT_ACTIVE`, like any other resident action there (FR-011).
 
 ## Requirements *(mandatory)*
 
-> **Design references.** No wireframes exist for this feature. Every UI requirement is `[no WFb]`. After `/speckit.clarify`, a design prompt for Claude Design will be written for the Community settings page, the portfolio, the add-community form, the invitation flow and the company defaults page. Until those designs exist, the requirements below describe behavior and copy only. The board side keeps spec 025's visual language (025 FR-037).
+> **Design references.** No wireframes exist for this feature yet; every UI requirement is `[no WFb]`. The briefs for Claude Design are in [`design/`](./design/README.md). There is one brief per screen or flow, written to add a section "8 · Company administration" to the existing "HOA Management CRM" Claude Design project, the same canvas as the spec 025 board wireframes (`WFb`). When the designs come back as a handoff bundle, they are saved under `design/` and the `[no WFb]` tags are replaced with design citations. Until then, the requirements below describe behavior and copy only. The board side keeps spec 025's visual language (025 FR-037).
 
 ### Permissions at a glance
 
@@ -228,8 +273,9 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 | Activate, archive, restore | Yes | No | No |
 | Appoint a Community Manager | Yes | Yes (co-manager) | No |
 | End their own manager membership | Yes | Yes, if another active manager remains | — |
-| End or downgrade another Community Manager | Yes | See FR-019 | No |
+| End or downgrade another Community Manager | Yes | Yes (co-managers); never the last manager | No |
 | Grant or end Board Member and Accountant memberships | Yes | Yes (spec 025 FR-042) | No |
+| Invite a resident to a property, or remove one | Yes | Yes | No |
 | Resend or revoke an invitation | Yes | Yes, for invitations they could make | No |
 | Edit ARC settings, reset to company defaults | Yes | Yes | No |
 | Read company defaults | Yes | Yes | No |
@@ -256,7 +302,7 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
   - Onboarding or Active → Archived, subject to FR-014;
   - Archived → Active (restore).
   The existing `Inactive` status MUST be migrated to Archived.
-- **FR-011**: While a community is **Onboarding**, it MUST be hidden from residents. Its resident pages are not shown, and resident actions in it (poll votes, payments, autopay enrollment, architectural applications) MUST be refused with `COMMUNITY_NOT_ACTIVE`. Its non-resident members (Community Managers, Board Members, Accountants) and Company Administrators MUST be able to work in it.
+- **FR-011**: While a community is **Onboarding**, it MUST be hidden from residents. Its resident pages are not shown, and resident actions in it (poll votes, payments, autopay enrollment, architectural applications, claim-code redemption) MUST be refused with `COMMUNITY_NOT_ACTIVE`. Resident invitations are scheduled, not sent (FR-024b). Its non-resident members (Community Managers, Board Members, Accountants) and Company Administrators MUST be able to work in it.
 - **FR-012**: While a community is **Archived**:
   - it MUST NOT appear in any board or manager community switcher or in residents' views;
   - every write in it, across all specs (memberships, settings, votes, applications, poll votes, payments, autopay), MUST be refused with `COMMUNITY_ARCHIVED`;
@@ -277,10 +323,10 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 ### Managers and memberships
 
 - **FR-018**: A Company Administrator MUST be able to appoint a Community Manager in any non-archived community. A Community Manager MUST be able to appoint co-managers in a community they manage.
-- **FR-019**: A Company Administrator MUST be able to end or downgrade any Community Manager membership. A Community Manager MUST be able to end their own manager membership if another active manager remains. Whether a Community Manager may end or downgrade **another** manager's membership in their community is [NEEDS CLARIFICATION: the owner's clarification lets managers appoint co-managers but does not say whether they may remove one. Spec 025 currently allows it (subject to the last-manager rule); the original issue draft said only a Company Administrator may remove managers.]
+- **FR-019**: A Company Administrator MUST be able to end or downgrade any Community Manager membership. A Community Manager MUST be able to end or downgrade their own manager membership, or a co-manager's, in a community they manage (Clarifications 2026-10-10). Both are subject to FR-020: the last active manager can never be removed.
 - **FR-020**: A community that has an active Community Manager MUST never be left with zero, through any surface or concurrent requests. Ending the last one MUST be refused with `LAST_MANAGER`. A Company Administrator MUST be able to replace the last manager in one action, so the community is never left without one.
 - **FR-021**: Board Member and Accountant memberships MUST remain manageable by the community's Community Manager (spec 025 FR-042) and MUST also be manageable by a Company Administrator.
-- **FR-022**: Any membership this spec lets a user grant MAY be granted by email to someone without an account, as an **invitation**:
+- **FR-022**: Any membership this spec lets a user grant MAY be granted by email to someone without an account, as an **invitation**. The same rules apply to resident invitations (FR-024):
   - it is valid for **3 days** and usable once;
   - it is bound to the invited email: it can only be accepted by an account with that email, which the invitee creates or signs in with;
   - accepting it creates the membership, subject to the same rules as a direct appointment at that moment;
@@ -288,7 +334,20 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
   - an expired, revoked or used link MUST be refused (`INVITATION_EXPIRED` or `INVITATION_INVALID`) and create nothing;
   - a pending invitation does not count as an active manager (FR-010, FR-020).
 - **FR-023**: Every appointment, change, end, invitation, resend, revoke and acceptance MUST be logged as a sensitive event with actor, community, target user or email, the change and UTC time.
-- **FR-024**: Resident accounts and resident rights: [NEEDS CLARIFICATION: the owner said Community Managers "create the resident accounts, add or remove residents, and can restrict resident rights such as voting" (community polls today). Is that part of this spec, with managers inviting residents to properties, removing them and suspending their poll voting, or is it a separate Resident Roster spec, with this spec only reserving a Residents area under "Managers and memberships"? Residents reach their homes today through the spec 016 property claim codes.]
+### Residents
+
+- **FR-024**: A Community Manager of the community, or a Company Administrator, MUST be able to invite a person by email to be a resident of a property in that community. The invitation follows FR-022 (3 days, single use, bound to the email, resend and revoke). Accepting it links the accepting account to that property as a resident, the same link a claim code creates (spec 016). An email already linked to that property MUST be refused with `ALREADY_RESIDENT`. A property outside the community MUST be refused without revealing whether it exists. `[no WFb]`
+- **FR-024a**: If the invited email already has an account, the invitation asks them to sign in and accept. Nothing is linked until they accept.
+- **FR-024b**: A resident invitation made while the community is Onboarding MUST be saved as **scheduled** and not emailed. When the community is marked Active, every scheduled invitation MUST be emailed, and its 3 days start then. If the community is archived instead, scheduled invitations are revoked without being sent.
+- **FR-024c**: A Community Manager of the community, or a Company Administrator, MUST be able to remove a resident from a property. On removal:
+  - the resident loses access to that property on their next request;
+  - their account, other homes and community memberships are unchanged (spec 025 FR-011);
+  - any autopay they set up for that property is cancelled, and a charge already submitted settles normally;
+  - they are emailed that they were removed from that property;
+  - the property's owner of record and balance are unchanged.
+- **FR-024d**: The **Residents** area MUST list every property in the community with its address, its residents (name, email, resident since) and its scheduled, pending or expired invitations. It MUST search by address, resident name or email (case-insensitive partial match), filter to "No resident", "Invitation pending" and "Invitation expired", and paginate with a default of 25 and a maximum of 100 properties. `[no WFb]`
+- **FR-024e**: Every resident invitation, resend, revoke, acceptance and removal MUST be logged as a sensitive event with actor, community, property, target user or email, the change and UTC time.
+- **FR-024f**: Restricting resident rights, such as suspending a resident's poll voting, is NOT built (Clarifications 2026-10-10). Claim codes (spec 016) keep working as a second way for a resident to join.
 
 ### Company default settings
 
@@ -330,29 +389,31 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 - **Community** *(modified)*: Belongs to a management company. Status becomes Onboarding, Active or Archived (replacing Active and Inactive), with when and by whom it was activated, archived or restored.
 - **Company Default Settings** *(new)*: One set per management company. Holds the ARC defaults (FR-025). Reserves a place for notification defaults.
 - **Community ARC Settings** *(spec 027, unchanged shape)*: Now copied from Company Default Settings when a community is created, and resettable to them.
-- **Invitation** *(new)*: An offer of a membership sent by email to someone who may not have an account yet. Holds the invited email, community, role, who sent it, when it expires (3 days after sending), and its state (pending, accepted, expired or revoked). Only a hash of its link is stored.
+- **Invitation** *(new)*: An offer sent by email to someone who may not have an account yet. It offers either a community membership (role) or residency of one property in the community. Holds the invited email, community, the role or the property, who sent it, when it was sent and when it expires (3 days after sending), and its state (scheduled, pending, accepted, expired or revoked). Only a hash of its link is stored.
+- **Resident link** *(existing `UserProperty`, modified behavior)*: Links a resident's account to a property. Can now also be created by accepting a resident invitation, and removed by a manager or Company Administrator.
 - **Community Membership** *(spec 025, unchanged shape)*: Gains no fields. Confers nothing while its community is Archived.
-- **Recurring Payment (autopay)** *(spec 006, modified behavior)*: Cancelled, with the reason "community archived", when its community is archived.
+- **Recurring Payment (autopay)** *(spec 006, modified behavior)*: Cancelled when its community is archived (reason "community archived") or when its resident is removed from the property (reason "resident removed").
 
 ### Constitution Requirements *(mandatory when applicable)*
 
 - **Tenant boundary**: Communities, invitations and community settings are scoped to one community, which belongs to one management company. Company Default Settings and Company Administrator grants are scoped to the management company. The portfolio is the one intentional cross-community surface: it is limited to Company Administrators and lists only that company's communities, with summary fields only. Cross-community access stays denied by default (025 FR-013). Community scope never follows the parent link.
 - **Authorization**: Every action is checked server-side on every request, from the persisted Company Administrator grant and community memberships, through the 025 resolver extended with company-level capabilities (FR-004). The client's mode or route is never an input. Frontend checks only hide controls a user can't use. Constitution §3 ("an HOA MUST have at least one ... management administrator at all times") is enforced by FR-020 and by the activation rule in FR-010.
 - **Ownership and moderation**: This spec adds no user-generated content beyond community profile text, which is entered by staff and rendered as text, never HTML.
-- **API contract**: Uses the existing response and error shapes. Collections take `limit`/`offset` (default 25, max 100). All timestamps are UTC; formation and management start dates are plain dates. IDs are GUIDs; the community name is a display handle. Error codes added: `COMMUNITY_NAME_TAKEN`, `NO_ACTIVE_MANAGER`, `OPEN_WORK`, `COMMUNITY_ARCHIVED`, `COMMUNITY_NOT_ACTIVE`, `INVITATION_EXPIRED`, `INVITATION_INVALID`, `LAST_COMPANY_ADMIN`; `LAST_MANAGER` is reused. The ARC settings endpoints keep their shape; only who may call them widens.
+- **API contract**: Uses the existing response and error shapes. Collections take `limit`/`offset` (default 25, max 100). All timestamps are UTC; formation and management start dates are plain dates. IDs are GUIDs; the community name is a display handle. Error codes added: `COMMUNITY_NAME_TAKEN`, `NO_ACTIVE_MANAGER`, `OPEN_WORK`, `COMMUNITY_ARCHIVED`, `COMMUNITY_NOT_ACTIVE`, `INVITATION_EXPIRED`, `INVITATION_INVALID`, `ALREADY_RESIDENT`, `LAST_COMPANY_ADMIN`; `LAST_MANAGER` is reused. The ARC settings endpoints keep their shape; only who may call them widens.
 - **API implementation and docs**: New endpoints are FastEndpoints. Swagger stays available only in Development/Dev and is disabled in Production.
 - **Database/runtime**: Forward-only migrations (spec 025 FR-005) add the management company, Company Administrator grants, company default settings and invitations, and move community status to Onboarding, Active and Archived (`Inactive` becomes Archived). They are applied idempotently at Cloud Run startup. The migration backfills one management company and links every existing community to it. Existing communities keep their status (Active stays Active). Short-lived DbContexts, within Neon's low connection limit. The last-manager and last-administrator rules must hold under concurrent requests.
 - **File storage**: None. This spec stores no files.
-- **Security and abuse controls**: All write endpoints use the `board-writes` rate limit, including invitation sending (constitution §7). Invitation links are single-use, expire after 3 days, are bound to the invited email, and are stored only as hashes. Every membership, role, status, settings and administrator change is a sensitive event (constitution §7). Denials fail closed without revealing whether a community exists. Company Administrators get no board data by default (FR-003), following least privilege.
+- **Security and abuse controls**: All write endpoints use the `board-writes` rate limit, including sending manager and resident invitations (constitution §7). Invitation links are single-use, expire after 3 days, are bound to the invited email, and are stored only as hashes. The invitation acceptance page reveals only the community name and, for a resident invitation, the property address, and only to the holder of a valid link. Every membership, role, status, settings and administrator change is a sensitive event (constitution §7). Denials fail closed without revealing whether a community exists. Company Administrators get no board data by default (FR-003), following least privilege.
 - **Observability**: Errors go to Sentry with environment and release tags, plus community ID and capability as tags where relevant. No emails, names or invitation tokens go to telemetry. Trace context flows from the frontend to the backend.
 - **Accessibility**: The add-community form, Community settings page, portfolio, invitation acceptance and company defaults are fully keyboard operable, with labels, visible focus and validation messages tied to their fields. Status and the "No manager" and "differs from defaults" flags are conveyed by text, not color alone. Everything meets WCAG 2.1 AA.
 - **Quality gates**: 95% coverage on new backend and frontend files. Sonar passes. xUnit integration tests on Testcontainers PostgreSQL, with isolated per-test communities and companies, so they are safe in parallel and after earlier runs. `[Theory]` data covers role (Company Administrator, Community Manager of this community, Community Manager of another community, Board Member, Accountant, Resident) × action, and status (Onboarding, Active, Archived) × write type. The required Serilog sensitive events are asserted. Repowise docs are refreshed for the PR. The PR stays a focused vertical slice per story.
-- **Frontend testing**: Jasmine/Karma for permission-driven section rendering and portfolio flags. Angular Testing Library for the add-community form, Community settings sections, portfolio filter and search, and invitation acceptance. Playwright for the journey "add community → appoint manager → activate" and for refusal of a Board Member on the settings route. Cypress E2E for sign-in as Company Administrator → portfolio → community settings. Storybook visual regression for the portfolio, settings page sections and add-community form, once designs exist.
+- **Frontend testing**: Jasmine/Karma for permission-driven section rendering and portfolio flags. Angular Testing Library for the add-community form, Community settings sections, the Residents area (list, search, filters, invite, remove), portfolio filter and search, and invitation acceptance. Playwright for the journeys "add community → appoint manager → activate" and "invite resident → accept → see home", and for refusal of a Board Member on the settings route. Cypress E2E for sign-in as Company Administrator → portfolio → community settings. Storybook visual regression for the portfolio, settings page sections, Residents area and add-community form, once designs exist.
 - **Executable & living spec**: Every acceptance scenario and Independent Test above maps to an automated test that runs on demand and passes before merge. This `spec.md` and `tasks.md` are updated before the implementation PR. The implementation PR MUST also reconcile the older specs this one changes:
   - spec 025's `Community` status (FR-001) and its "inactive/offboarded" edge case become Onboarding, Active and Archived;
-  - spec 025 FR-042 gains co-manager appointment by Community Managers and management by Company Administrators;
-  - spec 027 FR-030 widens to "Company Administrator or that community's Community Manager".
-- **Spec independence & parallelism**: Hard dependencies on spec 025 (communities, memberships, resolver, board shell) and spec 027 (ARC settings), both merged, so this spec is individually completable now. The Notification Settings spec is optional: its sections stay hidden until it lands. The in-progress Resident Architectural Application Submission spec (`029-resident-arc-requests`) does not block this one. Its writes are refused in Onboarding and Archived communities through the shared status rule (FR-011, FR-012), so the two can be built in parallel. US1–US3 are the MVP; US4–US7 can be built in parallel once US1 lands.
+  - spec 025 FR-042 gains co-manager appointment and removal by Community Managers, and management by Company Administrators;
+  - spec 027 FR-030 widens to "Company Administrator or that community's Community Manager";
+  - spec 016's claim code is no longer the only way a resident joins a property (resident invitations, FR-024).
+- **Spec independence & parallelism**: Hard dependencies on spec 025 (communities, memberships, resolver, board shell) and spec 027 (ARC settings), both merged, so this spec is individually completable now. The Notification Settings spec is optional: its sections stay hidden until it lands. The in-progress Resident Architectural Application Submission spec (`029-resident-arc-requests`) does not block this one. Its writes are refused in Onboarding and Archived communities through the shared status rule (FR-011, FR-012), so the two can be built in parallel. US1–US3 and US8 are the MVP; US4–US7 can be built in parallel once US1 lands.
 
 ## Success Criteria *(mandatory)*
 
@@ -367,6 +428,9 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 - **SC-007**: Every change made through this spec produces exactly one sensitive event with all required fields.
 - **SC-008**: The portfolio shows its first page within 2 seconds for a company with 200 communities.
 - **SC-009**: A Company Administrator can find every community without an active manager in one step (the "No manager" flag on the portfolio).
+- **SC-010**: A manager can invite a resident to a property in under 1 minute, and the resident can go from the invitation email to seeing their home in under 5 minutes.
+- **SC-011**: 100% of removed residents lose access to that property on their next request, and 0 autopay charges start for that property on their behalf afterwards.
+- **SC-012**: 0 resident invitations are emailed while their community is Onboarding, and 100% of scheduled invitations are emailed when it is marked Active.
 
 ## Assumptions
 
@@ -376,8 +440,9 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 - **Company Administrator grants go to existing accounts only**. The person creates their account first. Invitations (FR-022) are for community memberships.
 - **Invitation resend**: Not answered by the owner. This spec lets anyone who could make the appointment resend or revoke it.
 - **Accepting an invitation** uses the existing registration, sign-in and email verification (spec 016). No new sign-up flow is designed here.
-- **Properties for a new community** come in through the existing import and seed path. Adding and editing properties is not part of this spec unless FR-024 brings resident and property roster management in.
-- **Owner emails** (autopay cancelled on archive; invitation) use the existing transactional email. They are plain text until designed.
+- **Properties for a new community** come in through the existing import and seed path. Adding and editing properties is not part of this spec; the Residents area lists the properties that exist.
+- **"Resident"** means any person linked to a property, as today. This spec does not tell owners and tenants apart.
+- **Emails** (manager and resident invitations, autopay cancelled on archive, resident removed) use the existing transactional email. They are plain text until Claude Design delivers templates (brief in `design/`).
 - **Desktop-first**, like the rest of the board side (spec 025). Mobile layout is out of scope.
 - **Demo data**: The dev seed gets one Company Administrator (via the setup step) and one Onboarding community, so the flow can be tried end to end.
 
@@ -390,11 +455,15 @@ As a Company Administrator, I grant the role to another user and revoke it. The 
 - Resident Architectural Application Submission (a separate spec).
 - Several management companies sharing one deployment (multi-company tenancy).
 - Other per-community settings, such as payment policy (`HoaPaymentConfig`), as company defaults. They can be added to the defaults later.
+- Restricting resident rights, such as suspending poll voting (owner decision, 2026-10-10).
+- Bulk-importing residents from a file. Invitations are one at a time in this spec; a bulk import can follow.
+- Adding, editing or removing properties.
+- Telling owners and tenants apart.
 
 ## Dependencies
 
 - **Spec 025** (merged): communities, memberships, scope resolver, the membership create, update and list endpoints, and the board shell.
 - **Spec 027** (merged): ARC settings, which this spec moves under Community settings and copies from company defaults.
 - **Spec 006** (merged): recurring payments (autopay), cancelled when a community is archived.
-- **Spec 016** (merged): registration and email verification, reused for invitation acceptance.
+- **Spec 016** (merged): registration and email verification, reused for invitation acceptance. Its `UserProperty` resident link and claim codes stay as they are, and resident invitations create the same link.
 - **Notification Settings spec** (optional): its sections stay hidden until it lands.
