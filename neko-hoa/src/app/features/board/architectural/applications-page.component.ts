@@ -161,7 +161,7 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
     // Edge case "board member of several communities": reload whenever the active community changes.
     effect(() => {
       if (this.ctx.communityId()) untracked(() => void this.reload());
-    }, { allowSignalWrites: true });
+    });
   }
 
   ngOnInit(): void {
