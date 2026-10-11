@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,10 +31,13 @@
 
 ## Notes
 
-- **Open markers (2)**, to resolve with the owner or in `/speckit.clarify`:
-  - **FR-019**: may a Community Manager end or downgrade *another* manager in their community, or is that Company Administrator only?
-  - **FR-024**: are resident accounts, adding and removing residents, and restricting resident rights (poll voting) in this spec, or in a separate Resident Roster spec?
-- **Technology names**: Serilog, FastEndpoints, Testcontainers, Sentry, the `board-writes` rate limit and the resolver capability names appear only where the repo's spec template requires them (Constitution Requirements) or where the owner's issue names them (FR-004, FR-040, FR-041). This matches specs 025 and 027. User stories, the remaining FRs and the success criteria are technology-agnostic.
-- **Error codes** (`COMMUNITY_NAME_TAKEN`, `OPEN_WORK`, …) are named so that every denial scenario has an exact assertion (the CLAUDE.md natural-language-test rule).
-- **Owner clarifications** from the issue #213 comment are recorded in the spec's Clarifications section (Session 2026-10-08). Two of them change the original draft: Community Managers may add communities and may appoint co-managers.
-- **Designs**: none exist. A Claude Design prompt follows `/speckit.clarify`.
+- **Owner answers (2026-10-10)**: Q1 (B) a Community Manager may remove co-managers, never the last manager; Q2 (custom) managers invite residents to a property by email and remove them; restricting resident rights is not built. No `[NEEDS CLARIFICATION]` markers remain.
+- **Adversarial review (2026-10-11)**: five reviewers (consistency, testability, grounding in code and merged specs, security, completeness) raised 56 distinct findings.
+  - F01–F22 were each checked by two independent skeptics. F20 and F21 were rejected; their optional suggestions were applied.
+  - F23–F56 were checked by hand against the spec and code, after usage limits stopped the automated checks. Almost all were real; F23 was applied as the optional clarification its checker suggested.
+  - The fixes are in the spec. The decisions they forced are listed under Clarifications › "Decisions made in spec review", for the owner to confirm or override.
+- **Biggest change**: today registration needs a claim code and sign-in needs a linked home (`AuthService`). The spec now adds invitation sign-up (FR-022a) and sign-in without a home (FR-036a, US9), and reconciles specs 016 and 017 sub-spec A.
+- **Technology names**: Serilog, FastEndpoints, Testcontainers, Sentry, the `board-writes`/`auth` rate limits and capability names appear only where the repo's spec template requires them (Constitution Requirements) or the owner's issue names them. This matches specs 025 and 027. User stories, most FRs and the success criteria are technology-agnostic.
+- **Error codes** are named so that every denial scenario has an exact assertion (the CLAUDE.md natural-language-test rule).
+- **Known gap, recorded as an assumption**: no property import exists, so a newly added community has no properties until seeded. A Properties spec is the natural follow-up.
+- **Designs**: briefs for Claude Design are in `design/`.
