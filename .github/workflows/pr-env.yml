@@ -35,9 +35,17 @@ concurrency:
 jobs:
   pr-env:
     name: Provision + validate (pr-${{ github.event.number }})
+    # Skip Dependabot-triggered runs: GitHub withholds repository Actions secrets from `pull_request`
+    # runs whose actor is dependabot[bot] (same treatment as forks), so every `secrets.*` below is
+    # empty and the job is guaranteed red at docker login (e.g. PR #190). Keyed on `github.actor`
+    # because that is exactly what GitHub keys the withholding on (re-runs keep the original actor);
+    # a maintainer push to a Dependabot branch runs with secrets and still provisions normally.
+    # To validate Dependabot PRs instead, mirror the secrets used here as *Dependabot* secrets
+    # (Settings → Secrets and variables → Dependabot) and drop the actor clause.
     if: >
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
+      github.event.pull_request.draft == false &&
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     # No GitHub Environment gate: solo use shouldn't pause every run for manual approval. Fork safety is
     # already enforced by `pull_request` (secrets withheld from forks) + the head-repo guard above + the
@@ -249,7 +257,14 @@ jobs:
             }
 
       # FR-009 clean failure: destroy partial resources so nothing billable is stranded (sweep backstops).
+      # No tofu binary ⇒ the job failed before pr-env-tofu-init, so nothing was provisioned; skip rather
+      # than log a misleading "tofu: command not found" under the real (earlier) failure.
       - name: Clean up on failure
         if: failure()
         working-directory: infra/environments/pr
-        run: tofu destroy -input=false -auto-approve || true
+        run: |
+          if ! command -v tofu >/dev/null 2>&1; then
+            echo "tofu not installed (job failed before provisioning) — nothing to clean up."
+            exit 0
+          fi
+          tofu destroy -input=false -auto-approve || true
