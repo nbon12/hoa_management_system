@@ -116,7 +116,7 @@ The rule the design must make obvious (FR-020): a community **has a manager** on
 **Page.** Community settings for one community (conventions §7.2). If section 8 has brief 04's header and section nav, use them. Otherwise:
 
 - **Header:** the community name as the page title; its status chip; the legal name on the line below. A Company Administrator also sees the status actions for that status: Active shows "Archive"; Onboarding shows "Mark Active" and "Archive"; Archived shows "Restore". A Community Manager sees no status actions and no Change parent.
-- **Section nav:** Profile · Managers and memberships (current) · Architectural review, as tabs across the top. Add a `.wf-note`: "section nav set by brief 04". No Notifications.
+- **Section nav:** brief 04's searchable side list on the left (owner decision 2026-10-14): search box, then Profile · Managers and memberships (current) · Architectural review. Add a `.wf-note`: "section nav set by brief 04". No Notifications.
 
 **Section body, top to bottom.**
 
@@ -786,8 +786,8 @@ Exact strings. Quotes mark visible text. "SR" means text for screen readers only
 
 **Opening the section.**
 
-- Company Administrator: the portfolio's "Community settings" link, then the "Managers and memberships" tab. Brief 03's "Appoint a manager" prompt opens this section at Managers.
-- Community Manager: "Community settings" in board mode, then the tab.
+- Company Administrator: the portfolio's "Community settings" link, then "Managers and memberships" in the side list. Brief 03's "Appoint a manager" prompt opens this section at Managers.
+- Community Manager: "Community settings" in board mode, then "Managers and memberships" in the side list.
 - Focus starts at the page title. Jump links move focus to the area heading.
 
 **Appoint a manager / Appoint a board member or accountant.**

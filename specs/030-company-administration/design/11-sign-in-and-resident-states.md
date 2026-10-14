@@ -273,7 +273,7 @@ Conventions §8 applies. In this brief:
 
 ## 8. Out of scope for this design
 
-- The landing-order flow and the company and board landings for Robin, Casey, Jordan and Pat (brief 01: 8.01.a, 8.01.c, 8.01.f, 8.01.j, 8.01.m, 8.01.r). The "Resident" segment for people with no home (brief 01, D2).
+- The landing-order flow and the company and board landings for Robin, Casey, Jordan and Pat (brief 01: 8.01.a, 8.01.d, 8.01.f, 8.01.j, 8.01.m, 8.01.r). The "Resident" segment for people with no home (brief 01, D2).
 - The Remove resident dialogs (brief 06). The "no longer managed", "removed from a home" and "autopay ended" emails (brief 12).
 - Invitation acceptance and sign-up pages, including signed-in acceptance (brief 10).
 - Resident pages for homes in Active communities: unchanged from sections 2–6.

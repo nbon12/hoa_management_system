@@ -9,11 +9,11 @@ Project: "HOA Management CRM". Canvas: NekoHOA Wireframes.html. Put every new ar
 
 Attached: spec.md (feature spec 030, the authority), 00-conventions.md (shared rules, dataset, vocabulary, refusal copy) and 02-portfolio.md (this brief). Details are in the brief's §4 (artboards and rows), §5 (exact copy) and §6 (interactions). If the files disagree, spec.md wins, then the conventions.
 
-Draw the Portfolio: the Company Administrator's list of every community. Use the neutral company-area frame from conventions §7.1, with avatar "RH" (Robin Hale), no violet banner and no board-mode control. If section 8 already has that frame, reuse it.
+Draw the Portfolio: the Company Administrator's list of every community. Use the company-area frame from conventions §7.1 (the company shell from brief 01), with avatar "RH" (Robin Hale), no violet banner and no board-mode control. If section 8 already has that frame, reuse it.
 
 Artboards, 1360 wide, as tall as the content, ids s8-02a to s8-02k, labels exactly:
-8.02.a Portfolio · first page · Option A · Company Administrator (A–Z by community name)
-8.02.b Portfolio · first page · Option B · Company Administrator ("No manager" rows first, then A–Z)
+8.02.a Portfolio · first page · Company Administrator (A–Z by community name)
+8.02.b Portfolio · sorted by Status · Company Administrator
 8.02.c Portfolio · Archived filter · Company Administrator
 8.02.d Portfolio · Onboarding filter · Company Administrator
 8.02.e Portfolio · search “Keystone” · Company Administrator
@@ -24,7 +24,7 @@ Artboards, 1360 wide, as tall as the content, ids s8-02a to s8-02k, labels exact
 8.02.j Board mode · no portfolio entry · Community Manager
 8.02.k Portfolio requested directly · refused · Community Manager
 
-Options A and B are alternatives for the default sort order. Draw both. 8.02.c–8.02.i use Option A.
+Default sort (owner left it to us, 2026-10-14): A–Z by community name. The Community name, Status and Parent column headers can be clicked to sort; 8.02.b shows sorting by Status. A "No manager" filter button sits after the status filters, so SC-009 stays one click on a portfolio of any size. 8.02.c–8.02.i use the default sort.
 
 Reuse: BoardArchApps (filter buttons with counts, search field, table in a card), BoardVendors (card header bar), wf-pill for status chips and flags, wf-ph for loading rows, and WFShellBoard + boardNav() + BoardNavMulti for 8.02.j–k with Jordan Blake's data passed in. Sections 1–7 must render exactly as before.
 
@@ -67,7 +67,7 @@ The page only lists and links. It changes no data. Status actions live in the Co
 | US1 #1 (appears in portfolio) | Keystone Park, added by Robin Hale on Oct 11, 2026, is in the list: status "Onboarding", parent "—", "No manager" (zero Community Manager memberships), and no "Differs from defaults" flag (its settings were copied from the company defaults). | 8.02.a, b, d |
 | US3 #14 (No manager after restore) | Briar Hollow was archived and then restored on Oct 5, 2026. Reese Walker's term ended while it was archived, so it returned to Onboarding. Its row reads "Onboarding" and "No manager". The `NO_ACTIVE_MANAGER` refusal on Mark Active is drawn in brief 04, not here. | 8.02.a, b, d |
 | SC-008 | The first page of 25 is all that loads. The frame, title, filters and search appear at once; placeholder rows stand in for the table. Nothing on the page needs every community at once: no "Show all" and no page size above 100. | 8.02.a, g |
-| SC-009 | "No manager" is a word in the row, seen without opening anything. Both no-manager rows are on the first page. Option B guarantees this for any data, not just the sample. | 8.02.a, b, d |
+| SC-009 | "No manager" is a word in the row, seen without opening anything, and a "No manager · 2" filter button lists only those communities in one click, however large the portfolio. | 8.02.a, b, d |
 | Spec independence, MVP foundation (d) | The minimal list: community name, status chip, link to Community settings. | DCPostIt by 8.02.a |
 | Constitution, Accessibility | The portfolio is fully keyboard operable. Status, "No manager" and "Differs from defaults" are text, not colour. | All, see §7 |
 
@@ -85,7 +85,7 @@ The page only lists and links. It changes no data. Status actions live in the Co
 **Body, top to bottom.**
 
 1. **Header row.** Title "Portfolio". Under it the subtitle "Every community of Juniper Row Community Management, including archived ones." On the right, the primary button "Add community".
-2. **Controls row.** On the left, the status filter: a group of four buttons labelled "Filter by status": "All · 31", "Onboarding · 3", "Active · 26", "Archived · 2". The pressed one looks different by more than colour (for example filled and bold). On the right, the search field with the visible label "Search communities" and the placeholder "Search by community or legal name".
+2. **Controls row.** On the left, the status filter: a group of four buttons labelled "Filter by status": "All · 31", "Onboarding · 3", "Active · 26", "Archived · 2"; then, after a small gap, a separate toggle button "No manager · 2" that narrows whatever status is chosen to communities with no open-ended manager. The pressed one looks different by more than colour (for example filled and bold). On the right, the search field with the visible label "Search communities" and the placeholder "Search by community or legal name".
 3. **Table card** (`wf-card` with `wf-table`). A header bar reading "Communities", as in `BoardVendors`. The table has these columns, in this order:
 
    | Column | Shows |
@@ -136,18 +136,18 @@ Keystone Ridge's row shows nothing about who added it. The spec doesn't list tha
 
 ### 4.2 Artboard list
 
-**8.02.a Portfolio · first page · Option A · Company Administrator**
+**8.02.a Portfolio · first page · Company Administrator**
 
 - Viewpoint: Robin Hale.
-- Filter "All · 31" pressed. Search empty.
+- Filter "All · 31" pressed; "No manager · 2" not pressed. Search empty.
 - Rows sorted A–Z by community name. Page 1 of 2: "Showing 1–25 of 31".
 - Every situation in §4.1 is visible on this page.
-- Design choice: Option A, the default sort order.
+- Default sort: A–Z by community name. The "Community name" header shows it is the current sort ("sorted A to Z" in text, not only an arrow).
 
-**8.02.b Portfolio · first page · Option B · Company Administrator**
+**8.02.b Portfolio · sorted by Status · Company Administrator**
 
-- Same as 8.02.a, except the order: rows flagged "No manager" first (Briar Hollow, then Keystone Park), then every other row A–Z.
-- Design choice: Option B, the default sort order. With Option A, a no-manager community can fall on page 2 when the portfolio is large. Option B always puts them first (SC-009).
+- Same data as 8.02.a. Robin clicked the "Status" header: rows are grouped Onboarding, Active, Archived, and A–Z by community name within each status. The "Status" header shows it is the current sort; clicking it again reverses the order.
+- Sorting keeps the filter and search, and returns to page 1.
 
 **8.02.c Portfolio · Archived filter · Company Administrator**
 
@@ -217,9 +217,9 @@ Keystone Ridge's row shows nothing about who added it. The spec doesn't list tha
 
 ### 4.4 Open questions (DCPostIt by 8.02.a)
 
-> 1. **Default sort order.** Option A, A–Z by community name (8.02.a), or Option B, "No manager" first (8.02.b)? The spec sets no order.
+> 1. **Sort order (decided 2026-10-14).** Default A–Z by community name; Community name, Status and Parent are sortable (8.02.b).
 > 2. **Filter counts while searching.** Drawn: the counts follow the search. Or should they always count the whole portfolio?
-> 3. **A "No manager" filter.** It would make SC-009 one click away on a portfolio of any size. FR-034 lists only a status filter, so it isn't drawn.
+> 3. **A "No manager" filter (decided 2026-10-14).** Drawn, after the status filters. It makes SC-009 one click on a portfolio of any size.
 > 4. **Onboarding rows that already have a manager** (Keystone Ridge). Drawn: no extra text. Or add a second line such as "Has a manager · can be marked Active"? The spec doesn't ask for it.
 > 5. **Managers of Archived communities.** Morgan Ellis is listed for Old Mill Commons, but the membership confers nothing while it is archived (FR-012). Drawn: listed plainly. Or add "No access while archived"? The spec doesn't say.
 
@@ -388,8 +388,8 @@ The conventions §8 baseline applies. For this page:
 - [ ] **US1 #1.** Keystone Park reads Onboarding, parent "—", "No manager", and has no "Differs from defaults" flag.
 - [ ] **US3 #14.** Briar Hollow reads "Onboarding" and "No manager".
 - [ ] **SC-008.** The loading state shows the frame, filters and search at once, with placeholder rows. Nothing asks to load every community (8.02.g).
-- [ ] **SC-009.** Both no-manager rows are on the first page in 8.02.a and 8.02.b. 8.02.b puts them first.
-- [ ] **Sort options.** 8.02.a (A–Z) and 8.02.b ("No manager" first) are both drawn and labelled "Design choice".
+- [ ] **SC-009.** The "No manager · 2" filter button is drawn after the status filters, and both no-manager rows read "No manager" in words.
+- [ ] **Sort.** 8.02.a is A–Z by community name; 8.02.b is sorted by the Status header; the current sort is stated in text.
 - [ ] **States.** Loading (8.02.g), load error with "Try again" (8.02.h) and no communities yet (8.02.i) are drawn with the §5 copy.
 - [ ] **MVP note.** A DCPostIt by 8.02.a says the MVP shows only community name, status and the Community settings link, plus Add community.
 - [ ] **Open questions.** A DCPostIt by 8.02.a lists the five questions in §4.4.

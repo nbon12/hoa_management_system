@@ -68,6 +68,14 @@ Verified against `main` at commit `21e2491` (spec 027 merged):
 - Q: May a Community Manager end or downgrade **another** manager in their community? → A: **Yes.** A Community Manager may remove or downgrade co-managers in their own community, but never the last manager (FR-019, FR-020).
 - Q: Are resident accounts, adding and removing residents, and restricting resident rights in this spec? → A: **Partly.** Managers **invite residents to a property by email** and **remove them** (US8). Restricting resident rights, such as suspending poll voting, is **not built**. The Residents page needs a Claude Design design, as do the other new screens; the briefs are in `design/` (see Design references).
 
+### Session 2026-10-14 (design choices)
+
+- Q: How do Company Administrators get to the company area? → A: Through their own **company sign-in page**, at a stable address they can bookmark (FR-036c). Inside the app, a "Company" menu in the account controls opens the company area.
+- Q: Default sort of the portfolio? → A: Owner left it to us: **A–Z by community name**, with sortable columns and a "No manager" filter (FR-034).
+- Q: Community settings section navigation? → A: A **side list**, with a **search box** that finds settings by name (FR-029).
+- Q: How does the Profile save? → A: **Per field**, when a field is filled out. A small "Saved" text or checkmark appears next to the field (FR-017).
+- Q: Mark Active when there is no manager? → A: The button is **disabled**, and hovering it shows why (FR-010). Keyboard focus shows the same reason, for accessibility.
+
 ### Decisions made in spec review (2026-10-11)
 
 An adversarial review of this spec against the code and the merged specs forced the decisions below. They are **not** owner decisions. Each is the safest default that makes the owner's decisions work. The owner may override any of them.
@@ -163,7 +171,7 @@ Restore it and confirm memberships and settings are unchanged.
 1. **Given** an Onboarding community and Ann, a resident linked to one of its properties, **When** Ann signs in, **Then** that home is not in her home list. Every resident request for it is refused with `COMMUNITY_NOT_ACTIVE`, including claim-code redemption and the reads and writes listed in FR-012a.
 2. **Given** an Onboarding community, **When** its Community Manager creates a Board Member membership and saves ARC settings, **Then** both succeed. **When** its Board Member reads board metrics, **Then** that succeeds. **When** the Board Member tries to save ARC settings, **Then** it is refused with 403 `FORBIDDEN`, exactly as in an Active community.
 3. **Given** an Onboarding community with at least one open-ended Community Manager and two scheduled resident invitations, **When** I (a Company Administrator) mark it Active, **Then** its status is Active, its linked residents see it on their next request, and both invitations are emailed.
-4. **Given** an Onboarding community with no open-ended Community Manager, **When** I mark it Active, **Then** it is refused with `NO_ACTIVE_MANAGER` and it stays Onboarding.
+4. **Given** an Onboarding community with no open-ended Community Manager, **When** I view its Profile, **Then** "Mark Active" is disabled, and hovering or keyboard-focusing it shows the reason ("It needs a Community Manager with no end date…"). **When** the request is made anyway, **Then** it is refused with `NO_ACTIVE_MANAGER` and the community stays Onboarding.
 5. **Given** an Active community with no open work, a pending manager invitation and a pending resident invitation, **When** I archive it, **Then**:
    - it is removed from board and manager community switchers;
    - both invitations are revoked and their links are refused with `INVITATION_INVALID`;
@@ -183,7 +191,7 @@ Restore it and confirm memberships and settings are unchanged.
 14. **Given** an archived community, previously Active, whose only manager's end date passed while it was archived, **When** I restore it, **Then** it returns to Onboarding and the portfolio flags it "No manager". **When** I then try to mark it Active before appointing a manager, **Then** it is refused with `NO_ACTIVE_MANAGER`.
 15. **Given** an archived community whose manager M has left the company, **When** I end M's manager membership while it is archived, **Then** it ends (the last-manager rule does not apply while archived). **When** I then restore the community, **Then** it returns to Onboarding and M has no access.
 16. **Given** an archived sub-association whose parent is also archived, **When** I try to restore the sub-association, **Then** it is refused with `PARENT_ARCHIVED`, naming the parent.
-17. **Given** I am the Community Manager of an Active community, **When** I edit its legal name, community name, county, formation date, management start date or description, **Then** the change is saved and logged with old and new values.
+17. **Given** I am the Community Manager of an Active community, **When** I change one profile field (legal name, community name, county, formation date, management start date or description) and leave it, **Then** that field alone is saved, "Saved" (with a checkmark) appears next to it, and the change is logged with old and new values. **When** a field fails validation, **Then** its message appears under it and it is not saved.
 18. **Given** "Keystone Park" exists and I manage "Keystone Ridge", **When** I rename Keystone Ridge to " KEYSTONE PARK", **Then** it is refused with `COMMUNITY_NAME_TAKEN` and the name is unchanged.
 19. **Given** a community from the spec 025 backfill with an empty legal name and no county, **When** I change only its description, **Then** the change is saved, and the Profile section flags legal name and county as missing.
 20. **Given** I am a Community Manager, **When** I try to activate, archive, restore or change the parent of my community, **Then** I am refused with 403 `FORBIDDEN` and nothing changes.
@@ -240,6 +248,7 @@ The Architectural review section is spec 027's ARC settings, moved under this pa
 6. **Given** I go to the old ARC settings location from spec 027, **When** it loads, **Then** I land on the Architectural review section of this page.
 7. **Given** an archived community, **When** I (a Company Administrator) open its settings, **Then** every section is shown read-only, including Residents. Invitations revoked by the archive are labelled "Revoked — community archived". The only actions offered are Restore and ending memberships (FR-012).
 8. **Given** A has a pending Board Member invitation and an expired Community Manager invitation, **When** I (A's manager) open Managers and memberships, **Then** both are listed with email, role, sent by, sent at and expires at, each with Resend and Revoke.
+9. **Given** I open A's settings, **When** I type "review" in the side list's search box, **Then** the list shows the matching settings (for example "Architectural review › Review period"), and choosing one opens that section with focus on that setting.
 
 ---
 
@@ -259,6 +268,7 @@ As a Company Administrator, I see every community the company manages in one lis
 4. **Given** communities in Onboarding, Active and Archived, **When** I filter by Archived, **Then** only archived communities are listed.
 5. **Given** I type "Keystone", **When** the list filters, **Then** only communities whose community name or legal name contains "Keystone" (any case) are listed.
 6. **Given** I am a Community Manager, **When** I use the app, **Then** the portfolio is never offered to me. **When** I request it directly, **Then** I am refused with 403 `FORBIDDEN`. My own communities stay in my existing switcher.
+7. **Given** 31 communities, **When** I open the portfolio, **Then** they are sorted A–Z by community name. **When** I click the Status column header, **Then** they are sorted by status, then by name. **When** I press the "No manager" filter, **Then** only communities with no open-ended manager are listed.
 
 ---
 
@@ -350,6 +360,8 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 4. **Given** I have no linked home, **When** I call any resident endpoint, **Then** it is refused with `PROPERTY_ACCESS_DENIED` and nothing is shown or changed.
 5. **Given** my only linked homes are in Onboarding communities and I hold no other role, **When** I sign in, **Then** I land on a "Your community isn't live yet" page, not an error.
 6. **Given** I have homes in both an Active and an Archived community, **When** I sign in, **Then** I land on the home in the Active community.
+7. **Given** I am a Company Administrator, **When** I sign in on the company sign-in page, **Then** I land on the portfolio, whatever else I hold.
+8. **Given** I am not a Company Administrator, **When** I sign in on the company sign-in page, **Then** I land on my usual landing (FR-036a) with the notice "This account isn't a Company Administrator, so you've been signed in to your usual page.", and nothing else changes.
 
 ---
 
@@ -459,7 +471,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   While a community has no manager, the company's Company Administrators are its management administrators for constitution §3. FR-037 guarantees at least one always exists.
 - **FR-009**: At creation, the new community's ARC settings MUST be copied from the company defaults in effect at that moment (FR-025). After that the copies are independent: later default changes never alter them.
 - **FR-010**: A community's status MUST be one of **Onboarding**, **Active** or **Archived**. The allowed changes, all by a Company Administrator only, are:
-  - **Onboarding → Active.** Refused with `NO_ACTIVE_MANAGER` unless the community has at least one open-ended Community Manager membership (active, no end date). Activation emails the scheduled resident invitations (FR-024b).
+  - **Onboarding → Active.** Refused with `NO_ACTIVE_MANAGER` unless the community has at least one open-ended Community Manager membership (active, no end date). Activation emails the scheduled resident invitations (FR-024b). While activation is not allowed, the "Mark Active" control MUST be shown disabled, with the reason shown on hover and on keyboard focus and given to screen readers (Clarifications 2026-10-14). `[no WFb]`
   - **Onboarding or Active → Archived.** Subject to FR-014.
   - **Restore.** The community returns to Active only if it had been Active before it was archived and it has an open-ended Community Manager at the moment of restore. Otherwise it returns to Onboarding, and the activation rule above applies from there. Restore is never refused for lack of a manager. Restoring a sub-association whose parent is Archived is refused with `PARENT_ARCHIVED`, naming the parent. Restoring a master does not restore its sub-associations.
 
@@ -506,6 +518,8 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - An archived community cannot be chosen as a parent (`PARENT_ARCHIVED`).
   - The parent link MUST NOT change anyone's access (spec 025).
 - **FR-017**: A Community Manager MUST be able to edit their own community's legal name, community name, county, formation date, management start date and description, but not its status or parent. A Company Administrator may edit all of them. The FR-006 rules apply on edit, with one difference: a required field that has a value cannot be cleared, but a field left empty by the spec 025 backfill may stay empty until filled. The Profile section flags any missing required fields.
+
+  Profile fields save **one at a time** (Clarifications 2026-10-14). When the person finishes a field, that field alone is validated and saved, and a short "Saved" text with a checkmark appears next to it. A field that fails validation shows its message under it, is not saved and keeps what was typed. Each field save is logged with old and new values (FR-033). `[no WFb]`
 
 ### Managers and memberships
 
@@ -614,6 +628,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - The page is addressed by community ID, not by the board-mode active community, so it works for Onboarding and Archived communities that appear in no switcher.
   - Company Administrators reach it from the portfolio. Community Managers reach it from board mode in the active community.
   - A Community Manager of an Onboarding community sees on the Profile section that a Company Administrator must mark it Active, and that resident invitations are sent then.
+  - The sections are listed in a **side list** with a **search box** (Clarifications 2026-10-14). Searching filters to matching sections and setting names, for example "Architectural review › Review period". Choosing a result opens that section and moves focus to that setting. Search covers setting names on this page only, never people or values.
 
   `[no WFb]`
 - **FR-030**: The spec 027 ARC settings MUST be shown as the page's Architectural review section, not rebuilt.
@@ -633,7 +648,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - a "No manager" flag when there is no open-ended manager;
   - a flag when its ARC settings differ from the company defaults.
 
-  It MUST filter by status, search by community name or legal name (case-insensitive partial match), and paginate with a default of 25 and a maximum of 100. `[no WFb]`
+  It MUST sort A–Z by community name by default, let the community name, status and parent columns be sorted, filter by status and by "No manager", search by community name or legal name (case-insensitive partial match), and paginate with a default of 25 and a maximum of 100 (Clarifications 2026-10-14). `[no WFb]`
 - **FR-035**: The portfolio MUST NOT be offered to anyone but a Company Administrator, and a direct request from anyone else MUST be refused with 403 `FORBIDDEN`.
 - **FR-036**: A Company Administrator MUST be able to open the **company area** from the top-bar account controls (spec 025 FR-019) without holding any community membership. The company area holds the portfolio, Add community, Company defaults, Company administrators, and each community's Community settings page. Holding the grant alone does not show the spec 025 board-mode control and unlocks no other board page (FR-003). A Community Manager reaches Add community from board mode. `[no WFb]`
 - **FR-036a**: Sign-in, token refresh, mode switch and the current-user endpoint MUST succeed for a user with no linked home. Their tokens carry no property, and every resident endpoint refuses them (FR-024g). After sign-in, a user with no usable home lands, in this order:
@@ -644,6 +659,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 
   Removing a user's last home MUST NOT stop them signing in. `[no WFb]`
 - **FR-036b**: Spec 025's board eligibility (the board-mode control, "My Communities", landing and route guard) MUST count memberships in Onboarding communities as well as Active ones. Only Archived communities are excluded.
+- **FR-036c**: There MUST be a **company sign-in page** at a stable address that Company Administrators can bookmark (Clarifications 2026-10-14). It uses the same accounts, credentials, lockout and rate limits as the usual sign-in, and grants nothing by itself. After signing in there, a Company Administrator lands on the portfolio. Anyone else lands on their usual FR-036a landing with a short notice that the account isn't a Company Administrator. Sign-in failures stay as generic as on the usual page (spec 017). `[no WFb]`
 
 ### Company Administrators
 
@@ -791,6 +807,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 - **SC-011**: 100% of removed residents are refused that property on their very next request, and 0 autopay charges start afterwards on any schedule they enrolled.
 - **SC-012**: 0 resident invitations are emailed while their community is Onboarding, and 100% of scheduled invitations whose sender still has authority are emailed when it is marked Active.
 - **SC-013**: 100% of users with no linked home who hold a membership or the Company Administrator role can sign in and land where their work is.
+- **SC-014**: A Company Administrator can reach the portfolio in one step from a bookmark.
 
 ## Assumptions
 

@@ -9,10 +9,10 @@ Project "HOA Management CRM", canvas "NekoHOA Wireframes.html". Attached: spec.m
 
 Add these to section "8 · Company administration" (create it after section 7 if missing, conventions §3). Ids s8-04a to s8-04z. Pages are 1360 wide; a dialog is drawn over its dimmed page, at the page's size. Shared section-8 frames and data go in wf-company.jsx; these artboards in wf-company-settings.jsx.
 
-8.04.a Community settings · Profile · Option A tabs · Company Administrator
-8.04.b Community settings · Profile · Option B side list · Company Administrator
-8.04.c Profile · editing · Option A one Save · Community Manager
-8.04.d Profile · editing · Option B save per field · Community Manager
+8.04.a Community settings · Profile · side list · Company Administrator
+8.04.b Community settings · settings search · Company Administrator
+8.04.c Profile · field saved · Community Manager
+8.04.d Profile · field couldn't save · Community Manager
 8.04.e Profile · required field cleared · Community Manager
 8.04.f Profile · Onboarding notice · Community Manager
 8.04.g Profile · name taken · Community Manager
@@ -20,8 +20,8 @@ Add these to section "8 · Company administration" (create it after section 7 if
 8.04.i Profile · Onboarding · Company Administrator
 8.04.j Mark Active dialog · Keystone Ridge
 8.04.k Profile · marked Active · Company Administrator
-8.04.l Mark Active dialog · no manager · Option A · Keystone Park
-8.04.m Profile · Mark Active disabled · Option B · Company Administrator
+8.04.l Profile · Mark Active disabled · reason on hover · Keystone Park
+8.04.m Mark Active dialog · refused · manager ended meanwhile · Keystone Park
 8.04.n Archive dialog · Old Mill Commons · Sep 30
 8.04.o Archive dialog · open work · Keystone Crossing Master
 8.04.p Profile · Archived · read-only · Company Administrator
@@ -38,7 +38,7 @@ Add these to section "8 · Company administration" (create it after section 7 if
 
 Build the page frame once; briefs 05–07 reuse it. Company Administrator pages use the company-area frame (conventions §7.1). Community Manager pages use WFShellBoard + boardNav() with Jordan Blake's data. Reuse BoardOverview's field grid and sub-associations list, and wf-card, wf-field, wf-pill, wf-btn. Sections 1–7 must render as before.
 
-Pairs a/b, c/d and l/m are alternatives: draw both. Other artboards use Option A. Put brief §4.3's design choices and open questions on DCPostIts.
+Owner decisions (2026-10-14): the section nav is a searchable side list; Profile saves per field with a "✓ Saved" mark beside the field; Mark Active without a manager is a disabled button whose reason shows on hover and on keyboard focus. Put brief §4.3's design choices and open questions on DCPostIts.
 
 Lofi, in section 7's visual language. Layout, copy, states and who sees what are binding; colour and spacing are placeholders. Statuses and flags are words, never colour alone.
 
@@ -65,7 +65,7 @@ The page frame drawn here (header, status actions, section nav, archived banner)
 | Spec item | What the design must show | Artboards |
 | --- | --- | --- |
 | US3 #3 | Marking an Onboarding community Active, when it has an open-ended Community Manager and two scheduled resident invitations, makes it Active and emails both invitations. The dialog names the 2 invitations (lena@example.com, omar@example.com) and when their links stop working. Afterwards the chip reads "Active". | 8.04.j, 8.04.k |
-| US3 #4 | Mark Active on an Onboarding community with no open-ended Community Manager is refused with `NO_ACTIVE_MANAGER`, and it stays Onboarding. Keystone Park has only a pending invitation, which doesn't count. | 8.04.l (Option A), 8.04.m (Option B) |
+| US3 #4 | With no open-ended Community Manager, "Mark Active" is disabled; hovering or focusing it shows the `NO_ACTIVE_MANAGER` reason. If the request is made anyway (for example the only manager was removed after the page loaded), it is refused with the same message, and the community stays Onboarding. Keystone Park has only a pending invitation, which doesn't count. | 8.04.l (disabled, reason), 8.04.m (refused) |
 | US3 #5 | Archiving revokes the pending manager invitation and the pending resident invitation, and their links stop working. The community leaves every switcher. Its profile, settings and Managers and memberships stay readable to the Company Administrator. Nothing is deleted. | 8.04.n (the consequences); 8.04.p, q, r (readable afterwards) |
 | US3 #2 | In an Onboarding community, its Community Manager works as usual: Profile shows the Onboarding notice and the other sections are editable. Board mode works in an Onboarding community (brief 01, 8.01.j, drawn for a Community Manager; a Board Member gets the same shell). A Board Member is still refused Community settings, exactly as in an Active community. | 8.04.f (Community Manager); 8.04.z (Board Member refused); brief 01 8.01.j |
 | US3 #6 | In an archived community, a Board Member's or Community Manager's write from an old tab is refused with the staff `COMMUNITY_ARCHIVED` banner (conventions §6.1). Anyone with no membership or home there gets the generic `FORBIDDEN` message instead, the same as for a community that doesn't exist. The vote itself lives on spec 027's pages, so there is no artboard. | Copy only: conventions §6.1; brief 01 §6 (old tab) |
@@ -77,7 +77,7 @@ The page frame drawn here (header, status actions, section nav, archived banner)
 | US3 #14 | A restored community with no open-ended manager returns to Onboarding. Mark Active is then refused with `NO_ACTIVE_MANAGER`. 8.04.u shows that outcome and its reason. 8.04.l shows the refusal; Briar Hollow gets the same message with its name (§5). Brief 02 draws the portfolio's "No manager" flag. | 8.04.u, 8.04.l; §5 |
 | US3 #15 | In an archived community, the Company Administrator ends Morgan Ellis's manager membership. The last-manager rule doesn't apply while archived. A later restore returns the community to Onboarding, and Morgan has no access. | 8.04.q (End membership offered), 8.04.s (it ends), 8.04.u (restore then returns to Onboarding; Morgan listed as ended) |
 | US3 #16 | Restoring an archived sub-association whose parent is archived is refused with `PARENT_ARCHIVED`, naming the parent. | 8.04.v |
-| US3 #17 | A Community Manager of an Active community edits the profile fields and saves. The toast reads "Profile saved." The log entry is not shown on screen. | 8.04.c, 8.04.d |
+| US3 #17 | A Community Manager of an Active community edits a profile field; it saves when they leave the field and "✓ Saved" appears beside it. Each field save is logged with old and new values (not shown on screen). | 8.04.c, 8.04.d |
 | US3 #18 | A Community Manager renames Keystone Ridge to " KEYSTONE PARK". It is refused with `COMMUNITY_NAME_TAKEN` as "That community name is unavailable.", and the name is unchanged. A Company Administrator would see the other community named (§5). | 8.04.g |
 | US3 #19 | A backfilled community (Keystone Crossing TH): changing only the description saves, and the Profile section still flags the missing required fields. | 8.04.h |
 | US3 #20 | A Community Manager never sees Mark Active, Archive, Restore or Change parent. Status and parent are plain text. If one is reached anyway, the server refuses with "You don't have permission to do that." (§5). | 8.04.c–h |
@@ -126,10 +126,9 @@ The page frame drawn here (header, status actions, section nav, archived banner)
 
    A Community Manager sees no status actions, not even disabled ones (US3 #20; conventions §7.10).
 
-**Section nav,** directly under the header: "Profile" · "Managers and memberships" · "Architectural review", in that order. The current section is marked by more than colour (for example bold and an underline or a bar). **Notifications is not drawn**: no tab, no locked item, no placeholder (FR-029). Each section has its own address, so it can be opened directly (FR-029; brief 07 sends the old ARC settings location to "Architectural review", FR-030).
+**Section nav (owner decision 2026-10-14):** a side list on the left of the content, beside the page's main nav, with a search box at its top. Items: "Profile" · "Managers and memberships" · "Architectural review", in that order. The current section is marked by more than colour (for example bold and an underline or a bar). **Notifications is not drawn**: no tab, no locked item, no placeholder (FR-029). Each section has its own address, so it can be opened directly (FR-029; brief 07 sends the old ARC settings location to "Architectural review", FR-030).
 
-- **Option A (8.04.a):** tabs in a row across the top of the content, under the header.
-- **Option B (8.04.b):** a short vertical list on the left of the content, beside the page's main nav.
+- **Settings search.** Placeholder "Search settings". Typing filters to matching sections and setting labels, shown as "Section › Setting" (for example "Architectural review › Review period"). Choosing a result opens that section and puts focus on that field. With no match: "No settings match “…”." It searches setting labels on this page only, never people or values (8.04.b).
 
 **Archived banner.** In an Archived community, the first thing in every section is this banner (conventions §7.3): "Old Mill Commons is archived. Juniper Row Community Management no longer manages it. Everything here is read-only. Nothing has been deleted."
 
@@ -139,8 +138,7 @@ Top to bottom:
 
 1. **Banners,** when they apply, in this order: the archived banner; the Onboarding notice (Community Manager only, FR-029); the missing-fields notice (when a required field is empty, FR-017).
 2. **"Details" card.** `BoardOverview`'s field grid, as a list of labels and values: Legal name · Community name · County · Formation date · Management start date, then Description at full width. Dates read "Jun 9, 1998". An empty description reads "No description". An empty required field reads "Missing — required". Section 7's "Community GUID" line and the "Amenities" card are not drawn.
-   - Option A (one Save per section): an "Edit profile" button on the card's header bar. It turns the grid into a form with "Save profile" and "Cancel".
-   - Option B (save per field): each row has its own "Edit" button. Editing one row shows its input with "Save" and "Cancel".
+   - **Saving (owner decision 2026-10-14): per field.** For anyone who may edit, the card shows the fields as inputs. A field saves on its own when the person finishes it (leaves the field, or picks a date). While it saves, "Saving…" shows beside it; then "✓ Saved" for a few seconds. A field that fails validation shows its error under it, isn't saved and keeps what was typed. There is no "Edit profile" or "Save profile" button.
 3. **"Status and parent" card.**
    - "Status": the chip, then one sentence on what the status means (§5).
    - "Parent association": the parent's community name, or "None". For a Company Administrator, a "Change parent" button sits beside it (not in an Archived community).
@@ -166,12 +164,12 @@ The spec doesn't decide these. Each post-it says "Design choice", names the draw
 
 | # | Question | Drawn | Other options | Post-it beside |
 | --- | --- | --- | --- | --- |
-| D1 | Section nav: tabs across the top, or a list on the left? (conventions §7.2) | Option A tabs (8.04.a). Option B side list (8.04.b). Briefs 05–07 follow the owner's pick. | — | 8.04.a |
-| D2 | Save: one Save per section, or save per field? (conventions §7.2) | Option A, "Edit profile" then "Save profile" (8.04.c). Option B, "Edit" on each row (8.04.d). Option A gives one error summary and one log entry per save. | — | 8.04.c |
-| D3 | Mark Active when there is no open-ended manager. | Option A: "Mark Active" stays enabled, and the dialog shows the refusal (8.04.l). Option B: "Mark Active" is disabled, with the refusal text beside it (8.04.m). | — | 8.04.l |
+| D1 | Settings search: does it also match words in help text (for example "days")? | Labels only. | Labels and helper text. | 8.04.b |
+| D2 | Where "✓ Saved" sits. | Right of the field's label, for about 3 seconds. | Inside the field's right edge. | 8.04.c |
+| D3 | Besides the hover/focus tooltip, is the reason also written under the disabled button? | Tooltip only, as the owner asked; a small "Why can't I?" link under the button opens the same text for touch screens. | Reason always written under the button. | 8.04.l |
 | D4 | When a dialog already knows the action will be refused (open work, archived parent, no manager), does it say so on opening? | Yes. The dialog asks the server when it opens, for its counts and names (conventions §7.4). If the answer is a refusal, the dialog shows only the refusal and "Close". | Show the consequences first and refuse only after "confirm". A refusal after confirming (for example a race) looks the same either way. | 8.04.o |
 | D5 | Restore's "end a membership first": how is the ending confirmed? | A step inside the restore dialog: the row's "End membership" swaps the dialog to a short confirmation with "End membership" and "Back", then returns to the refreshed restore view (copy in §5; result in 8.04.u). One dialog is open at a time. | Open the End membership dialog (8.04.s) on top of the restore dialog. | 8.04.t |
-| D6 | "No manager" chip in the Community settings header. (conventions §5.4) | Shown to Company Administrators, after the status chip (8.04.l, 8.04.m). | Portfolio only. | 8.04.m |
+| D6 | "No manager" chip in the Community settings header. (conventions §5.4) | Shown to Company Administrators, after the status chip (8.04.l, 8.04.m). | Portfolio only. | 8.04.l |
 | D7 | Change parent picker: are communities that would make a loop listed? Is "No parent" offered? | Both listed. Choosing a descendant is refused inline with `PARENT_CYCLE`. "No parent" is the first option. | Leave descendants out (then `PARENT_CYCLE` shows only from out-of-date data). Leave out "No parent", if a parent can't be removed (Q2). | 8.04.w |
 | D8 | Missing required fields: per-field flags only, or also a notice at the top of Profile? | Both. The notice lists the empty fields. The words "Missing — required" are themselves a design choice (conventions §5.4). | Per-field flags only. | 8.04.h |
 | D9 | Links inside refusal dialogs. | `NO_ACTIVE_MANAGER` offers "Open Managers and memberships". `PARENT_ARCHIVED` offers "Open Old Mill Commons". `OPEN_WORK` offers none, because a Company Administrator can't read architectural applications (FR-003). | No links. | 8.04.l |
@@ -203,45 +201,46 @@ Data that conventions §4 doesn't give is drawn as a short `wf-ph` bar with the 
 
 #### Frame and Profile, Company Administrator
 
-**8.04.a Community settings · Profile · Option A tabs · Company Administrator**
+**8.04.a Community settings · Profile · side list · Company Administrator**
 
 - Person: Robin Hale. No membership in Sakura Heights (US5 #1).
 - Community: Sakura Heights, Active.
 - Header: breadcrumb "Portfolio › Sakura Heights"; "Sakura Heights" with the "Active" chip; "Sakura Heights Homeowners Association, Inc."; no parent line; action "Archive".
-- Section nav Option A, "Profile" current.
-- Profile: the "Details" card in read view with "Edit profile"; the "Status and parent" card with "Active" and its sentence, parent "None" with "Change parent", sub-associations "None".
+- Side list with an empty "Search settings" box, then Profile (current) · Managers and memberships · Architectural review.
+- Profile: the "Details" card as inputs (per-field saving); the "Status and parent" card with "Active" and its sentence, parent "None" with "Change parent", sub-associations "None".
 - State: default.
-- Notes on canvas: "Managers and memberships: briefs 05–06. Architectural review: brief 07, which offers “Reset architectural review to company defaults” (US5 #1, FR-031)." "No Notifications section until the Notification Settings spec lands (FR-029)." Post-its D1 and Q1–Q5.
+- Notes on canvas: "Managers and memberships: briefs 05–06. Architectural review: brief 07, which offers “Reset architectural review to company defaults” (US5 #1, FR-031)." "No Notifications section until the Notification Settings spec lands (FR-029)." Post-its Q1–Q5.
 
-**8.04.b Community settings · Profile · Option B side list · Company Administrator**
+**8.04.b Community settings · settings search · Company Administrator**
 
-- Same person, community and content as 8.04.a. The only difference is the section nav: a vertical list on the left of the content.
-- State: default.
+- Same page as 8.04.a. Robin has typed "review" in "Search settings".
+- The side list shows the results instead of the sections: "Architectural review › Review period", "Architectural review › When the review period ends without a decision", "Architectural review › Reminder to the board". A second note shows a search with no match: "No settings match “parking”."
+- Choosing a result opens Architectural review with focus on that field (brief 07 draws the section).
+- State: search results.
+- Post-it D1.
 
 #### Profile, Community Manager
 
-**8.04.c Profile · editing · Option A one Save · Community Manager**
+**8.04.c Profile · field saved · Community Manager**
 
 - Person: Jordan Blake, in board mode. Community: Sakura Heights, Active.
-- Header: "Sakura Heights" with the "Active" chip and the legal name. No breadcrumb and no status actions.
-- The "Details" card is a form. Values: legal name, "Sakura Heights", "Wake County, NC", "06/09/1998", "07/01/2016". Jordan has typed a description: "Sakura Heights is a community of 120 homes in Wake County, NC." The counter reads "62 / 2,000".
-- Buttons: "Save profile", "Cancel".
-- The "Status and parent" card stays below in read view: "Active", parent "None", sub-associations "None", and the line "Only a Company Administrator can change the status or the parent association."
-- State: editing. After "Save profile", the read view returns with the new description, and the toast "Profile saved." appears (US3 #17). The success is drawn in 8.04.h.
+- Header: "Sakura Heights" with the "Active" chip and the legal name. No breadcrumb and no status actions. Side list as in 8.04.a.
+- The "Details" card shows the six fields as inputs: legal name, "Sakura Heights", "Wake County, NC", "06/09/1998", "07/01/2016". Jordan has just typed a description, "Sakura Heights is a community of 120 homes in Wake County, NC." (counter "62 / 2,000"), and tabbed out of it. "✓ Saved" shows beside the Description label.
+- A second note shows the moment before: "Saving…" beside the label.
+- The "Status and parent" card stays below as text: "Active", parent "None", sub-associations "None", and the line "Only a Company Administrator can change the status or the parent association."
+- State: success (US3 #17).
 - Post-it D2.
 
-**8.04.d Profile · editing · Option B save per field · Community Manager**
+**8.04.d Profile · field couldn't save · Community Manager**
 
-- Same person and community as 8.04.c.
-- The "Details" card is in read view. Each row has an "Edit" button. The Description row is open: the text area holds the same text as 8.04.c, with the counter "62 / 2,000", and "Save" and "Cancel" buttons. Only one row is open at a time.
-- After "Save", the toast reads "Description saved."
-- State: editing one field.
+- Same as 8.04.c, but the save of Description failed for a reason other than validation (for example the connection dropped).
+- Under the field: "Couldn't save. Check your connection and try again." with a "Try again" link. The text Jordan typed stays in the field. The other fields are unaffected.
+- State: error.
 
 **8.04.e Profile · required field cleared · Community Manager**
 
-- Same as 8.04.c (Option A form), but Jordan has cleared County and pressed "Save profile".
-- Error summary at the top of the card: heading "The profile wasn't saved", then one link: "County is required and can't be left empty." The same message is under the County field. Other fields keep what Jordan typed.
-- Focus is on the summary.
+- Same page as 8.04.c. Jordan cleared County and left the field.
+- Under County: "County is required and can't be left empty." The field is not saved; the saved value is still "Wake County, NC" and comes back if Jordan presses Esc. No "✓ Saved" for County. Other fields are unaffected.
 - State: validation error (FR-017).
 
 **8.04.f Profile · Onboarding notice · Community Manager**
@@ -250,14 +249,14 @@ Data that conventions §4 doesn't give is drawn as a short `wf-ph` bar with the 
 - Strip: "Keystone Ridge", the "Onboarding" chip, "· Community Manager".
 - Header: "Keystone Ridge" with the "Onboarding" chip; "Keystone Ridge HOA, Inc.". No status actions.
 - The first thing in Profile is the Onboarding notice: "Keystone Ridge is being set up. A Company Administrator must mark it Active. Resident invitations are sent then." It is a banner (`wf-card lav`), not a toast.
-- "Details" in read view with "Edit profile". "Status and parent": "Onboarding" with its sentence, parent "None", sub-associations "None", the Community Manager line.
+- "Details" as inputs (per-field saving). "Status and parent": "Onboarding" with its sentence, parent "None", sub-associations "None", the Community Manager line.
 - State: default (FR-029).
 
 **8.04.g Profile · name taken · Community Manager**
 
-- Same as 8.04.f, with the "Details" card as a form. Jordan changed Community name to " KEYSTONE PARK" (leading space, capitals) and pressed "Save profile".
+- Same as 8.04.f. Jordan changed Community name to " KEYSTONE PARK" (leading space, capitals) and left the field.
 - The Onboarding notice stays at the top.
-- Error summary: heading "The profile wasn't saved", then the link "That community name is unavailable." The same message is under Community name.
+- Under Community name: "That community name is unavailable." The field isn't saved.
 - The header still reads "Keystone Ridge": the name is unchanged (US3 #18).
 - The message doesn't name Keystone Park and says nothing about it (FR-007).
 - State: refusal.
@@ -268,12 +267,12 @@ Data that conventions §4 doesn't give is drawn as a short `wf-ph` bar with the 
 - Person: Jordan Blake. Community: Keystone Crossing TH, Active, from the spec 025 backfill.
 - Strip: "Keystone Crossing TH · Community Manager".
 - Header: "Keystone Crossing TH" with the "Active" chip; "Legal name: Missing — required"; "Sub-association of Keystone Crossing Master".
-- Toast: "Profile saved." Jordan has just changed only the description.
+- "✓ Saved" beside Description: Jordan has just changed only the description.
 - Missing-fields notice at the top of Profile: "4 required fields are empty: Legal name, County, Formation date and Management start date. Add them when you have them."
-- "Details" in read view. Legal name, County, Formation date and Management start date each read "Missing — required". Community name "Keystone Crossing TH". Description: "Townhome sub-association of Keystone Crossing. 168 homes."
+- "Details" as inputs. Legal name, County, Formation date and Management start date are empty, each with "Missing — required" next to its label. Community name "Keystone Crossing TH". Description: "Townhome sub-association of Keystone Crossing. 168 homes."
 - "Status and parent": "Active", parent "Keystone Crossing Master", sub-associations "None", the Community Manager line.
 - State: success. The save went through although required fields are still empty (US3 #19, FR-017).
-- Described, not drawn: in the form before saving, each empty required field shows "Missing — required" next to its label and the helper "Still empty. You can save other changes without it. Once it has a value, it can't be cleared."
+- Each empty required field also shows the helper "Still empty. You can save other changes without it. Once it has a value, it can't be cleared."
 - Post-it D8.
 
 #### Status: Mark Active
@@ -282,7 +281,7 @@ Data that conventions §4 doesn't give is drawn as a short `wf-ph` bar with the 
 
 - Person: Robin Hale. Community: Keystone Ridge, Onboarding, with Jordan Blake as open-ended manager and 2 scheduled resident invitations.
 - Header: breadcrumb "Portfolio › Keystone Ridge"; "Keystone Ridge" with the "Onboarding" chip; "Keystone Ridge HOA, Inc."; actions "Mark Active" and "Archive".
-- Profile: no Onboarding notice (it is for Community Managers). "Details" as in 8.04.f, with "Edit profile". "Status and parent": "Onboarding" with its sentence, parent "None" with "Change parent", sub-associations "None".
+- Profile: no Onboarding notice (it is for Community Managers). "Details" as in 8.04.f. "Status and parent": "Onboarding" with its sentence, parent "None" with "Change parent", sub-associations "None".
 - State: default.
 
 **8.04.j Mark Active dialog · Keystone Ridge**
@@ -302,23 +301,22 @@ Data that conventions §4 doesn't give is drawn as a short `wf-ph` bar with the 
 - State: success.
 - Note on canvas: "In Residents (brief 06), lena@example.com and omar@example.com now read Pending, expires Oct 15, 2026, 10:00 AM EDT."
 
-**8.04.l Mark Active dialog · no manager · Option A · Keystone Park**
+**8.04.l Profile · Mark Active disabled · reason on hover · Keystone Park**
 
-- Drawn over Keystone Park's Profile, as Robin Hale sees it. Header: breadcrumb "Portfolio › Keystone Park"; "Keystone Park" with the "Onboarding" chip and the "No manager" chip; "Keystone Park HOA, Inc."; actions "Mark Active" (enabled) and "Archive".
-- Title: "Mark Keystone Park Active?"
-- At the top of the dialog, the refusal: "Keystone Park can't be marked Active yet. It needs a Community Manager with no end date. A pending invitation doesn't count until it's accepted."
-- Link "Open Managers and memberships" (D9). Button: "Close". No consequence list, because nothing will happen (D4).
+- Keystone Park's Profile, as Robin Hale sees it. Header: breadcrumb "Portfolio › Keystone Park"; "Keystone Park" with the "Onboarding" chip and the "No manager" chip; "Keystone Park HOA, Inc."; actions "Mark Active" (disabled) and "Archive" (enabled).
+- The pointer is over "Mark Active", and a tooltip shows the reason: "Keystone Park can't be marked Active yet. It needs a Community Manager with no end date. A pending invitation doesn't count until it's accepted." The tooltip ends with the link "Open Managers and memberships" (D9).
+- A second note: "The same tooltip shows when the button gets keyboard focus. The button stays in the Tab order."
 - Keystone Park stays Onboarding.
-- State: refusal (US3 #4, `NO_ACTIVE_MANAGER`).
-- Note on canvas: "Briar Hollow gets the same refusal with its own name (US3 #14)."
-- Post-its D3 and D9.
+- State: disabled with reason (US3 #4, `NO_ACTIVE_MANAGER`).
+- Note on canvas: "Briar Hollow gets the same reason with its own name (US3 #14)."
+- Post-its D3, D6 and D9.
 
-**8.04.m Profile · Mark Active disabled · Option B · Company Administrator**
+**8.04.m Mark Active dialog · refused · manager ended meanwhile · Keystone Park**
 
-- Keystone Park's Profile, as in 8.04.l, with no dialog.
-- "Mark Active" is shown disabled. Right under the actions, its reason: "Keystone Park can't be marked Active yet. It needs a Community Manager with no end date. A pending invitation doesn't count until it's accepted." "Archive" stays enabled.
-- State: refusal shown in advance (Design choice D3, Option B).
-- Post-it D6.
+- Snapshot: Keystone Park had one open-ended manager when Robin opened the page, so "Mark Active" was enabled. Before Robin confirmed, that manager's membership was ended elsewhere.
+- Dialog title: "Mark Keystone Park Active?" At the top, the refusal: "Keystone Park can't be marked Active yet. It needs a Community Manager with no end date. A pending invitation doesn't count until it's accepted." Link "Open Managers and memberships". Button "Close".
+- After "Close", the page refreshes and "Mark Active" is disabled, as in 8.04.l.
+- State: refusal (server check, `NO_ACTIVE_MANAGER`).
 
 #### Status: Archive
 
@@ -354,7 +352,7 @@ Data that conventions §4 doesn't give is drawn as a short `wf-ph` bar with the 
 - Person: Robin Hale. Community: Old Mill Commons, Archived since Sep 30, 2026.
 - Header: breadcrumb "Portfolio › Old Mill Commons"; "Old Mill Commons" with the "Archived" chip; "Old Mill Commons Association, Inc."; one action, "Restore".
 - Section nav as usual. All three sections can be opened (US5 #7).
-- Profile: the archived banner first. "Details" values as plain text, with no "Edit profile" and no "Edit" buttons. "Status and parent": "Archived" with its sentence, parent "None" with no "Change parent", sub-associations "Old Mill Commons Villas · Archived".
+- Profile: the archived banner first. "Details" values as plain text, not inputs. "Status and parent": "Archived" with its sentence, parent "None" with no "Change parent", sub-associations "Old Mill Commons Villas · Archived".
 - State: read-only.
 
 **8.04.q Managers and memberships · Archived · read-only · Company Administrator**
@@ -514,8 +512,6 @@ Quote these exactly. "SR" means text for screen readers only. Names and counts c
 | Field labels | "Legal name" · "Community name" · "County" · "Formation date" · "Management start date" · "Description" |
 | Empty description | "No description" |
 | Empty required field | "Missing — required" (SR: "Legal name: missing, required") |
-| Option A button | "Edit profile" |
-| Option B row button | "Edit" (SR: "Edit county") |
 | Card heading | "Status and parent" |
 | Labels | "Status" · "Parent association" · "Sub-associations" |
 | No parent, no sub-associations | "None" |
@@ -539,13 +535,13 @@ Quote these exactly. "SR" means text for screen readers only. Names and counts c
 
 | Element | Text |
 | --- | --- |
-| Option A buttons | "Save profile" (busy: "Saving…") · "Cancel" |
-| Option B buttons | "Save" (busy: "Saving…") · "Cancel" |
-| Error summary heading | "The profile wasn't saved" |
-| Success toast, Option A | "Profile saved." |
-| Success toast, Option B | "Description saved." (the field's name) |
+| While a field saves | "Saving…" beside the field's label |
+| After a field saves | "✓ Saved" beside the field's label, for about 3 seconds (SR: "Description saved") |
+| Field save failed (not validation) | "Couldn't save. Check your connection and try again." with "Try again" |
+| Settings search | Placeholder "Search settings"; result "Architectural review › Review period"; no match "No settings match “parking”." |
+| Mark Active disabled reason (tooltip) | "Keystone Park can't be marked Active yet. It needs a Community Manager with no end date. A pending invitation doesn't count until it's accepted." Link "Open Managers and memberships". Touch link under the button: "Why can't I?" |
 
-**Validation** (conventions §6.3; each appears in the summary and under its field):
+**Validation** (conventions §6.3; each appears under its field):
 
 - "Enter the legal name." · "Legal name can be at most 200 characters."
 - "Enter a community name." · "Community name must be 2 to 80 characters."
@@ -703,17 +699,17 @@ Conventions §6.1 names a toast for this case, while §7.8 says a toast never ca
 - The page is addressed by the community, not by board mode's active community. So it opens for Onboarding and Archived communities that are in no switcher (FR-029).
 - Every section has its own address. The old ARC settings location opens Architectural review (FR-030; brief 07).
 
-**Section nav.** Choosing a section opens it. The header stays the same. Focus moves to the section's first heading. The browser's Back returns to the previous section.
+**Section nav.** The side list's search box filters to sections and setting labels; choosing a result opens that section and focuses the field. Choosing a section opens it. The header stays the same. Focus moves to the section's first heading. The browser's Back returns to the previous section.
 
-**Editing the profile, Option A**
+**Editing the profile (per field)**
 
-- "Edit profile" turns the "Details" card into a form. Focus moves to the first field.
-- "Cancel" drops the changes and returns to the read view. Focus returns to "Edit profile".
-- "Save profile" checks the fields. If any fail, the error summary appears at the top of the card and takes focus. Each link in it moves focus to its field. Nothing is saved.
-- On success: the read view returns with the new values, the toast "Profile saved." is shown, and focus returns to "Edit profile". If the community name changed, the page title and the breadcrumb change with it.
-- A server refusal (`COMMUNITY_NAME_TAKEN`) shows like a validation error. The name and the title stay as they were.
+- Each field is an input. When the person leaves a field (Tab, click elsewhere) or picks a date, that field alone is checked and saved.
+- While saving: "Saving…" beside the label. On success: "✓ Saved" beside the label for about 3 seconds, and the change is logged with old and new values. If the community name changed, the page title and the breadcrumb change with it.
+- On a validation error or `COMMUNITY_NAME_TAKEN`: the message appears under the field, the field isn't saved, and the typed text stays. Esc puts back the saved value.
+- On any other failure: "Couldn't save. Check your connection and try again." under the field, with "Try again".
+- Leaving the page with a field that failed to save asks "Leave without saving County?" with "Leave" and "Stay".
 
-**Editing the profile, Option B.** "Edit" on a row opens that row only. "Save" saves that field alone. "Cancel" closes the row. Errors appear under the field. The toast names the field: "Description saved."
+**Mark Active when it can't be done.** The button is disabled. Hover or keyboard focus shows the tooltip with the reason (8.04.l). On touch screens, "Why can't I?" under the button shows the same text. If the request is made anyway and refused (8.04.m), the dialog shows the refusal and the page refreshes after "Close".
 
 **Status actions, all dialogs**
 
@@ -758,9 +754,11 @@ Conventions §8 applies. For this page:
 - **Landmarks.** The breadcrumb is a navigation landmark named "Breadcrumb". The section nav is a navigation landmark named "Community settings sections". Its items are links, because each section has its own address. The current one is marked as current, in text and by more than colour.
 - **Keyboard order:** main nav → breadcrumb → status actions → section nav → section content. Status actions come before the sections because they belong to the whole community.
 - **Status actions.** Button names say the community: "Archive Keystone Ridge". "Archive" is marked as destructive by its words and its place, not only by colour.
-- **Disabled Mark Active (Option B).** It stays focusable and is announced as unavailable, with its reason as its description. The reason is visible text next to it, not a tooltip.
+- **Disabled Mark Active.** It stays in the Tab order (aria-disabled, not removed) and is announced as unavailable, with its reason as its description. The tooltip opens on hover and on keyboard focus, stays while the pointer is over it, and closes with Esc. On touch screens, "Why can't I?" shows the same text.
+- **Per-field saving.** "Saving…" and "✓ Saved" are announced politely ("Description saved"). Errors are tied to their field and announced at once. Focus never jumps on save.
+- **Settings search.** A labelled search field; the result count is announced ("3 settings match"). Results are links.
 - **Read views.** Labels and values form a description list. Archived values are plain text, not disabled inputs, so nothing looks usable.
-- **Forms.** Every field has a visible label with "(required)" or "(optional)" in words. Helper text, errors and the description counter are tied to their field. The error summary takes focus, and its links move focus to the field.
+- **Forms.** Every field has a visible label with "(required)" or "(optional)" in words. Helper text, errors and the description counter are tied to their field.
 - **Words, not colour.** Status chips, "No manager", "Missing — required", "Revoked — community archived" and "Ended Oct 12, 2026" are text. Icons only add to them.
 - **Banners.** The archived banner, the Onboarding notice and the missing-fields notice are static text at the top of the section. They are not live regions.
 - **Dialogs.** Focus moves to the title on open and stays inside. Esc acts as "Cancel" or "Close". On close, focus returns to the opening button, or to the page title if that button is gone. Consequence lines are a real list.
@@ -768,7 +766,7 @@ Conventions §8 applies. For this page:
 - **End-first step (D5).** Focus moves to the step's title. "Back" returns focus to the row's "End membership" button. After ending, the status line is announced politely and focus moves to it.
 - **Toasts** are announced politely, don't take focus, and stay long enough to read. Nothing in a toast needs action.
 - **Contrast:** 4.5:1 for text, including chips and placeholder text; 3:1 for control borders and the current-section marker. In board mode, the banner stays dark ink on violet (spec 025 FR-038).
-- **Zoom.** At 200%, the status actions wrap under the title, and Option A's tabs wrap or scroll inside their row. The page itself doesn't scroll sideways.
+- **Zoom.** At 200%, the status actions wrap under the title, and the side list moves above the content. The page itself doesn't scroll sideways.
 
 ## 8. Out of scope for this design
 
@@ -786,20 +784,19 @@ Conventions §8 applies. For this page:
 
 ## 9. Design review checklist
 
-- [ ] **FR-029, frame.** The page shows exactly Profile, Managers and memberships and Architectural review, in that order. There is no Notifications tab, locked item or placeholder (8.04.a, b).
-- [ ] **D1.** Section nav is drawn as tabs (8.04.a) and as a side list (8.04.b), each labelled "Design choice".
+- [ ] **FR-029, frame.** The page shows exactly Profile, Managers and memberships and Architectural review, in that order. There is no Notifications item, locked item or placeholder (8.04.a, b).
+- [ ] **Section nav.** A side list with a working "Search settings" box; searching "review" lists Architectural review settings, and a no-match message exists (8.04.a, b).
 - [ ] **FR-029, addressing.** A Company Administrator's page has the breadcrumb "Portfolio › <community>" and opens for Onboarding (8.04.i) and Archived (8.04.p) communities. A Community Manager's page is in board mode with "Community settings" current (8.04.c–h).
 - [ ] **US5 #1.** Robin Hale, with no membership, sees an editable Profile, the status actions for the current status, and a note that brief 07's section offers "Reset architectural review to company defaults" (8.04.a, i).
 - [ ] **US5 #2, US3 #20.** No Community Manager artboard shows Mark Active, Archive, Restore or Change parent, not even disabled. Status and parent are plain text with "Only a Company Administrator can change the status or the parent association." (8.04.c–h).
-- [ ] **US3 #17.** A Community Manager edits the six fields of an Active community and saves (8.04.c, d).
-- [ ] **D2.** Saving is drawn as one Save per section (8.04.c) and save per field (8.04.d), each labelled "Design choice".
-- [ ] **FR-017.** Clearing a filled required field shows "County is required and can't be left empty." in the summary and under the field (8.04.e).
+- [ ] **US3 #17.** A Community Manager edits a field of an Active community; it saves on leaving the field, with "Saving…" then "✓ Saved" beside it, and a failed save keeps the text (8.04.c, d).
+- [ ] **FR-017.** Clearing a filled required field shows "County is required and can't be left empty." under the field, and it isn't saved (8.04.e).
 - [ ] **US3 #18.** Renaming Keystone Ridge to " KEYSTONE PARK" shows "That community name is unavailable." and names nothing. The title still reads "Keystone Ridge". The Company Administrator's wording is in a note (8.04.g).
 - [ ] **US3 #19.** Keystone Crossing TH saves a description change. The header, the notice and the fields still say "Missing — required" (8.04.h).
 - [ ] **FR-029, notice.** Jordan sees "Keystone Ridge is being set up. A Company Administrator must mark it Active. Resident invitations are sent then." on Profile (8.04.f, g).
 - [ ] **FR-010, actions.** Onboarding shows Mark Active and Archive; Active shows Archive; Archived shows Restore (8.04.a, i, k, p).
 - [ ] **US3 #3.** The Mark Active dialog names lena@example.com and omar@example.com and the expiry "Oct 15, 2026, 10:00 AM EDT". Afterwards the chip reads "Active" and the toast confirms 2 invitations emailed (8.04.j, k).
-- [ ] **US3 #4, D3.** Keystone Park's Mark Active is refused with the `NO_ACTIVE_MANAGER` message, in the dialog (8.04.l) and as a disabled button with the same reason (8.04.m). The pending invitation shows as an email only.
+- [ ] **US3 #4.** Keystone Park's "Mark Active" is disabled, and hovering or focusing it shows the `NO_ACTIVE_MANAGER` reason (8.04.l). A request made anyway is refused with the same message (8.04.m). The pending invitation shows as an email only.
 - [ ] **US3 #5, #7, FR-012, FR-013.** The archive dialog shows 3 autopay schedules cancelled, 79 residents emailed, residents' "No longer managed" read access, 2 named invitations revoked, 5 named memberships kept with no access, leaving the switchers, read-only, nothing deleted, and restore's limits (8.04.n).
 - [ ] **US3 #10, #11, FR-014.** The open-work refusal lists ARC-1041 · Open, ARC-1042 · Decision Reached and both sub-associations. ARC items aren't links. The only button is "Close" (8.04.o).
 - [ ] **US5 #7, FR-012.** Every section of Old Mill Commons is read-only, with the archived banner. Values are plain text. The only actions are Restore and End membership. drew@example.com reads "Revoked — community archived". Residents are shown, read-only (8.04.p, q, r).

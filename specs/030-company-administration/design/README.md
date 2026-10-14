@@ -60,17 +60,22 @@ Coverage was checked mechanically against the spec on 2026-10-13:
 - **Copy.** Refusal messages are quoted the same way in every brief, from conventions §6. One sample dataset is used throughout.
 - **Review.** Each brief was written against the spec and conventions. The planned per-brief review agents did not run, because of usage limits. These checks were done by hand instead: dataset names, refusal copy, 72-hour expiry, artboard ids and scenario coverage. Review each brief's §9 checklist when the designs come back.
 
-## Design choices for you
+## Design choices
 
-The briefs ask Claude Design to draw these as side-by-side alternatives. Pick one of each while reviewing:
+Decided by the owner on 2026-10-14. The briefs already draw only these:
+
+| Where | Decision |
+| --- | --- |
+| 01 Company area entry | A bookmarkable **company sign-in page** (8.01.a–c), plus a **Company** menu in the account controls that opens the company shell (8.01.d–f) |
+| 02 Portfolio sort | **A–Z by community name**; Community name, Status and Parent columns sortable; a **No manager** filter (8.02.a, b) |
+| 04 Settings section nav | **Side list with a settings search box** (8.04.a, b) |
+| 04 Profile saving | **Per field**, saved when the field is finished, with **"✓ Saved"** beside it (8.04.c–e). Architectural review keeps one Save, as in spec 027 |
+| 04 Mark Active without a manager | **Disabled button**; the reason shows on hover and on keyboard focus (8.04.l); a request made anyway is refused (8.04.m) |
+
+Still open:
 
 | Where | Option A | Option B |
 | --- | --- | --- |
-| 01 Company area entry (8.01.a–f) | A third **Company** mode next to Resident/Board | A **Company** menu in the account controls that opens a company shell |
-| 02 Portfolio sort (8.02.a/b) | A–Z by community name | "No manager" rows first, then A–Z |
-| 04 Settings section nav (8.04.a/b) | Tabs | Side list |
-| 04 Profile saving (8.04.c/d) | One Save for the section | Save per field |
-| 04 Mark Active without a manager (8.04.l/m) | Button works; the dialog explains the refusal | Button disabled with the reason beside it |
-| 06 Residents detail (8.06.a/y) | Everything in the table rows | A property drawer opened from a row |
+| 06 Residents detail (8.06.a/y) | Everything in the table rows | A **property drawer**: a panel that slides in from the right when you click a property, showing all its residents, invitations and actions while the list stays visible behind it |
 
 Each brief also lists its smaller design choices and open questions on post-its, for example whether an expired invitation link may show any invitation details (the briefs take the safe default: no).

@@ -11,13 +11,13 @@ Add these artboards to section "8 · Company administration". Create it after se
 
 §4 gives each artboard's person, data, states and design choices; §5 gives the exact copy.
 
-Company entry, two alternatives as separate artboards:
-8.01.a Company area · Option A · Company mode · Company Administrator (Robin Hale)
-8.01.b Company area · Option A · Company mode · Company Administrator and Board Member (Casey Novak)
-8.01.c Board mode · Option A · mode control · Company Administrator and Board Member (Casey)
-8.01.d Board mode · Option B · Company menu open · Company Administrator and Board Member (Casey)
-8.01.e Company area · Option B · company shell · Company Administrator and Board Member (Casey)
-8.01.f Company area · Option B · company shell · Company Administrator (Robin)
+Company sign-in and company entry (owner decision: a bookmarkable company sign-in page, plus a "Company" menu in the account controls):
+8.01.a Company sign-in · bookmarkable page · Company Administrator (Robin Hale)
+8.01.b Company sign-in · not a Company Administrator · Community Manager (Jordan Blake)
+8.01.c Company sign-in · sign-in failed · Company Administrator (Robin)
+8.01.d Board mode · Company menu open · Company Administrator and Board Member (Casey Novak)
+8.01.e Company area · company shell · Company Administrator and Board Member (Casey)
+8.01.f Company area · company shell · Company Administrator (Robin)
 8.01.g Company area · Community settings open · Company Administrator (Robin)
 8.01.h Company area · board page refused · Company Administrator (Robin)
 
@@ -53,20 +53,21 @@ When done, open the canvas and check that each artboard renders in its stated st
 - **Board Members and Accountants** (Lee Morales, Avery Quinn) see the new board-nav entries locked, as spec 025 FR-040 requires for entries their role doesn't confer. A Board Member appointed co-manager gets the entries unlocked (US2 #3).
 - **Everyone** who signs in lands somewhere useful, even with no linked home (FR-036a). The flow artboard shows the order. Brief 11 draws the landing pages themselves.
 
-The owner picks Option A or Option B from this brief's artboards. Until then, briefs 02–09 use the neutral company frame in conventions §7.1. Only the frame changes once a choice is made.
+**Owner decision (2026-10-14):** Company Administrators get their own sign-in page at a stable address they can bookmark (FR-036c). Inside the app they move around with a "Company" menu in the top-bar account controls, which opens the company shell. (This was Option B; the earlier Option A, a third "Company" mode in the mode control, is dropped.) Briefs 02–09 draw their pages in this company shell.
 
 ## 3. Spec traceability
 
 | Spec item | What the design must show | Artboards |
 | --- | --- | --- |
-| FR-036 (entry) | A Company Administrator opens the company area from the top-bar account controls, with no community membership. Two alternatives: A, a "Company" mode in the mode control; B, a "Company" menu in the account cluster that opens a company shell. | 8.01.a, 8.01.b, 8.01.d, 8.01.e, 8.01.f |
-| FR-036 (contents) | The company area nav holds Portfolio, Add community, Company defaults and Company administrators. Each community's Community settings page opens inside the company area. | 8.01.a, 8.01.b, 8.01.e, 8.01.f, 8.01.g |
-| FR-036 (grant alone) | Robin, who holds only the grant, sees no "Board" option, no "Enter board mode" and no board nav. A link to a board page is refused and Robin is returned to the portfolio. | 8.01.a, 8.01.f, 8.01.h |
-| FR-036 (both roles) | Casey, a Company Administrator and a Board Member, sees the company entry and the board-mode control, in both options. | 8.01.b, 8.01.c, 8.01.d, 8.01.e |
+| FR-036 (entry) | A Company Administrator opens the company area from a "Company" menu in the top-bar account controls, with no community membership. The menu opens the company shell. | 8.01.d, 8.01.e, 8.01.f |
+| FR-036c | A company sign-in page at a stable address that Company Administrators can bookmark. Same sign-in rules as the usual page. A Company Administrator lands in the company area. Anyone else is signed in to their usual landing with a short notice; the page grants nothing. | 8.01.a, 8.01.b, 8.01.c |
+| FR-036 (contents) | The company area nav holds Portfolio, Add community, Company defaults and Company administrators. Each community's Community settings page opens inside the company area. | 8.01.e, 8.01.f, 8.01.g |
+| FR-036 (grant alone) | Robin, who holds only the grant, sees no "Board" option, no "Enter board mode" and no board nav. A link to a board page is refused and Robin is returned to the portfolio. | 8.01.f, 8.01.h |
+| FR-036 (both roles) | Casey, a Company Administrator and a Board Member, sees the Company menu and the board-mode control. | 8.01.d, 8.01.e |
 | FR-036 (last sentence) | "A Community Manager reaches Add community from board mode." An "Add community" board-nav entry, unlocked for Community Managers. | 8.01.i, 8.01.j, 8.01.l |
 | FR-029 | "Community Managers reach it from board mode in the active community": a "Community settings" board-nav entry opens the active community's page. "Company Administrators reach it from the portfolio": a breadcrumb "Portfolio › Keystone Park". The page opens for a community that is in no switcher. | 8.01.i, 8.01.g |
 | FR-035 | The portfolio is never offered to anyone but a Company Administrator: no company entry and no Portfolio nav item, not even locked. A direct request is refused with 403 `FORBIDDEN`. | 8.01.i, 8.01.k, 8.01.o, 8.01.q |
-| FR-036a | The landing order for a user with no usable home: 1 board mode, 2 company area, 3 "Your community isn't live yet", 4 "No home linked to this account". | 8.01.r; the landings themselves in 8.01.a, 8.01.f, 8.01.c, 8.01.j, 8.01.m |
+| FR-036a | The landing order for a user with no usable home: 1 board mode, 2 company area, 3 "Your community isn't live yet", 4 "No home linked to this account". | 8.01.r; the landings themselves in 8.01.f, 8.01.d, 8.01.j, 8.01.m |
 | FR-036b | Memberships in Onboarding communities count for the board-mode control, "My Communities", landing and the route guard. Only Archived communities are excluded. | 8.01.j, 8.01.m, 8.01.n |
 | FR-012 (switchers) | An Archived community "MUST NOT appear in any board or manager community switcher or in 'My Communities'". | 8.01.o, and its absence in 8.01.m and 8.01.n |
 | US6 #6 | "Given I am a Community Manager, When I use the app, Then the portfolio is never offered to me. When I request it directly, Then I am refused with 403 `FORBIDDEN`. My own communities stay in my existing switcher." | 8.01.i (never offered), 8.01.q (refused, landing with toast), 8.01.m (own communities stay) |
@@ -74,7 +75,7 @@ The owner picks Option A or Option B from this brief's artboards. Until then, br
 | US2 #1 (switcher) | Pat's pending invitation puts Keystone Park in no switcher ("A pending invitation does not count as a manager", FR-022). After Pat accepts, Pat holds an open-ended Community Manager membership and Keystone Park is Pat's board-mode community. | 8.01.j |
 | US2 #2 | "Pat signs in to board mode for that community, although Pat has no linked home." | 8.01.j, 8.01.r |
 | US2 #3 | Lee, a Board Member, is appointed co-manager directly from the people list and "holds an active Community Manager membership in A at once, with no invitation". Lee's board nav changes from locked to unlocked entries. | 8.01.k, 8.01.l |
-| US9 #1 | "Given I am a Company Administrator with no linked home and no community membership, When I sign in, Then I land on the portfolio." | 8.01.a, 8.01.f, 8.01.r |
+| US9 #1 | "Given I am a Company Administrator with no linked home and no community membership, When I sign in, Then I land on the portfolio." Both from the usual sign-in page and from the company sign-in page. | 8.01.a, 8.01.f, 8.01.r |
 | US9 #2 | "Given I hold an effective Community Manager membership in an Onboarding or Active community and no linked home, When I sign in, Then I land in board mode for that community." One community: Pat lands on Keystone Park. Several: Jordan lands on My Communities (spec 025 FR-025). | 8.01.j, 8.01.m, 8.01.r |
 
 ## 4. Artboards
@@ -85,7 +86,7 @@ All people, communities and dates come from conventions §4. "Now" is Monday, Oc
 
 **Board-mode frame.** `WFShellBoard`, unchanged except for the data passed in:
 
-- **Top bar cluster**, left to right: (Option B only, Company Administrators only) the "Company" menu button; the mode control; alerts "🔔 3"; the avatar with the person's initials (RH, CN, JB, PR, LM, AQ). Everything sits to the left of alerts and avatar, per spec 025 FR-019.
+- **Top bar cluster**, left to right: (Company Administrators only) the "Company" menu button; the mode control; alerts "🔔 3"; the avatar with the person's initials (RH, CN, JB, PR, LM, AQ). Everything sits to the left of alerts and avatar, per spec 025 FR-019.
 - **Violet banner**, unchanged: dark ink on violet, no control.
 - **Strip:** the active community's name in bold, then " · " and the person's role or roles in that community, in title case ("Community Manager", "Board Member · Community Manager"). If the community is Onboarding, an "Onboarding" chip follows the name (design choice D8). Leave out section 7's right-hand mono handle; in spec 030 the community name is the handle (FR-007). On "My Communities", where no community is active yet, the strip reads "No community chosen yet".
 - **Left nav** from `boardNav()`, with two new data entries. Add them behind a new option that defaults off, so section 7's nav renders as before. Let `boardNav()` take a set of roles as well as one role, because Lee holds two (spec 025 FR-027, the union of active roles).
@@ -95,21 +96,14 @@ All people, communities and dates come from conventions §4. "Now" is Monday, Oc
   - Everything else is section 7's nav. Finance items stay locked for Board Members, as in section 7.
 - **Body:** a `wf-ph` placeholder naming the page and who draws it, for example "Community Home — section 7, unchanged" or "Community settings · Sakura Heights — briefs 04–07".
 
-**Company-area frame.** Conventions §7.1, plus the top bar of the option being drawn:
+**Company-area frame.** Conventions §7.1, plus the company top bar below:
 
 - No violet banner. The violet banner means board mode.
 - **Strip:** "Juniper Row Community Management · Company area".
 - **Left nav,** no group headings, in this order: Portfolio · Add community · Company defaults · Company administrators. No locks: everyone who sees this frame can use every entry.
 - **Body:** the page title (`wf-h1`) and a dashed placeholder naming the brief that draws the page: "Portfolio — brief 02", "Add community — brief 03", "Company defaults — brief 08", "Company administrators — brief 09", "Community settings — briefs 04–07".
 
-**Option A top bar.** One mode control (`.wfb-mode`), segments in this order: Resident · Board · Company. The current mode's segment is on.
-
-- "Resident" is shown as today (design choice D2).
-- "Board" is shown only to people with an effective Board Member, Accountant or Community Manager membership in an Onboarding or Active community (spec 025 FR-020, FR-036b).
-- "Company" is shown only to Company Administrators.
-- So Robin sees "Resident · Company", Casey sees "Resident · Board · Company", and Jordan, Pat, Lee and Avery see "Resident · Board", as today.
-
-**Option B top bar.** Spec 025's board-mode control, unchanged and only for board-eligible people: the "🗝️ Enter board mode" chip outside board mode (as in `BoardModeSwitch`), and "Resident · Board" in board mode. For Company Administrators only, a "Company" menu button sits to its left. Its menu lists: Portfolio · Add community · Company defaults · Company administrators. In the company shell, the "Company" button shows as current.
+**Company top bar.** Spec 025's board-mode control, unchanged and only for board-eligible people: the "🗝️ Enter board mode" chip outside board mode (as in `BoardModeSwitch`), and "Resident · Board" in board mode. For Company Administrators only, a "Company" menu button sits to its left. Its menu lists: Portfolio · Add community · Company defaults · Company administrators. In the company shell, the "Company" button shows as current.
 
 ### 4.2 Design choices (each goes on a `DCPostIt`)
 
@@ -118,9 +112,9 @@ The spec doesn't decide these. Draw the first option. Put the question and the o
 | # | Question | Drawn | Other options | Post-it beside |
 | --- | --- | --- | --- | --- |
 | D1 | Where does "Add community" sit in the board nav? | Top block, after "My Communities". | The last item of the nav, after "Reports". | 8.01.i |
-| D2 | What does "Resident" do for a person with no usable home (Robin, Casey, Jordan, Pat)? The spec says the mode switch must work for them (FR-036a), but not what they then see. Their resident pages are refused, and the app sends them back to their FR-036a landing (FR-024g). | "Resident" shown as today. For Robin under Option A: "Resident · Company". | Leave "Resident" out for people with no usable home. Under Option A, Robin would then see "Company" alone. | 8.01.a |
-| D3 | In board mode, does a Company Administrator who is not a Community Manager there (Casey) get "Community settings" and "Add community" as working links? The server would allow both, because Casey is a Company Administrator. | Locked, like any Board Member. The board nav follows community roles (spec 025 FR-027, FR-040). Casey uses the company area for both (FR-029, FR-036). | Unlocked links that open those pages in the company area. | 8.01.c |
-| D4 | Option A only: is "Company" remembered as the last-used mode (spec 025 FR-022)? For people with no usable home, FR-036a fixes the landing anyway: board mode comes before the company area, so Casey still lands in board mode. The spec says nothing for a Company Administrator who has a home. | Not remembered. Sign-in follows FR-036a and spec 025. | Remembered, for Company Administrators with a usable home only. | 8.01.b |
+| D2 | What does "Resident" do for a person with no usable home (Robin, Casey, Jordan, Pat)? The spec says the mode switch must work for them (FR-036a), but not what they then see. Their resident pages are refused, and the app sends them back to their FR-036a landing (FR-024g). | "Resident" shown as today, where spec 025 shows it. | Leave "Resident" out for people with no usable home. | 8.01.f |
+| D3 | In board mode, does a Company Administrator who is not a Community Manager there (Casey) get "Community settings" and "Add community" as working links? The server would allow both, because Casey is a Company Administrator. | Locked, like any Board Member. The board nav follows community roles (spec 025 FR-027, FR-040). Casey uses the company area for both (FR-029, FR-036). | Unlocked links that open those pages in the company area. | 8.01.d |
+| D4 | How different does the company sign-in page look from the usual sign-in page? | The usual sign-in layout (wf-auth), titled "Company sign-in" with the company name, and a line saying it is for Juniper Row staff. | Identical to the usual page except for the title. | 8.01.a |
 | D5 | Is a quicker community switcher wanted? US6 #6 says "my existing switcher". Today, and in section 7, the only way to switch is "My Communities". | 8.01.n draws an optional menu on the strip's community name. "My Communities" stays either way. | No new control. "My Communities" is the only switcher. | 8.01.n |
 | D6 | In the company area, how does the left nav show that a community's Community settings page is open? | "Portfolio" stays current. The breadcrumb names the community. | A child item under "Portfolio" with the community's name. | 8.01.g |
 | D7 | Order of rows in "My Communities" and the switcher. | Alphabetical by community name. | Onboarding communities first, then alphabetical. | 8.01.m |
@@ -128,53 +122,54 @@ The spec doesn't decide these. Draw the first option. Put the question and the o
 
 ### 4.3 Company entry (FR-036)
 
-**8.01.a Company area · Option A · Company mode · Company Administrator**
+**8.01.a Company sign-in · bookmarkable page · Company Administrator**
 
-- **Person:** Robin Hale, Company Administrator. No community membership. No home. Avatar "RH".
-- **Shows:** the company-area frame with Option A's top bar. Mode control "Resident · Company", with "Company" on. No "Board" segment and no board nav (FR-036). Nav: "Portfolio" current. Body: title "Portfolio" and the placeholder "Portfolio — brief 02".
-- **Why here:** this is where Robin lands after signing in (FR-036a step 2, US9 #1).
+- **Person:** Robin Hale, Company Administrator. No community membership. No home.
+- **Shows:** the sign-in look of section 1 (`wf-auth.jsx`), not the app shell. Title "Company sign-in". Line under it: "For Juniper Row Community Management staff. Bookmark this page." Fields "Email" and "Password", button "Sign in", link "Forgot password?" (today's flow, unchanged). Below the card, small text: "Not company staff? Use the usual sign-in page." with a link. A canvas note shows the stable address, for example "/company/sign-in" (the exact path is a build decision).
+- **After sign-in:** Robin lands in the company area, on the portfolio (8.01.f; FR-036c, FR-036a step 2).
 - **States:** default.
-- **Notes on canvas:** "Robin holds only the grant: no Board option (FR-036)". Post-it D2.
+- **Notes on canvas:** "Same accounts, passwords, lockout and rate limits as the usual sign-in page. The page grants nothing by itself (FR-036c)." Post-it D4.
 
-**8.01.b Company area · Option A · Company mode · Company Administrator and Board Member**
+**8.01.b Company sign-in · not a Company Administrator · Community Manager**
 
-- **Person:** Casey Novak, Company Administrator and Board Member of Keystone Crossing Master. No home. Avatar "CN".
-- **Shows:** the same frame and body as 8.01.a. Mode control "Resident · Board · Company", with "Company" on.
-- **States:** default.
-- **Notes on canvas:** "Casey is also a Board Member, so Board is offered too (FR-036)". Post-it D4.
+- **Person:** Jordan Blake, Community Manager, not a Company Administrator.
+- **Shows:** where Jordan lands after signing in on the company sign-in page: Jordan's usual landing, board mode "My Communities" (board-mode frame), with a notice at the top of the body: "This account isn't a Company Administrator, so you've been signed in to your usual page."
+- **Why here:** the company sign-in page only changes where a Company Administrator lands. Anyone else signs in normally (FR-036c, FR-036a).
+- **States:** notice.
 
-**8.01.c Board mode · Option A · mode control · Company Administrator and Board Member**
+**8.01.c Company sign-in · sign-in failed · Company Administrator**
+
+- **Person:** Robin Hale, wrong password.
+- **Shows:** 8.01.a with today's generic sign-in failure message above the fields (spec 017; it never says whether the email has an account). A second note shows the rate-limit message from conventions §6.2: "Too many requests. Wait a few minutes, then try again."
+- **States:** refusal.
+
+**8.01.d Board mode · Company menu open · Company Administrator and Board Member**
 
 - **Person:** Casey Novak.
-- **Shows:** the board-mode frame. Mode control "Resident · Board · Company", with "Board" on. Strip "Keystone Crossing Master · Board Member". Nav as a Board Member with one community: no "My Communities"; "Add community" locked; "Community Home" current; "Community settings" locked; Finance "AP Ledger" and "Vendor Aging" locked, as in section 7. Body: "Community Home — section 7, unchanged".
-- **Why here:** Casey lands here after signing in (FR-036a step 1: board mode comes before the company area; spec 025 FR-026: one community, so its Community Home).
-- **States:** default.
+- **Shows:** the board-mode frame with the company top bar. Strip "Keystone Crossing Master · Board Member". Nav as a Board Member with one community: no "My Communities"; "Add community" and "Community settings" locked (D3); Finance items locked as in section 7. Top bar: "Company" menu button (open), then "Resident · Board" with "Board" on, then alerts and avatar. The open menu has a small heading "Company area" and four items: Portfolio · Add community · Company defaults · Company administrators.
+- **Why here:** Casey lands in board mode after signing in on the usual page (FR-036a step 1). The Company menu is how Casey gets to the company area.
+- **States:** menu open.
 - **Notes on canvas:** post-it D3.
 
-**8.01.d Board mode · Option B · Company menu open · Company Administrator and Board Member**
+**8.01.e Company area · company shell · Company Administrator and Board Member**
 
 - **Person:** Casey Novak.
-- **Shows:** the board-mode frame and nav of 8.01.c, with Option B's top bar: "Company" menu button (open), then "Resident · Board" with "Board" on, then alerts and avatar. The open menu has a small heading "Company area" and four items: Portfolio · Add community · Company defaults · Company administrators.
-- **States:** menu open.
-
-**8.01.e Company area · Option B · company shell · Company Administrator and Board Member**
-
-- **Person:** Casey Novak.
-- **Shows:** the company-area frame with Option B's top bar: "Company" shown as current, then the "🗝️ Enter board mode" chip (spec 025, as drawn in `BoardModeSwitch`), then alerts and avatar. Nav: "Portfolio" current. Body: "Portfolio" title and placeholder.
+- **Shows:** the company-area frame with the company top bar: "Company" shown as current, then the "🗝️ Enter board mode" chip (spec 025, as drawn in `BoardModeSwitch`), then alerts and avatar. Nav: "Portfolio" current. Body: "Portfolio" title and placeholder.
 - **States:** default.
 - **Notes on canvas:** "'Enter board mode' takes Casey back to board mode (spec 025, unchanged)".
 
-**8.01.f Company area · Option B · company shell · Company Administrator**
+**8.01.f Company area · company shell · Company Administrator**
 
 - **Person:** Robin Hale.
 - **Shows:** as 8.01.e, but the cluster is "Company" (current), alerts and avatar only. No board-mode control of any kind (FR-036).
-- **Why here:** Robin's landing under Option B (FR-036a step 2, US9 #1).
+- **Why here:** Robin's landing after signing in on either sign-in page (FR-036a step 2, FR-036c, US9 #1).
+- **Notes on canvas:** post-it D2.
 - **States:** default.
 
 **8.01.g Company area · Community settings open · Company Administrator**
 
 - **Person:** Robin Hale. Community: Keystone Park (Onboarding, no manager, pat@example.com invitation pending).
-- **Shows:** the company-area frame with Option A's top bar. A note says Option B differs only in the top bar. Breadcrumb "Portfolio › Keystone Park". Nav: "Portfolio" stays current (D6). Body: title "Keystone Park" with its "Onboarding" chip, then the placeholder "Community settings — briefs 04–07".
+- **Shows:** the company-area frame with the company top bar. Breadcrumb "Portfolio › Keystone Park". Nav: "Portfolio" stays current (D6). Body: title "Keystone Park" with its "Onboarding" chip, then the placeholder "Community settings — briefs 04–07".
 - **Why here:** Company Administrators reach Community settings from the portfolio (FR-029). Keystone Park is in nobody's switcher, because nobody holds a membership in it yet, and the page still opens (FR-029: "addressed by community ID").
 - **States:** default.
 - **Notes on canvas:** post-it D6.
@@ -182,7 +177,7 @@ The spec doesn't decide these. Draw the first option. Put the question and the o
 **8.01.h Company area · board page refused · Company Administrator**
 
 - **Person:** Robin Hale.
-- **Shows:** 8.01.a (Option A frame; Option B differs only in the top bar), with the toast "You don't have access to that page." near the top of the body.
+- **Shows:** 8.01.f, with the toast "You don't have access to that page." near the top of the body.
 - **Why here:** Robin opened a link to a board-mode page. The grant alone unlocks no board page (FR-003, FR-036). The request is refused with 403 `FORBIDDEN`, and the app takes Robin to the landing page (spec 025 FR-028), which for Robin is the portfolio (FR-036a).
 - **States:** refusal.
 
@@ -281,7 +276,7 @@ The spec doesn't decide these. Draw the first option. Put the question and the o
   3. **Question 1:** "Holds an effective Board Member, Accountant or Community Manager membership in an Onboarding or Active community?"
      - **Yes:** "Board mode. One community: its Community Home. Two or more: My Communities." Examples: Casey Novak → Keystone Crossing Master; Jordan Blake → My Communities; Pat Rivera → Keystone Park; Jane Alvarez, after removal from #29 → Sakura Heights.
   4. **Question 2:** "Company Administrator?"
-     - **Yes:** "Company area · Portfolio (Option A: Company mode; Option B: company shell)." Example: Robin Hale.
+     - **Yes:** "Company area · Portfolio." Example: Robin Hale. (The company sign-in page leads here too, FR-036c.)
   5. **Question 3:** "Are all their homes in Onboarding communities?"
      - **Yes:** "“Your community isn't live yet” (brief 11)." Example: Ann Brooks.
   6. **Otherwise:** "“No home linked to this account” (brief 11)." Example: Dana Fox.
@@ -298,14 +293,24 @@ The spec doesn't decide these. Draw the first option. Put the question and the o
 
 Quote these exactly. Placeholders such as "Portfolio — brief 02" are canvas labels, not product copy.
 
+**Company sign-in page (8.01.a–c)**
+
+| Element | Text |
+| --- | --- |
+| Title | "Company sign-in" |
+| Line under the title | "For Juniper Row Community Management staff. Bookmark this page." |
+| Fields and button | "Email", "Password", "Sign in", "Forgot password?" (as today) |
+| Link below the card | "Not company staff? Use the usual sign-in page." |
+| Notice for someone who isn't a Company Administrator | "This account isn't a Company Administrator, so you've been signed in to your usual page." |
+| Sign-in failure | Today's generic sign-in failure message, unchanged (spec 017) |
+
 **Top bar**
 
 | Element | Text |
 | --- | --- |
-| Option A mode control segments | "Resident", "Board", "Company" |
-| Option B company button | "Company". Accessible name: "Company area menu". |
-| Option B menu heading | "Company area" |
-| Option B menu items | "Portfolio", "Add community", "Company defaults", "Company administrators" |
+| Company button | "Company". Accessible name: "Company area menu". |
+| Company menu heading | "Company area" |
+| Company menu items | "Portfolio", "Add community", "Company defaults", "Company administrators" |
 | Board-mode chip outside board mode (spec 025, unchanged) | "🗝️ Enter board mode" |
 | Mode switch failure (today's app copy, unchanged) | "Could not switch modes. Please try again." |
 
@@ -351,16 +356,12 @@ Quote these exactly. Placeholders such as "Portfolio — brief 02" are canvas la
 
 ## 6. Interactions
 
-**Option A mode control**
+**Company sign-in page**
 
-- Choosing a segment switches mode, as spec 025's control does today. While the switch runs, the control is disabled. The person lands on that mode's landing:
-  - "Board": the board landing (one community: its Community Home; two or more: "My Communities").
-  - "Company": the portfolio.
-  - "Resident": the resident landing. For a person with no usable home, see D2.
-- Focus moves to the new page's main heading.
-- If the switch fails, the control shows "Could not switch modes. Please try again." next to it, and the mode doesn't change.
+- Signing in runs the usual sign-in (same rules, lockout and rate limits). Then a Company Administrator lands on the portfolio; anyone else lands on their usual FR-036a landing with the notice in §5. Focus moves to the new page's main heading.
+- The page's address never changes, so it can be bookmarked. Opening it while already signed in as a Company Administrator goes straight to the portfolio.
 
-**Option B company menu**
+**Company menu**
 
 - "Company" opens a menu. Choosing an item opens the company shell on that page.
 - Esc or clicking outside closes the menu. Focus returns to "Company".
@@ -397,8 +398,8 @@ Quote these exactly. Placeholders such as "Portfolio — brief 02" are canvas la
 
 Conventions §8 applies. In this brief:
 
-- **Mode control (Option A):** a labelled group of real buttons. The current mode is marked as pressed, in text as well as fill. Every segment is reachable by keyboard. The "on" fill meets 3:1 against its neighbours and its text meets 4.5:1. The "Company" segment uses the same treatment as "Board"; no new colour.
-- **Company menu (Option B) and switcher (D5):** menu buttons that say whether they are open. Arrow keys move through the items. Enter chooses. Esc closes and returns focus to the button. The current item is marked "Current" in text.
+- **Company sign-in page:** a real form with labelled fields; the failure message is announced and tied to the form; the notice after a non-administrator signs in is announced and doesn't take focus.
+- **Company menu and switcher (D5):** menu buttons that say whether they are open. Arrow keys move through the items. Enter chooses. Esc closes and returns focus to the button. The current item is marked "Current" in text.
 - **Navigation:** the left nav is a navigation landmark with a name ("Board navigation", "Company area navigation"). The current page is marked as current. Locked entries are announced as unavailable with their reason, for example "Community settings, not available to your role". The lock icon only adds to that.
 - **Breadcrumb:** a navigation landmark named "Breadcrumb". The last item is the current page.
 - **Chips:** "Onboarding" is text. In a table it is read with the name: "Keystone Ridge, Onboarding".
@@ -421,10 +422,11 @@ Conventions §8 applies. In this brief:
 
 ## 9. Design review checklist
 
-- [ ] Option A and Option B are separate artboards (8.01.a–8.01.f), and the company entry sits in the top-bar account cluster, left of alerts and avatar (FR-036; spec 025 FR-019).
+- [ ] The company sign-in page has a stable, bookmarkable address, uses the usual sign-in rules, lands a Company Administrator on the portfolio and anyone else on their usual page with the notice (8.01.a–c; FR-036c).
+- [ ] The "Company" menu sits in the top-bar account cluster, left of alerts and avatar, and opens the company shell (8.01.d–f; FR-036; spec 025 FR-019).
 - [ ] Robin Hale sees no "Board" option, no "Enter board mode" and no board nav in any artboard (FR-036, FR-003).
 - [ ] A board-page link opened by Robin is refused, and Robin is back on the portfolio with "You don't have access to that page." (8.01.h; FR-036, spec 025 FR-028).
-- [ ] Casey Novak sees both the company entry and the board-mode control, in both options (8.01.b–8.01.e; FR-036).
+- [ ] Casey Novak sees both the Company menu and the board-mode control (8.01.d, 8.01.e; FR-036).
 - [ ] The company-area nav is exactly Portfolio, Add community, Company defaults and Company administrators, with no locks and no violet banner (FR-036; conventions §7.1).
 - [ ] Community settings opens in the company area from the portfolio, with "Portfolio › Keystone Park", for a community in no switcher (8.01.g; FR-029).
 - [ ] Jordan Blake's top bar has no company entry, and no board nav anywhere has a "Portfolio" item, locked or not (8.01.i, 8.01.k, 8.01.o; FR-035, US6 #6).

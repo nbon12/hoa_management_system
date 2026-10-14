@@ -102,7 +102,7 @@ What the design must make obvious:
 
 ### 4.1 The Residents area (every page artboard)
 
-**Page.** Brief 04's header and section nav (Option A tabs until the owner picks), "Managers and memberships" current. Brief 05's section heading, intro and jump links. Then Managers, Board members and accountants, and Invitations, each drawn as one `wf-ph` bar ("Managers — as 8.05.a", and so on; archived: "as 8.05.x"). Then the Residents card, in full.
+**Page.** Brief 04's header and searchable side-list section nav, "Managers and memberships" current. Brief 05's section heading, intro and jump links. Then Managers, Board members and accountants, and Invitations, each drawn as one `wf-ph` bar ("Managers — as 8.05.a", and so on; archived: "as 8.05.x"). Then the Residents card, in full.
 
 **Residents card,** top to bottom:
 

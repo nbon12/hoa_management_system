@@ -83,7 +83,7 @@ Each community follows its own governing documents, so its architectural review 
 
 | # | Question | Drawn | Other option | Post-it beside |
 | --- | --- | --- | --- | --- |
-| D1 | Save model. Follows brief 04's D2. | Option A: a read view, then "Edit architectural review" opens one form with one Save (one log entry per save). The reset card is hidden while the form is open, so a reset never mixes with unsaved edits. | If brief 04 picks save per field, each row gets "Edit", "Save" and "Cancel"; the reset card stays visible. | 8.07.d |
+| D1 | Save model. The owner chose per-field saving for Profile (2026-10-14); this section keeps one Save, as in spec 027 (conventions §7.2). | A read view, then "Edit architectural review" opens one form with one Save (one log entry per save). The reset card is hidden while the form is open, so a reset never mixes with unsaved edits. | Per-field saving like Profile, with "✓ Saved" beside each field. | 8.07.d |
 | D2 | A summary line at the top as well as the per-field chips? | Yes: "2 settings differ from the company defaults: Review period and Reminder to the board." or "These settings match the company defaults." | Per-field chips only. | 8.07.a |
 | D3 | In the form, does the chip follow what is typed? | No. Chips mark saved values in the read view. In the form, every field shows its company default as helper text. | The chip updates as the person types. | 8.07.d |
 | D4 | Reset when every setting already matches. | Shown disabled, with the reason "These settings already match the company defaults." beside it. Still offered in the sense of US5 #1: it is there and says why it can't be used. | Always enabled; the dialog then says "Nothing will change." with "Close". | 8.07.c |

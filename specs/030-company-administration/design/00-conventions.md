@@ -68,7 +68,7 @@ Every artboard label has the form **`8.<NN>.<letter> <short name>`**.
 
 Examples:
 
-- `8.01.a Company area · Option A · Company mode`
+- `8.01.a Company sign-in · bookmarkable page · Company Administrator`
 - `8.02.a Portfolio · first page · Company Administrator`
 - `8.04.f Archive dialog · Old Mill Commons`
 - `8.06.a Residents · first page · Community Manager`
@@ -372,7 +372,7 @@ On save, a form shows an error summary at the top that names each field at fault
 ### 7.1 Frames
 
 - **Community Manager screens** sit inside `WFShellBoard`: board mode, violet banner, board nav. Community settings and Add community are reached from board mode (FR-029, FR-036).
-- **Company Administrator screens** sit inside the company area. Brief 01 offers two options for how it is reached. Until one is chosen, briefs 02–09 use one neutral frame: the top bar with the account cluster; a `wf-strip` reading "Juniper Row Community Management · Company area"; and a left nav with Portfolio, Add community, Company defaults and Company administrators. No violet banner, because the violet banner means board mode. If brief 01's chosen option differs, only the frame changes.
+- **Company Administrator screens** sit inside the company area (owner decision 2026-10-14, brief 01). Company Administrators reach it from their own bookmarkable company sign-in page, or from a "Company" menu in the top-bar account cluster. The frame: the top bar with the account cluster and the "Company" button shown as current; a `wf-strip` reading "Juniper Row Community Management · Company area"; and a left nav with Portfolio, Add community, Company defaults and Company administrators. No violet banner, because the violet banner means board mode.
 - **Resident screens** (brief 11) use `WFShell` or `WFShellSide`.
 - **Public screens** (brief 10) use the `wf-auth.jsx` look with no app nav.
 
@@ -380,8 +380,8 @@ On save, a form shows an error summary at the top that names each field at fault
 
 - **Header:** the community name as the page title; its status chip; the legal name on the line below (or "Missing — required" for a backfilled community); and "Sub-association of Keystone Crossing Master" when it has a parent. For a Company Administrator, the header also holds the status actions for the current status: Onboarding shows Mark Active and Archive; Active shows Archive; Archived shows Restore. Community Managers never see status actions or Change parent.
 - **Address:** the page belongs to one community, not to the board-mode active community. It works for Onboarding and Archived communities that are in no switcher (FR-029). A Company Administrator reaches it from the portfolio, with a breadcrumb "Portfolio › Keystone Park". A Community Manager reaches it from the "Community settings" nav entry in board mode.
-- **Section nav:** Profile · Managers and memberships · Architectural review, in this order. **Notifications is not drawn**: no tab, no disabled item, no placeholder (FR-029). Each section can be opened directly. The old ARC settings page leads to Architectural review (FR-030).
-- **Design choices for brief 04** (briefs 05–07 follow them): whether the section nav is tabs across the top or a secondary list on the left; and whether each section has its own Save button or saves per field.
+- **Section nav (owner decision 2026-10-14):** a **side list** on the left of the content, with a **search box** at its top: Profile · Managers and memberships · Architectural review, in this order. Typing in the search box filters the list to matching sections and settings by their labels (for example "review" shows "Architectural review › Review period"); choosing a result opens that section and moves focus to that field. No match: "No settings match \"…\"." Search only finds setting labels on this page, never people or data. **Notifications is not drawn**: no tab, no disabled item, no placeholder (FR-029). Each section can be opened directly. The old ARC settings page leads to Architectural review (FR-030).
+- **Saving (owner decision 2026-10-14):** Profile saves **per field**. When the person finishes a field (leaves it, or picks a value), that field saves on its own, and a small "✓ Saved" appears next to it for a few seconds. A field that fails validation shows its error under it, is not saved, and keeps what was typed. Architectural review keeps one Save for the section, as in spec 027, because its rules are reviewed together. Managers, memberships and residents change through their own actions and dialogs.
 - **Managers and memberships** has four areas: Managers; Board members and accountants; Residents; Invitations (for the Community Manager, Board Member and Accountant roles). Brief 05 chooses their order and whether they are sub-tabs or stacked blocks; brief 06 follows it.
 - **Onboarding notice.** A Community Manager of an Onboarding community sees this at the top of Profile (FR-029): "Keystone Ridge is being set up. A Company Administrator must mark it Active. Resident invitations are sent then."
 
@@ -441,7 +441,7 @@ The spec asks for no "type the name to confirm" step. Don't add one.
 
 | Kind | Use for | Example |
 | --- | --- | --- |
-| Toast | A finished action whose result is also visible on the page | "Invitation sent to kim@example.com." · "Profile saved." |
+| Toast | A finished action whose result is also visible on the page | "Invitation sent to kim@example.com." · "Restore complete." |
 | Inline | Validation, and refusals about one field | `COMMUNITY_NAME_TAKEN`, `ALREADY_RESIDENT` |
 | Banner | The state of a page or section | Archived read-only; Onboarding notice; load errors |
 | In the dialog | Refusals after the person confirms | `LAST_MANAGER`, `OPEN_WORK` |
@@ -461,6 +461,7 @@ The spec asks for no "type the name to confirm" step. Don't add one.
 ### 7.10 Showing and hiding controls
 
 - Hide controls the person can't use. Disable a control only when the reason helps, and show the reason next to it (example: Resend on a Scheduled invitation).
+- **Disabled with a reason (owner decision 2026-10-14, example: Mark Active with no manager):** the button stays visible but disabled. Hovering it **or focusing it with the keyboard** shows a tooltip with the reason, and screen readers read the reason as the button's description. The button must still be reachable by Tab, so keyboard users can find out why.
 - Company-area pages are never shown to people who can't use them (FR-035, FR-036). Holding the Company Administrator role alone does not show the board-mode control (FR-036).
 - Board-mode nav keeps spec 025 FR-040: entries the role does not confer are shown disabled with a lock.
 - Hiding is only for clarity; the server decides. Every hidden action still has a refusal message in §6 for when it is reached anyway (spec Constitution Requirements, Authorization).
