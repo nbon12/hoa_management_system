@@ -62,7 +62,7 @@ Coverage was checked mechanically against the spec on 2026-10-13:
 
 ## Design choices
 
-Decided by the owner on 2026-10-14. The briefs already draw only these:
+Decided on 2026-10-14 and 2026-10-17. The briefs draw only these; nothing is left as an A/B choice.
 
 | Where | Decision |
 | --- | --- |
@@ -71,11 +71,6 @@ Decided by the owner on 2026-10-14. The briefs already draw only these:
 | 04 Settings section nav | **Side list with a settings search box** (8.04.a, b) |
 | 04 Profile saving | **Per field**, saved when the field is finished, with **"✓ Saved"** beside it (8.04.c–e). Architectural review keeps one Save, as in spec 027 |
 | 04 Mark Active without a manager | **Disabled button**; the reason shows on hover and on keyboard focus (8.04.l); a request made anyway is refused (8.04.m) |
-
-Still open:
-
-| Where | Option A | Option B |
-| --- | --- | --- |
-| 06 Residents detail (8.06.a/y) | Everything in the table rows | A **property drawer**: a panel that slides in from the right when you click a property, showing all its residents, invitations and actions while the list stays visible behind it |
+| 06 Residents detail | **Property drawer** (2026-10-17, recommended default; easy to switch back to rows): short rows with no buttons; clicking a property opens a panel on the right with its residents, invitations and every action (8.06.y) |
 
 Each brief also lists its smaller design choices and open questions on post-its, for example whether an expired invitation link may show any invitation details (the briefs take the safe default: no).

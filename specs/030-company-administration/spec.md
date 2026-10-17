@@ -21,6 +21,14 @@ Because invitations reach people who have no account yet, and managers and Compa
 
 There is one management company per deployment for now. The data model must not prevent several companies later.
 
+## Terms used in this spec
+
+- **Resident**: a user account linked to a property through a **resident link** (the existing `UserProperty` record). Being linked is what lets a person see and use that home in resident mode: dashboard, ledger, payments, autopay, directory, violations and polls. A resident may be an owner, a co-owner, a family member or a tenant; this spec does not tell them apart. A property may have several residents, and a person may be a resident of several properties.
+- **Resident link**: the record joining one user account to one property, with the date it was made. Today it is created only by redeeming a claim code. This spec adds a second way (a manager's resident invitation) and a way to remove it.
+- **Owner of record**: the property's legal owner contact record (the existing `Owner` record): names, email, phone, mailing address, statement and alert preferences, the payment account, and a `VotingRights` flag. It is **not** a user account and need not match anyone linked to the property. This spec never changes it.
+- **Resident role**: spec 025 lists `Resident` as a community membership role, but the product doesn't use it. Creating one is refused, and residents are represented by resident links, not memberships. This spec keeps it that way.
+- **Member**: someone with a community membership (Community Manager, Board Member or Accountant). It is never used to mean a resident.
+
 ## Grounding: what exists today
 
 Verified against `main` at commit `21e2491` (spec 027 merged):
@@ -75,6 +83,8 @@ Verified against `main` at commit `21e2491` (spec 027 merged):
 - Q: Community settings section navigation? → A: A **side list**, with a **search box** that finds settings by name (FR-029).
 - Q: How does the Profile save? → A: **Per field**, when a field is filled out. A small "Saved" text or checkmark appears next to the field (FR-017).
 - Q: Mark Active when there is no manager? → A: The button is **disabled**, and hovering it shows why (FR-010). Keyboard focus shows the same reason, for accessibility.
+- Q: Should the Residents area put actions in the rows or in a property drawer? → A: (2026-10-17, recommended default while the owner considers it) A **property drawer**: short rows with no buttons; clicking a property opens a side panel with its residents, invitations and actions (FR-024d).
+- Q: What does "resident" mean? → A: A user account linked to a property; see Terms. Owners and tenants are not told apart in this spec.
 
 ### Decisions made in spec review (2026-10-11)
 
@@ -599,6 +609,8 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - filters "No resident", "Invitation pending" (including scheduled ones, labelled "Scheduled") and "Invitation expired";
   - pagination: 25 properties by default, at most 100.
 
+  Each property's residents, invitations and actions open in a **property drawer** beside the list (Clarifications 2026-10-14).
+
   A community with no properties MUST show that properties have not been loaded yet and offer no invite action. Each load and search MUST log the spec 025 FR-017 association-data access event. `[no WFb]`
 - **FR-024e**: Every resident invitation, resend, revoke, acceptance (successful or not) and removal MUST be logged as a sensitive event per change. The event carries actor, community, property ID, the target user ID (or invitation ID), the change and UTC time.
 - **FR-024f**: Restricting resident rights, such as suspending a resident's poll voting, is NOT built (Clarifications 2026-10-10). Claim codes (spec 016/017) keep working unchanged:
@@ -816,7 +828,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 - **Invitation resend**: Not answered by the owner. This spec lets anyone who could send the invitation resend or revoke it.
 - **Invitations survive only while their sender has authority** (FR-022). The alternative, "invitations belong to the community and outlive their sender", was rejected as less safe. The owner may choose it instead.
 - **Properties for a new community**: No property import exists today. A community added through this spec has no properties until an engineer-run seed loads them, or until a later Properties spec adds an import. Its Residents area says so (FR-024d). This is the one remaining engineer step in onboarding an HOA.
-- **"Resident"** means any person linked to a property, as today. This spec does not tell owners and tenants apart.
+- **"Resident"** means any person linked to a property, as today (see Terms). This spec does not tell owners and tenants apart, and it does not use the owner of record's `VotingRights` flag.
 - **Emails**: these use the existing transactional email and are plain text until Claude Design delivers templates (briefs in `design/`):
   - manager, board, accountant, resident and Company Administrator invitations;
   - "community added, waiting to go live" to Company Administrators;

@@ -17,7 +17,7 @@ File wf-company-residents.jsx; ids s8-06a to s8-06y; 1360 wide (8.06.y 1440); di
 8.06.c Residents · search · keystone park dr #29 · Community Manager
 8.06.d Residents · filter No resident · Community Manager
 8.06.e Residents · no results · Community Manager
-8.06.f Invite resident · from a row · Community Manager
+8.06.f Invite resident · from the drawer · Community Manager
 8.06.g Residents · invitation sent · Community Manager
 8.06.h Invite resident · refused · already a resident · Company Administrator
 8.06.i Invite resident · refused · invitation already pending · Community Manager
@@ -36,9 +36,9 @@ File wf-company-residents.jsx; ids s8-06a to s8-06y; 1360 wide (8.06.y 1440); di
 8.06.v Residents · Old Mill Commons · archived · Company Administrator
 8.06.w Remove resident dialog · refused · no longer a manager · Board Member
 8.06.x Another community's Residents · refused · Community Manager
-8.06.y Residents · property drawer · Option B · Community Manager
+8.06.y Residents · property drawer open · #29 · Community Manager
 
-8.06.a is Option A (no drawer), 8.06.y is Option B: draw both.
+Decision (2026-10-17): every action lives in a property drawer. List rows are short and have no buttons. Clicking a property opens its drawer on the right (8.06.y); invite, resend, revoke and remove start there, and their dialogs are drawn over the open drawer. The header's "Invite a resident" stays.
 
 Reuse BoardArchApps (counted filters, search, table card), BoardVendors (header bar), GlossaryPanel (drawer), wf-card, wf-table, wf-btn, wf-pill, wf-field, wf-ph. Sections 1–7 stay unchanged. Brief §4.5 goes on a DCPostIt by 8.06.a.
 
@@ -95,7 +95,7 @@ What the design must make obvious:
 | FR-022 (resident states) | "Scheduled", "Pending", "Expired", "Revoked", "Revoked — community archived" as text chips. Accepted invitations are not listed; the person shows as a resident. A resend makes the resender the sender. | 8.06.a, m, n, p, v |
 | FR-003a | Own email refused. A Company Administrator inviting their own email gets the same message (US7 #10, §5). | 8.06.j |
 | US5 #7 | Old Mill Commons: banner, plain text, search, filters and pages still work, no actions. rae@example.com reads "Revoked — community archived" / "Sep 30, 2026". | 8.06.v |
-| SC-010 | Inviting from a row needs one field and one button. | 8.06.f |
+| SC-010 | Inviting from a property's drawer needs one field and one button. | 8.06.f |
 | FR-042 | Every refusal says why, except the two `FORBIDDEN` messages. | 8.06.h–k, w, x |
 
 ## 4. Artboards
@@ -109,12 +109,20 @@ What the design must make obvious:
 1. **Header bar** (`BoardVendors`): title "Residents" left; button "Invite a resident" right. No button when archived or when no properties are loaded.
 2. **Helper line** (`wf-sub`, §5). An Onboarding community adds the Onboarding line.
 3. **Search and filters** (`BoardArchApps`): a labelled search field, then one row of filter buttons with counts. One filter is on at a time; "All" is the default.
-4. **Table** (`wf-table`), one row per property. Columns: **Property · Residents · Invitations · Actions**.
+4. **Table** (`wf-table`), one row per property. Columns: **Property · Residents · Invitations**. No buttons in rows; the whole row, and the address as its button, opens the property drawer.
    - **Property:** the address, as the row header. A "No resident" chip under it when the property has no resident.
-   - **Residents:** one block per resident: name; email; "Resident since Mar 2, 2024"; a "Remove" button. Empty when there is none.
-   - **Invitations:** one block per scheduled, pending, expired or revoked invitation, newest first, revoked last: the email and its state chip; "Sent by Jordan Blake · Oct 10, 2026, 4:40 PM EDT"; the state's second line (conventions §5.2); "Resend" and "Revoke" buttons where allowed.
-   - **Actions:** "Invite resident" (property fixed).
+   - **Residents:** the residents' names, comma-separated ("Jane Alvarez, Sam Ortiz"). Empty when there is none. When a search matched a resident's email, that email shows under the name.
+   - **Invitations:** a short summary in words, for example "1 pending" or "1 scheduled · 1 expired"; "None" when there are no open invitations. Revoked invitations aren't counted here; the drawer lists them.
 5. **Footer:** "Showing 1–25 of 120", then Previous, page numbers, Next. Previous is disabled on page 1.
+
+**Property drawer** (`GlossaryPanel` pattern, right side, the list stays visible behind it). Top to bottom:
+
+1. Heading: the address, with "No resident" chip if it applies; "Close" button.
+2. **Residents:** one block per resident: name; email; "Resident since Mar 2, 2024"; a "Remove" button. "No residents yet." when empty.
+3. **Invitations:** one block per scheduled, pending, expired or revoked invitation, newest first, revoked last: the email and its state chip; "Sent by Jordan Blake · Oct 10, 2026, 4:40 PM EDT"; the state's second line (conventions §5.2); "Resend" and "Revoke" where allowed. "No invitations." when empty.
+4. Button "Invite resident" (property fixed). Not shown when archived.
+
+In an archived community the drawer opens read-only: same content, no buttons.
 
 **Default order** (design choice): by address, street A–Z, then house and unit numbers in number order (#9 before #10).
 
@@ -153,6 +161,8 @@ What the design must make obvious:
 
 ### 4.3 Artboard list
 
+**Drawer rule.** Every action and every invitation or resident "block" mentioned below is in that property's drawer. Draw the drawer open on the property named, with any dialog over it. Rows themselves only change their summary text.
+
 **8.06.a Residents · first page · Community Manager.** Jordan Blake. Baseline. Header without status actions. State: default.
 
 **8.06.b Residents · first page · Company Administrator.** Robin Hale. Baseline. Breadcrumb "Portfolio › Sakura Heights"; header action "Archive". Rows and controls exactly as 8.06.a. `.wf-note`: "Same controls as a Community Manager (spec permissions table)". State: default.
@@ -163,19 +173,19 @@ What the design must make obvious:
 
 **8.06.e Residents · no results · Community Manager.** Jordan. Search holds "jane alvarex". In place of the table: "No properties match “jane alvarex”." and the button "Clear search". Filters stay. No footer. State: no results.
 
-**8.06.f Invite resident · from a row · Community Manager.** Jordan. Snapshot "Oct 10, 4:40 PM". Opened from #29's "Invite resident". Title "Invite a resident" with "Sakura Heights" under it. Property shown as fixed text: "711 Keystone Park Dr #29", with the line "This property has 2 residents. Whoever accepts is added next to them." Email address: "kim@example.com". Helper and summary (§5). Buttons "Send invitation", "Cancel". State: default (filled).
+**8.06.f Invite resident · from a row · Community Manager.** Jordan. Snapshot "Oct 10, 4:40 PM". Opened from "Invite resident" in #29's drawer. Title "Invite a resident" with "Sakura Heights" under it. Property shown as fixed text: "711 Keystone Park Dr #29", with the line "This property has 2 residents. Whoever accepts is added next to them." Email address: "kim@example.com". Helper and summary (§5). Buttons "Send invitation", "Cancel". State: default (filled).
 
-**8.06.g Residents · invitation sent · Community Manager.** Jordan. Same snapshot, right after 8.06.f. Toast "Invitation sent to kim@example.com." #29's Invitations cell gains the kim@example.com Pending block. "Invitation pending · 1". Focus on the #29 address. `.wf-note`: "Same toast and row whether or not kim@ has an account (FR-018, FR-024a)." State: success.
+**8.06.g Residents · invitation sent · Community Manager.** Jordan. Same snapshot, right after 8.06.f. Toast "Invitation sent to kim@example.com." #29's drawer lists kim@example.com as Pending, and #29's row now reads "1 pending". "Invitation pending · 1". Focus on the #29 address. `.wf-note`: "Same toast and row whether or not kim@ has an account (FR-018, FR-024a)." State: success.
 
 **8.06.h Invite resident · refused · already a resident · Company Administrator.** Robin. Baseline. Opened from the header's "Invite a resident". "Property (required)" is a combobox; search "#29"; one option "711 Keystone Park Dr #29", "✓ Selected". Email "jane@example.com". Under the email field: "jane@example.com is already a resident of 711 Keystone Park Dr #29." Input kept; dialog open. State: refusal (`ALREADY_RESIDENT`).
 
-**8.06.i Invite resident · refused · invitation already pending · Community Manager.** Jordan. Baseline. From #29's row, email "kim@example.com". Under the field: the `INVITATION_PENDING` message, then the button "Resend invitation". "Send invitation" stays. State: refusal.
+**8.06.i Invite resident · refused · invitation already pending · Community Manager.** Jordan. Baseline. From #29's drawer, email "kim@example.com". Under the field: the `INVITATION_PENDING` message, then the button "Resend invitation". "Send invitation" stays. State: refusal.
 
-**8.06.j Invite resident · refused · own email · Community Manager.** Jordan. Baseline. From #35's row, email "jordan@example.com". Under the field: the `SELF_GRANT_NOT_ALLOWED` message. State: refusal.
+**8.06.j Invite resident · refused · own email · Community Manager.** Jordan. Baseline. From #35's drawer, email "jordan@example.com". Under the field: the `SELF_GRANT_NOT_ALLOWED` message. State: refusal.
 
 **8.06.k Invite resident · refused · too many requests · Community Manager.** As 8.06.f. Jordan pressed "Send invitation". Next to the button: "Too many requests. Wait a few minutes, then try again." Input kept. State: refusal (rate limit, FR-041).
 
-**8.06.l Invite resident · Keystone Ridge · Onboarding · Community Manager.** Jordan. Snapshot "Keystone Ridge, Oct 10". Opened from 8 Ridgeview Ct's row. Email "omar@example.com". The Onboarding helper in the dialog, the scheduled summary, and the buttons "Save invitation", "Cancel" (§5). The page behind shows lena@example.com Scheduled on 2 Ridgeview Ct. State: default (Onboarding).
+**8.06.l Invite resident · Keystone Ridge · Onboarding · Community Manager.** Jordan. Snapshot "Keystone Ridge, Oct 10". Opened from 8 Ridgeview Ct's drawer. Email "omar@example.com". The Onboarding helper in the dialog, the scheduled summary, and the buttons "Save invitation", "Cancel" (§5). The page behind shows lena@example.com Scheduled on 2 Ridgeview Ct. State: default (Onboarding).
 
 **8.06.m Residents · Keystone Ridge · invitation scheduled · Community Manager.** Jordan. Same snapshot, after 8.06.l. Toast "Invitation saved. It will be sent when Keystone Ridge is marked Active." The Onboarding helper line under the header. 2 and 8 Ridgeview Ct show their Scheduled blocks. Each Resend is disabled with "Sent when Keystone Ridge is marked Active" as its reason; Revoke is enabled. `.wf-note`: "Nothing emailed while Onboarding (FR-024b, SC-012)." State: success (scheduled).
 
@@ -187,7 +197,7 @@ What the design must make obvious:
 
 **8.06.q Revoke invitation dialog · kim@example.com · Community Manager.** Jordan. Baseline, over 8.06.a. Copy in §5. Afterwards (not drawn): toast "Invitation to kim@example.com revoked."; the block reads "Revoked" / "Revoked by Jordan Blake, Oct 12, 2026" with no buttons. State: confirmation.
 
-**8.06.r Remove resident dialog · Jane Alvarez · autopay cancelled · Company Administrator.** Robin. Baseline, over 8.06.b, from Jane's "Remove". Copy in §5. Buttons "Remove resident", "Cancel". State: confirmation.
+**8.06.r Remove resident dialog · Jane Alvarez · autopay cancelled · Company Administrator.** Robin. Baseline, over 8.06.b with #29's drawer open, from Jane's "Remove". Copy in §5. Buttons "Remove resident", "Cancel". State: confirmation.
 
 **8.06.s Residents · Jane Alvarez removed · Company Administrator.** Robin, right after 8.06.r. Toast "Jane Alvarez was removed from 711 Keystone Park Dr #29. Its autopay was cancelled." #29 shows Sam Ortiz and the kim@ invitation. Counts unchanged. Focus on the #29 address. `.wf-note`: "Jane is still a Board Member in the area above. Her next request for #29 is refused (brief 11)." State: success.
 
@@ -201,7 +211,7 @@ What the design must make obvious:
 
 **8.06.x Another community's Residents · refused · Community Manager.** Jordan opened a link to Briar Hollow's Residents area. He lands in board mode, Sakura Heights, "Community Home" current, with the toast "You don't have access to that page." Body: "Community Home — section 7, unchanged". Nothing names Briar Hollow. State: refusal (`FORBIDDEN`, US8 #11).
 
-**8.06.y Residents · property drawer · Option B · Community Manager.** Jordan. Baseline, 1440 wide. The table keeps the same columns and text but has no buttons and no Actions column. Each address is a button that opens a right-side panel (`GlossaryPanel` pattern). Open for #29: heading "711 Keystone Park Dr #29"; "Residents" with Jane and Sam, each with "Remove"; "Invitations" with kim@ and "Resend", "Revoke"; button "Invite resident"; "Close". State: default (design choice).
+**8.06.y Residents · property drawer open · #29 · Community Manager.** Jordan. Baseline, 1440 wide. #29's row is marked as selected; the drawer is open on the right: heading "711 Keystone Park Dr #29"; "Residents" with Jane Alvarez and Sam Ortiz, each with email, "Resident since" and "Remove"; "Invitations" with kim@example.com (Pending) and "Resend", "Revoke"; button "Invite resident"; "Close". State: default.
 
 ### 4.4 States not drawn
 
@@ -223,12 +233,12 @@ Each looks like a drawn artboard with a different message (§5).
 
 ### 4.5 Design choices and open questions (DCPostIt by 8.06.a)
 
-> 1. **Where actions live.** Option A (8.06.a): buttons inside each row. Option B (8.06.y): rows show the same data with no buttons; a property drawer holds the actions.
+> 1. **Where actions live (decided 2026-10-17).** In the property drawer (8.06.y). Rows are short and have no buttons.
 > 2. **Order.** By address. Other option: properties that need attention first ("No resident", then expired invitations).
 > 3. **Filters.** One at a time; counts cover the whole community and don't follow the search. Other options: combinable filters; counts that follow the search.
 > 4. **Search** runs as you type, after a short pause. It matches addresses, resident names and resident emails. Open question: should it also match invited emails? FR-024d says "resident name or email".
-> 5. **Revoked invitations** are always shown, last in the cell. Other option: hidden behind "Show revoked (1)".
-> 6. **Two ways to invite:** a row's "Invite resident" fixes the property; the header's "Invite a resident" asks for it. Other option: rows only.
+> 5. **Revoked invitations** are always shown in the drawer, last in the list. Other option: hidden behind "Show revoked (1)".
+> 6. **Two ways to invite:** the drawer's "Invite resident" fixes the property; the header's "Invite a resident" asks for it. Other option: drawer only.
 > 7. **Onboarding:** the button reads "Save invitation", because nothing is emailed yet, and the area has an Onboarding helper line.
 > 8. **Other homes.** The Remove dialog never says whether the resident has other homes, because they may be in other communities (FR-004). It says "any other homes" don't change.
 > 9. **Autopay line** names only the person being removed ("Sam Ortiz didn't enroll it"). Other option: name who enrolled it.
@@ -236,7 +246,7 @@ Each looks like a drawn artboard with a different message (§5).
 > 11. **Resend** has no confirmation, as in brief 05.
 > 12. **Removing someone already removed** by another person: the spec gives no code. Suggested toast in §5.
 > 13. **Expired invitation, same email and property.** The spec refuses duplicates only for scheduled or pending invitations (FR-022). Open question: should the dialog point to Resend instead of creating a second invitation?
-> 14. **Reason for the disabled Resend.** Drawn: the row's line "Sent when Keystone Ridge is marked Active" (conventions §5.2). Other option: the longer `COMMUNITY_NOT_ACTIVE` message beside the button (conventions §6.1).
+> 14. **Reason for the disabled Resend.** Drawn: the drawer's line "Sent when Keystone Ridge is marked Active" (conventions §5.2). Other option: the longer `COMMUNITY_NOT_ACTIVE` message beside the button (conventions §6.1).
 
 ## 5. Copy
 
@@ -356,7 +366,7 @@ Exact strings. "SR" means text for screen readers only. Conventions §6 messages
 
 **Invite.**
 
-1. A row's "Invite resident" opens the dialog with that property fixed. The header's "Invite a resident" opens it with the property picker, which searches this community's properties by address and lists no other community's. Focus moves to the dialog title.
+1. The drawer's "Invite resident" opens the dialog with that property fixed. The header's "Invite a resident" opens it with the property picker, which searches this community's properties by address and lists no other community's. Focus moves to the dialog title.
 2. Email field only: no lookup, no suggestions, no account hint (FR-018).
 3. Submit checks the email format and the property first. Then the button shows "Sending…" (or "Saving…" while Onboarding).
 4. **Success:** the dialog closes, the toast shows, and focus moves to the property's address in the list. The new block is Pending (Active) or Scheduled (Onboarding), with the email only.
@@ -386,14 +396,14 @@ Hiding is for clarity only. The server decides, and each hidden action has a ref
 The conventions §8 baseline applies. For this area:
 
 - **Headings.** "Residents" is an `h3` under the "Managers and memberships" `h2`. The drawer's heading is the address.
-- **Table.** A caption (§5), real column headers, and the address as each row's header, so each resident and invitation is read with its property. Residents and invitations inside a cell are lists.
+- **Table.** A caption (§5), real column headers, and the address as each row's header, so each resident and invitation is read with its property. The drawer's residents and invitations are lists, and the drawer's heading names the property.
 - **Buttons** carry the person, email or address in their names (§5): "Remove Jane Alvarez from 711 Keystone Park Dr #29".
 - **Disabled Resend** stays focusable and has its reason tied to it.
 - **Search** has a visible label. **Filters** are a labelled group; the one that is on is marked as selected, not by colour alone. The result count and "No properties match …" are announced politely.
 - **Pagination** is a navigation region named "Pages", with the current page marked.
 - **Dialogs** follow conventions §8. In the invite dialog: title → property (picker or fixed text) → email → primary button → "Cancel". The picker is a combobox, as in brief 05; its match count is announced.
 - **Refusals** under the email field are announced at once and tied to the field. A refusal at the top of a dialog takes focus.
-- **Drawer (Option B)** follows the glossary panel: focus moves in on open and returns to the address button on close; Esc closes it.
+- **Drawer** follows the glossary panel: focus moves in on open and returns to the address button on close; Esc closes it.
 - **Text, not colour:** "No resident", every state chip and "Revoked — community archived" are words.
 - **Zoom:** at 200% the table may scroll inside its card; the page never scrolls sideways.
 
@@ -432,7 +442,7 @@ The conventions §8 baseline applies. For this area:
 - [ ] **US5 #7.** 8.06.v has the archived banner, plain text, working search and filters, no actions, and rae@example.com as "Revoked — community archived" / "Sep 30, 2026".
 - [ ] **Permission variants.** Company Administrator artboards have the breadcrumb and status actions; Community Manager artboards have neither. Residents controls are the same for both.
 - [ ] **No hidden data.** No invitee has a name; the list shows no balance, owner or autopay; no other community or home is named to Jordan.
-- [ ] **Option B.** 8.06.y keeps every list column's data and moves only the buttons into the drawer.
+- [ ] **Drawer.** Rows have no buttons; clicking a property opens its drawer with residents, invitations and every action (8.06.y); dialogs are drawn over the open drawer.
 - [ ] **Design choices.** A DCPostIt by 8.06.a lists the 14 items in §4.5; each drawn choice is labelled "Design choice".
 - [ ] **Accessibility.** Caption, row headers, named buttons, labelled search and filters, focusable disabled Resend, and focus on dialog titles are noted.
 - [ ] **Data and canvas.** Only conventions §4 data; times in EDT; labels and ids match §1 (s8-06a to s8-06y); sections 1–7 render as before.

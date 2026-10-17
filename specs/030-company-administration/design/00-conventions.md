@@ -282,6 +282,8 @@ Use these words exactly. They are the spec's terms.
 | Company Administrator | The company-level business role. Not "admin", "super user" or "platform administrator" (FR-003). Plural: Company Administrators. |
 | Community Manager | "Manager" alone is fine in running text after first use. A second manager is a "co-manager". |
 | Board Member, Accountant, Resident | Title case, as in the spec. |
+| Resident | A person whose account is linked to a property (spec "Terms"). Owners and tenants are not told apart. Never call a resident a "member". |
+| Owner of record | The property's legal owner contact. Not a user account. Not shown in the Residents area, and never changed by these screens. |
 | Open-ended | A membership with no end date. Others read "Ends Dec 31, 2026" or "Ended Jun 30, 2026". |
 | Places | company area · Portfolio · Add community · Company defaults · Company administrators · Community settings, with sections Profile · Managers and memberships · Architectural review · the Residents area (inside Managers and memberships) · My Communities · board mode, and the mode control's "Resident" and "Board". |
 | Preferred verbs | Add community · Mark Active · Archive · Restore · Change parent · Appoint · Invite · Resend · Revoke · End membership · Downgrade to Board Member · Replace manager · Remove resident · Revoke role. Exact label: **"Reset architectural review to company defaults"** (US5). |
