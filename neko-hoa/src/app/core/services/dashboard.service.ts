@@ -16,6 +16,7 @@ interface ApiDashboard {
   nextEvent:            ApiEvent | null;
   recentActivity:       ApiLedger[];
   communityExpenses:    ApiExpense[];
+  architecturalInfoRequested?: { count: number; applicationId: string | null };
 }
 
 interface ApiAnnouncement {
@@ -102,6 +103,7 @@ export class DashboardService {
         color:  e.color,
         amount: e.amount,
       })),
+      architecturalInfoRequested: api.architecturalInfoRequested ?? { count: 0, applicationId: null },
     };
   }
 

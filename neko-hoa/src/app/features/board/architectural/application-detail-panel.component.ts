@@ -73,6 +73,9 @@ import { FORMAL_DENIAL_NOTE, decisionReachedLabel, fmtDate, fmtSize, myVoteLabel
               <span>{{ r.message }}</span>
               <span class="muted">— {{ r.requestedBy }}, {{ date(r.requestedAt) }}</span>
               <span class="muted adp__due">· review still due {{ date(d.dueDate) }}</span>
+              @if (r.responseMessage) {
+                <div class="adp__reply">Owner replied ({{ date(r.respondedAt!) }}): {{ r.responseMessage }}</div>
+              }
             </div>
           }
 

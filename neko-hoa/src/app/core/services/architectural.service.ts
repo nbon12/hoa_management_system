@@ -25,9 +25,10 @@ export interface ArcMyVote {
 }
 
 export interface ArcDecision {
-  outcome: 'Approved' | 'Denied';
+  /** Withdrawn (029) is a resident withdrawal, shown only with the "Show withdrawn" filter. */
+  outcome: 'Approved' | 'Denied' | 'Withdrawn';
   wording: 'RevisionsRequested' | 'Denied' | null;
-  source: 'Votes' | 'Lapse';
+  source: 'Votes' | 'Lapse' | null;
 }
 
 export interface ArcListItem {
@@ -67,6 +68,8 @@ export interface ArcAttachment {
   fileName: string;
   sizeBytes: number;
   contentType: string;
+  /** 029: set when the owner added the file with an info-request reply. */
+  infoRequestId?: string | null;
 }
 
 export interface ArcVote {
@@ -82,6 +85,8 @@ export interface ArcInfoRequest {
   message: string;
   requestedAt: string;
   respondedAt: string | null;
+  /** 029: the owner's reply, visible to board members and managers. */
+  responseMessage?: string | null;
 }
 
 export interface ArcRevisionSummary {
@@ -119,6 +124,8 @@ export interface ArcListParams {
   status?: 'open' | 'closed';
   search?: string;
   awaitingMyVote?: boolean;
+  /** 029: include resident-withdrawn applications in the closed tab. */
+  includeWithdrawn?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -145,6 +152,7 @@ export class ArchitecturalService {
       .set('offset', String(p.offset ?? 0));
     if (p.search) params = params.set('search', p.search);
     if (p.awaitingMyVote) params = params.set('awaitingMyVote', 'true');
+    if (p.includeWithdrawn) params = params.set('includeWithdrawn', 'true');
     return firstValueFrom(this.http.get<ArcListResponse>(this.apps(communityId), { params }));
   }
 

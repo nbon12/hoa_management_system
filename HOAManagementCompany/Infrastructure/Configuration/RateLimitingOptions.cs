@@ -25,6 +25,9 @@ public sealed class RateLimitingOptions
     /// <summary>Per-user permits per minute for board write endpoints (027 votes, info requests, outcomes, settings).</summary>
     public int BoardWritesPermitsPerMinute { get; set; } = 30;
 
+    /// <summary>Per-user permits per minute for resident architectural-request writes (029: drafts, uploads, submit, reply, withdraw, revise).</summary>
+    public int ResidentWritesPermitsPerMinute { get; set; } = 30;
+
     /// <summary>Permit count per minute for the shared <c>"unknown"</c> partition (un-attributable requests).</summary>
     public int UnknownPermitsPerMinute { get; set; } = 30;
 

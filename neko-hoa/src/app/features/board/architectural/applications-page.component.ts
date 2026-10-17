@@ -32,6 +32,12 @@ import { FORMAL_DENIAL_NOTE, decisionReachedLabel, fmtDate, myVoteLabel, outcome
           <button type="button" role="tab" class="tab" [class.tab--active]="status() === 'closed'"
                   [attr.aria-selected]="status() === 'closed'" (click)="setStatus('closed')">Closed · {{ counts().closed }}</button>
         </div>
+        @if (status() === 'closed') {
+          <label class="ap__withdrawn">
+            <input type="checkbox" [ngModel]="includeWithdrawn()" (ngModelChange)="setIncludeWithdrawn($event)" name="includeWithdrawn" />
+            Show withdrawn
+          </label>
+        }
         <label class="ap__search">
           <span class="sr-only">Search address or owner</span>
           <input class="input" type="search" placeholder="🔍 Search address or owner" aria-label="Search address or owner"
@@ -132,6 +138,7 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
   readonly ctx = arcContext();
 
   readonly status = signal<'open' | 'closed'>('open');
+  readonly includeWithdrawn = signal(false);
   readonly search = signal('');
   readonly items = signal<ArcListItem[]>([]);
   readonly counts = signal<ArcCounts>({ open: 0, closed: 0, awaitingMyVote: 0 });
@@ -168,6 +175,12 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
 
   setStatus(status: 'open' | 'closed'): void {
     this.status.set(status);
+    void this.reload();
+  }
+
+  /** 029: resident-withdrawn applications are hidden unless the board asks for them. */
+  setIncludeWithdrawn(value: boolean): void {
+    this.includeWithdrawn.set(value);
     void this.reload();
   }
 
@@ -218,7 +231,10 @@ export class ApplicationsPageComponent implements OnInit, OnDestroy {
     if (!cid) return;
     this.loading.set(true);
     try {
-      const page = await this.arc.list(cid, { status: this.status(), search: this.search().trim() || undefined });
+      const page = await this.arc.list(cid, {
+        status: this.status(), search: this.search().trim() || undefined,
+        includeWithdrawn: this.status() === 'closed' && this.includeWithdrawn() ? true : undefined,
+      });
       this.items.set(page.items);
       this.counts.set(page.counts);
       this.error.set(null);

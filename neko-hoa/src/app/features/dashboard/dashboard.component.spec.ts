@@ -23,6 +23,7 @@ const MOCK_SUMMARY: DashboardSummary = {
   nextEvent: null,
   recentActivity: [],
   communityExpenses: [],
+  architecturalInfoRequested: { count: 0, applicationId: null },
 };
 
 function makeMockAuthService(): Partial<AuthService> {
@@ -143,6 +144,24 @@ describe('DashboardComponent', () => {
     });
     it('returns default for unknown category', () => {
       expect(fixture.componentInstance.categoryColor('Unknown')).toBe('var(--lav-2)');
+    });
+  });
+
+  // 029 US3 AS1 / FR-017: an open architectural request with an unanswered board question shows a dashboard
+  // alert that links to it; with none, there is no alert.
+  describe('architectural info-requested alert (029)', () => {
+    it('shows the alert with a link to the request when count > 0', async () => {
+      TestBed.resetTestingModule();
+      const { el: alertEl } = await createDashboardFixture({
+        ...MOCK_SUMMARY, architecturalInfoRequested: { count: 1, applicationId: 'app-42' },
+      });
+      const alert = alertEl.querySelector('[role="status"]');
+      expect(alert?.textContent).toContain('The board needs more information about your architectural request.');
+      expect(alert?.querySelector('a')?.getAttribute('href')).toBe('/app/property/architectural/app-42');
+    });
+
+    it('shows no alert when count is 0', () => {
+      expect(el.textContent).not.toContain('The board needs more information');
     });
   });
 });

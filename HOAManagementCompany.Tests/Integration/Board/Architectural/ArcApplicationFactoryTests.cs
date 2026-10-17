@@ -71,4 +71,31 @@ public class ArcApplicationFactoryTests(TestDatabaseFixture fixture) : ArcTestBa
             factory.CreateRevisionAsync(v1, Input(s.PropertyId, Today), [], default));
         Assert.Equal("REVISION_NOT_ALLOWED", ex.Code); // a newer revision already exists
     }
+
+    // 029 T013: the resident-authored fields travel through the factory, and stay null when omitted (027 callers).
+    [Fact]
+    public async Task CreateFromSettings_PersistsResidentFields_AndLeavesThemNullWhenOmitted()
+    {
+        var s = await CreateScenarioAsync(1);
+        using var scope = NewScope();
+        var factory = scope.ServiceProvider.GetRequiredService<ArcApplicationFactory>();
+        var acknowledged = DateTimeOffset.UtcNow;
+
+        var withFields = await factory.CreateFromSettingsAsync(Input(s.PropertyId, Today) with
+        {
+            PlannedStartDate = new DateOnly(2026, 11, 2), PlannedCompletionDate = new DateOnly(2026, 11, 20),
+            ContractorName = "Cedar & Co", ContractorContact = "919-555-0100", AcknowledgedAt = acknowledged
+        }, default);
+        var without = await factory.CreateFromSettingsAsync(Input(s.PropertyId, Today), default);
+        await Db(scope).SaveChangesAsync();
+
+        Assert.Equal(new DateOnly(2026, 11, 2), withFields.PlannedStartDate);
+        Assert.Equal(new DateOnly(2026, 11, 20), withFields.PlannedCompletionDate);
+        Assert.Equal("Cedar & Co", withFields.ContractorName);
+        Assert.Equal("919-555-0100", withFields.ContractorContact);
+        Assert.Equal(acknowledged, withFields.AcknowledgedAt);
+        Assert.Null(without.PlannedStartDate);
+        Assert.Null(without.ContractorName);
+        Assert.Null(without.AcknowledgedAt);
+    }
 }

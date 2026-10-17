@@ -37,6 +37,8 @@ public sealed record ArcListQuery
     public string? Status { get; init; }
     public string? Search { get; init; }
     public bool? AwaitingMyVote { get; init; }
+    /// <summary>029: include resident-withdrawn applications in the closed tab (default false).</summary>
+    public bool? IncludeWithdrawn { get; init; }
     public int? Limit { get; init; }
     public int? Offset { get; init; }
 }
@@ -100,7 +102,7 @@ public sealed record ArcTallyDto(int Approve, int RevisionsNeeded, int Deny, int
 
 public sealed record ArcMyVoteDto(string State, string? Choice = null);
 
-public sealed record ArcDecisionDto(string Outcome, string? Wording, string Source);
+public sealed record ArcDecisionDto(string Outcome, string? Wording, string? Source);
 
 public sealed record ArcListItemDto(
     Guid Id,
@@ -124,12 +126,15 @@ public sealed record ArcCountsDto(int Open, int Closed, int AwaitingMyVote);
 public sealed record ArcListResponse(
     IReadOnlyList<ArcListItemDto> Items, int Total, int Limit, int Offset, ArcCountsDto Counts);
 
-public sealed record ArcAttachmentDto(Guid Id, string FileName, long SizeBytes, string ContentType);
+// InfoRequestId is set for a file the owner added with an info-request reply (029).
+public sealed record ArcAttachmentDto(Guid Id, string FileName, long SizeBytes, string ContentType, Guid? InfoRequestId = null);
 
 public sealed record ArcVoteDto(string VoterName, string Choice, string? Comment, DateTimeOffset CastAt);
 
+// ResponseMessage is the owner's reply (029 FR-018), visible to board members and managers.
 public sealed record ArcInfoRequestDto(
-    Guid Id, string RequestedBy, string Message, DateTimeOffset RequestedAt, DateTimeOffset? RespondedAt);
+    Guid Id, string RequestedBy, string Message, DateTimeOffset RequestedAt, DateTimeOffset? RespondedAt,
+    string? ResponseMessage = null);
 
 public sealed record ArcRevisionSummaryDto(Guid Id, int Revision, DateOnly ReceivedDate, ArcDecisionDto? Decision);
 

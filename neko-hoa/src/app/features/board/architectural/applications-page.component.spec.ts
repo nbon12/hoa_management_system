@@ -239,4 +239,18 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     expect(screen.getByText('No active community selected.')).toBeTruthy();
     expect(arc.list).not.toHaveBeenCalled();
   });
+
+  // 029 (Clarifications 2026-10-08): withdrawn requests are hidden from the Closed tab unless the board
+  // turns on "Show withdrawn"; the toggle only exists on the Closed tab.
+  it('offers a Show withdrawn toggle on the Closed tab that adds includeWithdrawn (029)', async () => {
+    await setup();
+    expect(screen.queryByLabelText('Show withdrawn')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: /Closed/ }));
+    await until(() => !!screen.queryByLabelText('Show withdrawn'));
+    expect(arc.list.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({ status: 'closed', includeWithdrawn: undefined }));
+
+    fireEvent.click(screen.getByLabelText('Show withdrawn'));
+    await until(() => arc.list.calls.mostRecent().args[1]?.includeWithdrawn === true);
+    expect(arc.list.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({ status: 'closed', includeWithdrawn: true }));
+  });
 });

@@ -198,6 +198,7 @@ export class ShellComponent implements OnInit {
       { label: 'Info',       route: '/app/property/info' },
       { label: 'Owner',      route: '/app/property/owner' },
       { label: 'Directory',  route: '/app/property/directory' },
+      { label: 'Architectural requests', route: '/app/property/architectural' },
     ]},
     { group: 'Community', items: [
       { label: 'Announcements', route: '/app/community/announcements' },

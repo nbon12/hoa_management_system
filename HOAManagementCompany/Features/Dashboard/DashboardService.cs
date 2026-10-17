@@ -66,6 +66,14 @@ public class DashboardService(ApplicationDbContext db)
             .Select(e => new ExpenseSummary(e.Id, e.Label, e.Color, e.Amount))
             .ToListAsync(ct);
 
+        var awaitingInfo = await db.ArchitecturalApplications
+            .Where(a => a.PropertyId == propertyId
+                        && a.Status == ArcApplicationStatus.Open
+                        && a.InfoRequests.Any(i => i.RespondedAt == null))
+            .OrderBy(a => a.InfoRequests.Where(i => i.RespondedAt == null).Min(i => i.RequestedAt))
+            .Select(a => a.Id)
+            .ToListAsync(ct);
+
         return new DashboardResponse(
             currentBalance,
             balanceDueDate,
@@ -76,7 +84,8 @@ public class DashboardService(ApplicationDbContext db)
             thisWeekEvents,
             nextEvent,
             recentActivity,
-            communityExpenses);
+            communityExpenses,
+            new ArchitecturalInfoRequestedSummary(awaitingInfo.Count, awaitingInfo.Count > 0 ? awaitingInfo[0] : null));
     }
 
     private static string CalculateDueDate(int assessmentDueDay)

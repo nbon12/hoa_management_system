@@ -25,6 +25,14 @@ import { DashboardSummary } from '../../core/models';
     </div>
     <p class="muted">Here's what's happening at Sakura Heights this week.</p>
 
+    @if ((summary()?.architecturalInfoRequested?.count ?? 0) > 0) {
+      <div class="alert" role="status">
+        <span>📐</span>
+        The board needs more information about your architectural request.
+        <a [routerLink]="['/app/property/architectural', summary()!.architecturalInfoRequested.applicationId]">Reply now</a>
+      </div>
+    }
+
     <!-- 4 stat cards -->
     <div class="grid-4">
       <div class="card" [class.card--rose]="(summary()?.currentBalance ?? 0) > 0">

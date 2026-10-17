@@ -187,4 +187,9 @@ export interface DashboardSummary {
   thisWeekEvents: CalendarEvent[];
   recentActivity: LedgerEntry[];
   communityExpenses: { label: string; color: string; amount: number }[];
+  /** 029 FR-017: open architectural requests with an unanswered board question. */
+  architecturalInfoRequested: { count: number; applicationId: string | null };
 }
+
+// ─── Resident architectural requests (029) ──────────────────────────────────
+export * from './resident-arc.models';

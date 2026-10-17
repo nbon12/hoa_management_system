@@ -47,6 +47,12 @@ public class ApplicationsListEndpoint(ApplicationDbContext db, ICommunityScopeRe
         var (limit, offset) = Paging.Normalize(req.Limit, req.Offset);
 
         var all = db.ArchitecturalApplications.Where(a => a.CommunityId == req.CommunityId);
+        // 029 (Clarifications 2026-10-08): resident-withdrawn applications are hidden from the board's
+        // default views and shown only with the opt-in "show withdrawn" filter. They are Closed, so the
+        // open tab never contains them; this only narrows the closed tab and its count.
+        var closed = req.IncludeWithdrawn == true
+            ? all.Where(a => a.Status == ArcApplicationStatus.Closed)
+            : all.Where(a => a.Status == ArcApplicationStatus.Closed && a.DecisionOutcome != ArcOutcome.Withdrawn);
         var isBoard = await queries.ActiveBoard(req.CommunityId).AnyAsync(m => m.UserId == caller, ct);
         var awaiting = all.Where(a =>
             a.Status == ArcApplicationStatus.Open
@@ -56,13 +62,13 @@ public class ApplicationsListEndpoint(ApplicationDbContext db, ICommunityScopeRe
         // Counts ignore search and paging so tab labels and the header pill stay stable (FR-003, FR-005).
         var counts = new ArcCountsDto(
             await all.CountAsync(a => a.Status != ArcApplicationStatus.Closed, ct),
-            await all.CountAsync(a => a.Status == ArcApplicationStatus.Closed, ct),
+            await closed.CountAsync(ct),
             isBoard ? await awaiting.CountAsync(ct) : 0);
 
         IQueryable<ArchitecturalApplication> filtered = req.AwaitingMyVote == true
             ? (isBoard ? awaiting : all.Where(_ => false))
             : status == "closed"
-                ? all.Where(a => a.Status == ArcApplicationStatus.Closed)
+                ? closed
                 : all.Where(a => a.Status != ArcApplicationStatus.Closed);
 
         if (!string.IsNullOrEmpty(search))

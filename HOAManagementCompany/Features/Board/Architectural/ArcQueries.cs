@@ -145,7 +145,7 @@ public sealed class ArcQueries(ApplicationDbContext db, TimeProvider clock)
         var attachments = await db.ArchitecturalAttachments
             .Where(x => x.ApplicationId == app.Id)
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.FileName)
-            .Select(x => new ArcAttachmentDto(x.Id, x.FileName, x.SizeBytes, x.ContentType))
+            .Select(x => new ArcAttachmentDto(x.Id, x.FileName, x.SizeBytes, x.ContentType, x.InfoRequestId))
             .ToListAsync(ct);
 
         var votes = await db.ArchitecturalVotes
@@ -158,7 +158,8 @@ public sealed class ArcQueries(ApplicationDbContext db, TimeProvider clock)
             .Where(r => r.ApplicationId == app.Id)
             .OrderBy(r => r.RequestedAt)
             .Select(r => new ArcInfoRequestDto(
-                r.Id, r.RequestedBy.FirstName + " " + r.RequestedBy.LastName, r.Message, r.RequestedAt, r.RespondedAt))
+                r.Id, r.RequestedBy.FirstName + " " + r.RequestedBy.LastName, r.Message, r.RequestedAt, r.RespondedAt,
+                r.ResponseMessage))
             .ToListAsync(ct);
 
         var revisions = (await db.ArchitecturalApplications
@@ -209,7 +210,8 @@ public sealed class ArcQueries(ApplicationDbContext db, TimeProvider clock)
             : new ArcDecisionDto(
                 a.DecisionOutcome.Value.ToString(),
                 a.DecisionWording?.ToString(),
-                (a.DecisionSource ?? ArcDecisionSource.Votes).ToString());
+                // A resident withdrawal (029) has no decision source.
+                a.DecisionOutcome == ArcOutcome.Withdrawn ? null : (a.DecisionSource ?? ArcDecisionSource.Votes).ToString());
 
     public static bool IsOverdue(ArchitecturalApplication a, DateTimeOffset now) =>
         a.Status == ArcApplicationStatus.Open && IsDueDatePassed(a.DueDate, a.TimeZoneId, now);

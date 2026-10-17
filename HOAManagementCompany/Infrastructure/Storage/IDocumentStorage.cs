@@ -6,4 +6,6 @@ public interface IDocumentStorage
     /// <summary>True when an object exists at <paramref name="storageKey"/> (027: attachment unavailable state).</summary>
     Task<bool> ExistsAsync(string storageKey, CancellationToken ct = default);
     Task UploadAsync(string storageKey, byte[] content, string contentType = "application/pdf", CancellationToken ct = default);
+    /// <summary>Deletes the object at <paramref name="storageKey"/>; a missing object is not an error (029: draft discard).</summary>
+    Task DeleteAsync(string storageKey, CancellationToken ct = default);
 }

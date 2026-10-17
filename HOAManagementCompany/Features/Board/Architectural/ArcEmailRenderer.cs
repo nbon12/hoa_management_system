@@ -23,6 +23,8 @@ public static class ArcEmailKinds
     public const string OwnerDenied = "arc_owner_denied";
     public const string BoardReminder = "arc_board_reminder";
     public const string BoardLapsed = "arc_board_lapsed";
+    /// <summary>Submission confirmation to the resident who submitted (029 FR-025).</summary>
+    public const string OwnerSubmitted = "arc_owner_submitted";
 }
 
 /// <summary>
@@ -41,6 +43,7 @@ public sealed class ArcEmailRenderer(IOptions<ArchitecturalReviewOptions> option
     public static string OwnerKind(ArcOutcome outcome, ArcDenialWording? wording) => outcome switch
     {
         ArcOutcome.Approved => ArcEmailKinds.OwnerApproved,
+        ArcOutcome.Withdrawn => throw new InvalidOperationException("A withdrawn application has no outcome email."),
         _ when wording == ArcDenialWording.Denied => ArcEmailKinds.OwnerDenied,
         _ => ArcEmailKinds.OwnerRevisionsRequested
     };
@@ -125,6 +128,24 @@ public sealed class ArcEmailRenderer(IOptions<ArchitecturalReviewOptions> option
             PayloadJson = JsonSerializer.Serialize(message),
             Status = OutboxStatus.Pending
         };
+
+    /// <summary>
+    /// Plain-template confirmation that a resident's request (or revision) was received (029 FR-025).
+    /// Never includes board data: there is none yet, and the template has no slot for it.
+    /// </summary>
+    public AlertMessage OwnerSubmitted(
+        ArchitecturalApplication app, string propertyAddress, string recipientFirstName, string recipientEmail, string communityName)
+    {
+        var b = new StringBuilder();
+        b.AppendLine(communityName).AppendLine();
+        b.AppendLine($"Hello {recipientFirstName},").AppendLine();
+        b.AppendLine("We received your architectural request.").AppendLine();
+        Summary(b, app, propertyAddress, null);
+        b.AppendLine($"Decision due by: {app.DueDate:MM/dd/yy}");
+        b.AppendLine().AppendLine("Work may not begin until this request is approved.");
+        b.AppendLine().AppendLine($"Track your request: {OwnerRequestLink(app.Id)}");
+        return new AlertMessage(recipientEmail, $"We received your architectural request {app.DisplayId}", b.ToString());
+    }
 
     private static void Summary(StringBuilder b, ArchitecturalApplication app, string propertyAddress, DateOnly? decisionDate)
     {

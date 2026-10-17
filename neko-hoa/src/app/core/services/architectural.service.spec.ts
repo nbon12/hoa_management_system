@@ -105,4 +105,18 @@ describe('ArchitecturalService (027)', () => {
     r.flush(settings);
     await p2;
   });
+
+  it('list() passes includeWithdrawn only when asked (029)', async () => {
+    const p = svc.list(C, { status: 'closed', includeWithdrawn: true });
+    const req = http.expectOne(r => r.url.endsWith('/architectural-applications'));
+    expect(req.request.params.get('includeWithdrawn')).toBe('true');
+    req.flush({ items: [], total: 0, limit: 25, offset: 0, counts: { open: 0, closed: 0, awaitingMyVote: 0 } });
+    await p;
+
+    const q = svc.list(C, { status: 'closed' });
+    const req2 = http.expectOne(r => r.url.endsWith('/architectural-applications'));
+    expect(req2.request.params.has('includeWithdrawn')).toBeFalse();
+    req2.flush({ items: [], total: 0, limit: 25, offset: 0, counts: { open: 0, closed: 0, awaitingMyVote: 0 } });
+    await q;
+  });
 });
