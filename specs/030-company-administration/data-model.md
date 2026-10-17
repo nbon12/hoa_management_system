@@ -84,7 +84,7 @@ These are the same six rule fields as `CommunityArcSettings`, with the same vali
 | `NormalizedEmail` | string(256) | `trim().ToLowerInvariant()`, the same as `EmailVerificationService.Normalize` |
 | `TokenHash` | string(64)? | SHA-256 hex of the current link token. Null while `Scheduled`; replaced on resend. |
 | `State` | `InvitationState` | |
-| `SenderUserId` | string | The current sender; updated on resend (FR-022). `Restrict` on delete. |
+| `SenderUserId` | string? | The current sender; updated on resend (FR-022). `Restrict` on delete. Null only for a `CompanyAdministrator` invitation created by the setup step, which passes the sender-authority check until a Company Administrator resends it. |
 | `CreatedAt` | timestamptz | |
 | `SentAt` | timestamptz? | Null while `Scheduled` |
 | `ExpiresAt` | timestamptz? | `SentAt + 72h` |
@@ -107,6 +107,7 @@ These are the same six rule fields as `CommunityArcSettings`, with the same vali
 - `Membership` requires `CommunityId` and `Role`, with `PropertyId` null.
 - `Residency` requires `CommunityId` and `PropertyId`, with `Role` null.
 - `CompanyAdministrator` requires `CommunityId`, `PropertyId` and `Role` all null.
+- `SenderUserId` may be null only for `CompanyAdministrator`.
 
 **State transitions** (FR-022):
 

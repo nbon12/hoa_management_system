@@ -11,11 +11,11 @@ Each item records a decision, why it was chosen, and what else was considered. E
 **Decision**: Add two tables.
 
 - `ManagementCompanies(Id, Name, CreatedAt)`: the migration inserts exactly one row.
-- `CompanyAdministratorGrants(Id, CompanyId, UserId, GrantedByUserId?, GrantedVia, GrantedAt, RevokedAt?, RevokedByUserId?)`: a filtered unique index on `(CompanyId, UserId) WHERE RevokedAt IS NULL` stops duplicate live grants.
+- `CompanyAdministratorGrants(Id, CompanyId, UserId, GrantedByUserId?, Source, GrantedAt, RevokedAt?, RevokedByUserId?)`: a filtered unique index on `(CompanyId, UserId) WHERE RevokedAt IS NULL` stops duplicate live grants.
 
 `Community` gains `ManagementCompanyId` (FK, not null after the backfill).
 
-An `ICompanyContext` service returns "the company" for the single-company deployment, from the one row, cached per request. Every query still filters by `ManagementCompanyId`, so a second company later only changes how `ICompanyContext` resolves it (FR-001).
+An `ICompanyContext` service, cached per request, resolves the caller's company: the company of their live grant, otherwise the company of their effective Community Manager memberships. For a community-scoped request it is the community's company. Only the setup step and the dev seed ask for "the deployment's company", the single row. Every query filters by `ManagementCompanyId`, so a second company later needs no query changes (FR-001), and tests that create their own companies stay isolated.
 
 **Rationale**: FR-001 and FR-002 need the company as a record and the role as a grant separate from memberships. A grant table with revocation fields keeps history without an audit table: the audit trail stays Serilog-only, and the table only holds state.
 
@@ -124,14 +124,14 @@ A **preview** endpoint per transition returns the counts and names the dialogs s
 **Decision**: One `Invitations` table for all three kinds: `Membership`, `Residency` and `CompanyAdministrator`.
 
 **Token**: 32 bytes from `RandomNumberGenerator`, base64url-encoded (256 bits), the same as `AuthCrypto.NewProofToken`. Only `AuthCrypto.Hash(token)` (SHA-256) is stored.
-- The link is `{AppBaseUrl}/invite#t={token}`. A URL fragment is never sent to the server, never written to logs or `Referer`, and not captured by Sentry's URL handling (spec Security).
+- The link is `{AppBaseUrl}/invite#t={token}`. A URL fragment is never sent to the server, and never written to logs or `Referer` (spec Security).
 - The page reads the fragment and POSTs the token in a request body.
-- `/invite` sets `Referrer-Policy: no-referrer` via a meta tag, and the Angular Sentry `beforeBreadcrumb` drops the fragment.
+- `/invite` sets `Referrer-Policy: no-referrer` via a meta tag. The Angular app has no Sentry SDK; its client telemetry is OpenTelemetry (`otel.bootstrap.ts`), which strips URL fragments from span attributes.
 
 **Timing**: `SentAt` and `ExpiresAt = SentAt + 72h` come from the injected `TimeProvider` (UTC). Expiry is derived (`State == Pending && now >= ExpiresAt`), not swept. Responses expose a computed `effectiveState`.
 
 **States**: `Scheduled`, `Pending`, `Accepted`, `Revoked`. *Expired* is the derived state.
-- A revoke stores a reason: `Manual`, `CommunityArchived`, `SenderLostAuthority`, `Replaced` or `Superseded`.
+- A revoke stores a reason: `Manual`, `CommunityArchived`, `SenderLostAuthority` or `Superseded`.
 - A resend writes a new token hash, `SentAt` and `ExpiresAt`, sets `SenderUserId` to the resender, and increments `ResendCount`. The old hash is gone, so the old link becomes `INVITATION_INVALID`.
 
 **Duplicates**:
@@ -352,7 +352,7 @@ For the property drawer, `GET /communities/{id}/residents/{propertyId}` returns 
 **Decision**: Extend `StartupTasks` with `--grant-company-admin <email> [--recover] [--company-name "<name>"]`, beside the existing `--seed` check. It runs before `app.Run()`, as `--seed` does. Unlike `--seed`, it is allowed in every environment, because it is the operator path. It applies migrations first, then calls `CompanyAdministratorService.SetupAsync`.
 
 - **No administrator exists**:
-  - if the email has an account, grant the role (`GrantedVia = Setup`);
+  - if the email has an account, grant the role (`Source = Setup`);
   - otherwise create a Company Administrator invitation and send it (R6);
   - print the result and exit 0.
 - **An administrator already exists and `--recover` is absent**: print "A Company Administrator already exists; nothing changed" and exit 0 with no writes.

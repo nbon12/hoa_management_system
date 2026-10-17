@@ -96,7 +96,7 @@ Add a company layer above spec 025's per-community model, and the flows that nee
   - **Rate limits**: `board-writes` on every write, including the 025 membership endpoints that lack it today; `auth` on the invitation endpoints; per-recipient email caps (R12).
   - **Sensitive events**: logged for every change and for failed acceptances (R19).
   - **Errors**: the production error shape is unchanged.
-  - **Observability**: new endpoints are covered by the existing Sentry and OpenTelemetry instrumentation. The Angular Sentry `beforeBreadcrumb` drops `/invite` fragments.
+  - **Observability**: new endpoints are covered by the existing backend Sentry and OpenTelemetry instrumentation. The Angular app's OpenTelemetry instrumentation strips URL fragments, so `/invite` tokens never reach telemetry (it has no Sentry SDK).
   - The pre-existing log-scrubber gap is raised as a separate task (R19).
 - **File storage**: ✅ Not applicable. No files.
 - **Caching/edge**: ✅ Every endpoint is `no-store`. `/invite` sets `Referrer-Policy: no-referrer`.
@@ -138,7 +138,7 @@ specs/030-company-administration/
 │   └── emails.md
 ├── design/                    # Claude Design briefs (00–12) + README; handoff/ arrives later
 ├── checklists/requirements.md
-└── tasks.md                   # /speckit.tasks (not created here)
+└── tasks.md                   # /speckit.tasks
 ```
 
 ### Source Code (repository root)
