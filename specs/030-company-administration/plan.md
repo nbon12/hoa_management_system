@@ -113,8 +113,8 @@ Add a company layer above spec 025's per-community model, and the flows that nee
   - ✅ Reconciling the older specs (025, 027, 016, 017 sub-spec A, 006) is listed in the spec and becomes tasks.
   - ✅ One spec text change came out of planning: the Security bullet now allows the sender's display name on the invitation page (contract `POST /invitations/preview`).
 - **Spec independence & parallelism**: ✅
-  - Hard dependencies only on merged specs: 025, 027, 006, 016/017.
-  - The in-progress `029-resident-arc-requests` uses the shared `ResidentAccess` check for its submit endpoint once both land. Whichever lands second wires it, which is a one-line call plus the static test.
+  - Hard dependencies only on merged specs: 025, 027, 006, 016/017 and 029.
+  - `029-resident-arc-requests` merged after this plan was first written. Its resident endpoints authorize through one class, `ResidentArcScope`, which this feature routes through `ResidentAccess` (tasks.md). That gives 029's routes the FR-012a status rule, which they lack today.
   - Notification Settings stays optional.
   - After the MVP foundation, US4, US5's ARC section, US6's flags and US7 can be built in parallel (spec Constitution Requirements).
 

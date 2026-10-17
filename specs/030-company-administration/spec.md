@@ -507,7 +507,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 
   The writes are: owner profile and directory-field edits, alert preferences, one-time payment intent and confirm, setup intent, autopay enroll, change and cancel, poll vote, event RSVP, drafts, and claim-code redemption.
 
-  Resident architectural applications are governed by the Resident Architectural Application Submission spec, which applies the same rule.
+  Resident architectural applications (spec 029, merged) follow the same rule: their endpoints get FR-024g's per-request check in this spec's implementation.
 - **FR-013**: Archiving MUST cancel every active autopay schedule for properties in the community in the same action:
   - each schedule's status becomes cancelled with the reason "community archived", and each cancellation is logged;
   - no automatic charge may start afterwards; a charge already submitted settles normally;
@@ -791,7 +791,8 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 
     FR-A2, FR-A3 and FR-A5 still apply and are reused for acceptance. FR-A10's accepted 15-minute token window no longer covers property access after a resident is removed or a community changes status (FR-024g).
   - **Spec 006.** Recurring payments gain the enroller and cancellation reason, and are cancelled on archive and on removal of the enrolling resident.
-- **Spec independence & parallelism**: Hard dependencies on spec 025 (communities, memberships, resolver, board shell), spec 027 (ARC settings) and spec 006 (autopay), all merged, so this spec is individually completable now. The Notification Settings spec is optional: its sections stay hidden until it lands. The in-progress Resident Architectural Application Submission spec (`029-resident-arc-requests`) does not block this one; its writes follow the shared status rule (FR-012a), so the two can be built in parallel.
+  - **Spec 029.** Its resident endpoints re-check the resident link and the community's status on every request (FR-024g, FR-012a).
+- **Spec independence & parallelism**: Hard dependencies on spec 025 (communities, memberships, resolver, board shell), spec 027 (ARC settings) and spec 006 (autopay), all merged, so this spec is individually completable now. The Notification Settings spec is optional: its sections stay hidden until it lands. The Resident Architectural Application Submission spec (`029-resident-arc-requests`) has merged. Its resident endpoints trust the token's property claim today, so this spec routes them through FR-024g's check (FR-012a).
 
   The **MVP** is US1–US3, US8 and US9, plus a foundation slice they all need:
   - (a) the management company record and its backfill (FR-001);
@@ -858,6 +859,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 - **Spec 025** (merged): communities, memberships, scope resolver, the membership create, update and list endpoints, and the board shell. Its board-eligibility rules are extended to Onboarding communities (FR-036b).
 - **Spec 027** (merged): ARC settings, which this spec moves under Community settings and copies from company defaults.
 - **Spec 006** (merged): recurring payments (autopay). They gain an enroller and a cancellation reason, and are cancelled on archive and on removal of the enrolling resident.
+- **Spec 029** (merged): resident architectural requests. Its endpoints get the per-request resident check and status rule (FR-024g, FR-012a).
 - **Specs 016 and 017** (merged): registration, sign-in, email verification and claim codes.
   - Claim codes keep working as they do today (FR-024f).
   - Invitation sign-up (FR-022a) and sign-in without a home (FR-036a) are added beside the claim-code path.
