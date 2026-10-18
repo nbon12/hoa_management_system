@@ -454,14 +454,14 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **`toast-host.component.spec.ts`**: a polite live region that auto-dismisses.
   - **`property-drawer.component.spec.ts`**: opens beside the list, and full width below 768 px; moves focus in; Esc closes it and returns focus to the row.
 - [X] T064 Implement `DisabledReasonDirective`, `AutosaveFieldDirective`, `ToastHostComponent` and `PropertyDrawerComponent` (the glossary-panel pattern) in `neko-hoa/src/app/shared/`, and `ToastService` in `neko-hoa/src/app/core/services/toast.service.ts`, until T063 pass
-- [ ] T065 [P] Write `CommunitySettingsShellTests` first, for `GET /communities/{id}/settings`. File: `HOAManagementCompany.Tests/Integration/Company/CommunitySettingsShellTests.cs`
+- [X] T065 [P] Write `CommunitySettingsShellTests` first, for `GET /communities/{id}/settings`. File: `HOAManagementCompany.Tests/Integration/Company/CommunitySettingsShellTests.cs`
   - **US5-S1** (shell): a Company Administrator with no membership gets `sections` = profile, managers-and-memberships, architectural-review, and every `can.*` that fits the status.
   - **US5-S2**: the community's Community Manager gets `changeParent`, `activate`, `archive` and `restore` false, and the other `can.*` true.
   - **US5-S3**: Board Member, Accountant, Resident and a Community Manager of another community get 403 `FORBIDDEN`, identical to a nonexistent id.
   - `sections` never contains `notifications` (FR-029).
   - `noManager` is null for non-administrators.
   - With no open-ended manager, `can.activate.reasonCode` is `NO_ACTIVE_MANAGER`.
-- [ ] T066 Implement `CommunitySettingsEndpoint` (`ViewCommunitySettings`, read, `no-store`) in `HOAManagementCompany/Features/Board/Settings/CommunitySettingsEndpoint.cs`, until T065 passes
+- [X] T066 Implement `CommunitySettingsEndpoint` (`ViewCommunitySettings`, read, `no-store`) in `HOAManagementCompany/Features/Board/Settings/CommunitySettingsEndpoint.cs`, until T065 passes
 - [X] T067 [P] Write `community-settings-page.component.spec.ts` and `settings-side-nav.component.spec.ts` first, in `neko-hoa/src/app/features/community-settings/`:
   - sections render from `sections[]`;
   - controls are hidden according to `can.*`;
