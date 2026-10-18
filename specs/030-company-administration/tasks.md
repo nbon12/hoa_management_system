@@ -268,7 +268,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Resident access on every request (FR-024g, FR-012a; research R8)
 
-- [ ] T035 [P] Write `ResidentAccessTheoryTests` first.
+- [X] T035 [P] Write `ResidentAccessTheoryTests` first.
   - **Theory**: every endpoint row in `contracts/invitations-and-auth.md § Resident access`, including spec 029's `/property/architectural-applications` routes, × home status (Active, Onboarding, Archived) × caller. The callers are a linked resident; a token for a property the user is no longer linked to; and a token with no `propertyId` claim.
   - **Assert exactly**:
     - Active and linked → the endpoint's normal status;
@@ -278,12 +278,12 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Also**: a token whose `communityId` claim is wrong still gets the right community's data, because the database's community is used.
 
   File: `HOAManagementCompany.Tests/Integration/Residents/ResidentAccessTheoryTests.cs`
-- [ ] T036 [P] Add `ResidentAccessStaticAnalysisTests` (R3). File: `HOAManagementCompany.Tests/Integration/Board/ResidentAccessStaticAnalysisTests.cs`
+- [X] T036 [P] Add `ResidentAccessStaticAnalysisTests` (R3). File: `HOAManagementCompany.Tests/Integration/Board/ResidentAccessStaticAnalysisTests.cs`
   - Every `*Endpoint.cs` or `*Endpoints.cs` under `Features/Payments`, `Features/Property`, `Features/Community` and `Features/Dashboard` that reads the `propertyId` or `communityId` claim, `RequirePropertyId()` or `RequireCommunityId()` must also call `ResidentAccess.RequireAsync`. Matching both names matters: `AlertPreferencesEndpoints.cs` and 029's `Property/Architectural/*Endpoints.cs` are plural.
   - 029's endpoints authorize through `Property/Architectural/ResidentArcScope.cs`. That file must call `ResidentAccess.RequireAsync` and must no longer read the claim itself.
   - No file under `Features/` may contain `Guid.Parse(User.FindFirst(`.
-- [ ] T037 Implement `ResidentAccess.RequireAsync(user, ResidentOperation, ct)` in `HOAManagementCompany/Features/Residents/ResidentAccess.cs`. It returns `ResidentContext(PropertyId, CommunityId, CommunityStatus)`, using R8's query and outcomes. `ResidentOperation` is `Read`, `ReadHistory` or `Write`. Add a Repowise `domain=residents` marker and register it as scoped in `Program.cs`.
-- [ ] T038 Adopt `ResidentAccess` in the payment endpoints, using each one's operation from the contract table and the returned `PropertyId`/`CommunityId` in place of token claims:
+- [X] T037 Implement `ResidentAccess.RequireAsync(user, ResidentOperation, ct)` in `HOAManagementCompany/Features/Residents/ResidentAccess.cs`. It returns `ResidentContext(PropertyId, CommunityId, CommunityStatus)`, using R8's query and outcomes. `ResidentOperation` is `Read`, `ReadHistory` or `Write`. Add a Repowise `domain=residents` marker and register it as scoped in `Program.cs`.
+- [X] T038 Adopt `ResidentAccess` in the payment endpoints, using each one's operation from the contract table and the returned `PropertyId`/`CommunityId` in place of token claims:
   - `HOAManagementCompany/Features/Payments/LedgerEndpoint.cs` and `DraftsEndpoint.cs`;
   - `OneTime/ConfirmPaymentEndpoint.cs`, `CreateIntentEndpoint.cs`, `PaymentOptionsEndpoint.cs`, `ReceiptEndpoint.cs` and `TransactionsEndpoint.cs`;
   - `Recurring/RecurringDeleteEndpoint.cs`, `RecurringGetEndpoint.cs`, `RecurringUpsertEndpoint.cs` and `SetupIntentEndpoint.cs`;
@@ -291,7 +291,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - `Alerts/AlertPreferencesEndpoints.cs`.
 
   Check that `StatementService` and `RecurringDraftService` take ids from their callers, not from claims.
-- [ ] T039 [P] Adopt `ResidentAccess` the same way in the other resident endpoints, removing any raw `Guid.Parse` claim reads. Do this together with T038 until T035 and T036 pass.
+- [X] T039 [P] Adopt `ResidentAccess` the same way in the other resident endpoints, removing any raw `Guid.Parse` claim reads. Do this together with T038 until T035 and T036 pass.
   - `HOAManagementCompany/Features/Property/`: `AddressHistoryEndpoint.cs`, `DirectoryFieldPatchEndpoint.cs`, `DirectoryFieldsEndpoint.cs`, `OwnerGetEndpoint.cs`, `OwnerPatchEndpoint.cs`, `PropertyEndpoint.cs`.
   - `HOAManagementCompany/Features/Community/`:
     - `Announcements/AnnouncementGetEndpoint.cs` and `Announcements/AnnouncementsListEndpoint.cs`;
@@ -301,7 +301,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - `Poll/PollGetEndpoint.cs` and `Poll/PollVoteEndpoint.cs`;
     - `Violations/ViolationsEndpoint.cs`.
   - `HOAManagementCompany/Features/Dashboard/DashboardEndpoint.cs`.
-- [ ] T040 [P] Adopt `ResidentAccess` in spec 029's resident ARC endpoints (merged after this plan was written), through their single authorization point `HOAManagementCompany/Features/Property/Architectural/ResidentArcScope.cs`. Do this with T038 and T039 until T035 and T036 pass.
+- [X] T040 [P] Adopt `ResidentAccess` in spec 029's resident ARC endpoints (merged after this plan was written), through their single authorization point `HOAManagementCompany/Features/Property/Architectural/ResidentArcScope.cs`. Do this with T038 and T039 until T035 and T036 pass.
   - Replace the static `PropertyId(user)` claim read with an async `RequireAsync(user, op, ct)` that calls `ResidentAccess.RequireAsync` and pins drafts and applications to the returned `PropertyId`.
   - The operation is:
     - `ReadHistory` for submitted requests (the list, the detail and attachment links), so they stay readable after an archive (FR-012a);

@@ -62,8 +62,8 @@ public class DraftAttachmentUrlEndpoint(
     public override async Task HandleAsync(ResidentArcDraftAttachmentRoute req, CancellationToken ct)
     {
         ResidentArcHttp.NoStore(HttpContext);
-        var key = await drafts.AttachmentKeyAsync(User, req.DraftId, req.AttachmentId, ct);
-        ResidentArcLog.AttachmentAccess(logger, ResidentArcScope.UserId(User), ResidentArcScope.PropertyId(User),
+        var (key, propertyId) = await drafts.AttachmentKeyAsync(User, req.DraftId, req.AttachmentId, ct);
+        ResidentArcLog.AttachmentAccess(logger, ResidentArcScope.UserId(User), propertyId,
             $"attachment:{req.AttachmentId}", clock.GetUtcNow());
         await SendOkAsync(await ResidentArcHttp.LinkAsync(storage, clock, key, ct), ct);
     }

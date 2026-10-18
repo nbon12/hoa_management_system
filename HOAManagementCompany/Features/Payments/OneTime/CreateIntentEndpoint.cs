@@ -5,6 +5,7 @@ using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Payments.Services;
 using HOAManagementCompany.Infrastructure.Payments;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.OneTime;
 
@@ -13,7 +14,7 @@ namespace HOAManagementCompany.Features.Payments.OneTime;
 /// gross/fee split stored in metadata (server-authoritative), and forwards the client idempotency
 /// key to Stripe (FR-007a/b). No raw card data is accepted (SC-001).
 /// </summary>
-public class CreateIntentEndpoint(IStripeGateway gateway, FeeCalculator feeCalculator, PaymentConfigService config)
+public class CreateIntentEndpoint(ResidentAccess access, IStripeGateway gateway, FeeCalculator feeCalculator, PaymentConfigService config)
     : Endpoint<CreateIntentRequest, CreateIntentResponse>
 {
     public override void Configure()
@@ -24,7 +25,9 @@ public class CreateIntentEndpoint(IStripeGateway gateway, FeeCalculator feeCalcu
 
     public override async Task HandleAsync(CreateIntentRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         var method = req.Method.Equals("card", StringComparison.OrdinalIgnoreCase) ? PaymentMethod.Card : PaymentMethod.Ach;
 
         var cfg = await config.GetForPropertyAsync(propertyId, ct);

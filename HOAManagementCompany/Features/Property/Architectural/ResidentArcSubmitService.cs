@@ -6,6 +6,8 @@ using HOAManagementCompany.Features.Payments.Alerts;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
+using HOAManagementCompany.Features.Residents;
+
 namespace HOAManagementCompany.Features.Property.Architectural;
 
 // <!-- REPOWISE:START domain=resident-arc -->
@@ -28,7 +30,7 @@ public sealed class ResidentArcSubmitService(
 
     public async Task<Guid> SubmitAsync(ClaimsPrincipal user, Guid draftId, CancellationToken ct)
     {
-        var draft = await scope.DraftAsync(user, draftId, ct);
+        var draft = await scope.DraftAsync(user, draftId, ResidentOperation.Write, ct);
         ValidateForSubmit(draft);
         var userId = ResidentArcScope.UserId(user);
 

@@ -1,8 +1,9 @@
 using FastEndpoints;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.Recurring;
 
-public class RecurringDeleteEndpoint(PaymentService paymentService) : EndpointWithoutRequest
+public class RecurringDeleteEndpoint(ResidentAccess access, PaymentService paymentService) : EndpointWithoutRequest
 {
     public override void Configure()
     {
@@ -12,7 +13,9 @@ public class RecurringDeleteEndpoint(PaymentService paymentService) : EndpointWi
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         await paymentService.CancelRecurringAsync(propertyId, ct);
         await SendNoContentAsync(ct);
     }

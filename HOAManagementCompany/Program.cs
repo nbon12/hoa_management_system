@@ -450,6 +450,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.
 builder.Services.AddScoped<HOAManagementCompany.Features.Company.ICompanyContext,
     HOAManagementCompany.Features.Company.CompanyContext>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyEmailRenderer>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Residents.ResidentAccess>();
 
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();

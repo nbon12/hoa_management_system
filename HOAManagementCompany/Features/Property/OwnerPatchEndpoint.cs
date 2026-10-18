@@ -3,10 +3,11 @@ using HOAManagementCompany.Features.Common;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Property.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Property;
 
-public class OwnerPatchEndpoint(PropertyService propertyService) : Endpoint<OwnerPatchRequest, OwnerDto>
+public class OwnerPatchEndpoint(ResidentAccess access, PropertyService propertyService) : Endpoint<OwnerPatchRequest, OwnerDto>
 {
     public override void Configure()
     {
@@ -16,7 +17,9 @@ public class OwnerPatchEndpoint(PropertyService propertyService) : Endpoint<Owne
 
     public override async Task HandleAsync(OwnerPatchRequest req, CancellationToken ct)
     {
-        var propertyId = User.RequirePropertyId();
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         try { await SendOkAsync(await propertyService.PatchOwnerAsync(propertyId, req, ct), ct); }
         catch (DomainException ex) { HttpContext.Response.StatusCode = ex.StatusCode;
         await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct); }

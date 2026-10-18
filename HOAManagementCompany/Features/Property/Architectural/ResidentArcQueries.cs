@@ -5,6 +5,8 @@ using HOAManagementCompany.Features.Board;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
+using HOAManagementCompany.Features.Residents;
+
 namespace HOAManagementCompany.Features.Property.Architectural;
 
 // <!-- REPOWISE:START domain=resident-arc -->
@@ -36,7 +38,7 @@ public sealed class ResidentArcQueries(ApplicationDbContext db, ResidentArcScope
 
     public async Task<ResidentArcListResponse> ListAsync(ClaimsPrincipal user, int? limit, int? offset, CancellationToken ct)
     {
-        var propertyId = ResidentArcScope.PropertyId(user);
+        var propertyId = (await scope.HomeAsync(user, ResidentOperation.ReadHistory, ct)).PropertyId;
         var (take, skip) = Paging.Normalize(limit, offset);
 
         var drafts = await db.ArchitecturalApplicationDrafts
@@ -81,7 +83,7 @@ public sealed class ResidentArcQueries(ApplicationDbContext db, ResidentArcScope
     }
 
     public async Task<ResidentArcDetailDto> DetailAsync(ClaimsPrincipal user, Guid applicationId, CancellationToken ct) =>
-        await BuildDetailAsync(await scope.ApplicationAsync(user, applicationId, ct), ct);
+        await BuildDetailAsync(await scope.ApplicationAsync(user, applicationId, ResidentOperation.ReadHistory, ct), ct);
 
     public async Task<ResidentArcDetailDto> BuildDetailAsync(ArchitecturalApplication app, CancellationToken ct)
     {

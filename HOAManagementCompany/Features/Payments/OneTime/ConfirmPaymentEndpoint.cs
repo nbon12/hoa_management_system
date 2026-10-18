@@ -10,6 +10,7 @@ using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.OneTime;
 
@@ -20,7 +21,7 @@ namespace HOAManagementCompany.Features.Payments.OneTime;
 /// never from the client. Replaying the same PaymentIntent collapses to the original record (FR-017).
 /// ACH stays Pending — its ledger entry is deferred to the settlement webhook (FR-007 ACH).
 /// </summary>
-public class ConfirmPaymentEndpoint(
+public class ConfirmPaymentEndpoint(ResidentAccess access, 
     IStripeGateway gateway, ApplicationDbContext db, LedgerService ledger, IdempotencyService idempotency)
     : Endpoint<ConfirmPaymentRequest, ConfirmPaymentResponse>
 {
@@ -32,7 +33,9 @@ public class ConfirmPaymentEndpoint(
 
     public override async Task HandleAsync(ConfirmPaymentRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         var idempotencyKey = HttpContext.Request.Headers[IdempotencyService.HeaderName].FirstOrDefault();
 
         // Replay collapse (FR-007a/FR-035): a re-submitted confirm — keyed by the client idempotency

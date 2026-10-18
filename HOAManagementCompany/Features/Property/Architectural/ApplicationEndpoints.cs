@@ -54,8 +54,8 @@ public class ApplicationAttachmentUrlEndpoint(
     public override async Task HandleAsync(ResidentArcAttachmentRoute req, CancellationToken ct)
     {
         ResidentArcHttp.NoStore(HttpContext);
-        var key = await actions.AttachmentKeyAsync(User, req.Id, req.AttachmentId, ct);
-        ResidentArcLog.AttachmentAccess(logger, ResidentArcScope.UserId(User), ResidentArcScope.PropertyId(User),
+        var (key, propertyId) = await actions.AttachmentKeyAsync(User, req.Id, req.AttachmentId, ct);
+        ResidentArcLog.AttachmentAccess(logger, ResidentArcScope.UserId(User), propertyId,
             $"attachment:{req.AttachmentId}", clock.GetUtcNow());
         await SendOkAsync(await ResidentArcHttp.LinkAsync(storage, clock, key, ct), ct);
     }

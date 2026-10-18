@@ -1,14 +1,20 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Payments.Alerts;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Tests.Fixtures;
 using HOAManagementCompany.Tests.Integration.Board;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace HOAManagementCompany.Tests.Integration.Company;
 
@@ -24,9 +30,12 @@ public abstract class CompanyTestBase(TestDatabaseFixture fixture) : BoardTestBa
     protected TestClock Clock { get; } = new();
     protected FakeAlertProvider Email { get; } = new("email");
     protected FakeAlertProvider Sms { get; } = new("sms");
+    protected FakeStripeGateway Stripe { get; } = new();
 
     protected override void ConfigureTestServices(IServiceCollection services)
     {
+        services.RemoveAll<IStripeGateway>();
+        services.AddSingleton<IStripeGateway>(Stripe);
         services.RemoveAll<TimeProvider>();
         services.AddSingleton<TimeProvider>(Clock);
         services.RemoveAll<IAlertProvider>();
@@ -108,7 +117,7 @@ public abstract class CompanyTestBase(TestDatabaseFixture fixture) : BoardTestBa
     protected Task<(string UserId, string Email)> CreateManagerAsync(Guid communityId, DateOnly? endDate = null) =>
         CreateStaffAsync(communityId, CommunityRole.CommunityManager, endDate);
 
-    /// <summary>A property in <paramref name="communityId"/> (no resident yet).</summary>
+    /// <summary>A property in <paramref name="communityId"/> with its owner of record (no resident yet).</summary>
     protected Task<Guid> CreatePropertyAsync(Guid communityId, string? address = null) => WithDbAsync(async db =>
     {
         var id = Guid.NewGuid();
@@ -119,6 +128,10 @@ public abstract class CompanyTestBase(TestDatabaseFixture fixture) : BoardTestBa
             Zip = "27601", Lot = "1", Section = "1", FiscalYear = 2026, YearBuilt = 2005, Status = "active",
             MonthlyAssessment = 250m, AnnualAssessment = 3000m, AssessmentDueDay = 1, LateFeeAmount = 50m,
             LateFeeGraceDays = 15, FinanceChargeRate = 0.015m,
+        });
+        db.Owners.Add(new Owner
+        {
+            Id = Guid.NewGuid(), PropertyId = id, FirstName = "Pat", LastName = "Owner", Email = $"owner-{id:N}@nekohoa.dev",
         });
         await db.SaveChangesAsync();
         return id;
@@ -168,6 +181,34 @@ public abstract class CompanyTestBase(TestDatabaseFixture fixture) : BoardTestBa
         var body = await res.Content.ReadFromJsonAsync<Dictionary<string, JsonElement>>();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", body!["token"].GetString());
+        return client;
+    }
+
+    /// <summary>
+    /// Signs an access token the way AuthService does, for any home — including one the user is no
+    /// longer linked to, or none — so tests can play a stale or forged token (FR-024g).
+    /// </summary>
+    protected string MintToken(string userId, Guid? propertyId = null, Guid? communityId = null)
+    {
+        var config = Services.GetRequiredService<IConfiguration>();
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(JwtRegisteredClaimNames.Email, EmailOf(userId)),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        };
+        if (propertyId is { } p) claims.Add(new Claim("propertyId", p.ToString()));
+        if (communityId is { } c) claims.Add(new Claim("communityId", c.ToString()));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Secret"]!));
+        var token = new JwtSecurityToken(config["Jwt:Issuer"], config["Jwt:Audience"], claims,
+            expires: DateTime.UtcNow.AddMinutes(15), signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    protected HttpClient ClientWithToken(string token)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 
