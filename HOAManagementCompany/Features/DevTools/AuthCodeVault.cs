@@ -15,12 +15,24 @@ public sealed class AuthCodeVault
 {
     private readonly ConcurrentDictionary<string, string> _verification = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _claim = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _invitation = new(StringComparer.OrdinalIgnoreCase);
 
     public void StoreVerification(string contact, string code) => _verification[contact] = code;
     public void StoreClaim(string contact, string code) => _claim[contact] = code;
 
+    // 030 T054: the newest invitation link emailed to a contact, so Playwright and the quickstart
+    // can accept invitations without SES.
+    public void StoreInvitationLink(string contact, string link) => _invitation[contact] = link;
+
     public string? GetVerification(string contact) => _verification.TryGetValue(contact, out var c) ? c : null;
     public string? GetClaim(string contact) => _claim.TryGetValue(contact, out var c) ? c : null;
+    public string? GetInvitationLink(string contact) => _invitation.TryGetValue(contact, out var l) ? l : null;
+}
+
+/// <summary>Keeps each invitation link the service issues in the vault (030 T054). Registered only with the vault.</summary>
+public sealed class VaultingInvitationLinkObserver(AuthCodeVault vault) : Invitations.IInvitationLinkObserver
+{
+    public void LinkIssued(string email, string link) => vault.StoreInvitationLink(email.Trim(), link);
 }
 
 /// <summary>Decorates the real notifier: delivery proceeds unchanged, codes are also vaulted.</summary>

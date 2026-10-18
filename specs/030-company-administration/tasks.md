@@ -344,14 +344,14 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Invitation core (FR-022, FR-022a, FR-041b, FR-041c; research R6, R12)
 
-- [ ] T045 [P] Write `InvitationStateTests` first. A pure `[Theory]` over state (Scheduled, Pending, Expired, Accepted, Revoked) × action (accept, resend, revoke, activate, archive). Each case gives the next state or the refusal code, exactly as in data-model.md's transition table. File: `HOAManagementCompany.Tests/Unit/Company/InvitationStateTests.cs`
-- [ ] T046 [P] Add `InvitationTokens` in `HOAManagementCompany/Features/Invitations/InvitationTokens.cs`:
+- [X] T045 [P] Write `InvitationStateTests` first. A pure `[Theory]` over state (Scheduled, Pending, Expired, Accepted, Revoked) × action (accept, resend, revoke, activate, archive). Each case gives the next state or the refusal code, exactly as in data-model.md's transition table. File: `HOAManagementCompany.Tests/Unit/Company/InvitationStateTests.cs`
+- [X] T046 [P] Add `InvitationTokens` in `HOAManagementCompany/Features/Invitations/InvitationTokens.cs`:
   - a token is 32 random bytes, base64url-encoded (43 characters);
   - `Hash` is `AuthCrypto.Hash`;
   - the link builder makes `{App:BaseUrl}/invite#t={token}`.
 
   Unit test the length, the alphabet and that the token sits in the fragment: `HOAManagementCompany.Tests/Unit/Company/InvitationTokensTests.cs`
-- [ ] T047 [P] Write `InvitationLifecycleTests` first, using `CompanyAdministrator` invitations so the core is tested on its own. US2, US7 and US8 test the kind-specific offers. File: `HOAManagementCompany.Tests/Integration/Invitations/InvitationLifecycleTests.cs`
+- [X] T047 [P] Write `InvitationLifecycleTests` first, using `CompanyAdministrator` invitations so the core is tested on its own. US2, US7 and US8 test the kind-specific offers. File: `HOAManagementCompany.Tests/Integration/Invitations/InvitationLifecycleTests.cs`
   - **Create** stores only the token hash and sets `SentAt` and `ExpiresAt` (72 hours later) from `TestClock`. It sends one email through `FakeAlertProvider` whose body holds the link, and records one `InvitationDelivery`.
   - **A failed send** leaves the invitation Pending with `LastSendError`. A later successful resend clears it.
   - **Resend** gives a new hash, a new 72 hours and the resender as sender. The old token is refused with `INVITATION_INVALID`.
@@ -364,23 +364,23 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **The per-recipient cap**: the sixth send to one email within 24 hours → 429 `RATE_LIMITED`. A resend inside the 60-second cooldown → 429. The activation fan-out bypasses the cap (FR-041c).
   - **Supersede**: a new invitation for a target whose open invitation has expired first revokes the old one as `Superseded`.
   - **Logging**: every change logs one `InvitationChange` and every refusal one `InvitationAcceptFailed`. No rendered event property contains the token, an email or a name.
-- [ ] T048 Implement `InvitationService` in `HOAManagementCompany/Features/Invitations/InvitationService.cs`, with an `IInvitationOfferHandler` per `InvitationKind` in `IInvitationOfferHandler.cs`, until T045 and T047 pass.
+- [X] T048 Implement `InvitationService` in `HOAManagementCompany/Features/Invitations/InvitationService.cs`, with an `IInvitationOfferHandler` per `InvitationKind` in `IInvitationOfferHandler.cs`, until T045 and T047 pass.
   - **Operations**: create, send, resend, revoke, preview lookup, accept, and the activation fan-out entry point.
   - **Caps**: counted against `InvitationDeliveries`.
   - **Locking**: a `SELECT … FOR UPDATE` row lock per invitation, inside `CommunityLocks` or `CompanyLocks`.
   - **Handler interface**: `ValidateCreateAsync`, `SenderStillAuthorizedAsync`, `ApplyAsync`, `DescribeAsync`.
   - **Delivery**: send directly through the email `IAlertProvider`, never the outbox (R6).
   - Add a Repowise `domain=invitations` marker.
-- [ ] T049 [P] Add `InvitationEmailRenderer` in `HOAManagementCompany/Features/Invitations/InvitationEmailRenderer.cs`.
+- [X] T049 [P] Add `InvitationEmailRenderer` in `HOAManagementCompany/Features/Invitations/InvitationEmailRenderer.cs`.
   - It renders the three direct-send templates in `contracts/emails.md`.
   - Expiry is shown in the community's time zone, or the company default's for Company Administrator invitations.
   - Bodies are never logged.
   - Test (`HOAManagementCompany.Tests/Unit/Company/InvitationEmailRendererTests.cs`): subjects, body fields, the local expiry text, and the setup-step sender line.
-- [ ] T050 Add `SenderAuthority` in `HOAManagementCompany/Features/Board/SenderAuthority.cs`:
+- [X] T050 Add `SenderAuthority` in `HOAManagementCompany/Features/Board/SenderAuthority.cs`:
   - `CouldSendAsync(userId, invitation)` re-runs `DecideAsync`, or the company grant check, for the invitation's capability. A setup-step invitation with no sender always passes.
   - `RevokeOrphanedAsync(userId, communityId?, cause)` revokes, in the caller's transaction, every Scheduled or Pending invitation the user can no longer send. Each is logged with `SenderLostAuthority`.
-- [ ] T051 Implement the `CompanyAdministrator` offer handler in `HOAManagementCompany/Features/Invitations/CompanyAdministratorOfferHandler.cs`. Applying it creates a live grant with `Source = Invitation` and the `InvitationId`. It does nothing when a live grant already exists.
-- [ ] T052 [P] Write `InvitationEndpointsTests` first, for `POST /invitations/preview`, `/invitations/register` and `/invitations/accept`, using the `CompanyAdministrator` kind. File: `HOAManagementCompany.Tests/Integration/Invitations/InvitationEndpointsTests.cs`
+- [X] T051 Implement the `CompanyAdministrator` offer handler in `HOAManagementCompany/Features/Invitations/CompanyAdministratorOfferHandler.cs`. Applying it creates a live grant with `Source = Invitation` and the `InvitationId`. It does nothing when a live grant already exists.
+- [X] T052 [P] Write `InvitationEndpointsTests` first, for `POST /invitations/preview`, `/invitations/register` and `/invitations/accept`, using the `CompanyAdministrator` kind. File: `HOAManagementCompany.Tests/Integration/Invitations/InvitationEndpointsTests.cs`
   - **Preview**:
     - a valid link returns the contract body;
     - `invitedEmail` and `hasAccount` are set only for an anonymous caller, and are `null` for a signed-in one (FR-022a);
@@ -392,8 +392,8 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Register for an email that already has an account** → the generic 422 `REGISTRATION_FAILED`, and the invitation stays Pending.
   - **Accept** applies the offer to the caller. Accepting while already holding the grant returns `alreadyHeld: true` and duplicates nothing.
   - **All three** use the `auth` rate limit (a burst gets 429) and set `no-store`.
-- [ ] T053 Implement `InvitationPreviewEndpoint`, `InvitationRegisterEndpoint` and `InvitationAcceptEndpoint` in `HOAManagementCompany/Features/Invitations/`, until T052 passes. They use the `auth` rate limit. Register reuses the Identity password rules and the `AuthService` sign-in.
-- [ ] T054 [P] Let the dev tools capture invitation links.
+- [X] T053 Implement `InvitationPreviewEndpoint`, `InvitationRegisterEndpoint` and `InvitationAcceptEndpoint` in `HOAManagementCompany/Features/Invitations/`, until T052 passes. They use the `auth` rate limit. Register reuses the Identity password rules and the `AuthService` sign-in.
+- [X] T054 [P] Let the dev tools capture invitation links.
   - Add an `IInvitationLinkObserver` that `InvitationService` calls after each send.
   - Its vault-backed implementation is registered only when `DevTools:E2ECleanupEnabled` is true, and never in Production (`E2ETestSupportGate`).
   - Expose the links through `E2EAuthCodesEndpoint`, so Playwright and the quickstart can read them without SES.

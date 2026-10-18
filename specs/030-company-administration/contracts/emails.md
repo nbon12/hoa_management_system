@@ -8,13 +8,13 @@ Plain text for now. The HTML layouts come from Claude Design brief 12 ([design/1
 
 ## Invitation emails: sent directly, not through the outbox (R6)
 
-These are sent through the email `IAlertProvider` at send time. Each attempt is recorded in `InvitationDeliveries`. On failure the invitation keeps `LastSendError`, and the lists offer Resend.
+These are sent through the email `IAlertProvider` at send time. Subjects and bodies use design brief 12's §5.2 copy, in its §5.4 plain-text form. Each attempt is recorded in `InvitationDeliveries`. On failure the invitation keeps `LastSendError`, and the lists offer Resend.
 
 | Template | When | Subject | Body fields |
 |---|---|---|---|
-| Role invitation | membership invitation sent or resent | "You're invited to join {community} as {role}" | community, role, term end (if any), sender name, **link**, expiry ("This link works until {local time}, 72 hours after it was sent."), how to ignore it |
-| Resident invitation | residency invitation sent or resent, including the activation fan-out | "You're invited to {property address} on {company}" | community, property address, sender name, **link**, expiry, "If you already have an account, sign in to accept." |
-| Company Administrator invitation | `POST /company/administrators/invitations`, or the setup step | "You're invited to be a Company Administrator for {company}" | company, sender ("set up by your deployer" for the setup step), **link**, expiry |
+| Role invitation | membership invitation sent or resent | "You're invited to be a {role} of {community}" ("an Accountant") | community, role, term end (if any), sender name, **link**, expiry ("This link works until {local time}, 72 hours after it was sent."), how to ignore it |
+| Resident invitation | residency invitation sent or resent, including the activation fan-out | "You're invited to be a resident of {property address}" | community, property address, sender name, **link**, expiry, "If you already have an account, sign in to accept." |
+| Company Administrator invitation | `POST /company/administrators/invitations`, or the setup step | "You're invited to be a Company Administrator of {company}" | company, sender ("set up by your deployer" for the setup step), **link**, expiry |
 
 ## Notification emails: through the outbox (R10)
 

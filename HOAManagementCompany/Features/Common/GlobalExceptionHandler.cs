@@ -31,8 +31,9 @@ public class GlobalExceptionHandler(
         // instead of converting it to a 500. Endpoints that catch it locally are unaffected.
         if (exception is DomainException domainEx)
         {
-            logger.LogWarning("Domain error {Code} ({StatusCode}): {Message}",
-                domainEx.Code, domainEx.StatusCode, domainEx.Message);
+            // The message is user-facing copy and can name an invited email address (030
+            // INVITATION_PENDING, ALREADY_MEMBER), so only the code and status are logged (FR-040).
+            logger.LogWarning("Domain error {Code} ({StatusCode})", domainEx.Code, domainEx.StatusCode);
 
             context.Response.StatusCode = domainEx.StatusCode;
             context.Response.ContentType = "application/json";

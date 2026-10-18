@@ -392,6 +392,18 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Auth.IAuthNotifier>(sp 
         : notifier;
 });
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
+// Invitations (030 R6): one lifecycle for every kind, with a handler per kind for what it offers.
+// The dev vault keeps each emailed link only where e2e test support is enabled (T054).
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.SenderAuthority>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.InvitationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
+    HOAManagementCompany.Features.Invitations.CompanyAdministratorOfferHandler>();
+builder.Services.AddSingleton<HOAManagementCompany.Features.Invitations.IInvitationLinkObserver>(sp =>
+    sp.GetRequiredService<IConfiguration>().GetValue<bool>("DevTools:E2ECleanupEnabled")
+    && !builder.Environment.IsProduction() && !builder.Environment.IsStaging()
+        ? new HOAManagementCompany.Features.DevTools.VaultingInvitationLinkObserver(
+            sp.GetRequiredService<HOAManagementCompany.Features.DevTools.AuthCodeVault>())
+        : new HOAManagementCompany.Features.Invitations.NoInvitationLinkObserver());
 // Board member experience (025-board-overall-design). The single community-scope
 // resolver every board-side endpoint authorizes through (FR-012). The MetricDescriptor
 // registry is intentionally empty here — spec 2 registers concrete descriptors.

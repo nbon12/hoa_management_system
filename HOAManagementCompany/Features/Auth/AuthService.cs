@@ -104,6 +104,13 @@ public class AuthService(
         return await CreateTokenPairAsync(user, property, ct);
     }
 
+    // 030 FR-022a: sign in an account just created from an invitation link, as /auth/login does.
+    public async Task<AuthResult> SignInAsync(ApplicationUser user, CancellationToken ct = default)
+    {
+        var property = await FindUsablePropertyAsync(user.Id, ct);
+        return await CreateTokenPairAsync(user, property, ct);
+    }
+
     public async Task LogoutAsync(string userId, CancellationToken ct = default)
     {
         await db.RefreshTokens

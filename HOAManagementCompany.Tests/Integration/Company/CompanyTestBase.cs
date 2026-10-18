@@ -27,7 +27,8 @@ namespace HOAManagementCompany.Tests.Integration.Company;
 /// </summary>
 public abstract class CompanyTestBase(TestDatabaseFixture fixture) : BoardTestBase(fixture)
 {
-    protected TestClock Clock { get; } = new();
+    // Starts on a whole microsecond, the precision Postgres keeps, so stored times compare equal.
+    protected TestClock Clock { get; } = new() { UtcNow = new DateTimeOffset(DateTimeOffset.UtcNow.UtcTicks / 10 * 10, TimeSpan.Zero) };
     protected FakeAlertProvider Email { get; } = new("email");
     protected FakeAlertProvider Sms { get; } = new("sms");
     protected FakeStripeGateway Stripe { get; } = new();
