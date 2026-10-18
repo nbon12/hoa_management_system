@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { boardGuard } from './core/guards/board.guard';
+import { companyAdminGuard } from './core/guards/company-admin.guard';
 import { landingGuard } from './core/guards/landing.guard';
 
 export const routes: Routes = [
@@ -9,6 +10,8 @@ export const routes: Routes = [
   { path: 'portal', loadComponent: () => import('./features/auth/portal-select.component').then(m => m.PortalSelectComponent) },
   { path: 'login',  loadComponent: () => import('./features/auth/login.component').then(m => m.LoginComponent) },
   { path: 'register', loadComponent: () => import('./features/auth/register.component').then(m => m.RegisterComponent) },
+  // 030 FR-022a / R6: public invitation acceptance. The token is in the URL fragment (`#t=…`).
+  { path: 'invite', loadComponent: () => import('./features/invitations/invitation-page.component').then(m => m.InvitationPageComponent) },
 
   // Protected app shell
   {
@@ -52,6 +55,15 @@ export const routes: Routes = [
       { path: 'board/architectural', canActivate: [boardGuard], data: { requiredRoles: ['BoardMember', 'CommunityManager'] }, loadComponent: () => import('./features/board/architectural/applications-page.component').then(m => m.ApplicationsPageComponent) },
       { path: 'board/arc-settings',  canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'] }, loadComponent: () => import('./features/board/architectural/arc-settings.component').then(m => m.ArcSettingsComponent) },
       { path: 'board/memberships', canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'] }, loadComponent: () => import('./features/board/membership-admin/membership-admin.component').then(m => m.MembershipAdminComponent) },
+
+      // 030 FR-029 / R20: one Community settings page per community, addressed by the community in
+      // the company area and by the active community in board mode. Each section has its own address.
+      { path: 'board/settings', pathMatch: 'full', redirectTo: 'board/settings/profile' },
+      { path: 'board/settings/:section', canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'], settingsMode: 'board' }, loadComponent: () => import('./features/community-settings/community-settings-page.component').then(m => m.CommunitySettingsPageComponent) },
+
+      // 030 company area (FR-036): Company Administrators only.
+      { path: 'company/communities/:communityId/settings', pathMatch: 'full', redirectTo: 'company/communities/:communityId/settings/profile' },
+      { path: 'company/communities/:communityId/settings/:section', canActivate: [companyAdminGuard], data: { settingsMode: 'company' }, loadComponent: () => import('./features/community-settings/community-settings-page.component').then(m => m.CommunitySettingsPageComponent) },
     ]
   },
 

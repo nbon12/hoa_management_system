@@ -264,7 +264,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - It has the five `co_*` kinds as constants, with their dedup keys and plain-text bodies per `contracts/emails.md`.
   - Register it with the outbox dispatcher.
   - Unit test (`HOAManagementCompany.Tests/Unit/Company/CompanyEmailRendererTests.cs`): every kind is at most 30 characters; each kind's subject, body fields and dedup-key format; no body contains an invitation link.
-- [ ] T034 [P] Add `refusalMessage(code, context)` in `neko-hoa/src/app/shared/refusal-messages.ts`, mapping every error code to the conventions table in `design/00-conventions.md` (FR-042). Test it in `refusal-messages.spec.ts`: every contract code has a message, and the non-disclosing codes never interpolate a name or an email.
+- [X] T034 [P] Add `refusalMessage(code, context)` in `neko-hoa/src/app/shared/refusal-messages.ts`, mapping every error code to the conventions table in `design/00-conventions.md` (FR-042). Test it in `refusal-messages.spec.ts`: every contract code has a message, and the non-disclosing codes never interpolate a name or an email.
 
 ### Resident access on every request (FR-024g, FR-012a; research R8)
 
@@ -334,7 +334,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - `BuildCurrentUserAsync` fills `properties[].communityStatus`, `memberships[].communityStatus`, `isCompanyAdministrator` and `landing` (from `LandingRule`).
   - Also update `HOAManagementCompany/Features/Auth/Models/AuthModels.cs`, and `HOAManagementCompany/Features/Board/MyCommunitiesEndpoint.cs` and `BoardModeEndpoint.cs` (Onboarding included, Archived excluded).
 - [X] T043 Remove the staff co-residence workaround from `HOAManagementCompany/Seed/AuthSeeder.cs`, since board and manager users no longer need a home to sign in. Update `HOAManagementCompany.Tests/Integration/Seed/SeederTests.cs`.
-- [ ] T044 [P] Frontend sign-in state:
+- [X] T044 [P] Frontend sign-in state:
   - `neko-hoa/src/app/core/models/index.ts` gains the new DTO fields;
   - `neko-hoa/src/app/core/services/auth.service.ts` keeps `properties`, `isCompanyAdministrator` and `landing` from `/auth/me`;
   - `neko-hoa/src/app/core/services/landing.ts` follows the server's `landing`: `Company` → `/app/company/portfolio`, `NoHome` → `/app/no-home`, `NotLive` → `/app/not-live`;
@@ -399,8 +399,8 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - Expose the links through `E2EAuthCodesEndpoint`, so Playwright and the quickstart can read them without SES.
   - Files: `HOAManagementCompany/Features/DevTools/AuthCodeVault.cs` and `E2EAuthCodesEndpoint.cs`.
   - Test (`HOAManagementCompany.Tests/Integration/DevTools/InvitationLinkVaultTests.cs`): links are captured when enabled, and the observer isn't registered when disabled.
-- [ ] T055 [P] Add the frontend `InvitationService` (`preview`, `register`, `accept`) in `neko-hoa/src/app/core/services/invitation.service.ts`. Its spec, `invitation.service.spec.ts`, uses HttpTestingController to show the token is only ever in a request body, never in a URL.
-- [ ] T056 [P] Write `neko-hoa/src/app/features/invitations/invitation-page.component.spec.ts` first (Angular Testing Library):
+- [X] T055 [P] Add the frontend `InvitationService` (`preview`, `register`, `accept`) in `neko-hoa/src/app/core/services/invitation.service.ts`. Its spec, `invitation.service.spec.ts`, uses HttpTestingController to show the token is only ever in a request body, never in a URL.
+- [X] T056 [P] Write `neko-hoa/src/app/features/invitations/invitation-page.component.spec.ts` first (Angular Testing Library):
   - reads `#t=` and removes it with `history.replaceState`;
   - a valid link shows the community, the offer and the sender;
   - which action it shows:
@@ -412,7 +412,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - `INVITATION_EXPIRED`, `INVITATION_INVALID` and `INVITATION_EMAIL_MISMATCH` show brief 10's copy, and the mismatch never shows an email;
   - `REGISTRATION_FAILED` says to sign in and accept;
   - on success it routes by `landing`.
-- [ ] T057 Implement `InvitationPageComponent` at `/invite` in `neko-hoa/src/app/features/invitations/invitation-page.component.ts`, and add the public route in `neko-hoa/src/app/app.routes.ts`. It is public, follows brief 10, and works at phone width.
+- [X] T057 Implement `InvitationPageComponent` at `/invite` in `neko-hoa/src/app/features/invitations/invitation-page.component.ts`, and add the public route in `neko-hoa/src/app/app.routes.ts`. It is public, follows brief 10, and works at phone width.
   - It sets a `Referrer-Policy: no-referrer` meta tag while shown.
   - Make `neko-hoa/src/app/core/observability/otel.bootstrap.ts` strip URL fragments from every span URL attribute. The Angular app has no Sentry SDK; its client telemetry is OpenTelemetry.
   - Test the stripping in `otel.bootstrap.spec.ts`.
@@ -437,11 +437,11 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Company area and Community settings page shell (MVP foundation d and e)
 
-- [ ] T061 [P] Add `CompanyService` and `CommunitySettingsService` in `neko-hoa/src/app/core/services/company.service.ts` and `community-settings.service.ts`, typed per the contracts, each with an HttpTestingController spec beside it.
+- [X] T061 [P] Add `CompanyService` and `CommunitySettingsService` in `neko-hoa/src/app/core/services/company.service.ts` and `community-settings.service.ts`, typed per the contracts, each with an HttpTestingController spec beside it.
   - **`CompanyService`**: communities, `createCommunity`, the lifecycle previews and actions, parent, defaults, administrators and Company Administrator invitations (both paged).
   - **`CommunitySettingsService`**: settings, profile, `patchProfile`, memberships, people, `replaceManager`, invitations, residents, the ARC settings and `resetArc`.
-- [ ] T062 [P] Add `companyAdminGuard` in `neko-hoa/src/app/core/guards/company-admin.guard.ts`, with `company-admin.guard.spec.ts`. It allows a user with `isCompanyAdministrator` and routes anyone else to their landing target.
-- [ ] T063 [P] Write specs first for the shared UI in `neko-hoa/src/app/shared/`:
+- [X] T062 [P] Add `companyAdminGuard` in `neko-hoa/src/app/core/guards/company-admin.guard.ts`, with `company-admin.guard.spec.ts`. It allows a user with `isCompanyAdministrator` and routes anyone else to their landing target.
+- [X] T063 [P] Write specs first for the shared UI in `neko-hoa/src/app/shared/`:
   - **`disabled-reason.directive.spec.ts`**:
     - the reason shows on hover and on keyboard focus, tied by `aria-describedby`;
     - the control has `aria-disabled` and stays focusable;
@@ -453,7 +453,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - announces politely.
   - **`toast-host.component.spec.ts`**: a polite live region that auto-dismisses.
   - **`property-drawer.component.spec.ts`**: opens beside the list, and full width below 768 px; moves focus in; Esc closes it and returns focus to the row.
-- [ ] T064 Implement `DisabledReasonDirective`, `AutosaveFieldDirective`, `ToastHostComponent` and `PropertyDrawerComponent` (the glossary-panel pattern) in `neko-hoa/src/app/shared/`, and `ToastService` in `neko-hoa/src/app/core/services/toast.service.ts`, until T063 pass
+- [X] T064 Implement `DisabledReasonDirective`, `AutosaveFieldDirective`, `ToastHostComponent` and `PropertyDrawerComponent` (the glossary-panel pattern) in `neko-hoa/src/app/shared/`, and `ToastService` in `neko-hoa/src/app/core/services/toast.service.ts`, until T063 pass
 - [ ] T065 [P] Write `CommunitySettingsShellTests` first, for `GET /communities/{id}/settings`. File: `HOAManagementCompany.Tests/Integration/Company/CommunitySettingsShellTests.cs`
   - **US5-S1** (shell): a Company Administrator with no membership gets `sections` = profile, managers-and-memberships, architectural-review, and every `can.*` that fits the status.
   - **US5-S2**: the community's Community Manager gets `changeParent`, `activate`, `archive` and `restore` false, and the other `can.*` true.
@@ -462,24 +462,24 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - `noManager` is null for non-administrators.
   - With no open-ended manager, `can.activate.reasonCode` is `NO_ACTIVE_MANAGER`.
 - [ ] T066 Implement `CommunitySettingsEndpoint` (`ViewCommunitySettings`, read, `no-store`) in `HOAManagementCompany/Features/Board/Settings/CommunitySettingsEndpoint.cs`, until T065 passes
-- [ ] T067 [P] Write `community-settings-page.component.spec.ts` and `settings-side-nav.component.spec.ts` first, in `neko-hoa/src/app/features/community-settings/`:
+- [X] T067 [P] Write `community-settings-page.component.spec.ts` and `settings-side-nav.component.spec.ts` first, in `neko-hoa/src/app/features/community-settings/`:
   - sections render from `sections[]`;
   - controls are hidden according to `can.*`;
   - a 403 routes to the landing page (US5-S3, frontend);
   - the side list's search filters section names and setting labels from the registry, and choosing a result opens the section and focuses the setting;
   - a Community Manager of an Onboarding community sees the "a Company Administrator must mark it Active" notice on Profile (FR-029);
   - below 768 px the side list collapses into a menu that keeps the search (constitution §6).
-- [ ] T068 Implement `CommunitySettingsPageComponent` (the header, the status shown as text, the side list and the section outlet) and `SettingsSideNavComponent` (search over a static registry of setting labels), following brief 04, in `neko-hoa/src/app/features/community-settings/`. Do this until T067 pass.
+- [X] T068 Implement `CommunitySettingsPageComponent` (the header, the status shown as text, the side list and the section outlet) and `SettingsSideNavComponent` (search over a static registry of setting labels), following brief 04, in `neko-hoa/src/app/features/community-settings/`. Do this until T067 pass.
   - Add the routes to `neko-hoa/src/app/app.routes.ts`:
     - `/app/company/communities/:communityId/settings/:section`, with `companyAdminGuard`;
     - `/app/board/settings/:section`, with `boardGuard` and `requiredRoles: ['CommunityManager']`.
-- [ ] T069 [P] Extend the specs first.
+- [X] T069 [P] Extend the specs first.
   - **`neko-hoa/src/app/shell/shell.component.spec.ts`**:
     - under `/app/company/**`, the shell shows the company nav (Portfolio · Add community · Company defaults · Company administrators) and no board banner;
     - the Company menu appears in the account cluster only for Company Administrators;
     - the grant alone shows no board-mode control (FR-036).
   - **`board-navigation.service.spec.ts`**: the board nav gains "Community settings" and "Add community" for Community Managers.
-- [ ] T070 Implement the company-area state and the Company menu in `neko-hoa/src/app/shell/shell.component.ts`, and the new `BOARD_NAV` entries in `neko-hoa/src/app/core/services/board-navigation.service.ts` (brief 01), until T069 pass
+- [X] T070 Implement the company-area state and the Company menu in `neko-hoa/src/app/shell/shell.component.ts`, and the new `BOARD_NAV` entries in `neko-hoa/src/app/core/services/board-navigation.service.ts` (brief 01), until T069 pass
 
 **Checkpoint**: the migration applies, the resolver decides per FR-004a, resident endpoints check access on every request, a user with no home can sign in, invitations can be created, sent and accepted, the setup step works, and the settings page shell renders.
 

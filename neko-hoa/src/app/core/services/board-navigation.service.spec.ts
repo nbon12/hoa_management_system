@@ -94,6 +94,59 @@ describe('BoardNavigationService.buildNav (pure derivation)', () => {
   });
 });
 
+// 030 T069 / brief 01 §4.1, FR-029, FR-036: the board nav gains "Add community" (top block, after
+// My Communities) and "Community settings" (last in Community management) for Community Managers.
+// No "Portfolio" item exists for anyone, locked or not (FR-035).
+describe('BoardNavigationService.buildNav (030 board-nav entries)', () => {
+  function labels(groups: BoardNavGroup[]): string[] {
+    return allItems(groups).map(i => i.label);
+  }
+
+  it('unlocks Community settings and Add community for a Community Manager', () => {
+    const nav = BoardNavigationService.buildNav({ roles: ['CommunityManager'], communityCount: 1 });
+    const settings = item(nav, 'Community settings')!;
+    expect(settings.locked).toBeFalse();
+    expect(settings.disabled).toBeFalse();
+    expect(settings.route).toBe('/app/board/settings/profile');
+    const add = item(nav, 'Add community')!;
+    expect(add.locked).toBeFalse();
+    expect(add.route).toBe('/app/board/communities/new');
+  });
+
+  it('places Add community after My Communities and before Community Home, and Community settings last in its group (D1)', () => {
+    const nav = BoardNavigationService.buildNav({ roles: ['CommunityManager'], communityCount: 5 });
+    expect(labels(nav).slice(0, 3)).toEqual(['My Communities', 'Add community', 'Community Home']);
+    const management = nav.find(g => g.group === 'Community management')!;
+    expect(management.items[management.items.length - 1].label).toBe('Community settings');
+  });
+
+  it('shows both entries locked for a Board Member or an Accountant (spec 025 FR-040, 8.01.k, 8.01.o)', () => {
+    for (const role of ['BoardMember', 'Accountant']) {
+      const nav = BoardNavigationService.buildNav({ roles: [role], communityCount: 1 });
+      expect(item(nav, 'Community settings')!.locked).withContext(role).toBeTrue();
+      expect(item(nav, 'Add community')!.locked).withContext(role).toBeTrue();
+    }
+  });
+
+  it('unlocks both after a Board Member is appointed co-manager (union of roles, 8.01.l)', () => {
+    const nav = BoardNavigationService.buildNav({ roles: ['BoardMember', 'CommunityManager'], communityCount: 1 });
+    expect(item(nav, 'Community settings')!.locked).toBeFalse();
+    expect(item(nav, 'Add community')!.locked).toBeFalse();
+  });
+
+  it('unlocks Add community from a manager role in another community; Community settings follows the active one', () => {
+    const nav = BoardNavigationService.buildNav({ roles: ['BoardMember'], communityCount: 2, anyRoles: ['BoardMember', 'CommunityManager'] });
+    expect(item(nav, 'Add community')!.locked).toBeFalse();
+    expect(item(nav, 'Community settings')!.locked).toBeTrue();
+  });
+
+  it('never offers a Portfolio item (FR-035)', () => {
+    for (const roles of [['CommunityManager'], ['BoardMember'], ['Accountant']]) {
+      expect(labels(BoardNavigationService.buildNav({ roles, communityCount: 3 }))).not.toContain('Portfolio');
+    }
+  });
+});
+
 describe('BoardNavigationService (signal-derived)', () => {
   const userSig = signal<CurrentUser | null>(null);
 
@@ -146,5 +199,45 @@ describe('BoardNavigationService (signal-derived)', () => {
     svc.setActiveCommunity('c2');
     // c2 is board-only → Memberships locked again.
     expect(item(svc.nav(), 'Memberships')!.locked).toBeTrue();
+  });
+});
+
+describe('BoardNavigationService (030 signal-derived)', () => {
+  const userSig = signal<CurrentUser | null>(null);
+  let svc: BoardNavigationService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [{ provide: AuthService, useValue: { user: userSig.asReadonly() } }],
+    });
+    svc = TestBed.inject(BoardNavigationService);
+  });
+
+  it('Add community follows any community; Community settings follows the active one', () => {
+    userSig.set({
+      id: 'u1', firstName: 'A', lastName: 'B', email: 'a@b.dev', initials: 'AB', lastActiveMode: 'Board',
+      memberships: [
+        { communityId: 'c1', communityName: 'One', role: 'BoardMember', communityStatus: 'Active' },
+        { communityId: 'c2', communityName: 'Two', role: 'CommunityManager', communityStatus: 'Onboarding' },
+      ],
+    });
+    svc.setActiveCommunity('c1');
+    expect(item(svc.nav(), 'Add community')!.locked).toBeFalse();
+    expect(item(svc.nav(), 'Community settings')!.locked).toBeTrue();
+    svc.setActiveCommunity('c2');
+    expect(item(svc.nav(), 'Community settings')!.locked).toBeFalse();
+  });
+
+  it('does not count or unlock from an Archived community (FR-036b)', () => {
+    userSig.set({
+      id: 'u1', firstName: 'A', lastName: 'B', email: 'a@b.dev', initials: 'AB', lastActiveMode: 'Board',
+      memberships: [
+        { communityId: 'c1', communityName: 'One', role: 'Accountant', communityStatus: 'Active' },
+        { communityId: 'old', communityName: 'Old Mill Commons', role: 'CommunityManager', communityStatus: 'Archived' },
+      ],
+    });
+    expect(svc.communityCount()).toBe(1);
+    expect(item(svc.nav(), 'My Communities')).toBeUndefined();
+    expect(item(svc.nav(), 'Add community')!.locked).toBeTrue();
   });
 });

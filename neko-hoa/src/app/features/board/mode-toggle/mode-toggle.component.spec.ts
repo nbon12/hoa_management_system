@@ -103,4 +103,44 @@ describe('ModeToggleComponent', () => {
     expect(el.textContent).toContain('not available');
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  // 030 T069 / FR-036, FR-036b, brief 01 8.01.e–f.
+  it('shows no control for the Company Administrator grant alone (FR-036)', () => {
+    userSig.set({
+      id: 'u1', firstName: 'Robin', lastName: 'Hale', email: 'r@b.dev', initials: 'RH', lastActiveMode: 'Resident',
+      memberships: [], properties: [], isCompanyAdministrator: true, landing: 'Company',
+    });
+    fixture.detectChanges();
+    expect(el.querySelector('button')).toBeNull();
+  });
+
+  it('counts an Onboarding membership and ignores an Archived one (FR-036b)', () => {
+    setUser([{ communityId: 'old', communityName: 'Old Mill Commons', role: 'Accountant', communityStatus: 'Archived' }]);
+    fixture.detectChanges();
+    expect(el.querySelector('button')).toBeNull();
+    setUser([{ communityId: 'kr', communityName: 'Keystone Ridge', role: 'CommunityManager', communityStatus: 'Onboarding' }]);
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Enter board mode');
+  });
+
+  it('shows "Enter board mode" in the company area even when the last mode was Board (8.01.e)', async () => {
+    setUser([{ communityId: 'c1', communityName: 'One', role: 'BoardMember' }], 'Board');
+    fixture.componentRef.setInput('outsideBoard', true);
+    fixture.detectChanges();
+    expect(el.querySelector('.mode-seg')).toBeNull();
+    (el.querySelector('.mode-enter') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(switchMode).toHaveBeenCalledWith('Board');
+    expect(navigate).toHaveBeenCalledWith(['/app/board/home']);
+  });
+
+  it('shows board mode to a user with no home whose landing is Board (FR-036a)', () => {
+    userSig.set({
+      id: 'u1', firstName: 'Pat', lastName: 'Rivera', email: 'p@b.dev', initials: 'PR', lastActiveMode: 'Resident',
+      memberships: [{ communityId: 'kp', communityName: 'Keystone Park', role: 'CommunityManager', communityStatus: 'Onboarding' }],
+      properties: [], isCompanyAdministrator: false, landing: 'Board',
+    });
+    fixture.detectChanges();
+    expect(el.querySelector('.mode-seg')).toBeTruthy();
+  });
 });
