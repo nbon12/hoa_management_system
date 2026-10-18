@@ -281,8 +281,23 @@ public class AuthService(
     }
 }
 
-public class DomainException(string code, string message, int statusCode) : Exception(message)
+public class DomainException(
+    string code, string message, int statusCode, IReadOnlyDictionary<string, object?>? extensions = null)
+    : Exception(message)
 {
     public string Code { get; } = code;
     public int StatusCode { get; } = statusCode;
+
+    // 030: extra body members for codes that carry detail, such as OPEN_WORK's items[] or
+    // INVITATION_PENDING's invitationId. Written beside code and message.
+    public IReadOnlyDictionary<string, object?>? Extensions { get; } = extensions;
+
+    public Dictionary<string, object?> ToBody()
+    {
+        var body = new Dictionary<string, object?> { ["code"] = Code, ["message"] = Message };
+        if (Extensions is not null)
+            foreach (var (key, value) in Extensions)
+                body[key] = value;
+        return body;
+    }
 }

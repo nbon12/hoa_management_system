@@ -20,7 +20,8 @@ public class MembershipCreateEndpoint(
     public override void Configure()
     {
         Post("/communities/{communityId}/memberships");
-        Description(x => x.WithName("CreateMembership").WithTags("Board"));
+        // 030 FR-041a: per-user write limit, which 025 lacked here.
+        Description(x => x.WithName("CreateMembership").WithTags("Board").RequireRateLimiting("board-writes"));
     }
 
     public override async Task HandleAsync(MembershipCreateRequest req, CancellationToken ct)

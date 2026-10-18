@@ -36,8 +36,9 @@ public class GlobalExceptionHandler(
 
             context.Response.StatusCode = domainEx.StatusCode;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(
-                new { code = domainEx.Code, message = domainEx.Message }, ct);
+            // Refusals are user-specific; the exception middleware clears headers set earlier.
+            context.Response.Headers.CacheControl = "no-store";
+            await context.Response.WriteAsJsonAsync(domainEx.ToBody(), ct);
             return true;
         }
 

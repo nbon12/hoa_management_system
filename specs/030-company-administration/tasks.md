@@ -160,7 +160,7 @@ Visual polish waits for `design/handoff/` (T160).
 Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique rows per test instead of a rolled-back transaction (testing constitution §2.1, approved 2026-10-18).
 
 
-- [ ] T017 Create `CompanyTestBase : BoardTestBase` in `HOAManagementCompany.Tests/Integration/Company/CompanyTestBase.cs`. Its factory helpers create only their own rows, keyed by new GUIDs, so tests are parallel-safe:
+- [X] T017 Create `CompanyTestBase : BoardTestBase` in `HOAManagementCompany.Tests/Integration/Company/CompanyTestBase.cs`. Its factory helpers create only their own rows, keyed by new GUIDs, so tests are parallel-safe:
   - `CreateCompanyAsync()`, `CreateCompanyAdminAsync(companyId)`;
   - `CreateCommunityAsync(companyId, status, name?, parentId?)`, `CreateManagerAsync(communityId, endDate?)`;
   - `CreatePropertyWithResidentAsync(communityId, address?)`;
@@ -173,11 +173,11 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Authorization (research R2, R3)
 
-- [ ] T018 Extend `HOAManagementCompany/Features/Board/ICommunityScopeResolver.cs`:
+- [X] T018 Extend `HOAManagementCompany/Features/Board/ICommunityScopeResolver.cs`:
   - the eight new `CommunityCapability` values;
   - the `CompanyCapability`, `ScopeDecision` and `ScopeOperation` enums;
   - `DecideAsync(user, communityId, capability, op, ct)` and `CanAccessCompanyAsync(user, capability, ct)`.
-- [ ] T019 [P] Write `ScopeDecisionTheoryTests` first.
+- [X] T019 [P] Write `ScopeDecisionTheoryTests` first.
   - **Theory**: role (Company Administrator, Community Manager of this community, Community Manager of another, Board Member, Accountant, Resident, no role, and a user who is both a Company Administrator and this community's Community Manager) × every community capability × status (Onboarding, Active, Archived) × op (Read, Write). Assert the R2 capability table.
   - **Also assert**:
     - a nonexistent community gives `Forbidden` to everyone;
@@ -188,7 +188,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - the user who holds both roles gets the union of their capabilities (spec Edge Cases).
 
   File: `HOAManagementCompany.Tests/Integration/Company/ScopeDecisionTheoryTests.cs`
-- [ ] T020 [P] Write `CompanyCapabilityTheoryTests` first.
+- [X] T020 [P] Write `CompanyCapabilityTheoryTests` first.
   - `CreateCommunity` and `ViewCompanyDefaults`:
     - allowed for a Company Administrator, and for an effective Community Manager in an Onboarding or Active community;
     - refused for a Community Manager whose only membership is in an Archived community (US1-S6), ended, or past its end date;
@@ -197,24 +197,24 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - A revoked grant confers nothing.
 
   File: `HOAManagementCompany.Tests/Integration/Company/CompanyCapabilityTheoryTests.cs`
-- [ ] T021 Implement `DecideAsync` and `CanAccessCompanyAsync` in `HOAManagementCompany/Features/Board/CommunityScopeResolver.cs`, in FR-004a's order (R2), until T019 and T020 pass.
+- [X] T021 Implement `DecideAsync` and `CanAccessCompanyAsync` in `HOAManagementCompany/Features/Board/CommunityScopeResolver.cs`, in FR-004a's order (R2), until T019 and T020 pass.
   - Keep `CanAccessAsync` as the wrapper `DecideAsync(…, Read) == Allowed`.
   - Set `community.id` and `capability` tags on `Activity.Current` for each decision. The backend's Sentry reads the OpenTelemetry pipeline, so its events carry them (spec Observability). Never tag an email or a name.
   - Add the Repowise `domain=board` marker.
   - Confirm `CommunityScopeResolverTests`, `ArcCapabilityTests` and `ResidentScopeUnchangedTests` still pass.
-- [ ] T022 [P] Add `BoardHttp.SendDecisionAsync(ScopeDecision)` in `HOAManagementCompany/Features/Board/BoardHttp.cs`. Each status gets a plain-language message (FR-042):
+- [X] T022 [P] Add `BoardHttp.SendDecisionAsync(ScopeDecision)` in `HOAManagementCompany/Features/Board/BoardHttp.cs`. Each status gets a plain-language message (FR-042):
   - `Forbidden` → the existing 403 body;
   - `Archived` → 409 `COMMUNITY_ARCHIVED`;
   - `NotActive` → 409 `COMMUNITY_NOT_ACTIVE`.
-- [ ] T023 [P] Add `CompanyErrors` in `HOAManagementCompany/Features/Company/CompanyErrors.cs`: one factory per code in `contracts/invitations-and-auth.md § Error codes`, each a `DomainException` with the contract's HTTP status.
+- [X] T023 [P] Add `CompanyErrors` in `HOAManagementCompany/Features/Company/CompanyErrors.cs`: one factory per code in `contracts/invitations-and-auth.md § Error codes`, each a `DomainException` with the contract's HTTP status.
   - Add an optional `Extensions` payload to `DomainException` (`HOAManagementCompany/Features/Auth/AuthService.cs`), and write it into the body in `HOAManagementCompany/Features/Common/GlobalExceptionHandler.cs`. It carries `OPEN_WORK`'s `items[]` and `INVITATION_PENDING`'s `invitationId`.
   - Unit test the body shape in `HOAManagementCompany.Tests/Unit/Company/CompanyErrorsTests.cs`.
-- [ ] T024 Widen `HOAManagementCompany.Tests/Integration/Board/BoardScopeEnforcementStaticAnalysisTests.cs` (R3):
+- [X] T024 Widen `HOAManagementCompany.Tests/Integration/Board/BoardScopeEnforcementStaticAnalysisTests.cs` (R3):
   - scan `Features/Board`, `Features/Company` and `Features/Residents` recursively, matching both `*Endpoint.cs` and `*Endpoints.cs`;
   - accept `CanAccessAsync`, `DecideAsync` or `CanAccessCompanyAsync`;
   - keep the allow-list rule that every listed name must exist;
   - document why `Features/Invitations/` (token-authorized) is not scanned.
-- [ ] T025 [P] Add `WriteRateLimitStaticAnalysisTests` (FR-041a, b), and add `RequireRateLimiting("board-writes")` now to the 025 `MembershipCreateEndpoint.cs` and `MembershipUpdateEndpoint.cs`.
+- [X] T025 [P] Add `WriteRateLimitStaticAnalysisTests` (FR-041a, b), and add `RequireRateLimiting("board-writes")` now to the 025 `MembershipCreateEndpoint.cs` and `MembershipUpdateEndpoint.cs`.
   - The rule: every `*Endpoint.cs` or `*Endpoints.cs` under `Features/Board`, `Features/Company` and `Features/Invitations` that configures `Post`, `Put`, `Patch` or `Delete` must call `RequireRateLimiting("board-writes")`, or `RequireRateLimiting("auth")` under `Features/Invitations`.
   - The allow-list carries a reason for each entry (`ArcSweepJobEndpoint`, `BoardModeEndpoint`).
 

@@ -20,7 +20,8 @@ public class MembershipUpdateEndpoint(
     public override void Configure()
     {
         Patch("/communities/{communityId}/memberships/{membershipId}");
-        Description(x => x.WithName("UpdateMembership").WithTags("Board"));
+        // 030 FR-041a: per-user write limit, which 025 lacked here.
+        Description(x => x.WithName("UpdateMembership").WithTags("Board").RequireRateLimiting("board-writes"));
     }
 
     public override async Task HandleAsync(MembershipUpdateRequest req, CancellationToken ct)
