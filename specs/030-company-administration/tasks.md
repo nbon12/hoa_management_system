@@ -496,7 +496,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Tests (write first)
 
-- [ ] T071 [P] [US1] Create `AddCommunityTests` in `HOAManagementCompany.Tests/Integration/Company/AddCommunityTests.cs`:
+- [X] T071 [P] [US1] Create `AddCommunityTests` in `HOAManagementCompany.Tests/Integration/Company/AddCommunityTests.cs`:
   - **US1-S1**: a Company Administrator adds Keystone Park with the scenario's fields.
     - The response is 201 with `status: "Onboarding"`.
     - The community has no parent and zero CommunityManager memberships, and it is listed by `GET /company/communities`.
@@ -515,7 +515,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Also**:
     - an archived parent → 409 `PARENT_ARCHIVED`;
     - `CommunityLifecycle Action=Created` is logged with IDs only.
-- [ ] T072 [P] [US1] Create `PortfolioEndpointTests`, the minimal list that US6 extends. File: `HOAManagementCompany.Tests/Integration/Company/PortfolioEndpointTests.cs`
+- [X] T072 [P] [US1] Create `PortfolioEndpointTests`, the minimal list that US6 extends. File: `HOAManagementCompany.Tests/Integration/Company/PortfolioEndpointTests.cs`
   - A Company Administrator sees only their own company's communities, with name, legal name, status and parent.
   - The order is A–Z by `NormalizedName`.
   - The page size defaults to 25, and `limit=101` is clamped to 100.
@@ -531,7 +531,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Implementation
 
-- [ ] T074 [US1] Implement `CommunityCreateEndpoint` (`POST /communities`) per `contracts/company.md` in `HOAManagementCompany/Features/Company/CommunityCreateEndpoint.cs`, until T071 passes. Rate limit: `board-writes`.
+- [X] T074 [US1] Implement `CommunityCreateEndpoint` (`POST /communities`) per `contracts/company.md` in `HOAManagementCompany/Features/Company/CommunityCreateEndpoint.cs`, until T071 passes. Rate limit: `board-writes`.
   - **Check**: `CreateCommunity`.
   - **Parent rules**:
     - a Company Administrator may choose any non-archived community of the company;
@@ -542,7 +542,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - for a non-administrator, insert the open-ended CommunityManager membership (FR-008).
   - **Name conflicts**: a unique-violation becomes `COMMUNITY_NAME_TAKEN`, with FR-007's message rule.
   - **After commit**: enqueue `co_community_added` for each Company Administrator and dispatch inline.
-- [ ] T075 [US1] Implement `PortfolioEndpoint` (`GET /company/communities`, `ViewPortfolio`) in `HOAManagementCompany/Features/Company/PortfolioEndpoint.cs`, until T072 passes. This first version has name, legal name, status, parent, paging and A–Z order only; US6 adds the rest.
+- [X] T075 [US1] Implement `PortfolioEndpoint` (`GET /company/communities`, `ViewPortfolio`) in `HOAManagementCompany/Features/Company/PortfolioEndpoint.cs`, until T072 passes. This first version has name, legal name, status, parent, paging and A–Z order only; US6 adds the rest.
 - [ ] T076 [US1] Implement `AddCommunityComponent` (company and board variants; brief 03) and the minimal `PortfolioComponent` (brief 02) in `neko-hoa/src/app/features/company/`, until T073 pass. Add the routes `/app/company/portfolio`, `/app/company/communities/new` and `/app/board/communities/new` to `neko-hoa/src/app/app.routes.ts`.
 
 **Checkpoint**: communities can be created in the product, with defaults copied, and the company area lists them.
