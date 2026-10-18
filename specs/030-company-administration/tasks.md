@@ -68,22 +68,22 @@ Visual polish waits for `design/handoff/` (T160).
 
 ## Phase 1: Setup
 
-- [ ] T001 Create the backend folders and the test folders:
+- [X] T001 Create the backend folders and the test folders:
   - backend: `HOAManagementCompany/Features/Company/`, `HOAManagementCompany/Features/Invitations/`, `HOAManagementCompany/Features/Residents/`, `HOAManagementCompany/Features/Board/Settings/`, `HOAManagementCompany/Features/Board/Residents/`;
   - tests: `HOAManagementCompany.Tests/Unit/Company/`, `HOAManagementCompany.Tests/Integration/Company/`, `HOAManagementCompany.Tests/Integration/Invitations/`, `HOAManagementCompany.Tests/Integration/Residents/`.
-- [ ] T002 [P] Create the frontend folders `neko-hoa/src/app/features/company/`, `neko-hoa/src/app/features/community-settings/`, `neko-hoa/src/app/features/invitations/`, `neko-hoa/src/app/features/landing/` and `neko-hoa/src/app/shared/`
-- [ ] T003 [P] Write `InvitationOptionsValidatorTests` first. Rules:
+- [X] T002 [P] Create the frontend folders `neko-hoa/src/app/features/company/`, `neko-hoa/src/app/features/community-settings/`, `neko-hoa/src/app/features/invitations/`, `neko-hoa/src/app/features/landing/` and `neko-hoa/src/app/shared/`
+- [X] T003 [P] Write `InvitationOptionsValidatorTests` first. Rules:
   - `ExpiryHours` must equal 72;
   - `MaxEmailsPerRecipientPer24h` is 1–50, default 5;
   - `ResendCooldownSeconds` is 0–3600, default 60;
   - a bad value fails startup validation and names the option.
 
   File: `HOAManagementCompany.Tests/Unit/Configuration/InvitationOptionsValidatorTests.cs`
-- [ ] T004 Add `InvitationOptions` (section `Invitations`) and its FluentValidation `InvitationOptionsValidator` (R12), until T003 passes.
+- [X] T004 Add `InvitationOptions` (section `Invitations`) and its FluentValidation `InvitationOptionsValidator` (R12), until T003 passes.
   - Files: `HOAManagementCompany/Infrastructure/Configuration/InvitationOptions.cs` and `InvitationOptionsValidator.cs`.
   - Register them with `AddValidatedOptions` in `HOAManagementCompany/Program.cs`.
   - Add the defaults to `HOAManagementCompany/appsettings.json`.
-- [ ] T005 [P] Add `AppLinks`, which reads `App:BaseUrl` and falls back to `ArchitecturalReview:AppBaseUrl` (R10). File: `HOAManagementCompany/Infrastructure/Configuration/AppLinks.cs`.
+- [X] T005 [P] Add `AppLinks`, which reads `App:BaseUrl` and falls back to `ArchitecturalReview:AppBaseUrl` (R10). File: `HOAManagementCompany/Infrastructure/Configuration/AppLinks.cs`.
   - Switch `HOAManagementCompany/Features/Board/Architectural/ArcEmailRenderer.cs` to it without changing its output.
   - Add `AppLinksValidator` (FluentValidation, registered with `AddValidatedOptions`; constitution §8): one of the two keys must be set, and the URL must be absolute, and HTTPS outside Development.
   - Test (`HOAManagementCompany.Tests/Unit/Configuration/AppLinksTests.cs`): the new key wins when both keys are set; the old key alone still works; the validator refuses a missing value, a relative URL, and plain HTTP outside Development.
@@ -96,34 +96,34 @@ Visual polish waits for `design/handoff/` (T160).
 
 ### Enums and entities (data-model.md)
 
-- [ ] T006 Change `CommunityStatus` to `Onboarding`, `Active`, `Archived` in `HOAManagementCompany/Domain/Enums/CommunityStatus.cs`. Its one other use, in `HOAManagementCompany.Tests/Integration/Board/CommunityScopeResolverTests.cs:84`, moves to `Archived` in T016. `MembershipStatus.Inactive` is a different enum and stays.
-- [ ] T007 [P] Create these enums, each in `HOAManagementCompany/Domain/Enums/<Name>.cs`:
+- [X] T006 Change `CommunityStatus` to `Onboarding`, `Active`, `Archived` in `HOAManagementCompany/Domain/Enums/CommunityStatus.cs`. Its one other use, in `HOAManagementCompany.Tests/Integration/Board/CommunityScopeResolverTests.cs:84`, moves to `Archived` in T016. `MembershipStatus.Inactive` is a different enum and stays.
+- [X] T007 [P] Create these enums, each in `HOAManagementCompany/Domain/Enums/<Name>.cs`:
   - `InvitationKind`, `InvitationState`;
   - `InvitationRevokeReason`: `Manual`, `CommunityArchived`, `SenderLostAuthority`, `Superseded`;
   - `CompanyGrantSource`: `Setup`, `Invitation`, `Recovery`.
-- [ ] T008 [P] Create `ManagementCompany` in `HOAManagementCompany/Domain/Entities/ManagementCompany.cs` and `CompanyDefaultSettings` in `HOAManagementCompany/Domain/Entities/CompanyDefaultSettings.cs`. The defaults entity holds the six ARC rule fields, and its initial values are the 027 defaults, shared as constants with `CommunityArcSettings`.
-- [ ] T009 [P] Create `CompanyAdministratorGrant` (data-model.md fields, plus `IsLive => RevokedAt == null`) in `HOAManagementCompany/Domain/Entities/CompanyAdministratorGrant.cs`
-- [ ] T010 [P] Create `Invitation` and `InvitationDelivery` per data-model.md in `HOAManagementCompany/Domain/Entities/Invitation.cs` and `InvitationDelivery.cs`.
+- [X] T008 [P] Create `ManagementCompany` in `HOAManagementCompany/Domain/Entities/ManagementCompany.cs` and `CompanyDefaultSettings` in `HOAManagementCompany/Domain/Entities/CompanyDefaultSettings.cs`. The defaults entity holds the six ARC rule fields, and its initial values are the 027 defaults, shared as constants with `CommunityArcSettings`.
+- [X] T009 [P] Create `CompanyAdministratorGrant` (data-model.md fields, plus `IsLive => RevokedAt == null`) in `HOAManagementCompany/Domain/Entities/CompanyAdministratorGrant.cs`
+- [X] T010 [P] Create `Invitation` and `InvitationDelivery` per data-model.md in `HOAManagementCompany/Domain/Entities/Invitation.cs` and `InvitationDelivery.cs`.
   - `Invitation.EffectiveState(DateTimeOffset now)` adds the derived `Expired` state.
   - `SenderUserId` is null only for a `CompanyAdministrator` invitation created by the setup step.
   - Add a Repowise `domain=entities` marker describing the three kinds, the state machine and token hashing.
-- [ ] T011 Modify `HOAManagementCompany/Domain/Entities/Community.cs`:
+- [X] T011 Modify `HOAManagementCompany/Domain/Entities/Community.cs`:
   - add `ManagementCompanyId` and its navigation;
   - add `NormalizedName`, set only through a `SetCommunityName(string)` method that trims and lower-cases, so the two can't drift;
   - add `CreatedByUserId` and the activated, archived and restored stamps;
   - add a Repowise `domain=entities` marker for the lifecycle and the restore rule.
-- [ ] T012 [P] Modify `RecurringPayment` in `HOAManagementCompany/Domain/Entities/RecurringPayment.cs`: add `EnrolledByUserId` and `CancellationReason`, plus a `RecurringCancellationReasons` constants class (`owner_cancelled`, `community_archived`, `resident_removed`).
+- [X] T012 [P] Modify `RecurringPayment` in `HOAManagementCompany/Domain/Entities/RecurringPayment.cs`: add `EnrolledByUserId` and `CancellationReason`, plus a `RecurringCancellationReasons` constants class (`owner_cancelled`, `community_archived`, `resident_removed`).
 
 ### Persistence
 
-- [ ] T013 Configure the new and changed entities in `HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs`:
+- [X] T013 Configure the new and changed entities in `HOAManagementCompany/Infrastructure/Persistence/ApplicationDbContext.cs`:
   - the DbSets;
   - string-converted enums and max lengths;
   - FKs and delete rules per data-model.md: `Invitation.SenderUserId` Restrict, other user references SetNull, grants Cascade;
   - the filtered unique indexes on `CompanyAdministratorGrants` and `Invitations`, and `InvitationDeliveries (NormalizedEmail, AttemptedAt)`;
   - on `Communities`, unique `(ManagementCompanyId, NormalizedName)` and `(ManagementCompanyId, Status)`, replacing the global `CommunityName` unique index;
   - the `CK_Invitations_KindShape` check, which also requires `SenderUserId` unless `Kind = 'CompanyAdministrator'`.
-- [ ] T014 Generate the forward-only migration with `dotnet ef migrations add AddCompanyAdministration` into `HOAManagementCompany/Infrastructure/Persistence/Migrations/`.
+- [X] T014 Generate the forward-only migration with `dotnet ef migrations add AddCompanyAdministration` into `HOAManagementCompany/Infrastructure/Persistence/Migrations/`.
   - Add the hand-written SQL for data-model.md steps 1–8:
     - the company row and its defaults row;
     - the community backfill;
@@ -132,7 +132,7 @@ Visual polish waits for `design/handoff/` (T160).
     - for `Inactive` → `Archived` communities, cancel autopay and terminate authorizations, with no email;
     - `CREATE COLLATION IF NOT EXISTS natural_sort`.
   - Every data step is idempotent and nothing is destructive. Follow the pattern of `20260825181517_AddCommunityAndMembership`.
-- [ ] T015 Add `CompanyAdministrationMigrationTests`, following `HOAManagementCompany.Tests/Integration/Board/CommunityBackfillMigrationTests.cs`.
+- [X] T015 Add `CompanyAdministrationMigrationTests`, following `HOAManagementCompany.Tests/Integration/Board/CommunityBackfillMigrationTests.cs`.
   - **Setup**: migrate a fresh Testcontainers database to the migration before this one. Seed one Active and one Inactive community, an active autopay schedule in the Inactive one, and no ARC settings rows. Then migrate.
   - **Asserts**:
     - exactly one `ManagementCompanies` row, and its `CompanyDefaultSettings` row has the 027 values;
@@ -146,7 +146,7 @@ Visual polish waits for `design/handoff/` (T160).
     - inserting an invitation that breaks `CK_Invitations_KindShape` fails, and so does a second open invitation for the same target.
   - File: `HOAManagementCompany.Tests/Integration/Company/CompanyAdministrationMigrationTests.cs`
 
-- [ ] T016 Update the existing code that creates communities, so the suite survives the migration's non-null `ManagementCompanyId` and the `SetCommunityName`-only `NormalizedName`:
+- [X] T016 Update the existing code that creates communities, so the suite survives the migration's non-null `ManagementCompanyId` and the `SetCommunityName`-only `NormalizedName`:
   - `HOAManagementCompany/Seed/AuthSeeder.cs` (the seeded "Sakura Heights HOA");
   - `HOAManagementCompany.Tests/Fixtures/TestDataSeeder.cs`;
   - `HOAManagementCompany.Tests/Integration/Board/BoardTestBase.cs` (`CreateCommunityAsync`);

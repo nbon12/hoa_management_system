@@ -199,6 +199,12 @@ builder.Services.AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsVal
     builder.Configuration, RateLimitingOptions.SectionName);
 builder.Services.AddValidatedOptions<ArcUploadOptions, ArcUploadOptionsValidator>(
     builder.Configuration, ArcUploadOptions.SectionName);
+// Company administration (030): invitation limits (R12) and the one origin for emailed links (R10).
+builder.Services.AddValidatedOptions<InvitationOptions, InvitationOptionsValidator>(
+    builder.Configuration, InvitationOptions.SectionName);
+builder.Services.AddValidatedOptions<AppLinksOptions, AppLinksOptionsValidator>(
+    builder.Configuration, AppLinksOptions.SectionName, o => o.ApplyEnvironment(builder.Configuration, builder.Environment));
+builder.Services.AddSingleton<AppLinks>();
 // DevTools toggles are config-gated (not host-name-gated) so they evaluate correctly in the deployed
 // `Dev` environment; defaults derive from IsDevLike(env) and are forced off in Production (014 US3).
 builder.Services.AddValidatedOptions<DevToolsOptions, DevToolsOptionsValidator>(

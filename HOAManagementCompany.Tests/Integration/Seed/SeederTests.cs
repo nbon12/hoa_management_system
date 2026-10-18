@@ -79,6 +79,7 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
             community = new HOAManagementCompany.Domain.Entities.Community
             {
                 Id = Guid.NewGuid(),
+                ManagementCompanyId = await HOAManagementCompany.Features.Company.DeploymentCompany.IdAsync(db),
                 CommunityName = seededCommunityName,
                 LegalName = seededCommunityName,
                 Status = CommunityStatus.Active,

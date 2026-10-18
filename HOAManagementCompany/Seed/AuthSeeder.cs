@@ -137,6 +137,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
         {
             community = new Community
             {
+                ManagementCompanyId = await Features.Company.DeploymentCompany.IdAsync(db, ct),
                 CommunityName = CommunityName,
                 LegalName = CommunityName,
                 Status = CommunityStatus.Active

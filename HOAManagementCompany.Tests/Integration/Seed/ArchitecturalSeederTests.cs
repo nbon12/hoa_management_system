@@ -31,6 +31,7 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
             community = new HOAManagementCompany.Domain.Entities.Community
             {
                 Id = Guid.NewGuid(), CommunityName = "Sakura Heights HOA", LegalName = "Sakura Heights HOA",
+                ManagementCompanyId = await HOAManagementCompany.Features.Company.DeploymentCompany.IdAsync(db),
                 Status = CommunityStatus.Active
             };
             db.Communities.Add(community);
