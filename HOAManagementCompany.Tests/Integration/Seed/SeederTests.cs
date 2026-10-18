@@ -52,13 +52,14 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
         Assert.Equal(1, await db.Properties.CountAsync(p => p.AccountNumber == "SAKURA-777"));
     }
 
-    // 025 P0-1 invariant: AuthSeeder.EnsureBoardUserAsync homes the board user on an
-    // ALREADY-CLAIMED property and must never hold a link on SAKURA-003 — the property
-    // E2EClaimCodeEndpoint hands out for the registration e2e. AuthService.RegisterAsync
-    // refuses a property that already has a UserProperty link, so a board-user link there
-    // breaks registration with 422 REGISTRATION_FAILED.
+    // 025 P0-1 invariant: AuthSeeder.EnsureBoardUserAsync must never leave the board user
+    // holding a link on SAKURA-003 — the property E2EClaimCodeEndpoint hands out for the
+    // registration e2e. AuthService.RegisterAsync refuses a property that already has a
+    // UserProperty link, so a board-user link there breaks registration with 422
+    // REGISTRATION_FAILED. 030 T043: the board user signs in without a home, so the seeder no
+    // longer gives it a co-residence link on another resident's property.
     [Fact]
-    public async Task EnsureBoardUser_LeavesTheE2eRegistrationPropertyUnclaimed()
+    public async Task EnsureBoardUser_GivesTheBoardUserNoHome_AndLeavesTheE2eRegistrationPropertyUnclaimed()
     {
         const string boardEmail = "board@nekohoa.dev";
         const string seededCommunityName = "Sakura Heights HOA";
@@ -110,16 +111,15 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
         }
         Assert.Equal(0, await db.UserProperties.CountAsync(up => up.PropertyId == regProperty.Id));
 
-        // A claimed co-residence property in that community, so the seeder has somewhere
-        // safe to home the board user (without one it skips and proves nothing).
-        var safeProperty = NewProperty($"SEED-SAFE-{Guid.NewGuid():N}"[..24], community.Id);
-        var coResident = NewUser($"seed-test-{Guid.NewGuid():N}");
-        db.Properties.Add(safeProperty);
-        db.Users.Add(coResident);
+        // A claimed property in that community, which the seeder must not share with the board user.
+        var claimedProperty = NewProperty($"SEED-SAFE-{Guid.NewGuid():N}"[..24], community.Id);
+        var resident = NewUser($"seed-test-{Guid.NewGuid():N}");
+        db.Properties.Add(claimedProperty);
+        db.Users.Add(resident);
         await db.SaveChangesAsync();
         db.UserProperties.Add(new UserProperty
         {
-            Id = Guid.NewGuid(), UserId = coResident.Id, PropertyId = safeProperty.Id,
+            Id = Guid.NewGuid(), UserId = resident.Id, PropertyId = claimedProperty.Id,
         });
         await db.SaveChangesAsync();
 
@@ -127,12 +127,22 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
             db, scope.ServiceProvider,
             scope.ServiceProvider.GetRequiredService<ILogger<HOAManagementCompany.Seed.DatabaseSeeder>>());
 
-        // ── Act 1: the fresh path — the seeder creates and homes the board user. ───
+        // ── Act 1: the fresh path — the seeder creates the board user, with a membership and no home. ───
         await seeder.EnsureBoardUserAsync();
 
         var boardUser = await db.Users.FirstOrDefaultAsync(u => u.Email == boardEmail);
         Assert.NotNull(boardUser);
+        Assert.Empty(await db.UserProperties.Where(up => up.UserId == boardUser!.Id).ToListAsync());
+        Assert.True(await db.CommunityMemberships.AnyAsync(m =>
+            m.UserId == boardUser!.Id && m.CommunityId == community.Id
+            && m.Role == CommunityRole.BoardMember && m.Status == MembershipStatus.Active));
         await AssertRegistrationPropertyStaysUnclaimedAsync(db, boardUser!.Id, regProperty.Id);
+
+        // …and still signs in (FR-036a), straight to board mode.
+        var login = await Client.PostAsJsonAsync("/api/v1/auth/login", new { email = boardEmail, password = "Password1!" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var user = (await login.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("user");
+        Assert.Equal("Board", user.GetProperty("landing").GetString());
 
         // ── Act 2: the regression itself — an earlier build linked the board user to
         // SAKURA-003. Re-running the seeder must self-heal that link, not preserve it. ──
@@ -154,13 +164,8 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
         // Zero links on SAKURA-003 — RegisterAsync only accepts an unclaimed property.
         Assert.Equal(0, await db.UserProperties.CountAsync(up => up.PropertyId == regPropertyId));
 
-        // …and the board user is homed on some OTHER property (it is not simply unlinked).
-        var boardLinks = await db.UserProperties
-            .Where(up => up.UserId == boardUserId)
-            .Select(up => up.PropertyId)
-            .ToListAsync();
-        Assert.NotEmpty(boardLinks);
-        Assert.DoesNotContain(regPropertyId, boardLinks);
+        // …and the board user holds no home at all: not SAKURA-003, and not a co-residence elsewhere.
+        Assert.Equal(0, await db.UserProperties.CountAsync(up => up.UserId == boardUserId));
     }
 
     // Fully qualified: HOAManagementCompany.Tests.Integration.Property is also a namespace.
@@ -198,7 +203,7 @@ public class SeederTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixt
             UserName = email,
             NormalizedUserName = email.ToUpperInvariant(),
             FirstName = "Seed",
-            LastName = "Coresident",
+            LastName = "Resident",
             EmailConfirmed = true,
             SecurityStamp = Guid.NewGuid().ToString(),
             ConcurrencyStamp = Guid.NewGuid().ToString(),

@@ -313,7 +313,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Sign-in without a home (FR-036a, FR-036b; research R11)
 
-- [ ] T041 [P] Write `SignInWithoutHomeTests` first, against `/auth/login`, `/auth/refresh`, `/auth/board-mode`, `/auth/switch-property` and `/auth/me`. File: `HOAManagementCompany.Tests/Integration/Auth/SignInWithoutHomeTests.cs`
+- [X] T041 [P] Write `SignInWithoutHomeTests` first, against `/auth/login`, `/auth/refresh`, `/auth/board-mode`, `/auth/switch-property` and `/auth/me`. File: `HOAManagementCompany.Tests/Integration/Auth/SignInWithoutHomeTests.cs`
   - **US9-S1**: a Company Administrator with no home and no membership signs in with 200.
     - The token has no `propertyId` or `communityId`.
     - `/auth/me` returns `isCompanyAdministrator: true` and `landing: "Company"`.
@@ -326,14 +326,14 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Refresh**: refresh succeeds and rotates the token for a user with no home. A failure inside the refresh transaction leaves the old refresh token usable.
   - **Switch property**: `/auth/switch-property` to an Onboarding home → 409 `COMMUNITY_NOT_ACTIVE`; to an Archived home → 200.
   - **Archived communities**: `memberships` and `/me/communities` leave them out (FR-036b).
-- [ ] T042 Change `HOAManagementCompany/Features/Auth/AuthService.cs` per R11, until T041 passes and `LoginLogoutTests`, `RefreshSwitchTests` and `BoardModeEndpointTests` still pass (update their `NO_PROPERTY` expectations to the new contract).
+- [X] T042 Change `HOAManagementCompany/Features/Auth/AuthService.cs` per R11, until T041 passes and `LoginLogoutTests`, `RefreshSwitchTests` and `BoardModeEndpointTests` still pass (update their `NO_PROPERTY` expectations to the new contract).
   - `FindUsablePropertyAsync` replaces `GetActivePropertyAsync`: Active first, then Archived, oldest link first, never Onboarding.
   - `CreateTokenPairAsync(user, Property?)` omits the property claims when the property is null.
   - Refresh deletes the old token and mints the new one in one transaction.
   - `SwitchModeAsync` and `SwitchPropertyAsync` follow the contract.
   - `BuildCurrentUserAsync` fills `properties[].communityStatus`, `memberships[].communityStatus`, `isCompanyAdministrator` and `landing` (from `LandingRule`).
   - Also update `HOAManagementCompany/Features/Auth/Models/AuthModels.cs`, and `HOAManagementCompany/Features/Board/MyCommunitiesEndpoint.cs` and `BoardModeEndpoint.cs` (Onboarding included, Archived excluded).
-- [ ] T043 Remove the staff co-residence workaround from `HOAManagementCompany/Seed/AuthSeeder.cs`, since board and manager users no longer need a home to sign in. Update `HOAManagementCompany.Tests/Integration/Seed/SeederTests.cs`.
+- [X] T043 Remove the staff co-residence workaround from `HOAManagementCompany/Seed/AuthSeeder.cs`, since board and manager users no longer need a home to sign in. Update `HOAManagementCompany.Tests/Integration/Seed/SeederTests.cs`.
 - [ ] T044 [P] Frontend sign-in state:
   - `neko-hoa/src/app/core/models/index.ts` gains the new DTO fields;
   - `neko-hoa/src/app/core/services/auth.service.ts` keeps `properties`, `isCompanyAdministrator` and `landing` from `/auth/me`;
