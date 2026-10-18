@@ -195,6 +195,17 @@ describe('boardGuard (030 FR-036a, FR-036b)', () => {
     expect(redirectPath(runGuard())).toBe('/app/dashboard');
   });
 
+  it('checks any community for a roleScope "any" route (Add community, FR-036)', () => {
+    signInAs('Board', [
+      { communityId: 'sh', communityName: 'Sakura Heights', role: 'BoardMember', communityStatus: 'Active' },
+      { communityId: 'kr', communityName: 'Keystone Ridge', role: 'CommunityManager', communityStatus: 'Onboarding' },
+    ]);
+    activeCommunitySig.set('sh');
+    const route = { data: { requiredRoles: ['CommunityManager'], roleScope: 'any' } } as unknown as ActivatedRouteSnapshot;
+    expect(TestBed.runInInjectionContext(() => boardGuard(route, {} as RouterStateSnapshot))).toBeTrue();
+    expect(redirectPath(runGuard(['CommunityManager']))).toBe('/app/board/home');
+  });
+
   it('shows the page refusal when a Board Member opens a manager-only page (8.04.z)', () => {
     signInAs('Board', [{ communityId: 'sh', communityName: 'Sakura Heights', role: 'BoardMember', communityStatus: 'Active' }]);
 

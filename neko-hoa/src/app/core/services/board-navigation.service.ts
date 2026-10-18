@@ -63,7 +63,6 @@ const BOARD_NAV: NavGroupDescriptor[] = [
     { label: 'Architectural Applications', route: '/app/board/architectural', requiredRoles: ['BoardMember', 'CommunityManager'] },
     { label: 'Board Approvals',            route: null, stub: true },
     { label: 'Announcements',              route: null, stub: true },
-    { label: 'Memberships',                route: '/app/board/memberships', requiredRoles: ['CommunityManager'] },
     { label: 'ARC Settings',               route: '/app/board/arc-settings', requiredRoles: ['CommunityManager'] },
     // 030 FR-029: the active community's Community settings page; its Community Manager only.
     { label: 'Community settings',         route: '/app/board/settings/profile', requiredRoles: ['CommunityManager'] },

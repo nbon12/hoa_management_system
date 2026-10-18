@@ -521,7 +521,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - The page size defaults to 25, and `limit=101` is clamped to 100.
   - The response is `no-store`.
   - A Community Manager gets 403 `FORBIDDEN`. This is US6-S6's backend half; it lives here because the endpoint is gated from day one.
-- [ ] T073 [P] [US1] Create `add-community.component.spec.ts` and the minimal `portfolio.component.spec.ts` in `neko-hoa/src/app/features/company/`:
+- [X] T073 [P] [US1] Create `add-community.component.spec.ts` and the minimal `portfolio.component.spec.ts` in `neko-hoa/src/app/features/company/`:
   - the form (brief 03) labels every field and ties each error to its field (US1-S9);
   - it submits the contract body;
   - it shows the `COMMUNITY_NAME_TAKEN` message under Community name (US1-S2, US1-S3);
@@ -543,7 +543,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Name conflicts**: a unique-violation becomes `COMMUNITY_NAME_TAKEN`, with FR-007's message rule.
   - **After commit**: enqueue `co_community_added` for each Company Administrator and dispatch inline.
 - [X] T075 [US1] Implement `PortfolioEndpoint` (`GET /company/communities`, `ViewPortfolio`) in `HOAManagementCompany/Features/Company/PortfolioEndpoint.cs`, until T072 passes. This first version has name, legal name, status, parent, paging and A–Z order only; US6 adds the rest.
-- [ ] T076 [US1] Implement `AddCommunityComponent` (company and board variants; brief 03) and the minimal `PortfolioComponent` (brief 02) in `neko-hoa/src/app/features/company/`, until T073 pass. Add the routes `/app/company/portfolio`, `/app/company/communities/new` and `/app/board/communities/new` to `neko-hoa/src/app/app.routes.ts`.
+- [X] T076 [US1] Implement `AddCommunityComponent` (company and board variants; brief 03) and the minimal `PortfolioComponent` (brief 02) in `neko-hoa/src/app/features/company/`, until T073 pass. Add the routes `/app/company/portfolio`, `/app/company/communities/new` and `/app/board/communities/new` to `neko-hoa/src/app/app.routes.ts`.
 
 **Checkpoint**: communities can be created in the product, with defaults copied, and the company area lists them.
 
@@ -560,7 +560,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Tests (write first)
 
-- [ ] T077 [P] [US2] Create `ManagerAppointmentTests` in `HOAManagementCompany.Tests/Integration/Company/ManagerAppointmentTests.cs`:
+- [X] T077 [P] [US2] Create `ManagerAppointmentTests` in `HOAManagementCompany.Tests/Integration/Company/ManagerAppointmentTests.cs`:
   - **US2-S1** (send): a Company Administrator appoints pat@example.com in a new community.
     - The response is 201 `{ invitationId, state: "Pending", expiresAt }`.
     - One email goes to Pat through `FakeAlertProvider`.
@@ -584,7 +584,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - re-appointing a former manager reactivates the old row (FR-019);
     - `ALREADY_MEMBER` for a current holder;
     - `INVITATION_PENDING`, with `invitationId`, for a duplicate open invitation.
-- [ ] T078 [P] [US2] Create `ManagerEndAndDowngradeTests` in `HOAManagementCompany.Tests/Integration/Company/ManagerEndAndDowngradeTests.cs`:
+- [X] T078 [P] [US2] Create `ManagerEndAndDowngradeTests` in `HOAManagementCompany.Tests/Integration/Company/ManagerEndAndDowngradeTests.cs`:
   - **US2-S9**: ending the only open-ended manager → 422 `LAST_MANAGER`, and the manager stays Active.
   - **US2-S10**: giving that manager the end date 2026-12-31 → 422, and `EndDate` stays null.
   - **US2-S12**: a Community Manager ends their own membership while another open-ended manager exists. `EndDate` is today, and their next `GET /communities/{id}/memberships` → 403.
@@ -595,10 +595,10 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Also**:
     - ending or downgrading a manager revokes the Pending invitations they can no longer send (`SenderLostAuthority`, logged; this sets up US2-S15);
     - the list returns `canEnd`, `canDowngrade` and `canEditEndDate` with `reasonCode: "LAST_MANAGER"`.
-- [ ] T079 [P] [US2] Create `ManagerConcurrencyTests` in `HOAManagementCompany.Tests/Integration/Company/ManagerConcurrencyTests.cs`.
+- [X] T079 [P] [US2] Create `ManagerConcurrencyTests` in `HOAManagementCompany.Tests/Integration/Company/ManagerConcurrencyTests.cs`.
   - **US2-S14**: two open-ended managers end each other at once, synchronized by a barrier with `Task.WhenAll`.
   - Over 20 iterations, assert exactly one 200 and one 422 `LAST_MANAGER`, and one open-ended manager left every time.
-- [ ] T080 [P] [US2] Create `MembershipInvitationAcceptanceTests` in `HOAManagementCompany.Tests/Integration/Invitations/MembershipInvitationAcceptanceTests.cs`:
+- [X] T080 [P] [US2] Create `MembershipInvitationAcceptanceTests` in `HOAManagementCompany.Tests/Integration/Invitations/MembershipInvitationAcceptanceTests.cs`:
   - **US2-S1** (accept): Pat accepts within 72 hours. Pat holds an Active CommunityManager membership with `StartDate` = the acceptance date and a null `EndDate`.
   - **US2-S2**: Pat registers from the link with names and a password, and no claim code.
     - The account is for pat@ with `EmailConfirmed`, and the membership exists.
@@ -615,18 +615,18 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Also**:
     - an end-dated CommunityManager invitation is refused at acceptance with `LAST_MANAGER` when no other open-ended manager remains;
     - accepting while already holding the role returns `alreadyHeld: true` and duplicates nothing.
-- [ ] T081 [P] [US2] Create `MembershipInvitationsListTests` for `GET /communities/{id}/invitations` and its resend and revoke routes. File: `HOAManagementCompany.Tests/Integration/Company/MembershipInvitationsListTests.cs`
+- [X] T081 [P] [US2] Create `MembershipInvitationsListTests` for `GET /communities/{id}/invitations` and its resend and revoke routes. File: `HOAManagementCompany.Tests/Integration/Company/MembershipInvitationsListTests.cs`
   - **US5-S8**: a Pending Board Member invitation and an Expired Community Manager invitation are both listed. Each has email, role, sent by, sent at, expires at and `effectiveState`, with `canResend` and `canRevoke` true.
   - **Also**:
     - revoke gives Revoked (`Manual`), and its link → 410;
     - resending an Accepted or Revoked invitation → 410 `INVITATION_INVALID`;
     - a child id from another community → 403;
   - **SC-005 rows**: add membership create and update, and invitation resend and revoke, to the `ArchivedWriteEndpoints` registry of T095.
-- [ ] T082 [P] [US2] Create `MembershipSensitiveEventTests` in `HOAManagementCompany.Tests/Integration/Company/MembershipSensitiveEventTests.cs`. For **US2-S19**:
+- [X] T082 [P] [US2] Create `MembershipSensitiveEventTests` in `HOAManagementCompany.Tests/Integration/Company/MembershipSensitiveEventTests.cs`. For **US2-S19**:
   - **Actions covered**: appoint (direct and by email), end-date change, end, downgrade, replace, invitation, resend, revoke, accept, and a failed accept.
   - **Each change** logs exactly one event, with actor, community, the target user id (or invitation id), the change and UTC time.
   - **No event** renders an email address, a name or the token.
-- [ ] T083 [P] [US2] Create `managers-memberships.component.spec.ts` in `neko-hoa/src/app/features/community-settings/` (brief 05):
+- [X] T083 [P] [US2] Create `managers-memberships.component.spec.ts` in `neko-hoa/src/app/features/community-settings/` (brief 05):
   - managers, board and accountants are listed with dates, and "open-ended" where it applies;
   - pending invitations are listed with Resend and Revoke;
   - the appoint dialog has the people picker and the email path, which shows "pending" and never a name;
@@ -636,31 +636,31 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Implementation
 
-- [ ] T084 [US2] Implement the `Membership` offer handler in `HOAManagementCompany/Features/Invitations/MembershipOfferHandler.cs`:
+- [X] T084 [US2] Implement the `Membership` offer handler in `HOAManagementCompany/Features/Invitations/MembershipOfferHandler.cs`:
   - validate the role and the term;
   - check sender authority through `ManageCommunityManagers` or `ManageMemberships`;
   - applying it creates or reactivates the membership, with `ManagerRule` checked at acceptance.
-- [ ] T085 [US2] Extend `HOAManagementCompany/Features/Board/MembershipCreateEndpoint.cs` per the contract:
+- [X] T085 [US2] Extend `HOAManagementCompany/Features/Board/MembershipCreateEndpoint.cs` per the contract:
   - `userId` or `email`, with the capability chosen by role;
   - the people-list check and the self-grant check;
   - `ManagerRule` under `CommunityLocks`, and reactivation of a previous row;
   - the email path through `InvitationService`, with `INVITATION_PENDING` and `ALREADY_MEMBER`;
   - `DecideAsync` with `SendDecisionAsync`;
   - log `BoardMembershipChange Kind=grant|reactivate`.
-- [ ] T086 [US2] Extend `HOAManagementCompany/Features/Board/MembershipUpdateEndpoint.cs`:
+- [X] T086 [US2] Extend `HOAManagementCompany/Features/Board/MembershipUpdateEndpoint.cs`:
   - accept `end`, `downgradeTo` and `endDate`;
   - `ManagerRule` under the lock, replacing today's racy count at lines 48–64;
   - downgrade per R7;
   - `SenderAuthority.RevokeOrphanedAsync` in the same transaction;
   - while Archived, only a Company Administrator's `end` is allowed;
   - logging.
-- [ ] T087 [P] [US2] Extend `HOAManagementCompany/Features/Board/MembershipsListEndpoint.cs`:
+- [X] T087 [P] [US2] Extend `HOAManagementCompany/Features/Board/MembershipsListEndpoint.cs`:
   - add `openEnded`, `effective`, `canEnd`, `canDowngrade`, `canEditEndDate` and `reasonCode`;
   - allow it while Archived for Company Administrators.
-- [ ] T088 [US2] Add `PeopleEndpoint` and `ReplaceManagerEndpoint` in `HOAManagementCompany/Features/Board/Settings/` per `contracts/community-settings.md`
-- [ ] T089 [US2] Add `InvitationsListEndpoint`, `InvitationResendEndpoint` and `InvitationRevokeEndpoint` (community routes; the capability depends on the invitation's kind) in `HOAManagementCompany/Features/Board/Settings/`. Do this with the other US2 implementation tasks until T077, T078, T079, T080, T081 and T082 pass.
-- [ ] T090 [US2] Implement `ManagersMembershipsSectionComponent`, with its appoint dialog, invitation list and replace dialog, in `neko-hoa/src/app/features/community-settings/`, until T083 pass
-- [ ] T091 [US2] Retire `neko-hoa/src/app/features/board/membership-admin/` (the component and its spec).
+- [X] T088 [US2] Add `PeopleEndpoint` and `ReplaceManagerEndpoint` in `HOAManagementCompany/Features/Board/Settings/` per `contracts/community-settings.md`
+- [X] T089 [US2] Add `InvitationsListEndpoint`, `InvitationResendEndpoint` and `InvitationRevokeEndpoint` (community routes; the capability depends on the invitation's kind) in `HOAManagementCompany/Features/Board/Settings/`. Do this with the other US2 implementation tasks until T077, T078, T079, T080, T081 and T082 pass.
+- [X] T090 [US2] Implement `ManagersMembershipsSectionComponent`, with its appoint dialog, invitation list and replace dialog, in `neko-hoa/src/app/features/community-settings/`, until T083 pass
+- [X] T091 [US2] Retire `neko-hoa/src/app/features/board/membership-admin/` (the component and its spec).
   - `/app/board/memberships` now redirects to `/app/board/settings/managers-and-memberships`.
   - Move any still-relevant assertions into the new section's spec.
   - Update `HOAManagementCompany.Tests/Integration/Board/MembershipAdminEndpointsTests.cs` for the extended 025 endpoints.
@@ -686,7 +686,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Tests (write first)
 
-- [ ] T092 [P] [US3] Create `LifecycleActivateTests` in `HOAManagementCompany.Tests/Integration/Company/LifecycleActivateTests.cs`:
+- [X] T092 [P] [US3] Create `LifecycleActivateTests` in `HOAManagementCompany.Tests/Integration/Company/LifecycleActivateTests.cs`:
   - **US3-S3**: a Company Administrator activates an Onboarding community that has an open-ended manager and two Scheduled residency invitations.
     - It becomes Active, with `ActivatedAt` set.
     - Both invitations become Pending with `SentAt` = now, and are emailed. The response has `invitationsSent: 2`.
@@ -696,11 +696,11 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - The preview returns `allowed: false` with that code.
     - `GET /settings` has `can.activate.reasonCode = NO_ACTIVE_MANAGER`.
   - **Also**: activating an Active community → 409 `INVALID_TRANSITION`, and a Community Manager → 403 (US3-S20).
-- [ ] T093 [P] [US3] Create `OnboardingCommunityWorkTests` in `HOAManagementCompany.Tests/Integration/Company/OnboardingCommunityWorkTests.cs`. For **US3-S2**, in an Onboarding community:
+- [X] T093 [P] [US3] Create `OnboardingCommunityWorkTests` in `HOAManagementCompany.Tests/Integration/Company/OnboardingCommunityWorkTests.cs`. For **US3-S2**, in an Onboarding community:
   - the Community Manager creates a Board Member membership (201) and saves ARC settings (200);
   - the Board Member reads metrics (200);
   - the Board Member saving ARC settings → 403 `FORBIDDEN`, the same as in an Active community.
-- [ ] T094 [P] [US3] Create `LifecycleArchiveTests` in `HOAManagementCompany.Tests/Integration/Company/LifecycleArchiveTests.cs`:
+- [X] T094 [P] [US3] Create `LifecycleArchiveTests` in `HOAManagementCompany.Tests/Integration/Company/LifecycleArchiveTests.cs`:
   - **US3-S5**: archiving an Active community with a pending manager invitation and a pending resident invitation:
     - it becomes Archived, and is gone from `/me/communities` for its manager and its Board Member;
     - both invitations are Revoked (`CommunityArchived`), and their links → 410 `INVITATION_INVALID`;
@@ -715,13 +715,13 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **US3-S11**: a master with a non-archived sub-association → 409 `OPEN_WORK`, listing it.
   - **Onboarding archive** (spec Edge Cases, SC-012): archiving an Onboarding community with two Scheduled resident invitations revokes both (`CommunityArchived`) and sends no email.
   - **Also**: the archive preview returns the counts and lists without changing anything, and a Community Manager → 403 (US3-S20).
-- [ ] T095 [P] [US3] Create `ArchivedCommunityWritesTheoryTests` (SC-005) in `HOAManagementCompany.Tests/Integration/Company/ArchivedCommunityWritesTheoryTests.cs`.
+- [X] T095 [P] [US3] Create `ArchivedCommunityWritesTheoryTests` (SC-005) in `HOAManagementCompany.Tests/Integration/Company/ArchivedCommunityWritesTheoryTests.cs`.
   - **Endpoints** (this story's rows): profile PATCH; parent change; ARC vote and info request; record outcome and resend outcome.
   - Keep the rows in an `ArchivedWriteEndpoints` registry (`MemberData`). US2, US5 and US8 add their own rows (T081, T129, T113), so this test passes at the end of US3.
   - **Authorized caller** → 409 `COMMUNITY_ARCHIVED`. This includes a Board Member voting (US3-S6, first half).
   - **User with no membership or home there** → 403 `FORBIDDEN`, identical to a nonexistent community (US3-S6, second half).
   - **Exception**: a Company Administrator ending the last manager's membership while archived → 200.
-- [ ] T096 [P] [US3] Create `LifecycleRestoreTests` in `HOAManagementCompany.Tests/Integration/Company/LifecycleRestoreTests.cs`:
+- [X] T096 [P] [US3] Create `LifecycleRestoreTests` in `HOAManagementCompany.Tests/Integration/Company/LifecycleRestoreTests.cs`:
   - **US3-S12**: it was Active and has an open-ended manager, so it returns to Active.
     - Memberships (with end dates) and ARC settings are equal before and after.
     - Autopay is still inactive, and revoked invitations are still Revoked.
@@ -733,13 +733,13 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **US3-S16**: a sub-association and its parent are both archived. Restoring the sub-association → 409 `PARENT_ARCHIVED`, naming the parent. Restoring the master doesn't restore its sub-associations.
   - **Name reservation** (spec Edge Cases): while archived, the community's name stays reserved, so another community can't take it and a restore never collides.
   - **Also**: the restore preview lists `membershipsRegainingAccess`, and a Community Manager → 403 (US3-S20).
-- [ ] T097 [P] [US3] Create `CommunityParentTests` for `PUT /parent` in `HOAManagementCompany.Tests/Integration/Company/CommunityParentTests.cs`:
+- [X] T097 [P] [US3] Create `CommunityParentTests` for `PUT /parent` in `HOAManagementCompany.Tests/Integration/Company/CommunityParentTests.cs`:
   - a Company Administrator sets and clears the parent;
   - choosing the community's own descendant → 422 `PARENT_CYCLE`;
   - an archived parent → 409 `PARENT_ARCHIVED`;
   - a Community Manager → 403 (US3-S20);
   - `CommunityLifecycle Action=ParentChanged` is logged.
-- [ ] T098 [P] [US3] Create `CommunityProfileTests` in `HOAManagementCompany.Tests/Integration/Company/CommunityProfileTests.cs`:
+- [X] T098 [P] [US3] Create `CommunityProfileTests` in `HOAManagementCompany.Tests/Integration/Company/CommunityProfileTests.cs`:
   - **US3-S17**: a Community Manager PATCHes `{ county }`.
     - The response is 200, only county changes, and one `CommunityProfileChanged Field=County Old= New=` is logged.
     - Each invalid value → 422 with `errors[].field`, and nothing is saved: a future formation date, a 201-character legal name, clearing a filled required field.
@@ -748,20 +748,20 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **US3-S20**: a Community Manager gets 403 on activate, archive, restore and parent (shared with the tests above).
   - **US3-S21**: a Community Manager of A only PATCHes B → 403, identical to a nonexistent id.
   - **Rename frees the old name** (spec Edge Cases): after Keystone Ridge is renamed Keystone Bluff, a new community can be created as "Keystone Ridge".
-- [ ] T099 [P] [US3] Create `ArchivedResidentHomeTests`. These are the backend cases beyond the R8 theory. File: `HOAManagementCompany.Tests/Integration/Residents/ArchivedResidentHomeTests.cs`
+- [X] T099 [P] [US3] Create `ArchivedResidentHomeTests`. These are the backend cases beyond the R8 theory. File: `HOAManagementCompany.Tests/Integration/Residents/ArchivedResidentHomeTests.cs`
   - **US3-S8**: after the archive, Jane's `/auth/me` lists the home with `communityStatus: "Archived"`, and she signs in to it. Ledger, statements, receipts and transactions return 200, and so do her home's submitted architectural requests (list, detail, attachment link). An architectural draft returns 409 `COMMUNITY_ARCHIVED` (FR-012a).
   - **US3-S9**: with her token from before the archive, `PUT /payments/recurring` and `POST /payments/intent` → 409 `COMMUNITY_ARCHIVED`. No `RecurringPayment` or `PaymentTransaction` row is created.
   - **US3-S1** (claim code): `POST /auth/register` with a valid code for a property in an Onboarding community → 409 `COMMUNITY_NOT_ACTIVE`, after the proof and the code are checked. The code isn't used up, and no account or link exists.
-- [ ] T100 [P] [US3] Create `ArchivedCommunityProcessorWritesTests` (FR-012, spec Edge Cases "autopay mid-charge") in `HOAManagementCompany.Tests/Integration/Payments/ArchivedCommunityProcessorWritesTests.cs`, using `SignedWebhookFixture` and `FakeStripeGateway`. For a property in an Archived community:
+- [X] T100 [P] [US3] Create `ArchivedCommunityProcessorWritesTests` (FR-012, spec Edge Cases "autopay mid-charge") in `HOAManagementCompany.Tests/Integration/Payments/ArchivedCommunityProcessorWritesTests.cs`, using `SignedWebhookFixture` and `FakeStripeGateway`. For a property in an Archived community:
   - a charge submitted before the archive settles: its succeeded webhook marks the transaction succeeded and posts the ledger entry;
   - a failed or returned payment, a refund and a dispute each still apply;
   - reconciliation still updates the property's transactions;
   - none of these is refused with `COMMUNITY_ARCHIVED`, and no new charge starts.
-- [ ] T101 [P] [US3] Create `RecurringCancellationTests` in `HOAManagementCompany.Tests/Integration/Payments/RecurringCancellationTests.cs`:
+- [X] T101 [P] [US3] Create `RecurringCancellationTests` in `HOAManagementCompany.Tests/Integration/Payments/RecurringCancellationTests.cs`:
   - the owner's own cancel records `owner_cancelled`;
   - `CancelRecurringForAsync` sets `inactive`, the reason and `TerminatedAt`, and makes no `FakeStripeGateway` call;
   - a schedule left `active` in an Archived community never drafts.
-- [ ] T102 [P] [US3] Write the US3 frontend specs first (briefs 04 and 11):
+- [X] T102 [P] [US3] Write the US3 frontend specs first (briefs 04 and 11):
   - **`profile-section.component.spec.ts`** in `neko-hoa/src/app/features/community-settings/`:
     - per-field save shows "✓ Saved" (US3-S17), and a failing field shows its error under the field (US3-S17);
     - missing required fields are flagged (US3-S19);
@@ -776,11 +776,11 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Implementation
 
-- [ ] T103 [US3] Add `PaymentService.CancelRecurringForAsync(propertyId, reason, ct)` in `HOAManagementCompany/Features/Payments/PaymentService.cs` (R9), until T101 passes.
+- [X] T103 [US3] Add `PaymentService.CancelRecurringForAsync(propertyId, reason, ct)` in `HOAManagementCompany/Features/Payments/PaymentService.cs` (R9), until T101 passes.
   - It sets `inactive`, `CancellationReason` and `TerminatedAt`, and makes no Stripe calls.
   - The existing owner cancel now records `owner_cancelled`.
   - Add the Active-community filter to `RunDueDraftsAsync` in `HOAManagementCompany/Features/Payments/Recurring/RecurringDraftService.cs`. Leave the webhook, refund, dispute and reconciliation paths unfiltered, until T100 passes too.
-- [ ] T104 [US3] Implement `CommunityLifecycleService` in `HOAManagementCompany/Features/Company/CommunityLifecycleService.cs`, per R4 and `contracts/company.md`. Add a Repowise `domain=company` marker.
+- [X] T104 [US3] Implement `CommunityLifecycleService` in `HOAManagementCompany/Features/Company/CommunityLifecycleService.cs`, per R4 and `contracts/company.md`. Add a Repowise `domain=company` marker.
   - **Operations**: activate, archive, restore and parent, plus the three previews. Each runs under `CommunityLocks`, in one transaction.
   - **Open work**: 027 applications that are Open or DecisionReached, and sub-associations that aren't archived.
   - **Archive cascade**:
@@ -788,13 +788,13 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - cancel autopay through `CancelRecurringForAsync`;
     - enqueue `co_community_archived` per linked resident, dispatched inline in at most 10 batches of 100.
   - **Activate**: the fan-out of scheduled invitations goes through `InvitationService`.
-- [ ] T105 [US3] Add `LifecyclePreviewEndpoint`, `LifecycleActivateEndpoint`, `LifecycleArchiveEndpoint`, `LifecycleRestoreEndpoint` and `LifecycleParentEndpoint` in `HOAManagementCompany/Features/Company/`. They use `ManageCommunityLifecycle` and `board-writes`.
-- [ ] T106 [US3] Add `ProfileGetEndpoint` and `ProfilePatchEndpoint` in `HOAManagementCompany/Features/Board/Settings/` per R14, until T098 passes
-- [ ] T107 [US3] Switch the existing board endpoints to `DecideAsync` with `BoardHttp.SendDecisionAsync` and the right operation, so an Archived community answers its members with `COMMUNITY_ARCHIVED`. Do this until T095, T093, T092, T094, T096 and T097 pass.
+- [X] T105 [US3] Add `LifecyclePreviewEndpoint`, `LifecycleActivateEndpoint`, `LifecycleArchiveEndpoint`, `LifecycleRestoreEndpoint` and `LifecycleParentEndpoint` in `HOAManagementCompany/Features/Company/`. They use `ManageCommunityLifecycle` and `board-writes`.
+- [X] T106 [US3] Add `ProfileGetEndpoint` and `ProfilePatchEndpoint` in `HOAManagementCompany/Features/Board/Settings/` per R14, until T098 passes
+- [X] T107 [US3] Switch the existing board endpoints to `DecideAsync` with `BoardHttp.SendDecisionAsync` and the right operation, so an Archived community answers its members with `COMMUNITY_ARCHIVED`. Do this until T095, T093, T092, T094, T096 and T097 pass.
   - The endpoints are `HOAManagementCompany/Features/Board/BoardMetricsEndpoint.cs` and every endpoint under `HOAManagementCompany/Features/Board/Architectural/` except `ArcSweepJobEndpoint.cs` and the ARC settings endpoints (`ArcSettingsGetEndpoint.cs`, `ArcSettingsPutEndpoint.cs`), which T131 owns.
   - `ArcSweepService.cs` skips non-Active communities (R21).
-- [ ] T108 [US3] In `HOAManagementCompany/Features/Auth/AuthService.cs` (`RegisterAsync`) and `ClaimCodeService.cs`, refuse a claim code for a property in an Onboarding community with 409 `COMMUNITY_NOT_ACTIVE`, after the proof and the code are checked and without using up the code. Do this until T099 passes.
-- [ ] T109 [US3] Build the US3 frontend (briefs 04 and 11), until T102 pass:
+- [X] T108 [US3] In `HOAManagementCompany/Features/Auth/AuthService.cs` (`RegisterAsync`) and `ClaimCodeService.cs`, refuse a claim code for a property in an Onboarding community with 409 `COMMUNITY_NOT_ACTIVE`, after the proof and the code are checked and without using up the code. Do this until T099 passes.
+- [X] T109 [US3] Build the US3 frontend (briefs 04 and 11), until T102 pass:
   - in `neko-hoa/src/app/features/community-settings/`:
     - `ProfileSectionComponent`: autosave per field, and the Status card with Mark Active, Archive and Restore, showing the disabled reason;
     - `LifecycleDialogsComponent`: the activate, archive and restore dialogs;
@@ -819,7 +819,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Tests (write first)
 
-- [ ] T110 [P] [US8] Create `ResidentInvitationTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentInvitationTests.cs`:
+- [X] T110 [P] [US8] Create `ResidentInvitationTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentInvitationTests.cs`:
   - **US8-S1**: a Community Manager of Active A invites jane@ to #29. The invitation is Pending and emailed with the property address.
     - Jane registers from the link, with no claim code.
     - A `UserProperty` link to #29 exists, and `/auth/me` lists #29 with `landing: "Resident"`.
@@ -840,7 +840,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Also**:
     - inviting the same email to two properties creates two independent invitations;
     - an invitation for a property outside the community → 403, identical to a nonexistent one.
-- [ ] T111 [P] [US8] Create `ResidentRemovalTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentRemovalTests.cs`:
+- [X] T111 [P] [US8] Create `ResidentRemovalTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentRemovalTests.cs`:
   - **US8-S6**: Jane enrolled #29's autopay (`EnrolledByUserId` = Jane, set by `PUT /payments/recurring`), and she is removed.
     - Her next `GET /property`, with her unexpired token → 403 `PROPERTY_ACCESS_DENIED`.
     - The schedule is `inactive` with `resident_removed` and `TerminatedAt`, and no draft starts for it.
@@ -854,7 +854,7 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
   - **Also**:
     - when the last resident is removed, the property shows no resident, and its owner of record and balance are unchanged;
     - DELETE for a user who isn't linked → 404.
-- [ ] T112 [P] [US8] Create `ResidentsAreaEndpointTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentsAreaEndpointTests.cs`:
+- [X] T112 [P] [US8] Create `ResidentsAreaEndpointTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentsAreaEndpointTests.cs`:
   - **US8-S13**, with 120 properties, 7 of them without residents:
     - The first page has 25 items, each with its address, resident names and invitation summary, and `total` is 120.
     - The drawer endpoint returns residents (name, email, resident since) and invitations (Scheduled, Pending, Expired and Revoked, with who sent them).
@@ -867,18 +867,18 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - Addresses are in natural order (#9 before #10), and `limit=101` is clamped.
   - **US8-S14**: with no properties → `propertiesLoaded: false` and no items.
   - **US8-S18**: each list load and search, and each drawer load, logs one `BoardAssociationDataAccess` with actor, community, resource and UTC time.
-- [ ] T113 [P] [US8] Create `ResidentAuthorizationTheoryTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentAuthorizationTheoryTests.cs`:
+- [X] T113 [P] [US8] Create `ResidentAuthorizationTheoryTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentAuthorizationTheoryTests.cs`:
   - **US8-S11**: a Community Manager of A only invites to, removes from, lists or previews a property in B → 403, identical to a nonexistent property or community.
   - **US8-S12**: `[Theory]` over Board Member, Accountant and Resident → 403 on invite and on remove.
   - **SC-005 rows**: add resident invite and remove to the `ArchivedWriteEndpoints` registry of T095.
-- [ ] T114 [P] [US8] Create `ResidentSensitiveEventTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentSensitiveEventTests.cs`. For **US8-S19**:
+- [X] T114 [P] [US8] Create `ResidentSensitiveEventTests` in `HOAManagementCompany.Tests/Integration/Residents/ResidentSensitiveEventTests.cs`. For **US8-S19**:
   - **Actions covered**: invite, resend, revoke, acceptance, failed acceptance and removal.
   - **Each change** logs one event, with actor, community, property id, target user id or invitation id, the change and UTC time.
   - **No event** renders an email, a name, a street address or the token.
-- [ ] T115 [P] [US8] Create `ClaimCodeAfterInvitationTests` (FR-024f) in `HOAManagementCompany.Tests/Integration/Auth/ClaimCodeAfterInvitationTests.cs`:
+- [X] T115 [P] [US8] Create `ClaimCodeAfterInvitationTests` (FR-024f) in `HOAManagementCompany.Tests/Integration/Auth/ClaimCodeAfterInvitationTests.cs`:
   - once a property has a resident by invitation, its outstanding claim code gets the generic `REGISTRATION_FAILED`;
   - a claim code still works for a property with no resident.
-- [ ] T116 [P] [US8] Create `residents-section.component.spec.ts` in `neko-hoa/src/app/features/community-settings/residents/` (brief 06):
+- [X] T116 [P] [US8] Create `residents-section.component.spec.ts` in `neko-hoa/src/app/features/community-settings/residents/` (brief 06):
   - the list has 25 rows, with address, resident names and invitation chips ("Scheduled" as text);
   - search, and the three filters with their counts;
   - when `propertiesLoaded` is false, the empty state shows with no invite action (US8-S14);
@@ -889,19 +889,19 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Implementation
 
-- [ ] T117 [US8] Record `EnrolledByUserId` = the caller on every enroll and re-enroll (R9): `UpsertRecurringAsync` in `HOAManagementCompany/Features/Payments/PaymentService.cs` gains a `userId` parameter, passed by `Recurring/RecurringUpsertEndpoint.cs`
-- [ ] T118 [US8] Implement the `Residency` offer handler in `HOAManagementCompany/Features/Invitations/ResidencyOfferHandler.cs`:
+- [X] T117 [US8] Record `EnrolledByUserId` = the caller on every enroll and re-enroll (R9): `UpsertRecurringAsync` in `HOAManagementCompany/Features/Payments/PaymentService.cs` gains a `userId` parameter, passed by `Recurring/RecurringUpsertEndpoint.cs`
+- [X] T118 [US8] Implement the `Residency` offer handler in `HOAManagementCompany/Features/Invitations/ResidencyOfferHandler.cs`:
   - the property must belong to the community, or `ALREADY_RESIDENT` applies;
   - the invitation is Scheduled in an Onboarding community;
   - sender authority is checked through `ManageResidents`;
   - applying it creates the `UserProperty` link unless it exists, and logs `ResidentLinkChange Change=Linked`.
 
   Also make `ClaimCodeService` refuse a code once its property has any resident (FR-024f).
-- [ ] T119 [US8] Add `ResidentsListEndpoint`, `ResidentDetailEndpoint`, `ResidentInviteEndpoint`, `RemovalPreviewEndpoint` and `ResidentRemoveEndpoint` in `HOAManagementCompany/Features/Board/Residents/`, per the contract, until T110, T111, T112, T113, T114 and T115 pass.
+- [X] T119 [US8] Add `ResidentsListEndpoint`, `ResidentDetailEndpoint`, `ResidentInviteEndpoint`, `RemovalPreviewEndpoint` and `ResidentRemoveEndpoint` in `HOAManagementCompany/Features/Board/Residents/`, per the contract, until T110, T111, T112, T113, T114 and T115 pass.
   - They use `ManageResidents`.
   - The list orders addresses with `natural_sort` and logs `BoardAssociationDataAccess`.
   - Removal runs in one transaction: it uses `CancelRecurringForAsync`, enqueues `co_resident_removed` and `co_autopay_ended`, and logs.
-- [ ] T120 [US8] Implement `ResidentsSectionComponent`, with `PropertyDrawerComponent`, the invite form and the remove dialog, in `neko-hoa/src/app/features/community-settings/residents/`, until T116 pass
+- [X] T120 [US8] Implement `ResidentsSectionComponent`, with `PropertyDrawerComponent`, the invite form and the remove dialog, in `neko-hoa/src/app/features/community-settings/residents/`, until T116 pass
 
 **Checkpoint**: the MVP P1 backend is complete. Residents join by invitation and lose access on removal.
 
@@ -919,18 +919,18 @@ The backend is covered by T041 (US9-S1 to US9-S6) and T030 (US9-S7 and US9-S8 ru
 
 ### Tests (write first)
 
-- [ ] T121 [P] [US9] Create `company-sign-in.component.spec.ts` in `neko-hoa/src/app/features/auth/` (brief 01, 8.01.a–c):
+- [X] T121 [P] [US9] Create `company-sign-in.component.spec.ts` in `neko-hoa/src/app/features/auth/` (brief 01, 8.01.a–c):
   - it calls `POST /auth/login`;
   - **US9-S7**: it routes to `/app/company/portfolio` when `isCompanyAdministrator`;
   - **US9-S8**: otherwise it routes to the landing with `?notice=not-company-admin`, and that page shows "This account isn't a Company Administrator, so you've been signed in to your usual page.";
   - failures show the same generic message as the usual sign-in page.
-- [ ] T122 [P] [US9] Create the landing-page specs:
+- [X] T122 [P] [US9] Create the landing-page specs:
   - `no-home.component.spec.ts` (US9-S3: tells the user to use an invitation link or contact their community manager) and `not-live.component.spec.ts` (US9-S5), in `neko-hoa/src/app/features/landing/`;
   - `neko-hoa/src/app/core/interceptors/auth.interceptor.spec.ts`: a 403 `PROPERTY_ACCESS_DENIED` calls `/auth/me`, then navigates to the new landing with brief 11's notice (US9-S4, FR-024g), with no refresh loop.
 
 ### Implementation
 
-- [ ] T123 [US9] Build the US9 frontend until T121 and T122 pass:
+- [X] T123 [US9] Build the US9 frontend until T121 and T122 pass:
   - `CompanySignInComponent` at `/company/sign-in`, public and bookmarkable, in `neko-hoa/src/app/features/auth/company-sign-in.component.ts`. It is titled "Company sign-in" and shows no company name. If the design handoff keeps the name (brief 01, D4), T160 adds it.
   - `NoHomeComponent` and `NotLiveComponent` at `/app/no-home` and `/app/not-live`, with `authGuard`, in `neko-hoa/src/app/features/landing/`.
   - The `PROPERTY_ACCESS_DENIED` handling in `neko-hoa/src/app/core/interceptors/auth.interceptor.ts`.

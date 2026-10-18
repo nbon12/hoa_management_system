@@ -8,6 +8,7 @@ import { until } from '../board/architectural/arc-testing';
 import { CommunitySettingsPageComponent } from './community-settings-page.component';
 import { CommunitySettingsContext } from './community-settings-context';
 import { CommunitySettings, CommunitySettingsService } from '../../core/services/community-settings.service';
+import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BoardNavigationService } from '../../core/services/board-navigation.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -59,7 +60,11 @@ describe('CommunitySettingsPageComponent (030 T067)', () => {
   const narrow = signal(false);
 
   async function open(url: string, opts: { result?: CommunitySettings | HttpErrorResponse; signedIn?: CurrentUser; isNarrow?: boolean; activeCommunity?: string | null } = {}) {
-    svc = jasmine.createSpyObj<CommunitySettingsService>('CommunitySettingsService', ['getSettings']);
+    svc = jasmine.createSpyObj<CommunitySettingsService>('CommunitySettingsService', ['getSettings', 'getProfile', 'getMemberships', 'getInvitations', 'getResidents']);
+    svc.getResidents.and.returnValue(new Promise(() => undefined));
+    svc.getProfile.and.returnValue(new Promise(() => undefined));
+    svc.getMemberships.and.returnValue(new Promise(() => undefined));
+    svc.getInvitations.and.returnValue(new Promise(() => undefined));
     const result = opts.result ?? settings();
     if (result instanceof HttpErrorResponse) svc.getSettings.and.rejectWith(result);
     else svc.getSettings.and.resolveTo(result);
@@ -74,6 +79,7 @@ describe('CommunitySettingsPageComponent (030 T067)', () => {
           { path: '**', component: LandingStubComponent },
         ]),
         { provide: CommunitySettingsService, useValue: svc },
+        { provide: CompanyService, useValue: jasmine.createSpyObj('CompanyService', { getCommunities: new Promise(() => undefined), getLifecyclePreview: new Promise(() => undefined) }) },
         { provide: AuthService, useValue: { user: userSig.asReadonly() } },
         { provide: ViewportService, useValue: { isNarrow: narrow.asReadonly() } },
       ],

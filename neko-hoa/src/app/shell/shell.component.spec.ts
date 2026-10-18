@@ -4,7 +4,9 @@ import { Router, provideRouter } from '@angular/router';
 import { ShellComponent } from './shell.component';
 import { AuthService } from '../core/services/auth.service';
 import { PropertyService } from '../core/services/property.service';
-import { CurrentUser, CommunityMembershipSummary, UserMode } from '../core/models';
+import { TokenService } from '../core/services/token.service';
+import { ToastService } from '../core/services/toast.service';
+import { CurrentUser, CommunityMembershipSummary, UserMode, UserPropertySummary } from '../core/models';
 
 // 025 T039 (US3) — the shell renders the correct navigation per role. The real
 // BoardNavigationService (providedIn: 'root') derives the board sidebar from the acting user's
@@ -76,7 +78,7 @@ describe('ShellComponent — nav per role (025 T039)', () => {
     expect(el.textContent).toContain('Enter board mode');
   });
 
-  it('board mode as Board Member: board nav + banner; manager-only Memberships renders locked (FR-040)', () => {
+  it('board mode as Board Member: board nav + banner; manager-only Community settings renders locked (FR-040)', () => {
     setUser([{ communityId: 'c1', communityName: 'One', role: 'BoardMember' }], 'Board');
     fixture.detectChanges();
 
@@ -88,8 +90,8 @@ describe('ShellComponent — nav per role (025 T039)', () => {
     expect(home).toBeTruthy();
     expect(home!.tagName).toBe('A');
     // Manager-only section is present but LOCKED (disabled div with 🔒), not absent and not a link.
-    const memberships = findItem(el, 'Memberships');
-    expect(memberships).withContext('Memberships item is rendered, not hidden').toBeTruthy();
+    const memberships = findItem(el, 'Community settings');
+    expect(memberships).withContext('Community settings item is rendered, not hidden').toBeTruthy();
     expect(memberships!.tagName).not.toBe('A');
     expect(memberships!.classList).toContain('shell__side-item--locked');
     expect(memberships!.textContent).toContain('🔒');
@@ -97,15 +99,15 @@ describe('ShellComponent — nav per role (025 T039)', () => {
     expect(findItem(el, 'My Communities')).toBeUndefined();
   });
 
-  it('board mode as Community Manager: manager-only Memberships is unlocked (a navigable link)', () => {
+  it('board mode as Community Manager: manager-only Community settings is unlocked (a navigable link)', () => {
     setUser([{ communityId: 'c1', communityName: 'One', role: 'CommunityManager' }], 'Board');
     fixture.detectChanges();
 
-    const memberships = findItem(el, 'Memberships');
+    const memberships = findItem(el, 'Community settings');
     expect(memberships).toBeTruthy();
     expect(memberships!.tagName).toBe('A');
     expect(memberships!.textContent).not.toContain('🔒');
-    expect(memberships!.getAttribute('href')).toContain('/app/board/memberships');
+    expect(memberships!.getAttribute('href')).toContain('/app/board/settings/profile');
   });
 
   it('board mode with 2+ communities: the My Communities entry is rendered (FR-025)', () => {
@@ -323,5 +325,180 @@ describe('ShellComponent — company area (030 T069)', () => {
     signIn({});
     await at('/app/dashboard');
     expect(nav('Resident navigation')).toBeTruthy();
+  });
+});
+
+// 030 T102 / US3-S8 / brief 11 8.11.c: the home list. Homes in Active communities come first, then
+// Archived ones labelled "No longer managed"; a home in an Onboarding community is never listed.
+describe('ShellComponent — home list (030 T102)', () => {
+  let fixture: ComponentFixture<ShellComponent>;
+  let el: HTMLElement;
+  let switchProperty: jasmine.Spy;
+
+  const P29: UserPropertySummary = { id: 'p29', accountNumber: 'A-29', address: '711 Keystone Park Dr #29', communityId: 'sh', communityName: 'Sakura Heights', communityStatus: 'Active' };
+  const P16: UserPropertySummary = { id: 'p16', accountNumber: 'A-16', address: '16 Old Mill Ln', communityId: 'om', communityName: 'Old Mill Commons', communityStatus: 'Archived' };
+  const P9: UserPropertySummary = { id: 'p9', accountNumber: 'A-9', address: '9 Briar Hollow Ct', communityId: 'bh', communityName: 'Briar Hollow', communityStatus: 'Onboarding' };
+
+  function jwt(claims: Record<string, unknown>): string {
+    const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+    return `${b64({ alg: 'none' })}.${b64(claims)}.sig`;
+  }
+
+  async function signInAs(properties: UserPropertySummary[], currentId: string) {
+    userSig.set({
+      id: 'u-sam', firstName: 'Sam', lastName: 'Ortiz', email: 'sam@example.com', initials: 'SO',
+      lastActiveMode: 'Resident', memberships: [], properties, isCompanyAdministrator: false, landing: 'Resident',
+    });
+    TestBed.inject(TokenService).setAccessToken(jwt({ propertyId: currentId }));
+    await TestBed.inject(NgZone).run(() => TestBed.inject(Router).navigateByUrl('/app/dashboard'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  function switcher(): HTMLButtonElement | null {
+    return el.querySelector<HTMLButtonElement>('button[aria-label^="Switch home"]');
+  }
+
+  function menuItems(): string[] {
+    return Array.from(el.querySelectorAll('[role="menuitem"]')).map(n => n.textContent!.replace(/\s+/g, ' ').trim());
+  }
+
+  beforeEach(async () => {
+    userSig.set(null);
+    TestBed.resetTestingModule();
+    switchProperty = jasmine.createSpy('switchProperty').and.callFake(async (id: string) => {
+      TestBed.inject(TokenService).setAccessToken(jwt({ propertyId: id }));
+    });
+    await TestBed.configureTestingModule({
+      imports: [ShellComponent],
+      providers: [
+        provideRouter([{ path: '**', component: PageStubComponent }]),
+        { provide: AuthService, useValue: { user: userSig.asReadonly(), logout: () => {}, switchMode: () => Promise.resolve(), switchProperty } },
+        { provide: PropertyService, useValue: { getProperty: () => Promise.resolve(null) } },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ShellComponent);
+    el = fixture.nativeElement;
+    document.body.appendChild(el);
+  });
+
+  afterEach(() => {
+    el.remove();
+    const tokens = TestBed.inject(TokenService);
+    tokens.clearAccessToken();
+    tokens.setSessionHint(false);
+  });
+
+  it('labels an archived home "No longer managed" in the home list, and leaves out an Onboarding one (US3-S8, 8.11.c)', async () => {
+    await signInAs([P9, P16, P29], 'p29');
+    const strip = el.querySelector<HTMLElement>('.shell__strip')!;
+    expect(strip.textContent).toContain('Sakura Heights');
+    expect(strip.textContent).not.toContain('No longer managed');
+    expect(switcher()!.getAttribute('aria-label')).toBe('Switch home. Current: 711 Keystone Park Dr #29');
+    expect(switcher()!.getAttribute('aria-expanded')).toBe('false');
+
+    switcher()!.click();
+    fixture.detectChanges();
+    const menu = el.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(menu.getAttribute('aria-label')).toBe('Your homes');
+    expect(el.textContent).toContain('Your homes');
+    expect(menuItems()).toEqual([
+      '711 Keystone Park Dr #29, Sakura Heights, Current',
+      '16 Old Mill Ln, Old Mill Commons, No longer managed',
+    ]);
+    expect(menu.textContent).not.toContain('Briar Hollow');
+  });
+
+  it('shows "No longer managed" in the strip for an archived current home, with no switcher for one home (8.11.h)', async () => {
+    await signInAs([P16, P9], 'p16');
+    const strip = el.querySelector<HTMLElement>('.shell__strip')!;
+    expect(strip.textContent).toContain('Old Mill Commons');
+    expect(strip.textContent).toContain('16 Old Mill Ln');
+    expect(strip.textContent).toContain('No longer managed');
+    expect(switcher()).toBeNull();
+  });
+
+  it('choosing a "No longer managed" home selects it and opens Statement (D3)', async () => {
+    await signInAs([P29, P16], 'p29');
+    switcher()!.click();
+    fixture.detectChanges();
+    (el.querySelectorAll<HTMLElement>('[role="menuitem"]')[1]).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(switchProperty).toHaveBeenCalledOnceWith('p16');
+    expect(TestBed.inject(Router).url).toBe('/app/payments/statement');
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+    expect(el.querySelector('.shell__strip')!.textContent).toContain('No longer managed');
+  });
+
+  it('choosing an Active home opens its Dashboard; choosing "Current" only closes the menu', async () => {
+    await signInAs([P29, P16], 'p16');
+    switcher()!.click();
+    fixture.detectChanges();
+    (el.querySelectorAll<HTMLElement>('[role="menuitem"]')[1]).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(switchProperty).not.toHaveBeenCalled();
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+
+    switcher()!.click();
+    fixture.detectChanges();
+    (el.querySelectorAll<HTMLElement>('[role="menuitem"]')[0]).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(switchProperty).toHaveBeenCalledOnceWith('p29');
+    expect(TestBed.inject(Router).url).toBe('/app/dashboard');
+  });
+
+  it('says when switching failed, and Home, End and Tab work in the menu', async () => {
+    await signInAs([P29, P16], 'p29');
+    switchProperty.and.rejectWith(new Error('offline'));
+    switcher()!.click();
+    fixture.detectChanges();
+    const items = el.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    items[0].focus();
+    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(document.activeElement).toBe(items[1]);
+    items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(document.activeElement).toBe(items[0]);
+    items[1].click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(TestBed.inject(ToastService).toasts().map(t => t.message)).toContain("Couldn't switch homes. Check your connection and try again.");
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+    TestBed.inject(ToastService).clear();
+
+    switcher()!.click();
+    fixture.detectChanges();
+    el.querySelector<HTMLElement>('[role="menuitem"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    fixture.detectChanges();
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('moves with the arrow keys and closes with Esc, returning focus to the button', async () => {
+    await signInAs([P29, P16], 'p29');
+    switcher()!.focus();
+    switcher()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const items = el.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    expect(document.activeElement).toBe(items[0]);
+    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items[1]);
+    items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items[0]);
+    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(document.activeElement).toBe(items[1]);
+    items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    expect(el.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(switcher());
+
+    switcher()!.click();
+    fixture.detectChanges();
+    document.body.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role="menu"]')).toBeNull();
   });
 });

@@ -49,12 +49,13 @@ describe('BoardNavigationService.buildNav (pure derivation)', () => {
     expect(item(nav, 'AP Ledger')!.locked).toBeFalse();
   });
 
-  it('gates the manager-only Memberships entry (locked for a board member)', () => {
+  it('gates the manager-only Community settings entry (locked for a board member)', () => {
     const board = BoardNavigationService.buildNav({ roles: ['BoardMember'], communityCount: 1 });
-    expect(item(board, 'Memberships')!.locked).toBeTrue();
+    expect(item(board, 'Community settings')!.locked).toBeTrue();
     const mgr = BoardNavigationService.buildNav({ roles: ['CommunityManager'], communityCount: 1 });
-    expect(item(mgr, 'Memberships')!.locked).toBeFalse();
-    expect(item(mgr, 'Memberships')!.route).toBe('/app/board/memberships');
+    expect(item(mgr, 'Community settings')!.locked).toBeFalse();
+    // 030 T091: the old Memberships page is a section of Community settings now.
+    expect(item(mgr, 'Memberships')).toBeUndefined();
   });
 
   it('resolves the union of two roles held in one community (Clarifications 2026-08-23)', () => {
@@ -65,8 +66,8 @@ describe('BoardNavigationService.buildNav (pure derivation)', () => {
     });
     expect(item(nav, 'AP Ledger')!.locked).toBeFalse();     // conferred by Accountant
     expect(item(nav, 'Vendor Aging')!.locked).toBeFalse();  // conferred by Accountant
-    // Memberships still requires CommunityManager, which neither role confers → locked.
-    expect(item(nav, 'Memberships')!.locked).toBeTrue();
+    // Community settings still requires CommunityManager, which neither role confers → locked.
+    expect(item(nav, 'Community settings')!.locked).toBeTrue();
   });
 
   it('027: Architectural Applications is live for board members and managers, locked for accountants', () => {
@@ -90,7 +91,7 @@ describe('BoardNavigationService.buildNav (pure derivation)', () => {
   it('a plain resident role confers nothing board-specific (Finance stays locked)', () => {
     const nav = BoardNavigationService.buildNav({ roles: ['Resident'], communityCount: 1 });
     expect(item(nav, 'AP Ledger')!.locked).toBeTrue();
-    expect(item(nav, 'Memberships')!.locked).toBeTrue();
+    expect(item(nav, 'Community settings')!.locked).toBeTrue();
   });
 });
 
@@ -193,12 +194,12 @@ describe('BoardNavigationService (signal-derived)', () => {
       { communityId: 'c2', communityName: 'Two', role: 'BoardMember' },
     ]);
     svc.setActiveCommunity('c1');
-    // c1 union includes CommunityManager → Memberships unlocked.
-    expect(item(svc.nav(), 'Memberships')!.locked).toBeFalse();
+    // c1 union includes CommunityManager → Community settings unlocked.
+    expect(item(svc.nav(), 'Community settings')!.locked).toBeFalse();
 
     svc.setActiveCommunity('c2');
-    // c2 is board-only → Memberships locked again.
-    expect(item(svc.nav(), 'Memberships')!.locked).toBeTrue();
+    // c2 is board-only → Community settings locked again.
+    expect(item(svc.nav(), 'Community settings')!.locked).toBeTrue();
   });
 });
 

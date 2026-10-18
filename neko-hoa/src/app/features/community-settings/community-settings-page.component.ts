@@ -14,6 +14,10 @@ import { refusalCodeOf, refusalMessage } from '../../shared/refusal-messages';
 import { CommunitySettingsContext, SettingsMode } from './community-settings-context';
 import { SettingsSideNavComponent, SettingChoice } from './settings-side-nav.component';
 import { SettingsSectionPlaceholderComponent } from './settings-section-placeholder.component';
+import { ManagersMembershipsSectionComponent } from './managers-memberships.component';
+import { ProfileSectionComponent } from './profile-section.component';
+import { ResidentsSectionComponent } from './residents/residents-section.component';
+import { LifecycleDialogsComponent } from './lifecycle-dialogs.component';
 import { sectionsFor } from './settings-registry';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -43,7 +47,8 @@ interface StatusAction {
 @Component({
   selector: 'app-community-settings-page',
   standalone: true,
-  imports: [RouterLink, DisabledReasonDirective, SettingsSideNavComponent, SettingsSectionPlaceholderComponent],
+  imports: [RouterLink, DisabledReasonDirective, SettingsSideNavComponent, SettingsSectionPlaceholderComponent, ManagersMembershipsSectionComponent,
+    ProfileSectionComponent, LifecycleDialogsComponent, ResidentsSectionComponent],
   providers: [CommunitySettingsContext],
   template: `
     @switch (state()) {
@@ -98,11 +103,21 @@ interface StatusAction {
                 <div class="card card--lav csp__banner">{{ onboardingNotice() }}</div>
               }
               @if (current(); as section) {
-                <!-- Placeholders until T090, T109, T120 and T132 build the sections. -->
-                <app-settings-section-placeholder [section]="section" />
+                @switch (section.id) {
+                  @case ('profile') { <app-profile-section /> }
+                  @case ('managers-and-memberships') {
+                    <app-managers-memberships-section><app-residents-section residents /></app-managers-memberships-section>
+                  }
+                  @default {
+                    <!-- A placeholder until T132 builds the section. -->
+                    <app-settings-section-placeholder [section]="section" />
+                  }
+                }
               }
             </div>
           </div>
+          <!-- The header's status buttons open these (T109). -->
+          <app-lifecycle-dialogs />
         }
       }
     }

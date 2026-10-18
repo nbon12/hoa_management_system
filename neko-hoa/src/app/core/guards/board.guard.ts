@@ -39,8 +39,10 @@ export const boardGuard: CanActivateFn = (route: ActivatedRouteSnapshot) => {
 
   const requiredRoles = route.data?.['requiredRoles'] as string[] | undefined;
   if (requiredRoles && requiredRoles.length) {
+    // 030: `roleScope: 'any'` routes (Add community) need the role in any community, not the active one.
+    const anyCommunity = route.data?.['roleScope'] === 'any';
     const active = nav.activeCommunityId();
-    const relevant = active ? board.filter(m => m.communityId === active) : board;
+    const relevant = active && !anyCommunity ? board.filter(m => m.communityId === active) : board;
     const roleSet = new Set(relevant.map(m => m.role));
     const allowed = requiredRoles.some(r => roleSet.has(r));
     if (!allowed) {

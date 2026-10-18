@@ -7,6 +7,9 @@ import { PropertyService } from '../core/services/property.service';
 import { BoardNavigationService } from '../core/services/board-navigation.service';
 import { isBoardMode } from '../core/services/landing';
 import { COMPANY_NAV, CompanyMenuComponent } from './company-menu.component';
+import { PageNoticeComponent } from '../shared/page-notice.component';
+import { ArchivedNoticeComponent } from '../shared/archived-notice.component';
+import { HomeSwitcherComponent } from './home-switcher.component';
 import { Property } from '../core/models';
 import { ModeToggleComponent } from '../features/board/mode-toggle/mode-toggle.component';
 import { BoardBannerComponent } from '../features/board/board-banner/board-banner.component';
@@ -19,7 +22,7 @@ interface NavGroup {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ModeToggleComponent, BoardBannerComponent, CompanyMenuComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ModeToggleComponent, BoardBannerComponent, CompanyMenuComponent, PageNoticeComponent, ArchivedNoticeComponent, HomeSwitcherComponent],
   template: `
     <div class="shell">
       <!-- Top bar -->
@@ -56,8 +59,8 @@ interface NavGroup {
         <!-- Property strip -->
         <div class="shell__strip">
           <span class="pin-icon"></span>
-          <b>{{ property()?.communityName }}</b>
-          <span>· {{ property()?.address }}</span>
+          <!-- 030 FR-012a (brief 11 8.11.c): the home, "No longer managed", and the home list. -->
+          <app-home-switcher [fallback]="property()" (switched)="loadProperty()" />
           <span class="mono" style="margin-left:auto;font-size:11px;color:var(--ink-mute);">
             {{ property()?.accountNumber }}
           </span>
@@ -116,7 +119,10 @@ interface NavGroup {
         </aside>
 
         <main class="shell__content">
-          <router-outlet />
+          <!-- 030 conventions §6.1: a notice the app moved the person here with; stays until dismissed. -->
+          <app-page-notice />
+          <!-- 030 US3-S9: a resident page refused with COMMUNITY_ARCHIVED shows the archived notice instead. -->
+          <app-archived-notice><router-outlet /></app-archived-notice>
         </main>
       </div>
     </div>
@@ -225,6 +231,10 @@ export class ShellComponent implements OnInit {
   boardNav = this.boardNavSvc.nav;
 
   async ngOnInit() {
+    await this.loadProperty();
+  }
+
+  async loadProperty(): Promise<void> {
     try {
       this.property.set(await this.propertySvc.getProperty());
     } catch { /* user may not have a property yet */ }

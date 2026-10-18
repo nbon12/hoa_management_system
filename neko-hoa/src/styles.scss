@@ -307,3 +307,29 @@ h1.page-title {
   border-left: 3px solid var(--rose); padding-left: 6px;
 }
 .autosave-retry { background: none; border: none; font: inherit; padding: 0; }
+
+/* ── 030 forms: helper text, field errors and the error summary (conventions §6.3, §7.5) ── */
+.field-help { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+.field-error {
+  font-size: 12px; color: var(--ink); margin-top: 4px;
+  border-left: 3px solid var(--rose); padding-left: 6px;
+}
+.field[aria-invalid="true"] { border-color: var(--ink); border-width: 2px; }
+.error-summary {
+  border: 2px solid var(--rose); border-radius: 12px; padding: 12px 14px; background: var(--paper);
+  ul { margin: 6px 0 0 18px; }
+  a { color: var(--ink); }
+}
+
+/* ── 030 dialogs (conventions §7.4): consequences, what doesn't change, refusals, buttons ── */
+.dlg-section { margin-top: 12px; }
+.dlg-section h3 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.dlg-section ul { margin-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.dlg-refusal { margin-top: 10px; }
+.dlg-form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.dlg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+.dlg-actions .btn { min-height: 40px; }
+fieldset.dlg-fieldset { border: none; display: flex; flex-direction: column; gap: 8px; }
+fieldset.dlg-fieldset legend { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.dlg-radio { display: flex; gap: 8px; align-items: flex-start; }
+.dlg-radio input { margin-top: 3px; }

@@ -198,6 +198,18 @@ describe('AuthService', () => {
       expect(svc.user()!.properties).toEqual([]);
       expect(TestBed.inject(TokenService).getAccessToken()).toBe(MOCK_AUTH_RESPONSE.token);
     });
+
+    it('switchProperty() posts the home and adopts the new session (brief 11 8.11.c)', async () => {
+      const done = svc.switchProperty('p16');
+      const req = http.expectOne(`${BASE}/auth/switch-property`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ propertyId: 'p16' });
+      expect(req.request.withCredentials).toBeTrue();
+      req.flush({ ...MOCK_AUTH_RESPONSE, token: 'header.payload.switched' });
+      await done;
+      expect(TestBed.inject(TokenService).getAccessToken()).toBe('header.payload.switched');
+      expect(svc.user()!.firstName).toBe('Jane');
+    });
   });
 
   describe('logout()', () => {

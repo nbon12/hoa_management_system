@@ -159,6 +159,18 @@ export class AuthService {
     this.applySession(res);
   }
 
+  /**
+   * 030 FR-012a / brief 11 8.11.c: make another of the person's homes the selected one. The
+   * response is a fresh session for that home. A home in an Onboarding community is refused with
+   * 409 `COMMUNITY_NOT_ACTIVE`; a "No longer managed" home is allowed (read-only).
+   */
+  async switchProperty(propertyId: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<AuthSessionResponse>(`${this.base}/auth/switch-property`, { propertyId }, { withCredentials: true })
+    );
+    this.applySession(res);
+  }
+
   /** Drop the local session (no navigation, no cross-tab broadcast). */
   clearSession(): void {
     this._user.set(null);
