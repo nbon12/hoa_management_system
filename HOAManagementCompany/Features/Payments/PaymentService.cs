@@ -60,7 +60,8 @@ public class PaymentService(
     /// mandate authorization. No raw card/bank number is ever accepted or stored.
     /// </summary>
     public async Task<RecurringPaymentDto> UpsertRecurringAsync(
-        Guid propertyId, RecurringPaymentRequest req, string? acceptedIp, string? userAgent, CancellationToken ct = default)
+        Guid propertyId, string userId, RecurringPaymentRequest req, string? acceptedIp, string? userAgent,
+        CancellationToken ct = default)
     {
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct)
             ?? throw new InvalidOperationException($"No owner found for property {propertyId}.");
@@ -94,6 +95,9 @@ public class PaymentService(
         existing.Method = method;
         existing.DraftDay = req.DraftDay;
         existing.Status = "active";
+        // 030 R9: whoever enrolls or re-enrolls is recorded, so removing them cancels it (FR-024c).
+        existing.EnrolledByUserId = userId;
+        existing.CancellationReason = null;
         existing.VaultedPaymentMethodId = vaulted.PaymentMethodId;
         existing.MethodBrand = vaulted.Brand;
         existing.MethodLast4 = vaulted.Last4;
@@ -125,17 +129,36 @@ public class PaymentService(
 
     public async Task CancelRecurringAsync(Guid propertyId, CancellationToken ct = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        if (await CancelRecurringForAsync(propertyId, RecurringCancellationReasons.OwnerCancelled, ct) is not null)
+            await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// 030 R9: stops a property's active autopay schedule — status <c>inactive</c>, the reason
+    /// recorded, and the current authorization terminated (006 FR-011b; the mandate record is
+    /// kept). No Stripe call is made: the vaulted method stays on the owner's customer, as with
+    /// the owner's own cancel. Returns the schedule when one was active; the caller saves, so the
+    /// cancel commits with the change that caused it.
+    /// </summary>
+    public async Task<RecurringPayment?> CancelRecurringForAsync(Guid propertyId, string reason, CancellationToken ct = default)
+    {
         var recurring = await db.RecurringPayments
             .Include(r => r.Authorizations)
-            .FirstOrDefaultAsync(r => r.PropertyId == propertyId, ct);
-        if (recurring is null) return;
+            .FirstOrDefaultAsync(r => r.PropertyId == propertyId && r.Status == "active", ct);
+        if (recurring is null) return null;
 
+        Cancel(recurring, reason, DateTimeOffset.UtcNow);
+        return recurring;
+    }
+
+    /// <summary>The cancel itself, for a schedule loaded with its authorizations (030 R9).</summary>
+    public static void Cancel(RecurringPayment recurring, string reason, DateTimeOffset now)
+    {
         recurring.Status = "inactive";
+        recurring.CancellationReason = reason;
         recurring.UpdatedAt = now;
         var current = recurring.Authorizations.FirstOrDefault(a => a.Id == recurring.CurrentAuthorizationId);
         if (current is not null) current.TerminatedAt = now;
-        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>

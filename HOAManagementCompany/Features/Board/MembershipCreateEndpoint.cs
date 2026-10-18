@@ -1,21 +1,30 @@
+using System.Net.Mail;
 using System.Security.Claims;
 using FastEndpoints;
-using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
-using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Features.Board.Settings;
+using HOAManagementCompany.Features.Company;
+using HOAManagementCompany.Features.Invitations;
 using HOAManagementCompany.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Board;
 
-// POST /api/v1/communities/{communityId}/memberships — grant a membership
-// (User Story 5, Scenario 1). Community Manager only. Every grant is recorded as a
-// security-sensitive event (FR-042, constitution §7).
+public sealed record MembershipInvitationResponse(Guid InvitationId, string State, DateTimeOffset? ExpiresAt);
+
+// POST /api/v1/communities/{communityId}/memberships — appoint a Community Manager, Board
+// Member or Accountant (025 US5; 030 FR-018–FR-021, contracts/community-settings.md). With a
+// userId the person must already be in the community's people list and the role is granted at
+// once (reactivating a previous row, R7); with an email a membership invitation is sent, with the
+// same response whether or not the email has an account. Community Manager grants need
+// ManageCommunityManagers and go through the open-ended-manager rule under the community lock.
+// Every change is a sensitive event (FR-023).
 public class MembershipCreateEndpoint(
     ApplicationDbContext db,
     ICommunityScopeResolver scope,
-    ILogger<MembershipCreateEndpoint> logger)
-    : Endpoint<MembershipCreateRequest, MembershipDto>
+    ICompanyContext companyContext,
+    MembershipService memberships,
+    InvitationService invitations)
+    : Endpoint<MembershipCreateRequest, object>
 {
     public override void Configure()
     {
@@ -27,54 +36,53 @@ public class MembershipCreateEndpoint(
     public override async Task HandleAsync(MembershipCreateRequest req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
-        try
+        var capability = req.Role == CommunityRole.CommunityManager
+            ? CommunityCapability.ManageCommunityManagers
+            : CommunityCapability.ManageMemberships;
+        if (await BoardHttp.SendDecisionAsync(HttpContext,
+                await scope.DecideAsync(User, req.CommunityId, capability, ScopeOperation.Write, ct), ct))
+            return;
+
+        if (req.Role is not (CommunityRole.CommunityManager or CommunityRole.BoardMember or CommunityRole.Accountant))
+            throw CompanyErrors.Validation(new CompanyErrors.FieldError("role", "Choose Community Manager, Board Member or Accountant."));
+        var hasUser = !string.IsNullOrWhiteSpace(req.UserId);
+        var hasEmail = !string.IsNullOrWhiteSpace(req.Email);
+        if (hasUser == hasEmail)
+            throw CompanyErrors.Validation(new CompanyErrors.FieldError(hasUser ? "email" : "userId",
+                "Choose someone from this community, or invite them by email."));
+
+        var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")!.Value;
+        if (hasEmail)
         {
-            if (!await scope.CanAccessAsync(User, req.CommunityId, CommunityCapability.ManageMemberships, ct))
-            {
-                await BoardHttp.ForbiddenAsync(HttpContext, ct);
-                return;
-            }
+            if (!MailAddress.TryCreate(req.Email!.Trim(), out var parsed) || parsed.Address != req.Email.Trim())
+                throw CompanyErrors.Validation(new CompanyErrors.FieldError("email", "Enter a valid email address."));
+            var companyId = await companyContext.ForCommunityAsync(req.CommunityId, ct)
+                            ?? throw CompanyErrors.Forbidden();
+            var invitation = await invitations.CreateAsync(new NewInvitation(InvitationKind.Membership, companyId,
+                req.CommunityId, null, req.Role, req.EndDate, req.Email), actorId, ct);
+            await SendAsync(new MembershipInvitationResponse(invitation.Id, invitation.State.ToString(), invitation.ExpiresAt),
+                StatusCodes.Status201Created, ct);
+            return;
+        }
 
-            if (req.Role == CommunityRole.Resident)
-                throw new DomainException("VALIDATION_ERROR", "Role must not be Resident.", 422);
-            if (req.EndDate is { } end && end < req.StartDate)
-                throw new DomainException("VALIDATION_ERROR", "End date cannot precede start date.", 422);
-            if (!await db.Users.AnyAsync(u => u.Id == req.UserId, ct))
-                throw new DomainException("VALIDATION_ERROR", "Unknown user.", 422);
-            if (await db.CommunityMemberships.AnyAsync(
-                    m => m.UserId == req.UserId && m.CommunityId == req.CommunityId && m.Role == req.Role, ct))
-                throw new DomainException("VALIDATION_ERROR", "That user already holds this role in this community.", 422);
+        // FR-003a: nobody grants themself a role.
+        if (req.UserId == actorId)
+            throw CompanyErrors.SelfGrantNotAllowed();
+        var startDate = req.StartDate ?? memberships.Today;
+        if (req.EndDate is { } end && end < startDate)
+            throw CompanyErrors.Validation(new CompanyErrors.FieldError("endDate", "The end date can't be before the start date."));
 
-            var membership = new CommunityMembership
-            {
-                UserId = req.UserId,
-                CommunityId = req.CommunityId,
-                Role = req.Role,
-                Status = MembershipStatus.Active,
-                StartDate = req.StartDate,
-                EndDate = req.EndDate
-            };
-            db.CommunityMemberships.Add(membership);
+        var dto = await CommunityLocks.RunAsync(db, req.CommunityId, async () =>
+        {
+            // The message doesn't say whether the id exists.
+            if (!await memberships.InPeopleListAsync(req.CommunityId, req.UserId!, ct))
+                throw CompanyErrors.Validation(new CompanyErrors.FieldError("userId", MembershipService.NotInPeopleList));
+            var (row, _) = await memberships.GrantAsync(req.CommunityId, req.UserId!, req.Role, startDate, req.EndDate,
+                actorId, "grant", null, tolerateHeld: false, ct);
             await db.SaveChangesAsync(ct);
-
-            // FR-042 / §7 sensitive event.
-            logger.LogInformation(
-                "BoardMembershipChange grant: Actor={ActorId} Community={CommunityId} TargetUser={TargetUserId} Role={Role} At={UtcNow:o}",
-                ActorId(), req.CommunityId, req.UserId, req.Role, DateTimeOffset.UtcNow);
-
-            var name = await db.Users.Where(u => u.Id == req.UserId)
-                .Select(u => u.FirstName + " " + u.LastName).FirstAsync(ct);
-            await SendAsync(new MembershipDto(
-                membership.Id, membership.UserId, name, membership.Role.ToString(),
-                membership.Status.ToString(), membership.StartDate, membership.EndDate), 201, ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-            await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+            var (name, _) = await memberships.NamesAsync(row.UserId, req.CommunityId, ct);
+            return memberships.ToDto(row, name);
+        }, ct);
+        await SendAsync(dto, StatusCodes.Status201Created, ct);
     }
-
-    private string ActorId() =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown";
 }

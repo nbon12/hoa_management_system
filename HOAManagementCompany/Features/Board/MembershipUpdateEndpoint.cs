@@ -1,20 +1,26 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Text.Json;
 using FastEndpoints;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Auth;
+using HOAManagementCompany.Features.Board.Settings;
+using HOAManagementCompany.Features.Company;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace HOAManagementCompany.Features.Board;
 
-// PATCH /api/v1/communities/{communityId}/memberships/{membershipId} — edit or end a
-// membership (User Story 5, Scenarios 3 & 4). Community Manager only. Refuses to remove
-// the last active Community Manager (FR-042, constitution §3). Each change is a
-// security-sensitive event (FR-042, §7). Takes effect on the member's next request.
+// PATCH /api/v1/communities/{communityId}/memberships/{membershipId} — end, downgrade or change
+// the end date of a membership (025 US5; 030 FR-019, FR-020, contracts/community-settings.md).
+// The open-ended-manager rule decides LAST_MANAGER under the community lock, so concurrent ends
+// can't both win (replacing 025's racy count). While the community is archived only a Company
+// Administrator's end is allowed, and the rule is skipped (FR-012). Ending or downgrading a
+// manager revokes the invitations they can no longer send. Takes effect on the next request.
 public class MembershipUpdateEndpoint(
     ApplicationDbContext db,
     ICommunityScopeResolver scope,
-    ILogger<MembershipUpdateEndpoint> logger)
+    MembershipService memberships)
     : Endpoint<MembershipUpdateRequest, MembershipDto>
 {
     public override void Configure()
@@ -27,63 +33,69 @@ public class MembershipUpdateEndpoint(
     public override async Task HandleAsync(MembershipUpdateRequest req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
-        try
+        // Refuse before revealing whether the membership exists.
+        if (await BoardHttp.SendDecisionAsync(HttpContext,
+                await scope.DecideAsync(User, req.CommunityId, CommunityCapability.ManageMemberships, ScopeOperation.Read, ct), ct))
+            return;
+
+        var changes = (req.End == true ? 1 : 0) + (req.DowngradeTo is null ? 0 : 1)
+                      + (req.EndDate.ValueKind == JsonValueKind.Undefined ? 0 : 1);
+        if (changes != 1)
+            throw CompanyErrors.Validation(new CompanyErrors.FieldError("end",
+                "Send one change at a time: end, downgradeTo or endDate."));
+        var endDate = ParseEndDate(req.EndDate);
+        var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")!.Value;
+
+        var dto = await CommunityLocks.RunAsync(db, req.CommunityId, async () =>
         {
-            if (!await scope.CanAccessAsync(User, req.CommunityId, CommunityCapability.ManageMemberships, ct))
+            var row = await db.CommunityMemberships
+                          .FirstOrDefaultAsync(x => x.Id == req.MembershipId && x.CommunityId == req.CommunityId, ct)
+                      ?? throw new DomainException("NOT_FOUND", "Membership not found in this community.", StatusCodes.Status404NotFound);
+            if (row.Role == CommunityRole.Resident)
+                throw CompanyErrors.Validation(new CompanyErrors.FieldError("role", "Resident memberships can't be changed here."));
+
+            // The rule first: the loser of two concurrent ends has lost their own role by now, and
+            // must hear LAST_MANAGER rather than FORBIDDEN (US2-S14). Archived communities skip it.
+            if (!await db.Communities.AnyAsync(c => c.Id == req.CommunityId && c.Status == CommunityStatus.Archived, ct))
+                await memberships.EnsureManagerRuleAsync(row,
+                    req.End == true ? "end" : req.DowngradeTo is not null ? "downgrade" : "endDate", endDate, ct);
+
+            var capability = row.Role == CommunityRole.CommunityManager
+                ? CommunityCapability.ManageCommunityManagers
+                : CommunityCapability.ManageMemberships;
+            var decision = await scope.DecideAsync(User, req.CommunityId, capability, ScopeOperation.Write, ct);
+            var archived = false;
+            if (decision == ScopeDecision.Archived && req.End == true
+                && await scope.DecideAsync(User, req.CommunityId, CommunityCapability.ManageCommunityLifecycle,
+                    ScopeOperation.Write, ct) == ScopeDecision.Allowed)
+                (decision, archived) = (ScopeDecision.Allowed, true);
+            if (BoardHttp.RefusalFor(decision) is { } refusal)
+                throw refusal;
+
+            if (req.End == true)
+                await memberships.EndAsync(row, archived, actorId, "end", null, ct);
+            else if (req.DowngradeTo is { } downgradeTo)
             {
-                await BoardHttp.ForbiddenAsync(HttpContext, ct);
-                return;
+                if (row.Role != CommunityRole.CommunityManager || downgradeTo != CommunityRole.BoardMember)
+                    throw CompanyErrors.Validation(new CompanyErrors.FieldError("downgradeTo",
+                        "Only a Community Manager can be downgraded, and only to Board Member."));
+                row = await memberships.DowngradeAsync(row, actorId, ct);
             }
+            else
+                await memberships.SetEndDateAsync(row, endDate, actorId, ct);
 
-            var m = await db.CommunityMemberships
-                .Include(x => x.User)
-                .FirstOrDefaultAsync(x => x.Id == req.MembershipId && x.CommunityId == req.CommunityId, ct);
-            if (m is null)
-                throw new DomainException("NOT_FOUND", "Membership not found in this community.", 404);
-
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var newRole = req.Role ?? m.Role;
-            var newStatus = req.Status ?? m.Status;
-            var newEnd = req.EndDate ?? m.EndDate;
-
-            static bool IsActiveManager(CommunityRole r, MembershipStatus s, DateOnly? end, DateOnly today) =>
-                r == CommunityRole.CommunityManager && s == MembershipStatus.Active && (end is null || end >= today);
-
-            // C3 / §3: never leave a community with zero active Community Managers.
-            if (IsActiveManager(m.Role, m.Status, m.EndDate, today)
-                && !IsActiveManager(newRole, newStatus, newEnd, today))
-            {
-                var otherActiveManagers = await db.CommunityMemberships.CountAsync(
-                    x => x.CommunityId == req.CommunityId
-                      && x.Id != m.Id
-                      && x.Role == CommunityRole.CommunityManager
-                      && x.Status == MembershipStatus.Active
-                      && (x.EndDate == null || x.EndDate >= today), ct);
-                if (otherActiveManagers == 0)
-                    throw new DomainException("LAST_MANAGER",
-                        "A community must keep at least one active Community Manager.", 422);
-            }
-
-            m.Role = newRole;
-            m.Status = newStatus;
-            if (req.EndDate is not null) m.EndDate = req.EndDate;
-            await db.SaveChangesAsync(ct);
-
-            logger.LogInformation(
-                "BoardMembershipChange edit: Actor={ActorId} Community={CommunityId} Membership={MembershipId} TargetUser={TargetUserId} Role={Role} Status={Status} EndDate={EndDate} At={UtcNow:o}",
-                ActorId(), req.CommunityId, m.Id, m.UserId, m.Role, m.Status, m.EndDate, DateTimeOffset.UtcNow);
-
-            await SendOkAsync(new MembershipDto(
-                m.Id, m.UserId, m.User.FirstName + " " + m.User.LastName, m.Role.ToString(),
-                m.Status.ToString(), m.StartDate, m.EndDate), ct);
-        }
-        catch (DomainException ex)
-        {
-            HttpContext.Response.StatusCode = ex.StatusCode;
-            await HttpContext.Response.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message }, ct);
-        }
+            var (name, _) = await memberships.NamesAsync(row.UserId, req.CommunityId, ct);
+            return memberships.ToDto(row, name);
+        }, ct);
+        await SendOkAsync(dto, ct);
     }
 
-    private string ActorId() =>
-        User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? "unknown";
+    // { "endDate": "2026-12-31" } sets or moves it; { "endDate": null } clears it.
+    private static DateOnly? ParseEndDate(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Undefined or JsonValueKind.Null => null,
+        JsonValueKind.String when DateOnly.TryParseExact(value.GetString(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var date) => date,
+        _ => throw CompanyErrors.Validation(new CompanyErrors.FieldError("endDate", "Enter a real date as YYYY-MM-DD.")),
+    };
 }

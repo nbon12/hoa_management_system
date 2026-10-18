@@ -21,7 +21,7 @@ public class RecurringUpsertEndpoint(ResidentAccess access, PaymentService payme
         var propertyId = home.PropertyId;
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var userAgent = HttpContext.Request.Headers.UserAgent.FirstOrDefault();
-        var result = await paymentService.UpsertRecurringAsync(propertyId, req, ip, userAgent, ct);
+        var result = await paymentService.UpsertRecurringAsync(propertyId, home.UserId, req, ip, userAgent, ct);
         // Audit trail (FR-029): schedule-config change recorded with non-PII identifiers only.
         Logger.LogInformation(
             "audit payments.recurring.upsert property {PropertyId} amountType {AmountType} draftDay {DraftDay}",

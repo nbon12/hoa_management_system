@@ -63,7 +63,7 @@ public static class CommunityProfileFields
 /// FR-029): the header, the sections, and what the caller may do. <c>can.*</c> drives the UI
 /// only; every action re-checks on the server.
 /// </summary>
-public class CommunitySettingsEndpoint(ApplicationDbContext db, ICommunityScopeResolver scope, TimeProvider clock)
+public class CommunitySettingsEndpoint(ApplicationDbContext db, ICommunityScopeResolver scope)
     : Endpoint<CommunitySettingsRequest, CommunitySettingsDto>
 {
     // FR-029: Notifications is not shown until the Notification Settings spec lands.
@@ -89,12 +89,10 @@ public class CommunitySettingsEndpoint(ApplicationDbContext db, ICommunityScopeR
                 .Select(c => new { c.Id, c.CommunityName, c.Status }).FirstAsync(ct)
             : null;
 
-        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
         var managers = await db.CommunityMemberships.AsNoTracking()
             .Where(m => m.CommunityId == community.Id && m.Role == CommunityRole.CommunityManager)
             .Select(m => new ManagerRule.Row(m.Id, m.Status, m.EndDate))
             .ToListAsync(ct);
-        var hasEffectiveManager = managers.Any(m => m.Status == MembershipStatus.Active && (m.EndDate is null || m.EndDate >= today));
         var isCompanyAdministrator = await scope.IsCompanyAdministratorAsync(User, community.ManagementCompanyId, ct);
 
         async Task<bool> MayWrite(CommunityCapability capability) =>
@@ -133,8 +131,9 @@ public class CommunitySettingsEndpoint(ApplicationDbContext db, ICommunityScopeR
             community.LegalName,
             community.Status.ToString(),
             parent is null ? null : new ParentSummary(parent.Id, parent.CommunityName),
-            // Shown only to Company Administrators (contract).
-            isCompanyAdministrator ? !hasEffectiveManager : null,
+            // Shown only to Company Administrators (contract). Like the portfolio flag, it means no
+            // open-ended Community Manager (brief 04 D6): one with an end date doesn't count.
+            isCompanyAdministrator ? !ManagerRule.HasOpenEndedManager(managers) : null,
             CommunityProfileFields.MissingRequired(community),
             Sections,
             can), ct);

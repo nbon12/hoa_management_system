@@ -38,11 +38,15 @@ public sealed class ResidentArcQueries(ApplicationDbContext db, ResidentArcScope
 
     public async Task<ResidentArcListResponse> ListAsync(ClaimsPrincipal user, int? limit, int? offset, CancellationToken ct)
     {
-        var propertyId = (await scope.HomeAsync(user, ResidentOperation.ReadHistory, ct)).PropertyId;
+        var home = await scope.HomeAsync(user, ResidentOperation.ReadHistory, ct);
+        var propertyId = home.PropertyId;
         var (take, skip) = Paging.Normalize(limit, offset);
 
+        // 030 FR-012a: an archived home keeps its submitted requests, but drafts are refused there,
+        // so they are left out of the list too.
+        var archived = home.CommunityStatus == CommunityStatus.Archived;
         var drafts = await db.ArchitecturalApplicationDrafts
-            .Where(d => d.PropertyId == propertyId)
+            .Where(d => d.PropertyId == propertyId && !archived)
             .OrderByDescending(d => d.UpdatedAt)
             .Select(d => new
             {

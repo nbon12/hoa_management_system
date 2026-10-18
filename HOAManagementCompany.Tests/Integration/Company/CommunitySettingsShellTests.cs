@@ -69,7 +69,7 @@ public class CommunitySettingsShellTests(TestDatabaseFixture fixture) : CompanyT
     {
         var companyId = await CreateCompanyAsync();
         var community = await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding);
-        // A manager with an end date doesn't count for activation, but is still a manager today.
+        // A manager with an end date counts for neither activation nor the "No manager" flag.
         await CreateManagerAsync(community, endDate: DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3));
         var bare = await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding);
         var (_, email) = await CreateCompanyAdminAsync(companyId);
@@ -83,7 +83,8 @@ public class CommunitySettingsShellTests(TestDatabaseFixture fixture) : CompanyT
             Assert.False(activate.GetProperty("allowed").GetBoolean());
             Assert.Equal("NO_ACTIVE_MANAGER", activate.GetProperty("reasonCode").GetString());
         }
-        Assert.False(withTermManager.GetProperty("noManager").GetBoolean());
+        // Brief 04 D6: "No manager" means no open-ended Community Manager, so a term manager doesn't count.
+        Assert.True(withTermManager.GetProperty("noManager").GetBoolean());
         Assert.True(withNoManager.GetProperty("noManager").GetBoolean());
     }
 

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Board;
 using HOAManagementCompany.Features.Board.Settings;
 using HOAManagementCompany.Infrastructure.Persistence;
@@ -12,7 +13,8 @@ public sealed class PortfolioQuery
     public int? Offset { get; set; }
 }
 
-public sealed record PortfolioItem(Guid Id, string CommunityName, string LegalName, string Status, ParentSummary? Parent);
+public sealed record PortfolioItem(Guid Id, string CommunityName, string LegalName, string Status, ParentSummary? Parent,
+    bool NoManager);
 
 /// <summary>
 /// GET /company/communities — the portfolio (030 US1 first version; US6 adds flags, filters,
@@ -51,7 +53,10 @@ public class PortfolioEndpoint(ApplicationDbContext db, ICommunityScopeResolver 
                 c.CommunityName,
                 c.LegalName,
                 c.Status.ToString(),
-                c.ParentCommunity == null ? null : new ParentSummary(c.ParentCommunity.Id, c.ParentCommunity.CommunityName)))
+                c.ParentCommunity == null ? null : new ParentSummary(c.ParentCommunity.Id, c.ParentCommunity.CommunityName),
+                // No open-ended Community Manager membership (ManagerRule.Row.IsOpenEnded).
+                !c.Memberships.Any(m => m.Role == CommunityRole.CommunityManager && m.Status == MembershipStatus.Active
+                                        && m.EndDate == null)))
             .ToListAsync(ct);
 
         await SendOkAsync(new PagedResponse<PortfolioItem>(items, total, limit, offset), ct);

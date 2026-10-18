@@ -173,6 +173,50 @@ public abstract class CompanyTestBase(TestDatabaseFixture fixture) : BoardTestBa
         return id;
     });
 
+    /// <summary>An architectural application row, so lifecycle tests can arrange open work (FR-014).</summary>
+    protected Task<Guid> CreateArcApplicationAsync(Guid communityId, Guid propertyId, int number,
+        ArcApplicationStatus status = ArcApplicationStatus.Open) => WithDbAsync(async db =>
+    {
+        var received = DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime).AddDays(-5);
+        var reached = status != ArcApplicationStatus.Open;
+        var app = new ArchitecturalApplication
+        {
+            Id = Guid.NewGuid(), CommunityId = communityId, PropertyId = propertyId, ApplicationNumber = number,
+            Revision = 1, OwnerName = "Pat Owner", ProjectType = ArcProjectType.Fence, ProjectTitle = "Fence replacement",
+            Description = "Replace the rear fence.", ReceivedDate = received, DueDate = received.AddDays(30),
+            DecisionRule = ArcDecisionRule.MajorityOfMembers, LapseRule = ArcLapseRule.FlagOverdueOnly,
+            TimeZoneId = CommunityArcSettings.DefaultTimeZoneId, Status = status,
+            DecisionOutcome = reached ? ArcOutcome.Approved : null,
+            DecisionSource = reached ? ArcDecisionSource.Votes : null,
+            DecisionReachedAt = reached ? Clock.UtcNow : null,
+            ClosedAt = status == ArcApplicationStatus.Closed ? Clock.UtcNow : null,
+        };
+        db.ArchitecturalApplications.Add(app);
+        await db.SaveChangesAsync();
+        return app.Id;
+    });
+
+    /// <summary>
+    /// A residency invitation row, inserted directly (the Residency offer arrives with US8). A
+    /// Pending one gets a fresh link; the token is returned.
+    /// </summary>
+    protected Task<(Guid Id, string? Token)> InsertResidencyInvitationAsync(Guid companyId, Guid communityId, Guid propertyId,
+        string email, string senderId, InvitationState state) => WithDbAsync(async db =>
+    {
+        var token = state == InvitationState.Pending ? Features.Invitations.InvitationTokens.New() : null;
+        var invitation = new Invitation
+        {
+            Id = Guid.NewGuid(), Kind = InvitationKind.Residency, CompanyId = companyId, CommunityId = communityId,
+            PropertyId = propertyId, Email = email, NormalizedEmail = Invitation.Normalize(email), State = state,
+            SenderUserId = senderId, CreatedAt = Clock.UtcNow,
+            TokenHash = token is null ? null : Features.Invitations.InvitationTokens.Hash(token),
+            SentAt = token is null ? null : Clock.UtcNow, ExpiresAt = token is null ? null : Clock.UtcNow.AddHours(72),
+        };
+        db.Invitations.Add(invitation);
+        await db.SaveChangesAsync();
+        return (invitation.Id, token);
+    });
+
     /// <summary>Signs <paramref name="email"/> in on a new client and returns it with the bearer header set.</summary>
     protected async Task<HttpClient> ClientForAsync(string email, string password = Password)
     {

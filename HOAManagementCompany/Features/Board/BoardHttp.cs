@@ -36,6 +36,18 @@ internal static class BoardHttp
         }
     }
 
+    // The same refusals as SendDecisionAsync, as an exception for code running inside a lock body.
+    // Null when the caller may proceed.
+    public static Auth.DomainException? RefusalFor(ScopeDecision decision) => decision switch
+    {
+        ScopeDecision.Allowed => null,
+        ScopeDecision.Archived => new Auth.DomainException("COMMUNITY_ARCHIVED",
+            "This community is archived, so it can't be changed.", StatusCodes.Status409Conflict),
+        ScopeDecision.NotActive => new Auth.DomainException("COMMUNITY_NOT_ACTIVE",
+            "This community isn't live yet.", StatusCodes.Status409Conflict),
+        _ => new Auth.DomainException("FORBIDDEN", "You do not have access to this community.", StatusCodes.Status403Forbidden),
+    };
+
     public static async Task ErrorAsync(HttpContext ctx, int status, string code, string message, CancellationToken ct)
     {
         ctx.Response.StatusCode = status;

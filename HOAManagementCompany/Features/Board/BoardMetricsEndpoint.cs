@@ -23,11 +23,10 @@ public class BoardMetricsEndpoint(
     public override async Task HandleAsync(BoardMetricsQuery req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
-        if (!await scope.CanAccessAsync(User, req.CommunityId, CommunityCapability.ViewAssociationData, ct))
-        {
-            await BoardHttp.ForbiddenAsync(HttpContext, ct);
+        // 030 FR-004a: forbidden, archived or allowed, decided in one place.
+        if (await BoardHttp.SendDecisionAsync(HttpContext,
+                await scope.DecideAsync(User, req.CommunityId, CommunityCapability.ViewAssociationData, ScopeOperation.Read, ct), ct))
             return;
-        }
 
         // FR-017: record association-wide (financial) data access — actor, community,
         // resource, UTC timestamp — as a structured sensitive event (constitution §7).

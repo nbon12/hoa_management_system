@@ -51,6 +51,11 @@ public class ClaimCodeService(
         return row;
     }
 
+    // 030 FR-012a: claim codes can't be redeemed while the home's community is Onboarding.
+    public Task<bool> IsInOnboardingCommunityAsync(Guid propertyId, CancellationToken ct) =>
+        db.Properties.AnyAsync(p => p.Id == propertyId
+                                    && p.Community.Status == Domain.Enums.CommunityStatus.Onboarding, ct);
+
     private static string Mask(string contact) =>
         contact.Length <= 4 ? "***" : $"{contact[..2]}***{contact[^2..]}";
 }

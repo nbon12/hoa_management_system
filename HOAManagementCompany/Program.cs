@@ -61,6 +61,10 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
         // Information so "Now listening on: ..." / "Application started" still print locally.
         .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
         .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
+        // 030 FR-040: a DomainException is an expected refusal, logged by GlobalExceptionHandler as
+        // its code only. On .NET 9 the exception middleware also logs every exception with its
+        // message before the handler runs, and some refusal messages name an invited email.
+        .Filter.ByExcluding(e => e.Exception is HOAManagementCompany.Features.Auth.DomainException)
         .Enrich.FromLogContext()
         .Enrich.With(new ActivityTraceEnricher()) // trace_id/span_id on every record (FR-003).
         .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName);
@@ -397,8 +401,14 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardServ
 builder.Services.AddScoped<HOAManagementCompany.Features.Board.SenderAuthority>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.InvitationService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyAdministratorService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.CommunityLifecycleService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
     HOAManagementCompany.Features.Invitations.CompanyAdministratorOfferHandler>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
+    HOAManagementCompany.Features.Invitations.MembershipOfferHandler>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
+    HOAManagementCompany.Features.Invitations.ResidencyOfferHandler>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Settings.MembershipService>();
 builder.Services.AddSingleton<HOAManagementCompany.Features.Invitations.IInvitationLinkObserver>(sp =>
     sp.GetRequiredService<IConfiguration>().GetValue<bool>("DevTools:E2ECleanupEnabled")
     && !builder.Environment.IsProduction() && !builder.Environment.IsStaging()
@@ -463,6 +473,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.
 builder.Services.AddScoped<HOAManagementCompany.Features.Company.ICompanyContext,
     HOAManagementCompany.Features.Company.CompanyContext>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyEmailRenderer>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Residents.ResidentRemovalService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Residents.ResidentAccess>();
 
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
