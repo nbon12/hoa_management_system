@@ -137,3 +137,180 @@ describe('PortfolioComponent (030 T073, minimal)', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 });
+
+// 030 T143 / US6 / brief 02: the portfolio's flags, status filter with counts, "No manager" filter,
+// search and sortable columns.
+describe('PortfolioComponent (030 T143, US6)', () => {
+  let company: jasmine.SpyObj<CompanyService>;
+  const COUNTS = { all: 31, onboarding: 3, active: 26, archived: 2, noManager: 2 };
+
+  const BRIAR = portfolioRow({ id: 'c-bh', communityName: 'Briar Hollow', status: 'Onboarding', noManager: true });
+  const KCM = portfolioRow({ id: 'c-kcm', communityName: 'Keystone Crossing Master', managers: [{ userId: 'u-jordan', name: 'Jordan Blake' }] });
+  const SF = portfolioRow({
+    id: 'c-sf', communityName: 'Keystone Crossing SF', parent: { id: 'c-kcm', communityName: 'Keystone Crossing Master' },
+    managers: [{ userId: 'u-jordan', name: 'Jordan Blake' }], differsFromDefaults: true,
+  });
+  const KP = portfolioRow({
+    id: 'c-kp', communityName: 'Keystone Park', status: 'Onboarding', noManager: true,
+    pendingManagerInvitations: [{ email: 'pat@example.com', expiresAt: '2099-10-15T12:00:00Z' }],
+  });
+
+  async function setup(result: PortfolioPage = portfolioPage([BRIAR, KCM, SF, KP], { total: 31, counts: COUNTS })) {
+    company = jasmine.createSpyObj<CompanyService>('CompanyService', ['getCommunities']);
+    company.getCommunities.and.resolveTo(result);
+    const r = await render(PortfolioComponent, {
+      providers: [
+        provideRouter([]),
+        { provide: CompanyService, useValue: company },
+        { provide: AuthService, useValue: { user: signal(ROBIN).asReadonly() } },
+      ],
+    });
+    await settle(r);
+    return r;
+  }
+
+  async function settle(r: Awaited<ReturnType<typeof setup>>) {
+    await r.fixture.whenStable();
+    r.fixture.detectChanges();
+    await r.fixture.whenStable();
+    r.fixture.detectChanges();
+  }
+
+  function lastQuery(): PortfolioQuery {
+    return company.getCommunities.calls.mostRecent().args[0] as PortfolioQuery;
+  }
+
+  function rowOf(name: string): HTMLElement {
+    return within(screen.getByRole('table', { name: 'Communities' })).getAllByRole('row').find(r => r.querySelector('th[scope="row"]')?.textContent!.trim() === name)!;
+  }
+
+  function cell(row: HTMLElement, column: string): HTMLElement {
+    const headers = within(screen.getByRole('table', { name: 'Communities' })).getAllByRole('columnheader').map(h => h.textContent!.trim());
+    return Array.from(row.children)[headers.indexOf(column)] as HTMLElement;
+  }
+
+  afterEach(() => TestBed.inject(ToastService).clear());
+
+  it('has the columns of brief 02, in order', async () => {
+    await setup();
+    expect(screen.getAllByRole('columnheader').map(h => h.textContent!.trim()))
+      .toEqual(['Community', 'Legal name', 'Status', 'Parent', 'Managers', 'Architectural review', 'Settings']);
+  });
+
+  it('shows "No manager" and "Differs from defaults" as text labels, with managers and pending manager invitations (US6-S1, US6-S2, US6-S3)', async () => {
+    await setup();
+    expect(within(cell(rowOf('Briar Hollow'), 'Managers')).getByText('No manager')).toBeTruthy();
+    expect(within(cell(rowOf('Keystone Crossing Master'), 'Managers')).getByText('Jordan Blake')).toBeTruthy();
+    expect(within(cell(rowOf('Keystone Crossing Master'), 'Managers')).queryByText('No manager')).toBeNull();
+    const kp = cell(rowOf('Keystone Park'), 'Managers');
+    expect(within(kp).getByText('No manager')).toBeTruthy();
+    expect(kp.textContent!.replace(/\s+/g, ' ')).toContain('pat@example.com · invitation pending');
+    expect(within(kp).getByText('pat@example.com, invitation pending').classList).toContain('sr-only');
+    expect(within(cell(rowOf('Keystone Crossing SF'), 'Architectural review')).getByText('Differs from defaults')).toBeTruthy();
+    expect(within(cell(rowOf('Keystone Crossing Master'), 'Architectural review')).getByText('Same as company defaults')).toBeTruthy();
+  });
+
+  it('filters by status, with counts, one at a time, back on page 1 (US6-S4, US6-S7)', async () => {
+    const r = await setup();
+    const group = screen.getByRole('group', { name: 'Filter by status' });
+    expect(within(group).getAllByRole('button').map(b => b.textContent!.replace(/\s+/g, ' ').trim()))
+      .toEqual(['All · 31', 'Onboarding · 3', 'Active · 26', 'Archived · 2']);
+    const all = within(group).getByRole('button', { name: 'All, 31 communities' });
+    expect(all.getAttribute('aria-pressed')).toBe('true');
+
+    company.getCommunities.and.resolveTo(portfolioPage([portfolioRow({ id: 'c-om', communityName: 'Old Mill Commons', status: 'Archived' })], { total: 1, counts: COUNTS }));
+    const archived = within(group).getByRole('button', { name: 'Archived, 2 communities' });
+    archived.focus();
+    fireEvent.click(archived);
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ status: 'archived', offset: 0 }));
+    expect(archived.getAttribute('aria-pressed')).toBe('true');
+    expect(all.getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement).toBe(archived);
+    expect(screen.getByText(/Showing 1–1 of 1/)).toBeTruthy();
+  });
+
+  it('narrows to communities with no manager, together with the status (US6-S7)', async () => {
+    const r = await setup();
+    const toggle = screen.getByRole('button', { name: 'No manager, 2 communities' });
+    expect(toggle.textContent!.replace(/\s+/g, ' ').trim()).toBe('No manager · 2');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    company.getCommunities.and.resolveTo(portfolioPage([BRIAR, KP], { total: 2, counts: COUNTS }));
+    fireEvent.click(toggle);
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ noManager: true, offset: 0 }));
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Onboarding, 3 communities' }));
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ noManager: true, status: 'onboarding' }));
+    fireEvent.click(toggle);
+    await settle(r);
+    expect(lastQuery().noManager).toBeUndefined();
+  });
+
+  it('searches community and legal names as the person types (US6-S5)', async () => {
+    const r = await setup();
+    const search = screen.getByRole('searchbox', { name: 'Search communities' }) as HTMLInputElement;
+    expect(search.placeholder).toBe('Search by community or legal name');
+    company.getCommunities.and.resolveTo(portfolioPage([KCM, SF, KP], { total: 3, counts: COUNTS }));
+    fireEvent.input(search, { target: { value: '  keystone ' } });
+    await until(() => company.getCommunities.calls.count() === 2);
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ search: 'keystone', offset: 0 }));
+    expect(screen.getByText(/Showing 1–3 of 3/)).toBeTruthy();
+  });
+
+  it('says when nothing matches, and "Clear search" restores the list and focuses the field', async () => {
+    const r = await setup();
+    const search = screen.getByRole('searchbox', { name: 'Search communities' }) as HTMLInputElement;
+    company.getCommunities.and.resolveTo(portfolioPage([], { total: 0, counts: COUNTS }));
+    fireEvent.input(search, { target: { value: 'Keystone Pk' } });
+    await until(() => company.getCommunities.calls.count() === 2);
+    await settle(r);
+    expect(screen.getByText('No communities match “Keystone Pk”.')).toBeTruthy();
+    expect(screen.queryByText(/has no communities yet/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archived, 2 communities' }));
+    await settle(r);
+    expect(screen.getByText('No Archived communities match “Keystone Pk”.')).toBeTruthy();
+
+    company.getCommunities.and.resolveTo(portfolioPage([BRIAR], { total: 1, counts: COUNTS }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    await settle(r);
+    expect(search.value).toBe('');
+    expect(lastQuery().search).toBeUndefined();
+    expect(document.activeElement).toBe(search);
+  });
+
+  it('says "No Archived communities." for a filter with no rows', async () => {
+    const r = await setup();
+    company.getCommunities.and.resolveTo(portfolioPage([], { total: 0, counts: { ...COUNTS, archived: 0 } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Archived, 2 communities' }));
+    await settle(r);
+    expect(screen.getByText('No Archived communities.')).toBeTruthy();
+  });
+
+  it('sorts by the Community, Status and Parent headers, with aria-sort (US6-S7)', async () => {
+    const r = await setup();
+    const header = (name: string) => screen.getAllByRole('columnheader').find(h => h.textContent!.trim() === name)!;
+    expect(header('Community').getAttribute('aria-sort')).toBe('ascending');
+    expect(header('Status').getAttribute('aria-sort')).toBe('none');
+    expect(header('Legal name').hasAttribute('aria-sort')).toBeFalse();
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ sort: 'name', dir: 'asc' }));
+
+    fireEvent.click(within(header('Status')).getByRole('button', { name: 'Status' }));
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ sort: 'status', dir: 'asc', offset: 0 }));
+    expect(header('Status').getAttribute('aria-sort')).toBe('ascending');
+    expect(header('Community').getAttribute('aria-sort')).toBe('none');
+
+    fireEvent.click(within(header('Status')).getByRole('button', { name: 'Status' }));
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ sort: 'status', dir: 'desc' }));
+    expect(header('Status').getAttribute('aria-sort')).toBe('descending');
+
+    fireEvent.click(within(header('Parent')).getByRole('button', { name: 'Parent' }));
+    await settle(r);
+    expect(lastQuery()).toEqual(jasmine.objectContaining({ sort: 'parent', dir: 'asc' }));
+  });
+});

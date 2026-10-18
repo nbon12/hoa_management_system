@@ -958,7 +958,7 @@ The backend is covered by T041 (US9-S1 to US9-S6) and T030 (US9-S7 and US9-S8 ru
   - **US4-S4**: `[Theory]` over Board Member, Accountant and Resident → 403 on GET.
   - **US4-S5**: `[Theory]` over a review period of 0 and of 400, reminder days of 31, and a 1,001-character statement → 422, naming the allowed range.
   - **Also**: `CompanyDefaultsChanged` is logged with old and new values.
-- [ ] T125 [P] [US4] Create `company-defaults.component.spec.ts` in `neko-hoa/src/app/features/company/` (brief 08):
+- [X] T125 [P] [US4] Create `company-defaults.component.spec.ts` in `neko-hoa/src/app/features/company/` (brief 08):
   - **US4-S6**: exactly one section, "Architectural review", is shown;
   - it is editable for a Company Administrator;
   - **US4-S3**: it is read-only, with no Save, for a Community Manager who opens it through `/app/board/company-defaults`;
@@ -969,7 +969,7 @@ The backend is covered by T041 (US9-S1 to US9-S6) and T030 (US9-S7 and US9-S8 ru
 
 - [ ] T126 [US4] Extract the six-field validation from `HOAManagementCompany/Features/Board/Architectural/ArcSettingsPutEndpoint.cs` into `ArcRuleValidator.cs` in the same folder, without changing 027's behavior (`ArcSettingsEndpointTests` stay green)
 - [ ] T127 [US4] Add `CompanyDefaultsGetEndpoint` (`ViewCompanyDefaults`) and `CompanyDefaultsPutEndpoint` (`ManageCompanyDefaults`, `board-writes`, `ArcRuleValidator`) in `HOAManagementCompany/Features/Company/`, until T124 passes
-- [ ] T128 [US4] Implement `CompanyDefaultsComponent` in `neko-hoa/src/app/features/company/`, until T125 pass. Add its routes to `neko-hoa/src/app/app.routes.ts`: `/app/company/defaults`, and the read-only `/app/board/company-defaults` for Community Managers.
+- [X] T128 [US4] Implement `CompanyDefaultsComponent` in `neko-hoa/src/app/features/company/`, until T125 pass. Add its routes to `neko-hoa/src/app/app.routes.ts`: `/app/company/defaults`, and the read-only `/app/board/company-defaults` for Community Managers.
 
 ---
 
@@ -1001,7 +1001,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
     - the shell's `can.*` offers only `restore` and `endMembershipsWhileArchived`;
     - **SC-005 rows**: add ARC settings PUT and reset to the `ArchivedWriteEndpoints` registry of T095.
   - **Also**: the GET adds `companyDefaults`, `differsFromDefaults` and `canEdit`.
-- [ ] T130 [P] [US5] Write the US5 frontend specs first (brief 07):
+- [X] T130 [P] [US5] Write the US5 frontend specs first (brief 07):
   - **`architectural-review-section.component.spec.ts`** in `neko-hoa/src/app/features/community-settings/`: the moved 027 form, a "differs from default" marker per field, the "Company defaults" link (FR-027), and the reset confirmation.
   - **`settings-side-nav.component.spec.ts`** (US5-S9): typing "review" lists "Architectural review › Review period", and choosing it opens the section with focus on that field.
   - **`neko-hoa/src/app/app.routes.spec.ts`** (US5-S6): `/app/board/arc-settings` redirects to `/app/board/settings/architectural-review`.
@@ -1013,7 +1013,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - `ArcSettingsGetEndpoint.cs` uses `ViewArcSettings` and adds `companyDefaults`, `differsFromDefaults` and `canEdit`;
   - `ArcSettingsPutEndpoint.cs` uses `ManageArcSettings` through `DecideAsync`;
   - add `ArcSettingsResetEndpoint.cs`, which copies the six fields only and never touches `NextApplicationNumber`.
-- [ ] T132 [US5] Move `neko-hoa/src/app/features/board/architectural/arc-settings.component.ts` and its spec into the settings page as `ArchitecturalReviewSectionComponent` in `neko-hoa/src/app/features/community-settings/`, until T130 pass.
+- [X] T132 [US5] Move `neko-hoa/src/app/features/board/architectural/arc-settings.component.ts` and its spec into the settings page as `ArchitecturalReviewSectionComponent` in `neko-hoa/src/app/features/community-settings/`, until T130 pass.
   - Add the defaults comparison and the reset.
   - Register its setting labels in the side-nav registry.
   - Redirect `/app/board/arc-settings` in `app.routes.ts`.
@@ -1060,7 +1060,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - resending an outcome email;
   - the applications list and detail;
   - board metrics.
-- [ ] T137 [P] [US7] Create `company-administrators.component.spec.ts` in `neko-hoa/src/app/features/company/` (brief 09):
+- [X] T137 [P] [US7] Create `company-administrators.component.spec.ts` in `neko-hoa/src/app/features/company/` (brief 09):
   - it lists administrators and invitations, each paged, and has the invite form;
   - Revoke asks for confirmation;
   - the last administrator's Revoke is disabled, with the `LAST_COMPANY_ADMIN` reason;
@@ -1074,7 +1074,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - `CompanyAdministratorsRevokeEndpoint`, which revokes under `CompanyLocks` and runs `SenderAuthority.RevokeOrphanedAsync`;
   - `CompanyInvitationResendEndpoint` and `CompanyInvitationRevokeEndpoint`.
 - [ ] T139 [US7] Add the `--recover` path to `CompanyAdministratorService.SetupAsync` in `HOAManagementCompany/Features/Company/CompanyAdministratorService.cs`, until T135 passes. It grants or invites with `Source = Recovery`, logs, and enqueues `co_admin_recovery`.
-- [ ] T140 [US7] Implement `CompanyAdministratorsComponent` in `neko-hoa/src/app/features/company/`, with the route `/app/company/administrators`, until T137 pass
+- [X] T140 [US7] Implement `CompanyAdministratorsComponent` in `neko-hoa/src/app/features/company/`, with the route `/app/company/administrators`, until T137 pass
 
 ---
 
@@ -1102,7 +1102,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
     - `noManager=true` returns only those communities;
     - `counts` ignore search and paging.
 - [ ] T142 [P] [US6] Create `PortfolioPerformanceTests` (SC-008) in `HOAManagementCompany.Tests/Performance/PortfolioPerformanceTests.cs`: with 200 communities that have managers, invitations and settings, the first page answers in under 2 s.
-- [ ] T143 [P] [US6] Extend `neko-hoa/src/app/features/company/portfolio.component.spec.ts` (brief 02):
+- [X] T143 [P] [US6] Extend `neko-hoa/src/app/features/company/portfolio.component.spec.ts` (brief 02):
   - the "No manager" and "differs from defaults" flags are text labels;
   - the status filter has counts;
   - search works;
@@ -1117,7 +1117,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - `noManager`, `differsFromDefaults` and `counts`;
   - the `status`, `noManager` and `search` filters;
   - `sort` and `dir`.
-- [ ] T145 [US6] Extend `PortfolioComponent` in `neko-hoa/src/app/features/company/` with the flags, the filters, search and sorting, until T143 pass
+- [X] T145 [US6] Extend `PortfolioComponent` in `neko-hoa/src/app/features/company/` with the flags, the filters, search and sorting, until T143 pass
 
 ---
 
@@ -1158,22 +1158,22 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 - [ ] T153 [P] Create `CompanyAdministrationRateLimitTests` in `HOAManagementCompany.Tests/Integration/RateLimiting/CompanyAdministrationRateLimitTests.cs`:
   - a burst over the `board-writes` limit on community create, profile PATCH, membership create and resident invite → 429;
   - a burst over the `auth` limit on `/invitations/preview` → 429.
-- [ ] T154 [P] Document the operator setup step in `infra/README.md`: `--grant-company-admin`, `--recover`, `--company-name`, and running it as a Cloud Run job execution of the service image
-- [ ] T155 Reconcile `specs/025-board-overall-design/spec.md` per the spec's list:
+- [X] T154 [P] Document the operator setup step in `infra/README.md`: `--grant-company-admin`, `--recover`, `--company-name`, and running it as a Cloud Run job execution of the service image
+- [X] T155 Reconcile `specs/025-board-overall-design/spec.md` per the spec's list:
   - `Community` status (FR-001) and its "inactive/offboarded" edge case;
   - board eligibility in FR-020, FR-023, FR-025 and FR-026 counts Onboarding communities;
   - FR-042: co-manager removal, Company Administrators, invitations and the open-ended-manager rule;
   - the "authentication reused unchanged" Assumption and the tenant-boundary note.
-- [ ] T156 [P] Reconcile `specs/027-board-arc-review/spec.md` FR-030: who may edit becomes "a Company Administrator or that community's Community Manager"
-- [ ] T157 [P] Reconcile `specs/016-security-hardening/spec-identity-access.md` and `specs/017-security-hardening-subspec-a/spec.md`:
+- [X] T156 [P] Reconcile `specs/027-board-arc-review/spec.md` FR-030: who may edit becomes "a Company Administrator or that community's Community Manager"
+- [X] T157 [P] Reconcile `specs/016-security-hardening/spec-identity-access.md` and `specs/017-security-hardening-subspec-a/spec.md`:
   - mark these as superseded by FR-022a, FR-024 and FR-036a:
     - the umbrella clarification ("one-time claim code only … no administrator-approval path");
     - FR-A1's clarification;
     - the Edge Case that rejects an administrator path;
     - the claim-code-only Assumption;
   - note that FR-A10's 15-minute token window no longer covers property access.
-- [ ] T158 [P] Reconcile `specs/006-stripe-payments/spec.md` and `specs/006-stripe-payments/data-model.md`: recurring payments gain the enroller and the cancellation reason, and are cancelled on archive and on removal of the enrolling resident
-- [ ] T159 [P] Reconcile `specs/029-resident-arc-requests/spec.md`. Its resident endpoints now re-check the resident link and the community's status on every request, through `ResidentAccess` (T040; 030 FR-024g, FR-012a). Onboarding homes get `COMMUNITY_NOT_ACTIVE`, Archived homes `COMMUNITY_ARCHIVED`, and an unlinked caller `PROPERTY_ACCESS_DENIED`, in place of trusting the token's `propertyId` claim.
+- [X] T158 [P] Reconcile `specs/006-stripe-payments/spec.md` and `specs/006-stripe-payments/data-model.md`: recurring payments gain the enroller and the cancellation reason, and are cancelled on archive and on removal of the enrolling resident
+- [X] T159 [P] Reconcile `specs/029-resident-arc-requests/spec.md`. Its resident endpoints now re-check the resident link and the community's status on every request, through `ResidentAccess` (T040; 030 FR-024g, FR-012a). Onboarding homes get `COMMUNITY_NOT_ACTIVE`, Archived homes `COMMUNITY_ARCHIVED`, and an unlinked caller `PROPERTY_ACCESS_DENIED`, in place of trusting the token's `propertyId` claim.
 - [ ] T160 When `specs/030-company-administration/design/handoff/` arrives:
   - apply it to the components built here;
   - replace the `[no WFb]` tags in `spec.md` with design citations;

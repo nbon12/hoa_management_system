@@ -7,7 +7,7 @@ import { screen, fireEvent, within } from '@testing-library/angular';
 import { until } from '../board/architectural/arc-testing';
 import { CommunitySettingsPageComponent } from './community-settings-page.component';
 import { CommunitySettingsContext } from './community-settings-context';
-import { CommunitySettings, CommunitySettingsService } from '../../core/services/community-settings.service';
+import { CommunitySettings, CommunitySettingsService, SettingsArcSettings } from '../../core/services/community-settings.service';
 import { CompanyService } from '../../core/services/company.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BoardNavigationService } from '../../core/services/board-navigation.service';
@@ -42,6 +42,12 @@ function settings(over: Partial<CommunitySettings> = {}, can: Partial<CommunityS
   };
 }
 
+const ARC_RULES = {
+  reviewPeriodDays: 30, reminderDays: 7, lapseRule: 'FlagOverdueOnly' as const, decisionRule: 'MajorityOfMembers' as const,
+  timeZoneId: 'America/New_York', formalDisapprovalStatement: 'The standard statement.',
+};
+const ARC: SettingsArcSettings = { ...ARC_RULES, updatedAt: null, companyDefaults: ARC_RULES, differsFromDefaults: [], canEdit: true };
+
 /** What a Community Manager gets (US5-S2): no lifecycle, no parent change, no "No manager". */
 const MANAGER_CAN = { changeParent: false, activate: NONE, archive: NONE, restore: NONE, replaceLastManager: false };
 
@@ -59,12 +65,17 @@ describe('CommunitySettingsPageComponent (030 T067)', () => {
   const userSig = signal<CurrentUser | null>(null);
   const narrow = signal(false);
 
-  async function open(url: string, opts: { result?: CommunitySettings | HttpErrorResponse; signedIn?: CurrentUser; isNarrow?: boolean; activeCommunity?: string | null } = {}) {
-    svc = jasmine.createSpyObj<CommunitySettingsService>('CommunitySettingsService', ['getSettings', 'getProfile', 'getMemberships', 'getInvitations', 'getResidents']);
+  async function open(url: string, opts: {
+    result?: CommunitySettings | HttpErrorResponse; signedIn?: CurrentUser; isNarrow?: boolean; activeCommunity?: string | null;
+    configure?: (s: jasmine.SpyObj<CommunitySettingsService>) => void;
+  } = {}) {
+    svc = jasmine.createSpyObj<CommunitySettingsService>('CommunitySettingsService', ['getSettings', 'getProfile', 'getMemberships', 'getInvitations', 'getResidents', 'getArcSettings']);
+    svc.getArcSettings.and.resolveTo(ARC);
     svc.getResidents.and.returnValue(new Promise(() => undefined));
     svc.getProfile.and.returnValue(new Promise(() => undefined));
     svc.getMemberships.and.returnValue(new Promise(() => undefined));
     svc.getInvitations.and.returnValue(new Promise(() => undefined));
+    opts.configure?.(svc);
     const result = opts.result ?? settings();
     if (result instanceof HttpErrorResponse) svc.getSettings.and.rejectWith(result);
     else svc.getSettings.and.resolveTo(result);
@@ -333,5 +344,73 @@ describe('CommunitySettingsPageComponent (030 T067)', () => {
     });
     await until(() => url() === '/app/no-home');
     expect(toasts()).toEqual(["You don't have access to that page."]);
+  });
+
+  // 030 T130 / US5-S7 / brief 04 8.04.p–r: an Archived community opens read-only for a Company
+  // Administrator. Only Restore and "End membership" are offered; revoked invitations say why.
+  describe('an Archived community (US5-S7)', () => {
+    const ARCHIVED = settings({ communityName: 'Old Mill Commons', status: 'Archived', noManager: false }, {
+      activate: NONE, archive: NONE, restore: { allowed: true, reasonCode: null }, editProfile: false, changeParent: false,
+      manageManagers: false, replaceLastManager: false, manageMemberships: false, manageResidents: false, editArcSettings: false,
+      endMembershipsWhileArchived: true,
+    });
+
+    function archivedData(s: jasmine.SpyObj<CommunitySettingsService>) {
+      s.getProfile.and.resolveTo({
+        legalName: 'Old Mill Commons Association, Inc.', communityName: 'Old Mill Commons', county: 'Wake County, NC',
+        formationDate: '1990-01-01', managementStartDate: '2015-01-01', description: null, missingRequiredFields: [],
+      });
+      s.getMemberships.and.resolveTo({
+        items: [{
+          id: 'm-morgan', userId: 'u-morgan', userDisplayName: 'Morgan Ellis', role: 'CommunityManager', status: 'Active',
+          startDate: '2020-01-01', endDate: null, openEnded: true, effective: true, canEnd: true, canDowngrade: false,
+          canEditEndDate: false, reasonCode: null,
+        }],
+        total: 1, limit: 100, offset: 0,
+      });
+      s.getInvitations.and.resolveTo({
+        items: [{
+          id: 'i-drew', kind: 'Membership', email: 'drew@example.com', role: 'CommunityManager', termEndDate: null, state: 'Revoked',
+          effectiveState: 'Revoked', revokeReason: 'CommunityArchived', sentBy: 'Morgan Ellis', sentAt: '2026-09-28T18:00:00Z',
+          expiresAt: '2026-10-01T18:00:00Z', lastSendError: null, canResend: false, canRevoke: false, resendBlockedReason: null,
+        }],
+        total: 1, limit: 100, offset: 0, timeZoneId: 'America/New_York',
+      });
+      s.getResidents.and.resolveTo({
+        items: [{ propertyId: 'p16', address: '16 Old Mill Ln', residentNames: ['Sam Ortiz'], matchedEmail: null, invitationSummary: { scheduled: 0, pending: 0, expired: 0 } }],
+        total: 1, limit: 25, offset: 0, counts: { all: 1, noResident: 0, invitationPending: 0, invitationExpired: 0 }, propertiesLoaded: true,
+      });
+      s.getArcSettings.and.resolveTo({ ...ARC, canEdit: false });
+    }
+
+    function buttons(): string[] {
+      return within(document.querySelector<HTMLElement>('.csp__section')!).queryAllByRole('button').map(b => b.textContent!.trim());
+    }
+
+    it('Profile is plain text, and the header offers only Restore', async () => {
+      await open('/app/company/communities/c-om/settings/profile', { result: ARCHIVED, configure: archivedData });
+      expect(screen.getAllByRole('button', { name: /^(Mark|Archive|Restore)/ }).map(b => b.getAttribute('aria-label'))).toEqual(['Restore Old Mill Commons']);
+      expect(screen.queryByRole('textbox')).toBeNull();
+      expect(screen.getByText('Jan 1, 1990')).toBeTruthy();
+      expect(buttons()).toEqual([]);
+    });
+
+    it('Managers and memberships offers only "End membership", and the revoked invitation says "Revoked — community archived"', async () => {
+      await open('/app/company/communities/c-om/settings/managers-and-memberships', { result: ARCHIVED, configure: archivedData });
+      expect(screen.getByRole('button', { name: /^End .*membership/ })).toBeTruthy();
+      expect(screen.getByText('Revoked — community archived')).toBeTruthy();
+      // Left: "End membership", the property's address (it opens the read-only drawer) and the filters.
+      expect(buttons().filter(b => b !== 'End membership' && b !== '16 Old Mill Ln' && !b.includes('·'))).toEqual([]);
+      expect(screen.queryByRole('button', { name: /Appoint|Invite|Resend|Revoke|Replace/ })).toBeNull();
+      expect(screen.getByRole('searchbox', { name: 'Search residents' })).toBeTruthy();
+    });
+
+    it('Architectural review is plain text, with no Edit, Reset or Company defaults link', async () => {
+      await open('/app/company/communities/c-om/settings/architectural-review', { result: ARCHIVED, configure: archivedData });
+      expect(screen.getByRole('heading', { level: 2, name: 'Architectural review' })).toBeTruthy();
+      expect(buttons()).toEqual([]);
+      expect(screen.queryByRole('link', { name: 'Company defaults' })).toBeNull();
+      expect(screen.queryByRole('spinbutton')).toBeNull();
+    });
   });
 });

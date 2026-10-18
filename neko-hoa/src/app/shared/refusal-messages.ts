@@ -62,7 +62,7 @@ export interface RefusalContext {
    * - `COMMUNITY_ARCHIVED`: `payments` (resident payments and autopay);
    * - `COMMUNITY_NOT_ACTIVE`: `resend`, `claimCode`;
    * - `PARENT_ARCHIVED`: `restore`;
-   * - `INVITATION_PENDING`: `resident`, `scheduled`;
+   * - `INVITATION_PENDING`: `resident`, `scheduled`, `companyAdmins`;
    * - `SELF_GRANT_NOT_ALLOWED` and `ALREADY_MEMBER`: `companyAdmins`;
    * - `LAST_MANAGER`: `downgrade`, `endDate`;
    * - `LAST_COMPANY_ADMIN`: `race`.
@@ -225,6 +225,9 @@ export function refusal(code: string | null | undefined, ctx: RefusalContext = {
       }
       if (ctx.variant === 'resident') {
         return plain(`${email} already has a pending invitation to ${ctx.propertyAddress || 'this home'}. Resend it instead?`);
+      }
+      if (ctx.variant === 'companyAdmins') {
+        return plain(`${email} already has a pending Company Administrator invitation. Resend it instead?`);
       }
       const role = roleLabel(ctx.role);
       return plain(`${email} already has a pending ${role ? role + ' ' : ''}invitation for ${community(ctx, 'this community')}. Resend it instead?`);

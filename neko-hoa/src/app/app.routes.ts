@@ -60,7 +60,8 @@ export const routes: Routes = [
       { path: 'board/communities', canActivate: [boardGuard], loadComponent: () => import('./features/board/communities/communities.component').then(m => m.CommunitiesComponent) },
       { path: 'board/metrics',     canActivate: [boardGuard], loadComponent: () => import('./features/board/metrics/metrics-page.component').then(m => m.BoardMetricsPageComponent) },
       { path: 'board/architectural', canActivate: [boardGuard], data: { requiredRoles: ['BoardMember', 'CommunityManager'] }, loadComponent: () => import('./features/board/architectural/applications-page.component').then(m => m.ApplicationsPageComponent) },
-      { path: 'board/arc-settings',  canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'] }, loadComponent: () => import('./features/board/architectural/arc-settings.component').then(m => m.ArcSettingsComponent) },
+      // 030 US5 / FR-030: the old ARC settings address opens the Architectural review section; the old address is replaced.
+      { path: 'board/arc-settings', pathMatch: 'full', redirectTo: 'board/settings/architectural-review' },
       // 030 T091 / R20: the old memberships page is now Community settings › Managers and memberships.
       { path: 'board/memberships', pathMatch: 'full', redirectTo: 'board/settings/managers-and-memberships' },
 
@@ -71,11 +72,16 @@ export const routes: Routes = [
 
       // 030 FR-006, FR-036: a Community Manager adds a community from board mode. The role may be
       // held in any community, not just the active one.
+      { path: 'board/company-defaults', canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'], roleScope: 'any', mode: 'board' }, loadComponent: () => import('./features/company/company-defaults.component').then(m => m.CompanyDefaultsComponent) },
       { path: 'board/communities/new', canActivate: [boardGuard], data: { requiredRoles: ['CommunityManager'], roleScope: 'any', variant: 'board' }, loadComponent: () => import('./features/company/add-community.component').then(m => m.AddCommunityComponent) },
 
       // 030 company area (FR-036): Company Administrators only.
       { path: 'company/portfolio', canActivate: [companyAdminGuard], loadComponent: () => import('./features/company/portfolio.component').then(m => m.PortfolioComponent) },
       { path: 'company/communities/new', canActivate: [companyAdminGuard], data: { variant: 'company' }, loadComponent: () => import('./features/company/add-community.component').then(m => m.AddCommunityComponent) },
+      // 030 US4 / FR-025–FR-028: the company defaults; read-only for Community Managers in board mode.
+      // 030 US7 / FR-037: grant and revoke the Company Administrator role.
+      { path: 'company/administrators', canActivate: [companyAdminGuard], loadComponent: () => import('./features/company/company-administrators.component').then(m => m.CompanyAdministratorsComponent) },
+      { path: 'company/defaults', canActivate: [companyAdminGuard], data: { mode: 'company' }, loadComponent: () => import('./features/company/company-defaults.component').then(m => m.CompanyDefaultsComponent) },
       { path: 'company/communities/:communityId/settings', pathMatch: 'full', redirectTo: 'company/communities/:communityId/settings/profile' },
       { path: 'company/communities/:communityId/settings/:section', canActivate: [companyAdminGuard], data: { settingsMode: 'company' }, loadComponent: () => import('./features/community-settings/community-settings-page.component').then(m => m.CommunitySettingsPageComponent) },
     ]

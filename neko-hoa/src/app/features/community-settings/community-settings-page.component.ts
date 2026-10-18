@@ -13,10 +13,10 @@ import { DisabledReasonDirective } from '../../shared/disabled-reason.directive'
 import { refusalCodeOf, refusalMessage } from '../../shared/refusal-messages';
 import { CommunitySettingsContext, SettingsMode } from './community-settings-context';
 import { SettingsSideNavComponent, SettingChoice } from './settings-side-nav.component';
-import { SettingsSectionPlaceholderComponent } from './settings-section-placeholder.component';
 import { ManagersMembershipsSectionComponent } from './managers-memberships.component';
 import { ProfileSectionComponent } from './profile-section.component';
 import { ResidentsSectionComponent } from './residents/residents-section.component';
+import { ArchitecturalReviewSectionComponent } from './architectural-review-section.component';
 import { LifecycleDialogsComponent } from './lifecycle-dialogs.component';
 import { sectionsFor } from './settings-registry';
 
@@ -47,8 +47,8 @@ interface StatusAction {
 @Component({
   selector: 'app-community-settings-page',
   standalone: true,
-  imports: [RouterLink, DisabledReasonDirective, SettingsSideNavComponent, SettingsSectionPlaceholderComponent, ManagersMembershipsSectionComponent,
-    ProfileSectionComponent, LifecycleDialogsComponent, ResidentsSectionComponent],
+  imports: [RouterLink, DisabledReasonDirective, SettingsSideNavComponent, ManagersMembershipsSectionComponent,
+    ProfileSectionComponent, LifecycleDialogsComponent, ResidentsSectionComponent, ArchitecturalReviewSectionComponent],
   providers: [CommunitySettingsContext],
   template: `
     @switch (state()) {
@@ -108,10 +108,7 @@ interface StatusAction {
                   @case ('managers-and-memberships') {
                     <app-managers-memberships-section><app-residents-section residents /></app-managers-memberships-section>
                   }
-                  @default {
-                    <!-- A placeholder until T132 builds the section. -->
-                    <app-settings-section-placeholder [section]="section" />
-                  }
+                  @case ('architectural-review') { <app-architectural-review-section /> }
                 }
               }
             </div>

@@ -98,6 +98,16 @@ describe('SettingsSideNavComponent (030 T067)', () => {
     expect(links().length).toBe(3);
   });
 
+  it('typing "review" lists "Architectural review › Review period", and choosing it asks for focus on that field (US5-S9)', async () => {
+    const { r, settingChosen } = await setup();
+    search(r, 'review');
+    const result = screen.getByRole('link', { name: 'Architectural review › Review period' });
+    expect(result.getAttribute('href')).toBe('/app/company/communities/c-sh/settings/architectural-review');
+    fireEvent.click(result);
+    r.fixture.detectChanges();
+    expect(settingChosen).toHaveBeenCalledOnceWith({ sectionId: 'architectural-review', settingId: 'review-period' });
+  });
+
   it('choosing a section asks for focus on its heading', async () => {
     const { sectionChosen, settingChosen } = await setup();
     fireEvent.click(screen.getByRole('link', { name: 'Architectural review' }));

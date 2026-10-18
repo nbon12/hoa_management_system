@@ -148,6 +148,8 @@ describe('refusalMessage (030 FR-042)', () => {
       .toBe('kim@example.com already has a pending invitation to 711 Keystone Park Dr #29. Resend it instead?');
     expect(refusalMessage('INVITATION_PENDING', { variant: 'scheduled', email: 'lena@example.com', propertyAddress: '2 Ridgeview Ct', communityName: 'Keystone Ridge' }))
       .toBe('lena@example.com already has a scheduled invitation to 2 Ridgeview Ct. It will be sent when Keystone Ridge is marked Active.');
+    expect(refusalMessage('INVITATION_PENDING', { variant: 'companyAdmins', email: 'ops@example.com' }))
+      .toBe('ops@example.com already has a pending Company Administrator invitation. Resend it instead?');
     expect(refusalMessage('ALREADY_MEMBER', { email: 'lee@example.com', role: 'BoardMember', communityName: 'Sakura Heights' }))
       .toBe('lee@example.com is already a Board Member of Sakura Heights.');
     expect(refusalMessage('ALREADY_MEMBER', { variant: 'companyAdmins', email: 'ops@example.com' }))

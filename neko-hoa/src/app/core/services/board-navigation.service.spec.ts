@@ -81,11 +81,10 @@ describe('BoardNavigationService.buildNav (pure derivation)', () => {
     expect(accountant.locked).toBeTrue();
   });
 
-  it('027: ARC Settings is manager-only', () => {
-    expect(item(BoardNavigationService.buildNav({ roles: ['BoardMember'], communityCount: 1 }), 'ARC Settings')!.locked).toBeTrue();
-    const mgr = item(BoardNavigationService.buildNav({ roles: ['CommunityManager'], communityCount: 1 }), 'ARC Settings')!;
-    expect(mgr.locked).toBeFalse();
-    expect(mgr.route).toBe('/app/board/arc-settings');
+  it('030 US5 (brief 07): ARC Settings has left the nav; it is the Architectural review section of Community settings', () => {
+    for (const role of ['BoardMember', 'CommunityManager']) {
+      expect(item(BoardNavigationService.buildNav({ roles: [role], communityCount: 1 }), 'ARC Settings')).toBeUndefined();
+    }
   });
 
   it('a plain resident role confers nothing board-specific (Finance stays locked)', () => {
