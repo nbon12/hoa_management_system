@@ -867,7 +867,7 @@ The conventions §8 baseline applies. For this section:
 - Start dates ("Since"), bulk invitations, and a page-size picker.
 - Scheduled and Accepted role invitations (§4.5 question 5).
 - Notifications.
-- Phone layout (staff pages are desktop-first, spec Assumptions).
+- Phone and tablet artboards beyond the main page's two (conventions §2).
 
 ## 9. Design review checklist
 

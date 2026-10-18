@@ -414,7 +414,7 @@ The conventions §8 baseline applies. For this area:
 - Restricting resident rights, such as poll voting (FR-024f). Claim-code issuing or management.
 - Loading, adding or editing properties. Owner of record, balances and autopay status in the list.
 - A history or audit view (FR-024e is logging only). Bulk invitations, export, and a page-size picker.
-- Notifications. Phone layout (staff pages are desktop-first).
+- Notifications. Phone and tablet artboards beyond the main page's two (conventions §2).
 
 ## 9. Design review checklist
 

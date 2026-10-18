@@ -21,7 +21,7 @@ We're adding company administration to the HOA Management CRM. A Company Adminis
 
 All of this goes in a new canvas section after section 7: "8 · Company administration". Create the empty section now; don't change sections 1–7.
 
-I'll attach spec.md (spec 030, the authority) and 00-conventions.md (rules, sample data, vocabulary, refusal copy, artboard naming). Read both. Every later brief uses them. The designs are lofi and in section 7's visual language: layout, copy, states and who sees what are binding; colour and spacing are placeholders. I'll then give you one brief at a time, numbered 01–12.
+I'll attach spec.md (spec 030, the authority) and 00-conventions.md (rules, sample data, vocabulary, refusal copy, artboard naming). Read both. Every later brief uses them. The designs are lofi and in section 7's visual language: layout, copy, states and who sees what are binding; colour and spacing are placeholders. Staff pages are desktop-first but must also work at tablet and phone width: each staff brief adds a tablet and a phone artboard of its main page (conventions §2). I'll then give you one brief at a time, numbered 01–12.
 ```
 
 ## Recommended order
@@ -34,6 +34,8 @@ I'll attach spec.md (spec 030, the authority) and 00-conventions.md (rules, samp
 6. **10 Invitation acceptance and sign-up**, **11 Sign-in and resident states** and **12 Emails**. These are independent of the staff pages and can run any time after 00.
 
 ## Index
+
+The Artboards column counts the briefs' listed artboards. Each staff brief (01–09) adds two more: a tablet and a phone artboard of its main page (conventions §2).
 
 | Brief | What it designs | Spec stories | Artboards |
 | --- | --- | --- | --- |

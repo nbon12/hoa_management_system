@@ -80,7 +80,7 @@ When done, open the canvas and check that each artboard renders in its stated st
 
 ## 4. Artboards
 
-All people, communities and dates come from conventions §4. "Now" is Monday, Oct 12, 2026, 10:00 AM EDT. Staff artboards are 1360 wide and as tall as the content. The flow is 1100 wide. Every artboard is drawn at desktop width only.
+All people, communities and dates come from conventions §4. "Now" is Monday, Oct 12, 2026, 10:00 AM EDT. Staff artboards are 1360 wide and as tall as the content. The flow is 1100 wide. Artboards are drawn at desktop width, plus the tablet and phone artboards of the main page that conventions §2 asks for.
 
 ### 4.1 Frames used in this brief
 
@@ -414,7 +414,7 @@ Conventions §8 applies. In this brief:
 - The Community Manager's Onboarding notice on Profile (FR-029). Brief 04 draws it.
 - A Board Member refused on the Community settings page (FR-032, US5 #3). Brief 04 draws it.
 - Resident-mode screens. Nobody in this brief is drawn in resident mode.
-- Phone and tablet layouts. Staff pages are desktop-only (spec Assumptions).
+- Phone and tablet artboards beyond the main page's two (conventions §2).
 - Notifications, in any nav or section (FR-028, FR-029).
 - Changes to the board banner, section 7's nav entries, or section 7's artboards.
 - Today's app has separate "Memberships" and "ARC Settings" nav entries, which section 7 never drew. US5 folds both pages into Community settings, and FR-030 sends the old ARC settings location to its Architectural review section. That redirect is behaviour, not a screen. Draw only "Community settings".

@@ -101,7 +101,7 @@ The page frame drawn here (header, status actions, section nav, archived banner)
 
 ## 4. Artboards
 
-"Now" is Monday, Oct 12, 2026, 10:00 AM EDT, except where an artboard says it is a snapshot. People and communities come from conventions §4. Every artboard is desktop width only.
+"Now" is Monday, Oct 12, 2026, 10:00 AM EDT, except where an artboard says it is a snapshot. People and communities come from conventions §4. Artboards are drawn at desktop width, plus the tablet and phone artboards of the main page that conventions §2 asks for.
 
 ### 4.1 The page frame (shared with briefs 05–07)
 

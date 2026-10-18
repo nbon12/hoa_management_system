@@ -30,7 +30,11 @@ The designs are **lofi**, with the same rules as the spec 025 board wireframes (
 - Keep sections 1–7 unchanged. Put section 8 in new files (for example `wf-company.jsx` for shared data and frames, plus one screens file per brief or per group of briefs) and add them to `NekoHOA Wireframes.html`. Prefer new props and new data over edits to shared components. If a shared component must change (for example `boardNav()` gaining items), sections 1–7 must still render as before. Say so in a note.
 - Shared components hard-code sample content. In section 8, pass the §4 data in instead: the `WFShellBoard` strip ("Keystone Crossing (Master)", "KEYCROSS"), the `WFShell` and `WFShellSide` strip ("Sakura Heights · 714 Keystone Park Dr"), and the avatar initials "NB".
 - Use only the people in §4. Do not reuse person names from sections 1–7.
-- **Desktop-first.** Staff pages (briefs 01–09) are drawn at desktop width only; mobile layout is out of scope for staff pages (spec Assumptions). Brief 10's invitation acceptance and sign-up pages are drawn at desktop **and** phone width, because invitees open them from email. Brief 11's resident pages are drawn at desktop width, like sections 2–6. Brief 12's emails are one column, so they read on a phone.
+- **Desktop-first, and responsive.** Staff pages (briefs 01–09) are drawn at desktop width first (spec Decisions made in analysis, 2026-10-18; constitution §6).
+  - Each staff brief also draws its main page at **tablet** (834 wide) and **phone** (390 wide), named "· tablet" and "· phone".
+  - These show how the page reflows: wide tables scroll inside their own container or stack into rows; the Community settings side list collapses into a menu; side panels such as the property drawer open full width; nothing scrolls the page sideways.
+
+  Brief 10's invitation acceptance and sign-up pages are drawn at desktop **and** phone width, because invitees open them from email. Brief 11's resident pages are drawn at desktop width, like sections 2–6. Brief 12's emails are one column, so they read on a phone.
 
 **Reuse these by name.** New screens extend the existing wireframes. They do not restyle them.
 
@@ -64,7 +68,7 @@ Every artboard label has the form **`8.<NN>.<letter> <short name>`**.
 - `NN` is the two-digit brief number, 01–12 (§9).
 - `letter` is a, b, c, … in the order the brief lists its artboards. Every variant gets its own letter: each viewpoint, state, option and phone version.
 - `short name` is the screen, then the state, then the viewpoint, separated by " · ". The viewpoint uses the role name: "Company Administrator" or "Community Manager".
-- Alternatives say "Option A", "Option B". Phone versions end with "· phone".
+- Alternatives say "Option A", "Option B". Tablet and phone versions end with "· tablet" and "· phone".
 
 Examples:
 
@@ -83,6 +87,8 @@ Once handed off, artboards are not renumbered. A new artboard takes the next fre
 | --- | --- |
 | Staff page (board mode or company area) | 1360 × as tall as the content |
 | Staff page with a side panel open | 1440 × as tall as the content |
+| Staff page, tablet | 834 × as tall as the content |
+| Staff page, phone | 390 × as tall as the content |
 | Dialog | Drawn over the dimmed page it belongs to, at that page's size |
 | Public page, desktop (brief 10) | 1100 × 780, as in section 1 |
 | Public page, phone (brief 10) | 390 × full content height |
@@ -481,7 +487,7 @@ Every artboard meets **WCAG 2.1 AA** (spec Constitution Requirements, Accessibil
 - **Tables:** real header cells, and a heading that names each table. Filter, search and page changes are announced.
 - **Announcements:** toasts are announced politely. Refusals after a save are announced at once.
 - **Contrast:** 4.5:1 for text; 3:1 for large text and control borders. The board banner stays dark ink on violet (spec 025 FR-038).
-- **Phone width (brief 10):** content reflows at 320 CSS px with no sideways scrolling and works at 200% zoom. Touch targets aim for about 44 × 44 px. The email field brings up the email keyboard. Whether the password field can show the password is a design choice.
+- **Phone and tablet width (every page):** content reflows at 320 CSS px with no sideways scrolling and works at 200% zoom. Touch targets aim for about 44 × 44 px. The email field brings up the email keyboard. Whether the password field can show the password is a design choice.
 - **Time limits:** expiry is shown as a date and time, never only as a countdown.
 - **Plain language:** write "architectural review" in full first; "ARC" may follow.
 

@@ -112,8 +112,8 @@ Every resident endpoint calls `ResidentAccess.RequireAsync(User, op)` first (R8)
 
 | Operation | Endpoints |
 |---|---|
-| `ReadPaymentHistory` | `GET /payments/ledger`, `/payments/statements`, `/payments/statements/{id}` (if present), `/payments/unpaid-assessments`, `/payments/transactions`, `/payments/receipts/{id}` |
-| `Read` | `GET /dashboard`, `/property`, `/property/owner`, `/property/address-history`, `/property/directory-fields`, `/community/announcements`, `/community/announcements/{id}`, `/community/events`, `/community/documents`, `/community/documents/{id}/download`, `/community/poll`, `/community/directory`, `/community/violations`, `/payments/options`, `/payments/recurring`, `/payments/drafts`, `/payments/alert-preferences`; spec 029: `/property/architectural-applications`, `/property/architectural-applications/{id}`, `/property/architectural-applications/{id}/attachments/{attachmentId}/url`, `/property/architectural-applications/drafts/{draftId}`, `/property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}/url` |
+| `ReadHistory` | `GET /payments/ledger`, `/payments/statements`, `/payments/statements/{id}` (if present), `/payments/unpaid-assessments`, `/payments/transactions`, `/payments/receipts/{id}`; spec 029's submitted requests: `/property/architectural-applications`, `/property/architectural-applications/{id}`, `/property/architectural-applications/{id}/attachments/{attachmentId}/url` |
+| `Read` | `GET /dashboard`, `/property`, `/property/owner`, `/property/address-history`, `/property/directory-fields`, `/community/announcements`, `/community/announcements/{id}`, `/community/events`, `/community/documents`, `/community/documents/{id}/download`, `/community/poll`, `/community/directory`, `/community/violations`, `/payments/options`, `/payments/recurring`, `/payments/drafts`, `/payments/alert-preferences`; spec 029's drafts: `/property/architectural-applications/drafts/{draftId}`, `/property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}/url` |
 | `Write` | `PATCH /property/owner`, `PATCH /property/directory-fields/{key}`, `POST /community/events/{id}/rsvp`, `POST /community/poll/{id}/vote`, `POST /payments/intent`, `POST /payments/one-time/confirm`, `POST /payments/recurring/setup-intent`, `PUT /payments/recurring`, `DELETE /payments/recurring`, `PUT /payments/alert-preferences`; spec 029: `POST /property/architectural-applications/drafts`, `PUT` and `DELETE /property/architectural-applications/drafts/{draftId}`, `POST /property/architectural-applications/drafts/{draftId}/submit`, `POST /property/architectural-applications/drafts/{draftId}/attachments`, `DELETE /property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}`, `POST /property/architectural-applications/{id}/info-requests/{infoRequestId}/attachments`, `POST /property/architectural-applications/{id}/info-requests/{infoRequestId}/reply`, `POST /property/architectural-applications/{id}/withdraw`, `POST /property/architectural-applications/{id}/revise` |
 
 **Results**:
@@ -122,7 +122,7 @@ Every resident endpoint calls `ResidentAccess.RequireAsync(User, op)` first (R8)
 |---|---|
 | No `propertyId` claim, or no resident link to that property | **403 `PROPERTY_ACCESS_DENIED`** |
 | The home's community is Onboarding | **409 `COMMUNITY_NOT_ACTIVE`** |
-| Archived, and the operation is not `ReadPaymentHistory` | **409 `COMMUNITY_ARCHIVED`** |
+| Archived, and the operation is not `ReadHistory` | **409 `COMMUNITY_ARCHIVED`** |
 | Otherwise | the endpoint runs with the **database's** property and community, not the token's |
 
 Every row is enforced by `ResidentAccessStaticAnalysisTests` (R3) and by a `[Theory]` over status × endpoint (spec Quality gates).

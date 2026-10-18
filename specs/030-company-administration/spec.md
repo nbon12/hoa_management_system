@@ -102,6 +102,14 @@ An adversarial review of this spec against the code and the merged specs forced 
 10. **When a manager adds a community, every Company Administrator is emailed**, because only they can take it live (FR-008).
 11. **Each resident endpoint re-checks the resident's link to the home on every request.** A removed resident loses the home at once, not when their token expires (FR-024g).
 
+### Decisions made in analysis (2026-10-18)
+
+`/speckit.analyze` found conflicts with the constitution and some gaps. The owner accepted every recommendation, and these choices were made under it:
+
+1. **Staff pages work at phone, tablet and desktop widths** (constitution §6). They are designed desktop-first, and each staff design brief adds a tablet and a phone artboard of its main page. The earlier "desktop-only" assumption, carried over from specs 025 and 027, conflicted with the constitution and is withdrawn. Amending the constitution to allow desktop-only staff tools was the alternative, and was not taken.
+2. **Residents keep read-only access to their home's submitted architectural requests after the community is archived** (spec 029: the list, the detail and attachment links), alongside payment history. Drafts and every write are refused (FR-012a).
+3. **The Company Administrators page pages its lists.** Administrators and Company Administrator invitations each take `limit` and `offset` (constitution §4; `contracts/company.md`).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Add a community the company has taken on (Priority: P1)
@@ -192,7 +200,7 @@ Restore it and confirm memberships and settings are unchanged.
    - all three schedules are cancelled with the reason "community archived", and no further automatic charge starts for them;
    - every resident linked to the community's properties is emailed once that the company no longer manages the community, and the email says autopay has ended where that applies;
    - each cancellation is logged.
-8. **Given** Jane's home is in a community that was just archived, **When** she signs in, **Then** the home is in her home list labelled "No longer managed". Its ledger, statements, receipts and transactions are readable. Every other resident request for it is refused with `COMMUNITY_ARCHIVED`.
+8. **Given** Jane's home is in a community that was just archived, **When** she signs in, **Then** the home is in her home list labelled "No longer managed". Its ledger, statements, receipts, transactions and submitted architectural requests are readable. Every other resident request for it is refused with `COMMUNITY_ARCHIVED`.
 9. **Given** Jane holds an access token issued before her community was archived, **When** she uses it to enroll autopay or make a payment, **Then** it is refused with `COMMUNITY_ARCHIVED` and nothing is created.
 10. **Given** a community with architectural applications ARC-1041 (Open) and ARC-1042 (Decision Reached), **When** I try to archive it, **Then** it is refused with `OPEN_WORK` and the message lists ARC-1041 and ARC-1042 with their statuses.
 11. **Given** a master community with a sub-association that is not archived, **When** I try to archive the master, **Then** it is refused with `OPEN_WORK` and the message lists that sub-association.
@@ -501,13 +509,13 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   | Status | The home | Resident reads | Resident writes |
   | --- | --- | --- | --- |
   | **Onboarding** | Left out of the resident's home list | All refused with `COMMUNITY_NOT_ACTIVE` | All refused with `COMMUNITY_NOT_ACTIVE` |
-  | **Archived** | Stays in the home list, labelled "No longer managed" | Ledger, statements, receipts and transactions allowed (read-only) for every resident linked to the home; all others refused with `COMMUNITY_ARCHIVED` | All refused with `COMMUNITY_ARCHIVED` |
+  | **Archived** | Stays in the home list, labelled "No longer managed" | Ledger, statements, receipts, transactions and the home's submitted architectural requests (spec 029) allowed (read-only) for every resident linked to the home; all others refused with `COMMUNITY_ARCHIVED`, including architectural drafts | All refused with `COMMUNITY_ARCHIVED` |
 
   The reads are dashboard, property, owner, ledger, statements, receipts, transactions, unpaid assessments, announcements, polls, events, documents, directory and violations.
 
   The writes are: owner profile and directory-field edits, alert preferences, one-time payment intent and confirm, setup intent, autopay enroll, change and cancel, poll vote, event RSVP, drafts, and claim-code redemption.
 
-  Resident architectural applications (spec 029, merged) follow the same rule: their endpoints get FR-024g's per-request check in this spec's implementation.
+  Resident architectural applications (spec 029, merged) follow the same rule: their endpoints get FR-024g's per-request check in this spec's implementation. Their submitted requests stay readable after archiving, like payment history (Decisions made in analysis, 2026-10-18).
 - **FR-013**: Archiving MUST cancel every active autopay schedule for properties in the community in the same action:
   - each schedule's status becomes cancelled with the reason "community archived", and each cancellation is logged;
   - no automatic charge may start afterwards; a charge already submitted settles normally;
@@ -582,7 +590,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - Invitation-state failures use FR-022's codes. Account-creation failures stay generic (spec 017 FR-A5) and tell the person to sign in and accept instead.
   - The acceptance page shows the community name, what is offered (the role, or the property address for a resident invitation) and the sender's name, only to the holder of a valid link. It shows nothing for an invalid link. The invited email is shown only to a visitor who is not signed in, so a different signed-in account never sees it (plan, contracts/invitations-and-auth.md). `[no WFb]`
 - **FR-022b**: The Managers and memberships section MUST list, next to active and ended memberships, every scheduled, pending, expired and revoked invitation for the Community Manager, Board Member and Accountant roles. Each shows email, role, sent by, sent at and expires at, with Resend and Revoke for anyone who could send it. `[no WFb]`
-- **FR-023**: Every appointment, change, end, invitation, resend, revoke and acceptance MUST be logged as a sensitive event per change. The event carries actor, community, the target user ID (or the invitation ID when the invitee has no account) and UTC time. Failed acceptance attempts MUST also be logged, with the refusal reason, the community, the signed-in user if any, and UTC time, matching spec 017's auditing of failed claim attempts.
+- **FR-023**: Every appointment, change, end, invitation, resend, revoke and acceptance MUST be logged as a sensitive event per change. The event carries actor, community, the target user ID (or the invitation ID when the invitee has no account) and UTC time. Failed acceptance attempts MUST also be logged, with the refusal reason, the community, the signed-in user if any, and UTC time, matching spec 017's auditing of failed claim attempts. Event content follows FR-040.
 
 ### Residents
 
@@ -612,7 +620,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   Each property's residents, invitations and actions open in a **property drawer** beside the list (Clarifications 2026-10-14).
 
   A community with no properties MUST show that properties have not been loaded yet and offer no invite action. Each load and search MUST log the spec 025 FR-017 association-data access event. `[no WFb]`
-- **FR-024e**: Every resident invitation, resend, revoke, acceptance (successful or not) and removal MUST be logged as a sensitive event per change. The event carries actor, community, property ID, the target user ID (or invitation ID), the change and UTC time.
+- **FR-024e**: Every resident invitation, resend, revoke, acceptance (successful or not) and removal MUST be logged as a sensitive event per change. The event carries actor, community, property ID, the target user ID (or invitation ID), the change and UTC time. Event content follows FR-040.
 - **FR-024f**: Restricting resident rights, such as suspending a resident's poll voting, is NOT built (Clarifications 2026-10-10). Claim codes (spec 016/017) keep working unchanged:
   - A code is redeemed only while registering a new account, and only for a property with no linked resident.
   - Once a property has a resident, by code or by invitation, an outstanding claim code for it is refused.
@@ -682,7 +690,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - A separate **recovery mode** of the same command MAY grant the role (or invite) when administrators already exist. It is for when every Company Administrator is unavailable or compromised. It logs a sensitive event and emails every current Company Administrator.
 
   This is the only part of this spec an application operator touches.
-- **FR-039**: Every grant, revoke and run of the setup step MUST be logged as a sensitive event with actor (or "setup"), target user ID or invitation ID, the change and UTC time.
+- **FR-039**: Every grant, revoke and run of the setup step MUST be logged as a sensitive event with actor (or "setup"), target user ID or invitation ID, the change and UTC time. Event content follows FR-040.
 
 ### Cross-cutting
 
@@ -763,7 +771,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - the invitation acceptance and sign-up pages;
   - the "No home linked" and "isn't live yet" pages.
 
-  Status and the "No manager", "differs from defaults", "Scheduled" and "No longer managed" labels are conveyed by text, not color alone. Everything meets WCAG 2.1 AA.
+  Status and the "No manager", "differs from defaults", "Scheduled" and "No longer managed" labels are conveyed by text, not color alone. Everything meets WCAG 2.1 AA. Every listed surface also works at phone, tablet and desktop widths (constitution §6; Assumptions).
 - **Quality gates**: 95% coverage on new backend and frontend files. Sonar passes. xUnit integration tests run on Testcontainers PostgreSQL, with isolated per-test communities and companies, so they are safe in parallel and after earlier runs. `[Theory]` data covers:
   - role × action: Company Administrator, Community Manager of this community, Community Manager of another community, Board Member, Accountant, Resident, and a user with no role;
   - community status (Onboarding, Active, Archived) × every resident read and write in FR-012a;
@@ -773,7 +781,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 - **Frontend testing**:
   - **Jasmine/Karma**: permission-driven section rendering, portfolio flags, and the sign-in landing order.
   - **Angular Testing Library**: the add-community form, each Community settings section (including the Residents area, the invitation lists and the restore dialog), portfolio filter and search, the company defaults form (editable and read-only), granting and revoking Company Administrators, invitation acceptance and sign-up, and the "No home linked" page.
-  - **Playwright**: the journeys "add community → invite manager → accept → activate" and "invite resident → sign up from link → see home", and refusal of a Board Member on the settings route.
+  - **Playwright**: the journeys "add community → invite manager → accept → activate" and "invite resident → sign up from link → see home", and refusal of a Board Member on the settings route. Each new page is also checked at phone (390 px), tablet (834 px) and desktop widths, with no sideways page scrolling.
   - **Cypress E2E**: sign in as a Company Administrator with no home → portfolio → community settings.
   - **Storybook visual regression**: every new page and section, once designs exist.
 - **Executable & living spec**: Every acceptance scenario, Independent Test, functional requirement and edge case above maps to an automated test that runs on demand and passes before merge (constitution §11). This `spec.md` and `tasks.md` are updated before the implementation PR. The implementation PR MUST also reconcile the older specs this one changes:
@@ -807,7 +815,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 
 ### Measurable Outcomes
 
-- **SC-001**: A Company Administrator can add a community, invite its first manager and, once the manager has accepted, take it live in under 5 minutes of their own time, with no engineering, database or seed-script involvement.
+- **SC-001**: A Company Administrator can add a community, invite its first manager and, once the manager has accepted, take it live in under 5 minutes of their own time, with no engineering, database or seed-script involvement. *(An outcome metric, checked in usability review and not automated. Its automated proxy is the Playwright journey "add community → invite manager → accept → activate", which completes with no engineering, database or seed step.)*
 - **SC-002**: 100% of this spec's actions refuse every role the permissions table denies, verified by an automated test per role and action.
 - **SC-003**: No community that has had a manager is ever left without an open-ended manager, now or on any later date, through any surface, including simultaneous requests.
 - **SC-004**: 100% of new communities start with settings equal to the company defaults in effect when they are created, and 0 existing communities change when a default changes.
@@ -816,7 +824,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 - **SC-007**: Every user action in this spec logs one sensitive event for itself and one for each change it causes, each with all required fields and no personal data; no change is logged twice.
 - **SC-008**: The portfolio shows its first page within 2 seconds for a company with 200 communities.
 - **SC-009**: A Company Administrator can find every community without an open-ended manager in one step (the "No manager" flag on the portfolio).
-- **SC-010**: Once a community's properties are loaded, a manager can invite a resident to a property in under 1 minute, and the resident can go from the invitation email to seeing their home in under 5 minutes.
+- **SC-010**: Once a community's properties are loaded, a manager can invite a resident to a property in under 1 minute, and the resident can go from the invitation email to seeing their home in under 5 minutes. *(An outcome metric, checked in usability review and not automated. Its automated proxy is the Playwright journey "invite resident → sign up from link → see home".)*
 - **SC-011**: 100% of removed residents are refused that property on their very next request, and 0 autopay charges start afterwards on any schedule they enrolled.
 - **SC-012**: 0 resident invitations are emailed while their community is Onboarding, and 100% of scheduled invitations whose sender still has authority are emailed when it is marked Active.
 - **SC-013**: 100% of users with no linked home who hold a membership or the Company Administrator role can sign in and land where their work is.
@@ -825,7 +833,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 ## Assumptions
 
 - **One company**: There is one management company per deployment. The migration creates it and links every existing community to it. Multi-company tenancy is out of scope, but nothing in this spec prevents it.
-- **Archived history**: "Readable for history and audit" means the archived community's Community settings sections, read-only, plus residents' own payment history (FR-012a). Other features' records (applications, payments, ledger) are kept unchanged but are not shown through new staff surfaces here. A reporting or audit spec can add that later.
+- **Archived history**: "Readable for history and audit" means the archived community's Community settings sections, read-only, plus residents' own payment history and their home's submitted architectural requests (FR-012a). Other features' records (applications, payments, ledger) are kept unchanged but are not shown through new staff surfaces here. A reporting or audit spec can add that later.
 - **Invitation resend**: Not answered by the owner. This spec lets anyone who could send the invitation resend or revoke it.
 - **Invitations survive only while their sender has authority** (FR-022). The alternative, "invitations belong to the community and outlive their sender", was rejected as less safe. The owner may choose it instead.
 - **Properties for a new community**: No property import exists today. A community added through this spec has no properties until an engineer-run seed loads them, or until a later Properties spec adds an import. Its Residents area says so (FR-024d). This is the one remaining engineer step in onboarding an HOA.
@@ -836,7 +844,13 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - "no longer managed" to residents on archive;
   - "removed from a home" and "autopay ended" on resident removal;
   - recovery-mode notice to Company Administrators.
-- **Desktop-first**, like the rest of the board side (spec 025). Mobile layout is out of scope for staff pages. The invitation acceptance and sign-up pages must work on a phone, because invitees open them from email.
+- **Responsive staff pages** (constitution §6; Decisions made in analysis, 2026-10-18). Staff pages are designed desktop-first, but MUST work at tablet and phone widths:
+  - nothing scrolls the page sideways;
+  - wide tables scroll inside their own container or stack into rows;
+  - the Community settings side list collapses into a menu;
+  - side panels such as the property drawer open full width.
+
+  The invitation acceptance and sign-up pages are phone-first, because invitees open them from email.
 - **Demo data**: In Development, Dev and PR environments only, the dev seed gets one Company Administrator (via the setup step) and one Onboarding community, so the flow can be tried end to end. Seeded invitations are sent only to the email simulator or allow-listed addresses.
 
 ## Out of Scope

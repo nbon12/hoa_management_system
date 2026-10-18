@@ -208,16 +208,32 @@ The dialogs ask the server first, then act (brief 04 D4).
 ### GET /company/administrators
 
 - **Auth**: `ManageCompanyAdministrators`.
-- **200**:
+- **Query**: `limit`/`offset` (25 / 0; limits above 100 are clamped).
+- **200**, ordered by name A–Z:
 
 ```json
 {
-  "administrators": [{ "userId": "…", "name": "Robin Hale", "email": "owner@example.com", "grantedAt": "…", "grantedBy": null, "source": "Setup" }],
-  "invitations": [{ "id": "guid", "email": "ops@example.com", "state": "Pending", "effectiveState": "Pending", "sentBy": "Robin Hale", "sentAt": "…", "expiresAt": "…" }]
+  "items": [{ "userId": "…", "name": "Robin Hale", "email": "owner@example.com", "grantedAt": "…", "grantedBy": null, "source": "Setup" }],
+  "total": 2, "limit": 25, "offset": 0
 }
 ```
 
   `grantedBy` is `null` when the source is `Setup`.
+
+### GET /company/invitations
+
+The Company Administrator invitations shown on the same page.
+
+- **Auth**: `ManageCompanyAdministrators`.
+- **Query**: `state` (optional), `limit`/`offset` (25 / 0; limits above 100 are clamped).
+- **200**, newest first:
+
+```json
+{
+  "items": [{ "id": "guid", "email": "ops@example.com", "state": "Pending", "effectiveState": "Pending", "revokeReason": null, "sentBy": "Robin Hale", "sentAt": "…", "expiresAt": "…", "canResend": true, "canRevoke": true }],
+  "total": 1, "limit": 25, "offset": 0
+}
+```
 
 ### POST /company/administrators/invitations
 

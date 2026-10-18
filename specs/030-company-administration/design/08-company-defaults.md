@@ -61,7 +61,7 @@ New communities should follow the company's standard setup until their own gover
 
 ## 4. Artboards
 
-"Now" is Monday, Oct 12, 2026, 10:00 AM EDT, except 8.08.e, which is a snapshot after the change. Values are the company defaults in conventions §4.1. Desktop width only.
+"Now" is Monday, Oct 12, 2026, 10:00 AM EDT, except 8.08.e, which is a snapshot after the change. Values are the company defaults in conventions §4.1. Desktop width, plus the tablet and phone artboards of the main page that conventions §2 asks for.
 
 ### 4.1 The page (every artboard)
 

@@ -55,7 +55,7 @@ Each community follows its own governing documents, so its architectural review 
 
 ## 4. Artboards
 
-"Now" is Monday, Oct 12, 2026, 10:00 AM EDT. People, communities and values come from conventions §4. Desktop width only.
+"Now" is Monday, Oct 12, 2026, 10:00 AM EDT. People, communities and values come from conventions §4. Desktop width, plus the tablet and phone artboards of the main page that conventions §2 asks for.
 
 ### 4.1 The section (every artboard)
 

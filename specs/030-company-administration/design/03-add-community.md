@@ -526,7 +526,7 @@ The conventions §8 baseline applies. For this form:
 - Bulk add or import of communities.
 - A "type the name to confirm" step, or any confirmation before adding.
 - A view of the form for Residents, Board Members or Accountants.
-- Phone layout (staff pages are desktop-first, spec Assumptions).
+- Phone and tablet artboards beyond the main page's two (conventions §2).
 - Notifications: nothing about it appears here.
 
 ## 9. Design review checklist

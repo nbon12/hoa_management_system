@@ -185,7 +185,7 @@ The 025 create and update endpoints get these rules, `board-writes` rate limitin
 
 ```csharp
 Task<ResidentContext> RequireAsync(ClaimsPrincipal user, ResidentOperation op, CancellationToken ct);
-// op: Read | ReadPaymentHistory | Write
+// op: Read | ReadHistory | Write
 ```
 
 It reads `propertyId` from the token. If the claim is missing, it returns `PROPERTY_ACCESS_DENIED` 403. Then it runs one query:
@@ -201,12 +201,12 @@ WHERE up."UserId" = @user AND up."PropertyId" = @property
 - No row: `PROPERTY_ACCESS_DENIED`.
 - Onboarding: `COMMUNITY_NOT_ACTIVE`.
 - Archived:
-  - `ReadPaymentHistory` (ledger, statements, receipts, transactions, unpaid assessments): allowed;
+  - `ReadHistory` (ledger, statements, receipts, transactions, unpaid assessments, and the home's submitted architectural requests from spec 029): allowed;
   - every other operation: `COMMUNITY_ARCHIVED`.
 
 It returns the property and **community from the database, not the token** (FR-012a: "never from the token").
 
-Every resident endpoint in `Features/Payments`, `Features/Property`, `Features/Community`, `Features/Dashboard` and `Features/Violations` (about 30 endpoints, listed in the contract) replaces `Guid.Parse(User.FindFirst("propertyId")!…)` / `RequirePropertyId()` / `RequireCommunityId()` with a call to `RequireAsync`. The static test in R3 enforces it.
+Every resident endpoint in `Features/Payments`, `Features/Property` (including spec 029's `Property/Architectural`, through `ResidentArcScope`), `Features/Community` (including `Community/Violations`) and `Features/Dashboard` (about 45 endpoints, listed in the contract) replaces `Guid.Parse(User.FindFirst("propertyId")!…)` / `RequirePropertyId()` / `RequireCommunityId()` with a call to `RequireAsync`. The static test in R3 enforces it.
 
 **Cost**: one indexed lookup per request, on the unique `(UserId, PropertyId)` index. That is acceptable under the Neon pool limits.
 

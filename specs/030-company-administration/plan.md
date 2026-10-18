@@ -69,9 +69,9 @@ Add a company layer above spec 025's per-community model, and the flows that nee
 **Scale/Scope**:
 - One company; tens of communities; hundreds of properties and residents per community.
 - 5 new tables, 2 modified tables, 1 collation.
-- About 35 new or changed endpoints across the four contracts. About 30 resident endpoints gain the access check.
+- About 35 new or changed endpoints across the four contracts. About 45 resident endpoints gain the access check, including spec 029's.
 - 1 CLI verb.
-- About 12 new Angular routes, 5 shared UI building blocks and 3 new services.
+- About 12 new Angular routes, 7 shared UI building blocks and 4 new services.
 
 ## Constitution Check
 
@@ -96,13 +96,17 @@ Add a company layer above spec 025's per-community model, and the flows that nee
   - **Rate limits**: `board-writes` on every write, including the 025 membership endpoints that lack it today; `auth` on the invitation endpoints; per-recipient email caps (R12).
   - **Sensitive events**: logged for every change and for failed acceptances (R19).
   - **Errors**: the production error shape is unchanged.
-  - **Observability**: new endpoints are covered by the existing backend Sentry and OpenTelemetry instrumentation. The Angular app's OpenTelemetry instrumentation strips URL fragments, so `/invite` tokens never reach telemetry (it has no Sentry SDK).
+  - **Observability**: ⚠️
+    - New backend endpoints are covered by the existing backend Sentry, which reads the OpenTelemetry pipeline. Each request activity carries `community.id` and `capability` tags.
+    - The Angular app has no Sentry SDK, although the constitution requires one (§2, §8). The gap predates this feature. It is recorded under Complexity Tracking and raised as a separate task.
+    - The Angular OpenTelemetry instrumentation strips URL fragments, so `/invite` tokens never reach telemetry.
   - The pre-existing log-scrubber gap is raised as a separate task (R19).
 - **File storage**: ✅ Not applicable. No files.
 - **Caching/edge**: ✅ Every endpoint is `no-store`. `/invite` sets `Referrer-Policy: no-referrer`.
+- **Responsiveness**: ✅ Staff pages are designed desktop-first and work at phone, tablet and desktop widths (constitution §6; spec Decisions made in analysis, 2026-10-18). The invitation pages are phone-first. Playwright checks every new page at three widths.
 - **Testing discipline**: ✅
   - Test-first per user story.
-  - Testcontainers PostgreSQL with isolated companies and communities per test, so the suite is parallel-safe.
+  - Testcontainers PostgreSQL with isolated companies and communities per test, so the suite is parallel-safe. This replaces the rolled-back transaction of testing constitution §2.1 with the equivalent pattern recorded under Complexity Tracking, approved by the owner on 2026-10-18.
   - `[Theory]` coverage as listed above.
   - Concurrency tests.
   - Every frontend tool is constitution-approved.
@@ -118,7 +122,7 @@ Add a company layer above spec 025's per-community model, and the flows that nee
   - Notification Settings stays optional.
   - After the MVP foundation, US4, US5's ARC section, US6's flags and US7 can be built in parallel (spec Constitution Requirements).
 
-No gate failures.
+No gate failures. Two items are recorded under Complexity Tracking: a pre-existing frontend Sentry gap, and the test-isolation pattern (approved 2026-10-18).
 
 ## Project Structure
 
@@ -179,9 +183,11 @@ HOAManagementCompany/
 │   │       ├── ArcSettingsGetEndpoint.cs           # ViewArcSettings + defaults comparison
 │   │       ├── ArcSettingsPutEndpoint.cs           # ManageArcSettings
 │   │       ├── ArcSettingsResetEndpoint.cs         # new
+│   │       ├── ArcRuleValidator.cs                 # new, shared with company defaults
 │   │       └── ArcSweepService.cs                  # skip non-Active communities
 │   ├── Company/                                    # new
 │   │   ├── ICompanyContext.cs / CompanyContext.cs
+│   │   ├── CompanyLocks.cs, CompanyErrors.cs, CompanyLog.cs
 │   │   ├── CommunityCreateEndpoint.cs
 │   │   ├── PortfolioEndpoint.cs
 │   │   ├── CommunityLifecycleService.cs            # activate/archive/restore/parent + previews (R4)
@@ -193,6 +199,8 @@ HOAManagementCompany/
 │   ├── Invitations/                                # new; token-authorized, outside the scope test
 │   │   ├── InvitationService.cs                    # create/send/resend/revoke/accept, caps (R6, R12)
 │   │   ├── InvitationTokens.cs
+│   │   ├── IInvitationOfferHandler.cs + Membership-, Residency- and CompanyAdministratorOfferHandler.cs
+│   │   ├── IInvitationLinkObserver.cs                # dev vault seam for e2e links
 │   │   ├── InvitationEmailRenderer.cs              # direct-send bodies (contracts/emails.md)
 │   │   └── Invitation{Preview,Register,Accept}Endpoint.cs
 │   ├── Residents/
@@ -200,10 +208,12 @@ HOAManagementCompany/
 │   ├── Payments/                                   # every resident endpoint → ResidentAccess; PaymentService:
 │   │                                               # EnrolledByUserId, CancelRecurringForAsync; draft job filter
 │   ├── Property/, Community/, Dashboard/           # resident endpoints → ResidentAccess
+│   │   └── Property/Architectural/ResidentArcScope.cs # spec 029's endpoints → ResidentAccess
 │   └── Common/ClaimsPrincipalExtensions.cs         # raw Guid.Parse claim reads removed
 ├── Infrastructure/
 │   ├── Configuration/StartupTasks.cs               # --grant-company-admin [--recover] [--company-name]
 │   ├── Configuration/InvitationOptions.cs (+ validator)
+│   ├── Configuration/AppLinks.cs (+ validator)     # App:BaseUrl
 │   └── Persistence/
 │       ├── ApplicationDbContext.cs                 # new DbSets + configuration
 │       └── Migrations/<ts>_AddCompanyAdministration.cs
@@ -238,7 +248,9 @@ neko-hoa/src/app/
 │   ├── disabled-reason.directive.ts                # hover + focus tooltip (Clarifications 2026-10-14)
 │   ├── autosave-field.directive.ts                 # per-field save, "✓ Saved"
 │   ├── toast-host.component.ts
-│   └── property-drawer.component.ts
+│   ├── property-drawer.component.ts
+│   ├── archived-notice.component.ts
+│   └── refusal-messages.ts
 ├── shell/shell.component.ts                        # company-area state, Company menu
 └── features/
     ├── auth/company-sign-in.component.ts           # new, bookmarkable
@@ -304,8 +316,10 @@ There are no constitution violations. These choices widen the slice and are reco
 
 | Choice | Why needed | Simpler alternative rejected because |
 |--------|------------|--------------------------------------|
-| A per-request `ResidentAccess` check in about 30 existing resident endpoints | SC-011 and FR-012a need removal and status to apply on the next request, and today's endpoints trust 15-minute token claims (or return 500 with no property claim) | Shorter tokens still leave a window and add refresh churn. A hidden global pre-processor can't tell read from write from payment-history access (R8). |
+| A per-request `ResidentAccess` check in about 45 existing resident endpoints (spec 029's included) | SC-011 and FR-012a need removal and status to apply on the next request, and today's endpoints trust 15-minute token claims (or return 500 with no property claim) | Shorter tokens still leave a window and add refresh churn. A hidden global pre-processor can't tell read from write from payment-history access (R8). |
 | Changing sign-in (`AuthService`) so staff need no home | Managers and Company Administrators often live in no community. Removing a resident's only home must not lock out their board role (spec F01). | Keeping the co-residence workaround would give staff fake homes and resident access they shouldn't have |
 | Sending invitation emails directly, not through the outbox | The outbox stores payloads in plain text and would hold live tokens (R6) | A token reference in the outbox would need a second render path only for invitations |
 | An ICU collation for natural address order | The design orders #9 before #10 (brief 06) | Sorting in memory breaks paging, and a stored sort key needs extra columns for every address format |
 | No Stripe payment-method detach on removal or archive (a known limit) | Today's owner-initiated cancel doesn't detach either, and the spec doesn't require it (R9) | Detaching would add new `IStripeGateway` surface and failure modes for no spec requirement. It can follow if the payments owner wants it. |
+| Test isolation by unique rows per test, not a rolled-back transaction. Testing constitution §2.1 allows "an equivalent pattern approved in writing"; the owner approved this one on 2026-10-18. | Integration tests drive the API through `WebApplicationFactory`, whose requests commit on their own connections. The concurrency tests (last manager, last administrator, accept vs revoke) need committed transactions and advisory locks. The setup-step and migration tests need their own fresh databases. | A wrapping transaction can't contain the API's own connections, and would make the concurrency tests meaningless. The pattern is the one 025 and 027 already use: every row keyed by a new GUID, every company and community created per test, and nothing relies on a clean database. |
+| Ship the new frontend pages without frontend Sentry. This is a pre-existing gap: the Angular app has no Sentry SDK, which constitution §2 and §8 require. | Adding Sentry to the Angular app is app-wide work, unrelated to company administration | Adding it inside this feature would widen it with an unrelated change. It is raised as a separate task. Until then the new pages rely on the existing OpenTelemetry instrumentation. |

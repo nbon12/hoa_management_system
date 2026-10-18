@@ -59,7 +59,7 @@ When done, open every artboard and check it renders without console errors, show
 
 ## 4. Artboards
 
-"Now" is Monday, Oct 12, 2026, 10:00 AM EDT, except 8.09.b and c (8:30 AM EDT). Company Administrator invitations show times in the company default time zone, America/New_York (FR-022). Desktop width only.
+"Now" is Monday, Oct 12, 2026, 10:00 AM EDT, except 8.09.b and c (8:30 AM EDT). Company Administrator invitations show times in the company default time zone, America/New_York (FR-022). Desktop width, plus the tablet and phone artboards of the main page that conventions §2 asks for. Both tables (administrators and invitations) page at 25 rows with the conventions §7.6 pager.
 
 ### 4.1 The page
 

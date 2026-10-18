@@ -367,7 +367,7 @@ The conventions §8 baseline applies. For this page:
 - Count tiles (`HeroStat`), a "No manager" filter, column sorting, a page-size picker, export, and bulk actions. None is in FR-034.
 - Extra columns: property counts, archived or activated dates, "added by", end-dated managers, expired or revoked invitations, Board Member and Accountant invitations.
 - Any view of the portfolio for Community Managers, Board Members, Accountants or Residents.
-- Phone layout (staff pages are desktop-first, spec Assumptions).
+- Phone and tablet artboards beyond the main page's two (conventions §2).
 - Notifications: nothing about it appears here.
 
 ## 9. Design review checklist
