@@ -446,6 +446,11 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcQueries>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcActionsService>();
 
+// ── Company administration (030-company-administration) ───────────────────
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.ICompanyContext,
+    HOAManagementCompany.Features.Company.CompanyContext>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyEmailRenderer>();
+
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();
 builder.Services.AddScoped<HOAManagementCompany.Seed.DocumentStorageInitializer>();

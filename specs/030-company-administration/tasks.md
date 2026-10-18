@@ -222,16 +222,16 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Company context, locks and pure rules
 
-- [ ] T026 [P] Add `ICompanyContext` and `CompanyContext` (scoped, cached per request) in `HOAManagementCompany/Features/Company/ICompanyContext.cs` and `CompanyContext.cs`, and register them in `Program.cs`.
+- [X] T026 [P] Add `ICompanyContext` and `CompanyContext` (scoped, cached per request) in `HOAManagementCompany/Features/Company/ICompanyContext.cs` and `CompanyContext.cs`, and register them in `Program.cs`.
   - `ForUserAsync(user)` returns the company of the caller's live grant, else the company of their effective Community Manager memberships.
   - `ForCommunityAsync(communityId)` returns the community's company.
   - `GetDeploymentCompanyAsync()` returns the single row, and throws unless there is exactly one. It is for the setup step and the seed only.
   - Every company query filters by the returned id (FR-001). That also keeps tests that create their own companies isolated.
-- [ ] T027 [P] Add `CommunityLocks.RunAsync(communityId, body, ct)` in `HOAManagementCompany/Features/Board/CommunityLocks.cs` and `CompanyLocks.RunAsync(companyId, body, ct)` in `HOAManagementCompany/Features/Company/CompanyLocks.cs` (R5).
+- [X] T027 [P] Add `CommunityLocks.RunAsync(communityId, body, ct)` in `HOAManagementCompany/Features/Board/CommunityLocks.cs` and `CompanyLocks.RunAsync(companyId, body, ct)` in `HOAManagementCompany/Features/Company/CompanyLocks.cs` (R5).
   - Each takes `pg_advisory_xact_lock` on a key derived from the id, in a key space distinct from `LedgerService`'s.
   - Each runs inside `CreateExecutionStrategy().ExecuteAsync` and one transaction.
   - Test (`HOAManagementCompany.Tests/Integration/Company/AdvisoryLockTests.cs`): two concurrent bodies serialize on the same id, and don't on different ids.
-- [ ] T028 [P] Write `ManagerRuleTheoryTests` first. These are pure tests: current rows × proposed change → allowed or `LAST_MANAGER`.
+- [X] T028 [P] Write `ManagerRuleTheoryTests` first. These are pure tests: current rows × proposed change → allowed or `LAST_MANAGER`.
   - **Changes covered**: end, downgrade, deactivate; set, move or clear an end date; appoint; replace; accept a manager invitation with or without an end date.
   - **Cases**:
     - the only open-ended manager can't be ended, downgraded or end-dated (the US2-S9 and US2-S10 data);
@@ -242,8 +242,8 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - Archived skips the rule.
 
   File: `HOAManagementCompany.Tests/Unit/Company/ManagerRuleTheoryTests.cs`
-- [ ] T029 Implement the pure, static `ManagerRule.Evaluate(currentRows, change, today)`, with a Repowise `domain=board` marker, until T028 passes. File: `HOAManagementCompany/Features/Board/ManagerRule.cs`
-- [ ] T030 [P] Write `LandingRuleTheoryTests` first. These are pure tests.
+- [X] T029 Implement the pure, static `ManagerRule.Evaluate(currentRows, change, today)`, with a Repowise `domain=board` marker, until T028 passes. File: `HOAManagementCompany/Features/Board/ManagerRule.cs`
+- [X] T030 [P] Write `LandingRuleTheoryTests` first. These are pure tests.
   - **Inputs**: usable homes (Active, Archived, Onboarding only, none); effective non-resident memberships in Onboarding or Active communities; whether the user is a Company Administrator; `lastActiveMode`; which sign-in page was used.
   - **Output**: `Board`, `Company`, `Resident`, `NotLive` or `NoHome`, in FR-036a's order.
   - **Cases**:
@@ -255,12 +255,12 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
     - US9-S8: the company page for a non-administrator gives the usual landing.
 
   File: `HOAManagementCompany.Tests/Unit/Company/LandingRuleTheoryTests.cs`
-- [ ] T031 Implement the pure `LandingRule.Decide(...)` until T030 passes. File: `HOAManagementCompany/Features/Auth/LandingRule.cs`
-- [ ] T032 [P] Add `CompanyLog` in `HOAManagementCompany/Features/Company/CompanyLog.cs`, following `ArcLog`.
+- [X] T031 Implement the pure `LandingRule.Decide(...)` until T030 passes. File: `HOAManagementCompany/Features/Auth/LandingRule.cs`
+- [X] T032 [P] Add `CompanyLog` in `HOAManagementCompany/Features/Company/CompanyLog.cs`, following `ArcLog`.
   - It has one method per R19 template: `CommunityLifecycle`, `CommunityProfileChanged`, `CompanyDefaultsChanged`, `InvitationChange`, `InvitationAcceptFailed`, `ResidentLinkChange`, `AutopayCancelled`, `CompanyAdminChange`.
   - Each method takes IDs, codes and setting values only, plus an optional `Cause`.
   - Add a `BoardMembershipChange` overload that adds `Kind` and `Cause`.
-- [ ] T033 [P] Add `CompanyEmailRenderer` in `HOAManagementCompany/Features/Company/CompanyEmailRenderer.cs`, modelled on `ArcEmailRenderer`.
+- [X] T033 [P] Add `CompanyEmailRenderer` in `HOAManagementCompany/Features/Company/CompanyEmailRenderer.cs`, modelled on `ArcEmailRenderer`.
   - It has the five `co_*` kinds as constants, with their dedup keys and plain-text bodies per `contracts/emails.md`.
   - Register it with the outbox dispatcher.
   - Unit test (`HOAManagementCompany.Tests/Unit/Company/CompanyEmailRendererTests.cs`): every kind is at most 30 characters; each kind's subject, body fields and dedup-key format; no body contains an invitation link.
