@@ -42,5 +42,8 @@ public class DatabaseSeeder(
 
         // 027: demo board, manager and architectural applications. Idempotent, every startup.
         await new ArchitecturalSeeder(db, services, logger).SeedAsync(ct);
+
+        // 030: the Company Administrator and the Onboarding community. Idempotent, every startup.
+        await new CompanySeeder(db, services, services.GetRequiredService<IHostEnvironment>(), logger).SeedAsync(ct);
     }
 }

@@ -419,17 +419,17 @@ Isolation follows the pattern recorded in plan.md's Complexity Tracking: unique 
 
 ### Setup step and seed (FR-038; research R18)
 
-- [ ] T058 [P] Write `SetupStepTests` first. Each test runs against its own fresh database, because the step reads the deployment's single company. File: `HOAManagementCompany.Tests/Integration/Company/SetupStepTests.cs`
+- [X] T058 [P] Write `SetupStepTests` first. Each test runs against its own fresh database, because the step reads the deployment's single company. File: `HOAManagementCompany.Tests/Integration/Company/SetupStepTests.cs`
   - **US7-S6**, no administrator exists:
     - when the email has an account: a live grant with `Source = Setup`; `CompanyAdminChange Actor=setup Change=Granted` is logged; stdout says `Granted Company Administrator to <userId>.`; exit 0;
     - when it doesn't: a `CompanyAdministrator` invitation is sent through `FakeAlertProvider`; stdout says `Invitation sent; it expires …`; exit 0.
   - **US7-S7**: a second run prints `A Company Administrator already exists; nothing changed.` and exits 0. It writes nothing: grant, invitation and outbox counts are unchanged.
   - `--company-name` sets the company's name.
   - An invalid email exits 2.
-- [ ] T059 Add `CompanyAdministratorService.SetupAsync(email, recover, companyName)` in `HOAManagementCompany/Features/Company/CompanyAdministratorService.cs`, until T058 passes. This task builds the non-recovery path; T139 adds recovery.
+- [X] T059 Add `CompanyAdministratorService.SetupAsync(email, recover, companyName)` in `HOAManagementCompany/Features/Company/CompanyAdministratorService.cs`, until T058 passes. This task builds the non-recovery path; T139 adds recovery.
   - Add the `--grant-company-admin <email> [--recover] [--company-name "<name>"]` verb to `HOAManagementCompany/Infrastructure/Configuration/StartupTasks.cs`.
   - The verb applies migrations first and is allowed in every environment. It is never an HTTP route.
-- [ ] T060 Add the idempotent `CompanySeeder` in `HOAManagementCompany/Seed/CompanySeeder.cs`, for dev-like environments only, and call it from `HOAManagementCompany/Seed/DatabaseSeeder.cs`. Per quickstart.md it adds:
+- [X] T060 Add the idempotent `CompanySeeder` in `HOAManagementCompany/Seed/CompanySeeder.cs`, for dev-like environments only, and call it from `HOAManagementCompany/Seed/DatabaseSeeder.cs`. Per quickstart.md it adds:
   - `company@nekohoa.dev`, created through `SetupAsync`;
   - the Onboarding community "Keystone Ridge", with `manager@nekohoa.dev` as its open-ended Community Manager and seeded properties.
 

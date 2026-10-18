@@ -148,11 +148,14 @@ public sealed class InvitationService(
 
     /// <summary>
     /// Emails a pending or expired invitation a new link with a new 72 hours, and makes
-    /// <paramref name="actorUserId"/> its sender (FR-022). The old link stops working.
+    /// <paramref name="actorUserId"/> its sender (FR-022). The old link stops working. A null actor
+    /// is the setup step resending its own Company Administrator invitation.
     /// </summary>
-    public async Task<Invitation> ResendAsync(string actorUserId, Guid invitationId, CancellationToken ct)
+    public async Task<Invitation> ResendAsync(string? actorUserId, Guid invitationId, CancellationToken ct)
     {
         var target = await TargetAsync(invitationId, ct) ?? throw CompanyErrors.NotFound("The invitation");
+        if (actorUserId is null && target.Kind != InvitationKind.CompanyAdministrator)
+            throw new InvalidOperationException("Only the setup step resends without a sender, and only Company Administrator invitations.");
         var sends = new List<PendingSend>();
 
         var invitation = await LockAsync(target.Kind, target.CompanyId, target.CommunityId, async () =>
@@ -172,7 +175,7 @@ public sealed class InvitationService(
             invitation.ResendCount++;
             sends.Add(Issue(invitation, now, bypassesCap: false, resent: true));
             await db.SaveChangesAsync(ct);
-            Log(actorUserId, invitation, "Resent", reason: null, cause: null, now);
+            Log(actorUserId ?? SetupActor, invitation, "Resent", reason: null, cause: null, now);
             return invitation;
         }, ct);
 

@@ -396,6 +396,7 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardServ
 // The dev vault keeps each emailed link only where e2e test support is enabled (T054).
 builder.Services.AddScoped<HOAManagementCompany.Features.Board.SenderAuthority>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.InvitationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyAdministratorService>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
     HOAManagementCompany.Features.Invitations.CompanyAdministratorOfferHandler>();
 builder.Services.AddSingleton<HOAManagementCompany.Features.Invitations.IInvitationLinkObserver>(sp =>
@@ -487,6 +488,11 @@ var app = builder.Build();
 var seedExitCode = await StartupTasks.RunSeedCommandAsync(app, args);
 if (seedExitCode is not null)
     return seedExitCode.Value;
+
+// ── --grant-company-admin setup step (030 FR-038) — every environment; never an HTTP route ──
+var setupExitCode = await StartupTasks.RunGrantCompanyAdminCommandAsync(app, args);
+if (setupExitCode is not null)
+    return setupExitCode.Value;
 
 // ── Middleware Pipeline ────────────────────────────────────────────────────
 app.UseExceptionHandler();
