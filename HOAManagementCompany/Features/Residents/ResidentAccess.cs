@@ -40,7 +40,16 @@ public sealed class ResidentAccess(ApplicationDbContext db)
         var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value;
         if (string.IsNullOrEmpty(userId) || !Guid.TryParse(user.FindFirst("propertyId")?.Value, out var propertyId))
             throw CompanyErrors.PropertyAccessDenied();
+        return await RecheckAsync(db, userId, propertyId, operation, ct);
+    }
 
+    /// <summary>
+    /// The same check for a known user and home, for a write that must check again under a lock
+    /// (for example after slow processor calls), so a removal or archive in between wins.
+    /// </summary>
+    public static async Task<ResidentContext> RecheckAsync(ApplicationDbContext db, string userId, Guid propertyId,
+        ResidentOperation operation, CancellationToken ct)
+    {
         var home = await db.UserProperties
             .Where(up => up.UserId == userId && up.PropertyId == propertyId)
             .Select(up => new

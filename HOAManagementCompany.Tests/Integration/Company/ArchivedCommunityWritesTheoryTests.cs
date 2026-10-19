@@ -28,7 +28,7 @@ public class ArchivedCommunityWritesTheoryTests(TestDatabaseFixture fixture) : C
 
     /// <summary>
     /// The registry of community writes. Each story adds its rows: US3 (profile, parent, ARC),
-    /// US2 (memberships and invitations) and US8 (residents) here; US5 adds its own when it lands.
+    /// US2 (memberships and invitations), US5 (ARC settings) and US8 (residents).
     /// </summary>
     private static readonly Dictionary<string, WriteRow> Rows = new()
     {
@@ -62,6 +62,15 @@ public class ArchivedCommunityWritesTheoryTests(TestDatabaseFixture fixture) : C
         ["invitation resend"] = new(HttpMethod.Post, "/communities/{communityId}/invitations/{invitationId}/resend",
             _ => new { }, Caller.Manager),
         ["invitation revoke"] = new(HttpMethod.Post, "/communities/{communityId}/invitations/{invitationId}/revoke",
+            _ => new { }, Caller.Manager),
+        // US5 (T129)
+        ["ARC settings save"] = new(HttpMethod.Put, "/communities/{communityId}/architectural-settings",
+            _ => new
+            {
+                reviewPeriodDays = 45, lapseRule = "FlagOverdueOnly", decisionRule = "MajorityOfMembers", reminderDays = 7,
+                timeZoneId = "America/New_York", formalDisapprovalStatement = "The board does not approve this application.",
+            }, Caller.Manager),
+        ["ARC settings reset"] = new(HttpMethod.Post, "/communities/{communityId}/architectural-settings/reset",
             _ => new { }, Caller.Manager),
         // US8 (T113)
         ["resident invite"] = new(HttpMethod.Post, "/communities/{communityId}/residents/invitations",
@@ -201,8 +210,10 @@ public class ArchivedCommunityWritesTheoryTests(TestDatabaseFixture fixture) : C
         var invitations = await db.Invitations.AsNoTracking().Where(i => i.CommunityId == communityId)
             .OrderBy(i => i.Id).Select(i => $"{i.Id}:{i.State}:{i.SentAt}").ToListAsync();
         var residents = await db.UserProperties.AsNoTracking().CountAsync(up => up.Property.CommunityId == communityId);
+        var arc = await db.CommunityArcSettings.AsNoTracking().Where(a => a.CommunityId == communityId)
+            .Select(a => $"{a.ReviewPeriodDays}:{a.LapseRule}:{a.UpdatedAt}").SingleAsync();
         var outbox = await db.OutboxMessages.AsNoTracking().CountAsync();
         return string.Join("|", community.CommunityName, community.County, community.ParentCommunityId, community.Status,
-            string.Join(",", memberships), string.Join(",", apps), votes, infoRequests, string.Join(",", invitations), residents, outbox);
+            string.Join(",", memberships), string.Join(",", apps), votes, infoRequests, string.Join(",", invitations), residents, arc, outbox);
     });
 }

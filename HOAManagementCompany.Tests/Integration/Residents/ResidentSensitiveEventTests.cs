@@ -77,6 +77,27 @@ public partial class ResidentSensitiveEventTests(TestDatabaseFixture fixture) : 
             Assert.DoesNotContain(secret, rendered, StringComparison.OrdinalIgnoreCase);
     }
 
+    // FR-024e: a sign-up from the link that is refused is a failed acceptance, and is logged.
+    [Fact]
+    public async Task ARefusedSignUpFromTheLink_IsLoggedAsAFailedAcceptance()
+    {
+        var community = await CreateCommunityInAsync(await CreateCompanyAsync());
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        var home = await CreatePropertyAsync(community, Address);
+        using var manager = await ClientForAsync(managerEmail);
+        var jane = $"jane-{Guid.NewGuid():N}@example.com";
+        var invitationId = (await JsonAsync(await InviteAsync(manager, community, home, jane))).GetProperty("invitationId").GetGuid();
+
+        var res = await CreateClient().PostAsJsonAsync("/api/v1/invitations/register",
+            new { token = Tokens(jane).Single(), firstName = "Jane", lastName = "Alvarez", password = "short" });
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var failed = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("InvitationAcceptFailed")
+                                                        && Prop(e, "InvitationId") == invitationId.ToString());
+        Assert.Equal(("VALIDATION_ERROR", home.ToString()), (Prop(failed, "Reason"), Prop(failed, "PropertyId")));
+        Assert.DoesNotContain(jane, failed.RenderMessage() + string.Join(" ", failed.Properties.Values));
+    }
+
     private static Task<HttpResponseMessage> InviteAsync(HttpClient sender, Guid community, Guid propertyId, string email) =>
         sender.PostAsJsonAsync($"/api/v1/communities/{community}/residents/invitations", new { propertyId, email });
 

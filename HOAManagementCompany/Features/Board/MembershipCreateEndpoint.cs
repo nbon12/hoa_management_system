@@ -1,6 +1,7 @@
 using System.Net.Mail;
 using System.Security.Claims;
 using FastEndpoints;
+using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Board.Settings;
 using HOAManagementCompany.Features.Company;
@@ -54,7 +55,8 @@ public class MembershipCreateEndpoint(
         var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")!.Value;
         if (hasEmail)
         {
-            if (!MailAddress.TryCreate(req.Email!.Trim(), out var parsed) || parsed.Address != req.Email.Trim())
+            if (req.Email!.Trim().Length > Invitation.MaxEmailLength || !MailAddress.TryCreate(req.Email.Trim(), out var parsed)
+                || parsed.Address != req.Email.Trim())
                 throw CompanyErrors.Validation(new CompanyErrors.FieldError("email", "Enter a valid email address."));
             var companyId = await companyContext.ForCommunityAsync(req.CommunityId, ct)
                             ?? throw CompanyErrors.Forbidden();

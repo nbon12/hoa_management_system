@@ -48,6 +48,9 @@ public class Invitation
     public ApplicationUser? Sender { get; set; }
     public ICollection<InvitationDelivery> Deliveries { get; set; } = [];
 
+    /// <summary>The column length of <see cref="Email"/> and <see cref="NormalizedEmail"/>.</summary>
+    public const int MaxEmailLength = 256;
+
     public static string Normalize(string email) => email.Trim().ToLowerInvariant();
 
     public bool IsExpired(DateTimeOffset now) => State == InvitationState.Pending && ExpiresAt is { } e && now >= e;

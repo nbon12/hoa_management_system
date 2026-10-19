@@ -951,7 +951,7 @@ The backend is covered by T041 (US9-S1 to US9-S6) and T030 (US9-S7 and US9-S8 ru
 
 ### Tests (write first)
 
-- [ ] T124 [P] [US4] Create `CompanyDefaultsEndpointTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyDefaultsEndpointTests.cs`:
+- [X] T124 [P] [US4] Create `CompanyDefaultsEndpointTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyDefaultsEndpointTests.cs`:
   - **US4-S1**: a Company Administrator PUTs `lapseRule: DeemedApproved`. A community created afterwards has `DeemedApproved`, and every existing community keeps its lapse rule.
   - **US4-S2**: take two existing communities (one created by this spec, one whose settings came from the migration backfill) and their received applications. After every default changes, their `CommunityArcSettings` and the applications' snapshot fields are unchanged.
   - **US4-S3**: a Community Manager's GET → 200 with `canEdit: false`, and their PUT → 403.
@@ -967,8 +967,8 @@ The backend is covered by T041 (US9-S1 to US9-S6) and T030 (US9-S7 and US9-S8 ru
 
 ### Implementation
 
-- [ ] T126 [US4] Extract the six-field validation from `HOAManagementCompany/Features/Board/Architectural/ArcSettingsPutEndpoint.cs` into `ArcRuleValidator.cs` in the same folder, without changing 027's behavior (`ArcSettingsEndpointTests` stay green)
-- [ ] T127 [US4] Add `CompanyDefaultsGetEndpoint` (`ViewCompanyDefaults`) and `CompanyDefaultsPutEndpoint` (`ManageCompanyDefaults`, `board-writes`, `ArcRuleValidator`) in `HOAManagementCompany/Features/Company/`, until T124 passes
+- [X] T126 [US4] Extract the six-field validation from `HOAManagementCompany/Features/Board/Architectural/ArcSettingsPutEndpoint.cs` into `ArcRuleValidator.cs` in the same folder, without changing 027's behavior (`ArcSettingsEndpointTests` stay green)
+- [X] T127 [US4] Add `CompanyDefaultsGetEndpoint` (`ViewCompanyDefaults`) and `CompanyDefaultsPutEndpoint` (`ManageCompanyDefaults`, `board-writes`, `ArcRuleValidator`) in `HOAManagementCompany/Features/Company/`, until T124 passes
 - [X] T128 [US4] Implement `CompanyDefaultsComponent` in `neko-hoa/src/app/features/company/`, until T125 pass. Add its routes to `neko-hoa/src/app/app.routes.ts`: `/app/company/defaults`, and the read-only `/app/board/company-defaults` for Community Managers.
 
 ---
@@ -986,7 +986,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ### Tests (write first)
 
-- [ ] T129 [P] [US5] Create `ArcSettingsSectionTests` in `HOAManagementCompany.Tests/Integration/Company/ArcSettingsSectionTests.cs`:
+- [X] T129 [P] [US5] Create `ArcSettingsSectionTests` in `HOAManagementCompany.Tests/Integration/Company/ArcSettingsSectionTests.cs`:
   - **US5-S1**: a Company Administrator with no membership GETs and PUTs ARC settings (200) and resets them, but still gets 403 when listing or voting on applications (FR-003).
   - **US5-S2**: the Community Manager edits ARC settings as in 027. A Board Member still reads them (200) and gets 403 on PUT.
   - **US5-S4**: each PUT logs one `ArcSettingsChanged` with old and new values.
@@ -1009,7 +1009,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ### Implementation
 
-- [ ] T131 [US5] Change the ARC settings endpoints in `HOAManagementCompany/Features/Board/Architectural/`, until T129 passes:
+- [X] T131 [US5] Change the ARC settings endpoints in `HOAManagementCompany/Features/Board/Architectural/`, until T129 passes:
   - `ArcSettingsGetEndpoint.cs` uses `ViewArcSettings` and adds `companyDefaults`, `differsFromDefaults` and `canEdit`;
   - `ArcSettingsPutEndpoint.cs` uses `ManageArcSettings` through `DecideAsync`;
   - add `ArcSettingsResetEndpoint.cs`, which copies the six fields only and never touches `NextApplicationNumber`.
@@ -1032,7 +1032,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ### Tests (write first)
 
-- [ ] T133 [P] [US7] Create `CompanyAdministratorsTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyAdministratorsTests.cs`:
+- [X] T133 [P] [US7] Create `CompanyAdministratorsTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyAdministratorsTests.cs`:
   - **US7-S1**: a Company Administrator invites ops@, giving a Pending `CompanyAdministrator` invitation valid for 72 hours, which is emailed. Ops accepts by registering. On the next request, `/auth/me` has `isCompanyAdministrator: true` and `GET /company/communities` returns 200.
   - **US7-S2**: with two administrators, one revokes the other.
     - The revoked user's next `GET /company/communities` → 403.
@@ -1047,15 +1047,15 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
     - `ALREADY_MEMBER` for a current administrator's email;
     - `INVITATION_PENDING` for a duplicate;
     - `/company/invitations/{id}/resend` and `/revoke` work as in T081.
-- [ ] T134 [P] [US7] Create `CompanyAdminConcurrencyTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyAdminConcurrencyTests.cs`.
+- [X] T134 [P] [US7] Create `CompanyAdminConcurrencyTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyAdminConcurrencyTests.cs`.
   - **US7-S4**: two administrators revoke each other at once, synchronized by a barrier.
   - Over 20 iterations, assert exactly one 200 and one 422 `LAST_COMPANY_ADMIN`, and one live grant left.
-- [ ] T135 [P] [US7] Create `SetupStepRecoveryTests` in `HOAManagementCompany.Tests/Integration/Company/SetupStepRecoveryTests.cs`, each against its own database. For **US7-S8**:
+- [X] T135 [P] [US7] Create `SetupStepRecoveryTests` in `HOAManagementCompany.Tests/Integration/Company/SetupStepRecoveryTests.cs`, each against its own database. For **US7-S8**:
   - with an administrator present, `--recover` for owner@ grants the role (`Source = Recovery`) when the email has an account, and invites otherwise;
   - `CompanyAdminChange Change=Recovery` is logged;
   - one `co_admin_recovery` outbox row goes to each current administrator;
   - exit 0.
-- [ ] T136 [P] [US7] Create `CompanyAdminNoBoardPowersTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyAdminNoBoardPowersTests.cs`. For **US7-S9**, a Company Administrator with no Board Member membership in A gets 403 on (FR-003):
+- [X] T136 [P] [US7] Create `CompanyAdminNoBoardPowersTests` in `HOAManagementCompany.Tests/Integration/Company/CompanyAdminNoBoardPowersTests.cs`. For **US7-S9**, a Company Administrator with no Board Member membership in A gets 403 on (FR-003):
   - casting a vote and recording an outcome;
   - resending an outcome email;
   - the applications list and detail;
@@ -1068,12 +1068,12 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ### Implementation
 
-- [ ] T138 [US7] Add these in `HOAManagementCompany/Features/Company/`, until T133, T134 and T136 pass:
+- [X] T138 [US7] Add these in `HOAManagementCompany/Features/Company/`, until T133, T134 and T136 pass:
   - `CompanyAdministratorsListEndpoint` (paged) and `CompanyInvitationsListEndpoint` (`GET /company/invitations`, paged);
   - `CompanyAdministratorsInviteEndpoint`;
   - `CompanyAdministratorsRevokeEndpoint`, which revokes under `CompanyLocks` and runs `SenderAuthority.RevokeOrphanedAsync`;
   - `CompanyInvitationResendEndpoint` and `CompanyInvitationRevokeEndpoint`.
-- [ ] T139 [US7] Add the `--recover` path to `CompanyAdministratorService.SetupAsync` in `HOAManagementCompany/Features/Company/CompanyAdministratorService.cs`, until T135 passes. It grants or invites with `Source = Recovery`, logs, and enqueues `co_admin_recovery`.
+- [X] T139 [US7] Add the `--recover` path to `CompanyAdministratorService.SetupAsync` in `HOAManagementCompany/Features/Company/CompanyAdministratorService.cs`, until T135 passes. It grants or invites with `Source = Recovery`, logs, and enqueues `co_admin_recovery`.
 - [X] T140 [US7] Implement `CompanyAdministratorsComponent` in `neko-hoa/src/app/features/company/`, with the route `/app/company/administrators`, until T137 pass
 
 ---
@@ -1089,7 +1089,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ### Tests (write first)
 
-- [ ] T141 [P] [US6] Extend `HOAManagementCompany.Tests/Integration/Company/PortfolioEndpointTests.cs`:
+- [X] T141 [P] [US6] Extend `HOAManagementCompany.Tests/Integration/Company/PortfolioEndpointTests.cs`:
   - **US6-S1**: with no open-ended manager, the row has `noManager: true`.
   - **US6-S2**: with only a pending manager invitation, `noManager` is true and `pendingManagerInvitations` lists it.
   - **US6-S3**: an ARC review period that differs from the default gives `differsFromDefaults: true`; an equal one gives false.
@@ -1101,7 +1101,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
     - `sort=status` orders by status, then name;
     - `noManager=true` returns only those communities;
     - `counts` ignore search and paging.
-- [ ] T142 [P] [US6] Create `PortfolioPerformanceTests` (SC-008) in `HOAManagementCompany.Tests/Performance/PortfolioPerformanceTests.cs`: with 200 communities that have managers, invitations and settings, the first page answers in under 2 s.
+- [X] T142 [P] [US6] Create `PortfolioPerformanceTests` (SC-008) in `HOAManagementCompany.Tests/Performance/PortfolioPerformanceTests.cs`: with 200 communities that have managers, invitations and settings, the first page answers in under 2 s.
 - [X] T143 [P] [US6] Extend `neko-hoa/src/app/features/company/portfolio.component.spec.ts` (brief 02):
   - the "No manager" and "differs from defaults" flags are text labels;
   - the status filter has counts;
@@ -1112,7 +1112,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ### Implementation
 
-- [ ] T144 [US6] Extend `HOAManagementCompany/Features/Company/PortfolioEndpoint.cs` as one SQL projection (R17), until T141 and T142 pass. It adds:
+- [X] T144 [US6] Extend `HOAManagementCompany/Features/Company/PortfolioEndpoint.cs` as one SQL projection (R17), until T141 and T142 pass. It adds:
   - managers and pending manager invitations;
   - `noManager`, `differsFromDefaults` and `counts`;
   - the `status`, `noManager` and `search` filters;
@@ -1146,16 +1146,16 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - keeps its tables usable: they scroll inside their own container or stack into rows;
   - collapses the settings side list into a menu below 768 px;
   - opens the property drawer full width on a phone.
-- [ ] T151 [P] Create `PermissionsMatrixTheoryTests` (SC-002, FR-005) in `HOAManagementCompany.Tests/Integration/Company/PermissionsMatrixTheoryTests.cs`.
+- [X] T151 [P] Create `PermissionsMatrixTheoryTests` (SC-002, FR-005) in `HOAManagementCompany.Tests/Integration/Company/PermissionsMatrixTheoryTests.cs`.
   - **Theory**: every action row of the spec's permissions table × the seven roles from Quality gates (Company Administrator; Community Manager of this community; Community Manager of another; Board Member; Accountant; Resident; no role).
   - **Each case** calls the real endpoint and asserts the table's answer: allowed (2xx, or an entity-rule code such as `LAST_MANAGER`), or 403 `FORBIDDEN`.
   - **FR-021's rows** are included: a Company Administrator grants and ends Board Member and Accountant memberships, directly and by invitation.
-- [ ] T152 [P] Create `CompanyTelemetryHygieneTests` (FR-040, SC-007) in `HOAManagementCompany.Tests/Integration/Company/CompanyTelemetryHygieneTests.cs`. Run one of each action across the feature, then assert:
+- [X] T152 [P] Create `CompanyTelemetryHygieneTests` (FR-040, SC-007) in `HOAManagementCompany.Tests/Integration/Company/CompanyTelemetryHygieneTests.cs`. Run one of each action across the feature, then assert:
   - every caused change has its own event, carrying the parent's actor and `Cause`;
   - no change is logged twice;
   - request spans for company, board and invitation endpoints carry the `community.id` and `capability` tags (spec Observability), and those tags never hold an email or a name;
   - no captured log event or OpenTelemetry span attribute contains any email, name, street address or token used in the test.
-- [ ] T153 [P] Create `CompanyAdministrationRateLimitTests` in `HOAManagementCompany.Tests/Integration/RateLimiting/CompanyAdministrationRateLimitTests.cs`:
+- [X] T153 [P] Create `CompanyAdministrationRateLimitTests` in `HOAManagementCompany.Tests/Integration/RateLimiting/CompanyAdministrationRateLimitTests.cs`:
   - a burst over the `board-writes` limit on community create, profile PATCH, membership create and resident invite → 429;
   - a burst over the `auth` limit on `/invitations/preview` → 429.
 - [X] T154 [P] Document the operator setup step in `infra/README.md`: `--grant-company-admin`, `--recover`, `--company-name`, and running it as a Cloud Run job execution of the service image

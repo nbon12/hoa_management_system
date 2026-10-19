@@ -215,7 +215,8 @@ public class ResidentInviteEndpoint(
         if (req.PropertyId is not { } propertyId)
             throw CompanyErrors.Validation(new CompanyErrors.FieldError("propertyId", "Choose a property."));
         var email = req.Email?.Trim();
-        if (string.IsNullOrEmpty(email) || !MailAddress.TryCreate(email, out var parsed) || parsed.Address != email)
+        if (string.IsNullOrEmpty(email) || email.Length > Invitation.MaxEmailLength || !MailAddress.TryCreate(email, out var parsed)
+            || parsed.Address != email)
             throw CompanyErrors.Validation(new CompanyErrors.FieldError("email", "Enter a valid email address."));
 
         var companyId = await companyContext.ForCommunityAsync(req.CommunityId, ct) ?? throw CompanyErrors.Forbidden();
@@ -278,9 +279,7 @@ public class ResidentRemoveEndpoint(
         if (await BoardHttp.SendDecisionAsync(HttpContext, decision, ct))
             return;
 
-        var actorId = ResidentsHttp.Actor(User);
-        var result = await CommunityLocks.RunAsync(db, communityId,
-            () => removals.RemoveAsync(communityId, propertyId, userId, actorId, ct), ct);
+        var result = await removals.RemoveAsync(User, communityId, propertyId, userId, ResidentsHttp.Actor(User), ct);
         // The emails were committed with the removal; send them now (the reconcile sweep is the backstop).
         await dispatcher.DispatchPendingAsync(ct);
         await SendOkAsync(result, ct);

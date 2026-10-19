@@ -1,7 +1,9 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Features.Board;
 using HOAManagementCompany.Features.Payments.Models;
 using HOAManagementCompany.Features.Payments.Recurring;
+using HOAManagementCompany.Features.Residents;
 using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -74,6 +76,20 @@ public class PaymentService(
         var vaulted = await gateway.GetSetupIntentResultAsync(req.SetupIntentId, ct);
         var method = vaulted.PaymentMethodType == "card" ? PaymentMethod.Card : PaymentMethod.Ach;
 
+        // 030 FR-024c/FR-024g: the schedule is written under the community lock, after checking the
+        // link and the status again, so a removal or archive that committed during the processor
+        // calls above wins instead of being undone by this enrollment.
+        var communityId = await db.Properties.Where(p => p.Id == propertyId).Select(p => p.CommunityId).FirstAsync(ct);
+        return await CommunityLocks.RunAsync(db, communityId, async () =>
+        {
+            await ResidentAccess.RecheckAsync(db, userId, propertyId, ResidentOperation.Write, ct);
+            return await SaveRecurringAsync(propertyId, userId, req, acceptedIp, userAgent, vaulted, method, ct);
+        }, ct);
+    }
+
+    private async Task<RecurringPaymentDto> SaveRecurringAsync(Guid propertyId, string userId, RecurringPaymentRequest req,
+        string? acceptedIp, string? userAgent, StripeVaultedMethod vaulted, PaymentMethod method, CancellationToken ct)
+    {
         var existing = await db.RecurringPayments
             .Include(x => x.Authorizations)
             .FirstOrDefaultAsync(rp => rp.PropertyId == propertyId, ct);

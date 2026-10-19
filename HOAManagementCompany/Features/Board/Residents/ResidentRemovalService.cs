@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Features.Company;
 using HOAManagementCompany.Features.Payments;
@@ -15,10 +16,11 @@ public sealed record RemovalResult(bool Removed, bool AutopayCancelled);
 /// Removing a resident from a home (030 FR-024c, R9). The link goes; the home's autopay is
 /// cancelled when this resident enrolled it or no enroller is recorded; the removed resident is
 /// emailed, and so is each other resident when autopay ended. The owner of record, the balance and
-/// the user's other homes and memberships are untouched. Runs inside the caller's community lock.
+/// the user's other homes and memberships are untouched.
 /// </summary>
 public sealed class ResidentRemovalService(
     ApplicationDbContext db,
+    ICommunityScopeResolver scope,
     PaymentService payments,
     CompanyEmailRenderer emails,
     TimeProvider clock,
@@ -36,34 +38,54 @@ public sealed class ResidentRemovalService(
         return new RemovalPreview(autopay, reason, others);
     }
 
-    public async Task<RemovalResult> RemoveAsync(Guid communityId, Guid propertyId, string userId, string actorId,
-        CancellationToken ct)
+    /// <summary>
+    /// Removes the link under the community lock, in one transaction. The caller was authorized
+    /// before the lock; the decision is taken again inside it, so an archive that committed while
+    /// this request waited still refuses it (FR-012).
+    /// </summary>
+    public async Task<RemovalResult> RemoveAsync(ClaimsPrincipal caller, Guid communityId, Guid propertyId, string userId,
+        string actorId, CancellationToken ct)
     {
-        var link = await RequireLinkAsync(propertyId, userId, ct);
         var now = clock.GetUtcNow();
-        var (autopay, _) = await ClassifyAsync(propertyId, userId, ct);
+        Guid? cancelledId = null;
+        var result = await CommunityLocks.RunAsync(db, communityId, async () =>
+        {
+            // The execution strategy may run this body again after a transient failure; start from
+            // the database, not from entities a rolled-back attempt left tracked.
+            db.ChangeTracker.Clear();
+            cancelledId = null;
+            if (BoardHttp.RefusalFor(await scope.DecideAsync(caller, communityId, CommunityCapability.ManageResidents,
+                    ScopeOperation.Write, ct)) is { } refusal)
+                throw refusal;
 
-        db.UserProperties.Remove(link);
-        var cancelled = autopay == WillCancel
-            ? await payments.CancelRecurringForAsync(propertyId, RecurringCancellationReasons.ResidentRemoved, ct)
-            : null;
+            var link = await RequireLinkAsync(propertyId, userId, ct);
+            var (autopay, _) = await ClassifyAsync(propertyId, userId, ct);
 
-        var home = await db.Properties.AsNoTracking().Where(p => p.Id == propertyId)
-            .Select(p => new { p.Address, p.Community.CommunityName }).FirstAsync(ct);
-        var removed = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.Email).FirstAsync(ct);
-        if (!string.IsNullOrEmpty(removed))
-            db.OutboxMessages.Add(emails.ResidentRemoved(userId, removed, propertyId, home.Address, home.CommunityName,
-                cancelled is not null, now));
-        if (cancelled is not null)
-            foreach (var other in await OtherResidentsAsync(propertyId, userId, ct))
-                db.OutboxMessages.Add(emails.AutopayEnded(other.UserId, other.Email, cancelled.Id, home.Address, now));
+            db.UserProperties.Remove(link);
+            var cancelled = autopay == WillCancel
+                ? await payments.CancelRecurringForAsync(propertyId, RecurringCancellationReasons.ResidentRemoved, ct)
+                : null;
 
-        await db.SaveChangesAsync(ct);
+            var home = await db.Properties.AsNoTracking().Where(p => p.Id == propertyId)
+                .Select(p => new { p.Address, p.Community.CommunityName }).FirstAsync(ct);
+            var removed = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.Email).FirstAsync(ct);
+            if (!string.IsNullOrEmpty(removed))
+                db.OutboxMessages.Add(emails.ResidentRemoved(userId, removed, propertyId, home.Address, home.CommunityName,
+                    cancelled is not null, now));
+            if (cancelled is not null)
+                foreach (var other in await OtherResidentsAsync(propertyId, userId, ct))
+                    db.OutboxMessages.Add(emails.AutopayEnded(other.UserId, other.Email, cancelled.Id, home.Address, now));
+
+            await db.SaveChangesAsync(ct);
+            cancelledId = cancelled?.Id;
+            return new RemovalResult(true, cancelled is not null);
+        }, ct);
+
         CompanyLog.ResidentLinkChange(logger, actorId, communityId, propertyId, userId, "Removed", cause: null, now);
-        if (cancelled is not null)
-            CompanyLog.AutopayCancelled(logger, actorId, propertyId, cancelled.Id, RecurringCancellationReasons.ResidentRemoved,
+        if (cancelledId is { } recurringId)
+            CompanyLog.AutopayCancelled(logger, actorId, propertyId, recurringId, RecurringCancellationReasons.ResidentRemoved,
                 "ResidentRemoved", now);
-        return new RemovalResult(true, cancelled is not null);
+        return result;
     }
 
     private async Task<UserProperty> RequireLinkAsync(Guid propertyId, string userId, CancellationToken ct) =>

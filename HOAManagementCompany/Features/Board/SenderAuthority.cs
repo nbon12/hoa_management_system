@@ -37,14 +37,23 @@ public sealed class SenderAuthority(
     {
         if (userId is null)
             return invitation.Kind == InvitationKind.CompanyAdministrator;
+        return await DecideAsync(userId, invitation, ct) == ScopeDecision.Allowed;
+    }
 
+    /// <summary>
+    /// Whether <paramref name="userId"/> may send, resend or revoke <paramref name="invitation"/> now,
+    /// as a write: forbidden, archived or allowed, as the resolver decides.
+    /// </summary>
+    public async Task<ScopeDecision> DecideAsync(string userId, Invitation invitation, CancellationToken ct)
+    {
         var principal = Principal(userId);
         if (invitation.Kind == InvitationKind.CompanyAdministrator)
-            return await resolver.IsCompanyAdministratorAsync(principal, invitation.CompanyId, ct);
+            return await resolver.IsCompanyAdministratorAsync(principal, invitation.CompanyId, ct)
+                ? ScopeDecision.Allowed
+                : ScopeDecision.Forbidden;
 
-        var decision = await resolver.DecideAsync(principal, invitation.CommunityId!.Value,
+        return await resolver.DecideAsync(principal, invitation.CommunityId!.Value,
             CapabilityFor(invitation.Kind, invitation.Role), ScopeOperation.Write, ct);
-        return decision == ScopeDecision.Allowed;
     }
 
     /// <summary>

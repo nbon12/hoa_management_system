@@ -90,6 +90,8 @@ public class CommunityScopeResolver(ApplicationDbContext db) : ICommunityScopeRe
         CompanyCapability capability,
         CancellationToken ct = default)
     {
+        // Spec Observability: the capability tags the request span; there is no community here.
+        Activity.Current?.SetTag("capability", capability.ToString());
         var userId = UserId(user);
         if (string.IsNullOrEmpty(userId))
             return false;

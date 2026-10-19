@@ -308,6 +308,21 @@ public partial class ResidentInvitationTests(TestDatabaseFixture fixture) : Comp
         Assert.Equal(InvitationState.Pending, (await InvitationAsync(b.GetProperty("invitationId").GetGuid())).State);
     }
 
+    // The address column holds 256 characters; a longer one is a validation error, not a server error.
+    [Fact]
+    public async Task AnEmailLongerThan256Characters_IsAValidationError()
+    {
+        var (community, home, manager) = await ActiveCommunityWithManagerAsync();
+
+        var res = await InviteAsync(manager, community, home, new string('a', 250) + "@example.com");
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal(("VALIDATION_ERROR", "email"),
+            (body.GetProperty("code").GetString(), body.GetProperty("errors")[0].GetProperty("field").GetString()));
+        Assert.False(await WithDbAsync(db => db.Invitations.AnyAsync(i => i.PropertyId == home)));
+    }
+
     [Fact]
     public async Task APropertyOutsideTheCommunity_GetsTheSame403_AsOneThatDoesntExist()
     {

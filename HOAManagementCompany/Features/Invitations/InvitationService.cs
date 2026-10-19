@@ -118,6 +118,7 @@ public sealed class InvitationService(
                 SenderUserId = senderUserId,
                 CreatedAt = now,
             };
+            await EnsureActorMayAsync(senderUserId, invitation, ct);
             await handler.ValidateCreateAsync(invitation, ct);
 
             if (await OpenForTargetAsync(invitation, ct) is { } open)
@@ -162,6 +163,7 @@ public sealed class InvitationService(
         {
             sends.Clear();
             var invitation = await LockRowAsync(invitationId, ct);
+            await EnsureActorMayAsync(actorUserId, invitation, ct);
             var now = clock.GetUtcNow();
             var outcome = InvitationTransitions.Apply(InvitationTransitions.ViewOf(invitation, now), InvitationAction.Resend);
             if (outcome.RefusalCode is { } code)
@@ -191,6 +193,7 @@ public sealed class InvitationService(
         return await LockAsync(target.Kind, target.CompanyId, target.CommunityId, async () =>
         {
             var invitation = await LockRowAsync(invitationId, ct);
+            await EnsureActorMayAsync(actorUserId, invitation, ct);
             var now = clock.GetUtcNow();
             var outcome = InvitationTransitions.Apply(InvitationTransitions.ViewOf(invitation, now), InvitationAction.Revoke);
             if (outcome.RefusalCode is { } code)
@@ -407,7 +410,17 @@ public sealed class InvitationService(
             {
                 if (await db.Users.AnyAsync(u => u.NormalizedEmail == invitation.NormalizedEmail.ToUpperInvariant(), ct))
                     return new AcceptResult("REGISTRATION_FAILED", invitation, null, false);
-                user = await CreateUserAsync(invitation, register);
+                try
+                {
+                    user = await CreateUserAsync(invitation, register);
+                }
+                catch (DomainException ex)
+                {
+                    // A refused sign-up is a failed acceptance too (FR-024e).
+                    CompanyLog.InvitationAcceptFailed(logger, invitation.Id, invitation.CommunityId, invitation.PropertyId,
+                        null, ex.Code, now);
+                    throw;
+                }
             }
 
             var alreadyHeld = await HandlerFor(invitation.Kind).ApplyAsync(invitation, user.Id, ct);
@@ -491,6 +504,15 @@ public sealed class InvitationService(
             .FirstOrDefaultAsync(ct);
 
     // Company Administrator invitations serialize per company; the rest per community (R5).
+    // The callers authorized the actor before taking the lock; a revoke or archive that committed
+    // while this request waited for it must still win (US7-S2, FR-012). The setup step has no actor.
+    private async Task EnsureActorMayAsync(string? actorUserId, Invitation invitation, CancellationToken ct)
+    {
+        if (actorUserId is not null
+            && BoardHttp.RefusalFor(await senderAuthority.DecideAsync(actorUserId, invitation, ct)) is { } refusal)
+            throw refusal;
+    }
+
     private Task<T> LockAsync<T>(InvitationKind kind, Guid companyId, Guid? communityId, Func<Task<T>> body, CancellationToken ct) =>
         kind == InvitationKind.CompanyAdministrator
             ? CompanyLocks.RunAsync(db, companyId, body, ct)
