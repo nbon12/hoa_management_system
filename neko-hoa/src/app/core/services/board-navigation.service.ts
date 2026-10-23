@@ -34,6 +34,11 @@ interface NavItemDescriptor {
   route: string | null;
   requiredRoles?: string[];
   stub?: boolean;
+  /**
+   * 030: `any` unlocks the item from a role held in ANY of the user's communities, not just the
+   * active one ("Add community" depends on no particular community, brief 01 §4.1).
+   */
+  roleScope?: 'active' | 'any';
 }
 
 interface NavGroupDescriptor {
@@ -48,6 +53,9 @@ interface NavGroupDescriptor {
  */
 const BOARD_NAV: NavGroupDescriptor[] = [
   { group: null, items: [
+    // 030 FR-036 (brief 01 D1): after "My Communities" when that item is shown. Unlocked by an
+    // effective Community Manager membership in any Onboarding or Active community.
+    { label: 'Add community', route: '/app/board/communities/new', requiredRoles: ['CommunityManager'], roleScope: 'any' },
     { label: 'Community Home', route: '/app/board/home' },
   ]},
   { group: 'Community management', items: [
@@ -55,8 +63,8 @@ const BOARD_NAV: NavGroupDescriptor[] = [
     { label: 'Architectural Applications', route: '/app/board/architectural', requiredRoles: ['BoardMember', 'CommunityManager'] },
     { label: 'Board Approvals',            route: null, stub: true },
     { label: 'Announcements',              route: null, stub: true },
-    { label: 'Memberships',                route: '/app/board/memberships', requiredRoles: ['CommunityManager'] },
-    { label: 'ARC Settings',               route: '/app/board/arc-settings', requiredRoles: ['CommunityManager'] },
+    // 030 FR-029: the active community's Community settings page; its Community Manager only.
+    { label: 'Community settings',         route: '/app/board/settings/profile', requiredRoles: ['CommunityManager'] },
   ]},
   { group: 'Finance', items: [
     { label: 'AP Ledger',   route: null, stub: true, requiredRoles: ['CommunityManager', 'Accountant'] },
@@ -96,11 +104,13 @@ export class BoardNavigationService {
     // Fall back to the sole community when none is explicitly selected (single-community land).
     const active = this._activeCommunityId() ?? (communityIds.length === 1 ? communityIds[0] : null);
     const roles = this.rolesForCommunity(memberships, active);
-    return BoardNavigationService.buildNav({ roles, communityCount: communityIds.length });
+    const anyRoles = this.rolesForCommunity(memberships, null);
+    return BoardNavigationService.buildNav({ roles, communityCount: communityIds.length, anyRoles });
   });
 
+  /** 030 FR-036b: memberships in Archived communities confer nothing and are not counted. */
   private memberships(): CommunityMembershipSummary[] {
-    return this.auth.user()?.memberships ?? [];
+    return (this.auth.user()?.memberships ?? []).filter(m => m.communityStatus !== 'Archived');
   }
 
   private distinctCommunityIds(memberships: CommunityMembershipSummary[]): string[] {
@@ -124,30 +134,33 @@ export class BoardNavigationService {
    * `communityCount` decides whether the My Communities item is rendered (FR-025).
    * Kept static and side-effect-free so it is exhaustively unit-testable (T035).
    */
-  static buildNav({ roles, communityCount }: { roles: string[]; communityCount: number }): BoardNavGroup[] {
+  static buildNav({ roles, communityCount, anyRoles }: { roles: string[]; communityCount: number; anyRoles?: string[] }): BoardNavGroup[] {
     const roleSet = new Set(roles);
+    // Roles across every community; without it, only the active community's roles count.
+    const anyRoleSet = new Set([...(anyRoles ?? []), ...roles]);
     const groups: BoardNavGroup[] = [];
 
     if (communityCount > 1) {
       groups.push({
         group: null,
         items: [BoardNavigationService.resolveItem(
-          { label: 'My Communities', route: '/app/board/communities' }, roleSet)],
+          { label: 'My Communities', route: '/app/board/communities' }, roleSet, anyRoleSet)],
       });
     }
 
     for (const g of BOARD_NAV) {
       groups.push({
         group: g.group,
-        items: g.items.map(item => BoardNavigationService.resolveItem(item, roleSet)),
+        items: g.items.map(item => BoardNavigationService.resolveItem(item, roleSet, anyRoleSet)),
       });
     }
 
     return groups;
   }
 
-  private static resolveItem(item: NavItemDescriptor, roleSet: Set<string>): BoardNavItem {
-    const locked = !!item.requiredRoles && !item.requiredRoles.some(r => roleSet.has(r));
+  private static resolveItem(item: NavItemDescriptor, roleSet: Set<string>, anyRoleSet: Set<string>): BoardNavItem {
+    const scope = item.roleScope === 'any' ? anyRoleSet : roleSet;
+    const locked = !!item.requiredRoles && !item.requiredRoles.some(r => scope.has(r));
     return {
       label: item.label,
       route: item.route,

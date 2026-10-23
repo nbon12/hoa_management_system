@@ -3,6 +3,9 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql;
 using Testcontainers.Minio;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -65,6 +68,32 @@ public class TestDatabaseFixture : IAsyncLifetime
             await s3.PutBucketAsync(new PutBucketRequest { BucketName = "hoa-documents", UseClientRegion = true });
         }
         catch { /* bucket may already exist */ }
+    }
+
+    /// <summary>
+    /// 030: a new, empty database in the same Postgres container, for tests that must not share
+    /// state with the main test database (the setup step reads the deployment's single company,
+    /// and the migration test replays a legacy schema). Migrated to <paramref name="targetMigration"/>
+    /// (or the latest) unless <paramref name="migrate"/> is false. Returns its connection string.
+    /// </summary>
+    public async Task<string> CreateFreshDatabaseAsync(bool migrate = true, string? targetMigration = null)
+    {
+        var name = "fresh_" + Guid.NewGuid().ToString("N");
+        await using (var conn = new NpgsqlConnection(ConnectionString))
+        {
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand($"CREATE DATABASE \"{name}\"", conn);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        var connectionString = new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name }.ConnectionString;
+        if (migrate)
+        {
+            await using var ctx = new ApplicationDbContext(
+                new DbContextOptionsBuilder<ApplicationDbContext>().UseNpgsql(connectionString).Options);
+            await ctx.GetService<IMigrator>().MigrateAsync(targetMigration);
+        }
+        return connectionString;
     }
 
     public async Task DisposeAsync()

@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Seed;
@@ -22,8 +23,8 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<DatabaseSeeder>>();
 
-        // EnsureBoardUserAsync needs a claimed, non-registration property in the community:
-        // arrange one, plus spare properties for the seeded applications.
+        // Arrange a property another resident has claimed (the board user must not be recused on
+        // anything, and 030 gives it no home), plus spare properties for the seeded applications.
         // The shared fixture seeds the community with a LegalName only (see SeederTests).
         var community = await db.Communities.FirstOrDefaultAsync(c => c.CommunityName == "Sakura Heights HOA");
         if (community is null)
@@ -31,6 +32,7 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
             community = new HOAManagementCompany.Domain.Entities.Community
             {
                 Id = Guid.NewGuid(), CommunityName = "Sakura Heights HOA", LegalName = "Sakura Heights HOA",
+                ManagementCompanyId = await HOAManagementCompany.Features.Company.DeploymentCompany.IdAsync(db),
                 Status = CommunityStatus.Active
             };
             db.Communities.Add(community);
@@ -70,9 +72,15 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
         Assert.True(await db.CommunityMemberships.AnyAsync(m =>
             m.CommunityId == community.Id && m.Role == CommunityRole.CommunityManager && m.User.Email == "manager@nekohoa.dev"));
 
-        // Every seeded demo user can log in (login requires a linked property).
-        foreach (var email in new[] { "board2@nekohoa.dev", "board5@nekohoa.dev", "manager@nekohoa.dev" })
-            Assert.True(await db.UserProperties.AnyAsync(up => up.User.Email == email), email);
+        // Every seeded demo user signs in without a home (030 FR-036a), straight to board mode.
+        foreach (var email in new[] { "board@nekohoa.dev", "board2@nekohoa.dev", "board5@nekohoa.dev", "manager@nekohoa.dev" })
+        {
+            Assert.False(await db.UserProperties.AnyAsync(up => up.User.Email == email), email);
+            var login = await Client.PostAsJsonAsync("/api/v1/auth/login", new { email, password = "Password1!" });
+            Assert.True(login.StatusCode == System.Net.HttpStatusCode.OK, $"{email}: {(int)login.StatusCode}");
+            var user = (await login.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("user");
+            Assert.Equal("Board", user.GetProperty("landing").GetString());
+        }
 
         var fence = await db.ArchitecturalApplications.SingleAsync(a => a.CommunityId == community.Id && a.ApplicationNumber == 1042);
         Assert.Equal(ArcApplicationStatus.Open, fence.Status);

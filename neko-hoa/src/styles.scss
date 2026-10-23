@@ -285,3 +285,51 @@ h1.page-title {
   white-space: nowrap;
   border: 0;
 }
+
+/* ── 030 shared UI: elements created by directives (no component style encapsulation) ── */
+/* DisabledReasonDirective: the control stays focusable; the reason shows on hover and focus. */
+.btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.disabled-reason-tip {
+  position: fixed; z-index: 1000; max-width: 280px;
+  padding: 8px 10px; border-radius: 8px;
+  background: var(--ink); color: var(--paper);
+  font-size: 12px; line-height: 1.4; font-weight: 400;
+  &[hidden] { display: none; }
+}
+/* AutosaveFieldDirective: "Saving…" / "✓ Saved" beside the label, errors under the field. */
+.autosave-status {
+  display: inline-block; margin-left: 8px;
+  font-size: 11px; font-weight: 500; color: var(--ink-soft);
+  text-transform: none; letter-spacing: 0;
+}
+.autosave-error {
+  font-size: 12px; color: var(--ink); margin-top: 4px;
+  border-left: 3px solid var(--rose); padding-left: 6px;
+}
+.autosave-retry { background: none; border: none; font: inherit; padding: 0; }
+
+/* ── 030 forms: helper text, field errors and the error summary (conventions §6.3, §7.5) ── */
+.field-help { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
+.field-error {
+  font-size: 12px; color: var(--ink); margin-top: 4px;
+  border-left: 3px solid var(--rose); padding-left: 6px;
+}
+.field[aria-invalid="true"] { border-color: var(--ink); border-width: 2px; }
+.error-summary {
+  border: 2px solid var(--rose); border-radius: 12px; padding: 12px 14px; background: var(--paper);
+  ul { margin: 6px 0 0 18px; }
+  a { color: var(--ink); }
+}
+
+/* ── 030 dialogs (conventions §7.4): consequences, what doesn't change, refusals, buttons ── */
+.dlg-section { margin-top: 12px; }
+.dlg-section h3 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.dlg-section ul { margin-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.dlg-refusal { margin-top: 10px; }
+.dlg-form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.dlg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+.dlg-actions .btn { min-height: 40px; }
+fieldset.dlg-fieldset { border: none; display: flex; flex-direction: column; gap: 8px; }
+fieldset.dlg-fieldset legend { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.dlg-radio { display: flex; gap: 8px; align-items: flex-start; }
+.dlg-radio input { margin-top: 3px; }

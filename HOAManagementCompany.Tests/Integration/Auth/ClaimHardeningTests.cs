@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,9 @@ using Xunit;
 namespace HOAManagementCompany.Tests.Integration.Auth;
 
 // 017-A FR-A8: a validly-signed token missing a required identity claim must produce a clean
-// 401 authorization error, never a NullReferenceException-driven 500.
+// authorization error, never a NullReferenceException-driven 500. Since 030 (FR-024g) resident
+// endpoints check the home against stored data on every request, so a token without a home — or
+// with a home the caller isn't linked to — is refused 403 PROPERTY_ACCESS_DENIED.
 public class ClaimHardeningTests(TestDatabaseFixture fixture) : IntegrationTestBase(fixture)
 {
     private string MintToken(bool includePropertyId, bool includeCommunityId)
@@ -46,22 +49,29 @@ public class ClaimHardeningTests(TestDatabaseFixture fixture) : IntegrationTestB
     [InlineData("/api/v1/property/address-history")]
     [InlineData("/api/v1/property/directory-fields")]
     [InlineData("/api/v1/dashboard")]
-    public async Task MissingPropertyIdClaim_Returns401NotServerError(string route)
+    public async Task MissingPropertyIdClaim_Returns403NotServerError(string route)
     {
         UseToken(MintToken(includePropertyId: false, includeCommunityId: true));
 
         var response = await Client.GetAsync(route);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertPropertyAccessDeniedAsync(response);
     }
 
     [Fact]
-    public async Task MissingCommunityIdClaim_Dashboard_Returns401NotServerError()
+    public async Task MissingCommunityIdClaim_Dashboard_Returns403NotServerError()
     {
         UseToken(MintToken(includePropertyId: true, includeCommunityId: false));
 
         var response = await Client.GetAsync("/api/v1/dashboard");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertPropertyAccessDeniedAsync(response);
+    }
+
+    private static async Task AssertPropertyAccessDeniedAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("PROPERTY_ACCESS_DENIED", body.RootElement.GetProperty("code").GetString());
     }
 }

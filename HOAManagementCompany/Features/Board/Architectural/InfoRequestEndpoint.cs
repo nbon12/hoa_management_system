@@ -24,11 +24,10 @@ public class InfoRequestEndpoint(ApplicationDbContext db, ICommunityScopeResolve
     public override async Task HandleAsync(ArcInfoRequestRequest req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
-        if (!await scope.CanAccessAsync(User, req.CommunityId, CommunityCapability.VoteArchitecturalApplications, ct))
-        {
-            await BoardHttp.ForbiddenAsync(HttpContext, ct);
+        // 030 FR-004a: forbidden, archived or allowed, decided in one place.
+        if (await BoardHttp.SendDecisionAsync(HttpContext,
+                await scope.DecideAsync(User, req.CommunityId, CommunityCapability.VoteArchitecturalApplications, ScopeOperation.Write, ct), ct))
             return;
-        }
 
         var message = req.Message?.Trim();
         if (string.IsNullOrEmpty(message))

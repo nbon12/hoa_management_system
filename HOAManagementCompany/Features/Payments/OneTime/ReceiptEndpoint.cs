@@ -1,11 +1,12 @@
 using FastEndpoints;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.OneTime;
 
 /// <summary>GET /payments/receipts/{id} — retrieves a durable receipt, scoped to the caller's property (FR-007f).</summary>
-public class ReceiptEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<ReceiptResponse>
+public class ReceiptEndpoint(ResidentAccess access, ApplicationDbContext db) : EndpointWithoutRequest<ReceiptResponse>
 {
     public override void Configure()
     {
@@ -15,7 +16,9 @@ public class ReceiptEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<R
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.ReadHistory, ct);
+        var propertyId = home.PropertyId;
         var id = Route<Guid>("id");
 
         var receipt = await db.Receipts

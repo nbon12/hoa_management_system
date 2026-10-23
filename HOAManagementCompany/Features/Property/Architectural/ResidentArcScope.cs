@@ -2,7 +2,7 @@ using System.Security.Claims;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Board.Architectural;
-using HOAManagementCompany.Features.Common;
+using HOAManagementCompany.Features.Residents;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,31 +10,37 @@ namespace HOAManagementCompany.Features.Property.Architectural;
 
 /// <summary>
 /// The single resident authorization point for architectural requests (029 FR-022–FR-024).
-/// Every draft and application is loaded pinned to the caller's ACTIVE property (the JWT
-/// <c>propertyId</c> claim, 025 FR-015). Board or manager memberships are never consulted, so they
-/// can't widen access (FR-023). "Not yours" and "doesn't exist" get the same 403 body, so a denial
-/// never reveals whether a request exists.
+/// Every draft and application is loaded pinned to the caller's selected home, which 030's
+/// <see cref="ResidentAccess"/> re-checks on every request from stored data: the resident link and
+/// the home's community status (030 FR-024g, FR-012a). Submitted requests stay readable when the
+/// community is archived (ReadHistory); drafts and writes don't. Board or manager memberships are
+/// never consulted, so they can't widen access (FR-023). "Not yours" and "doesn't exist" get the
+/// same 403 body, so a denial never reveals whether a request exists.
 /// </summary>
-public sealed class ResidentArcScope(ApplicationDbContext db, ILogger<ResidentArcScope> logger)
+public sealed class ResidentArcScope(ApplicationDbContext db, ResidentAccess access, ILogger<ResidentArcScope> logger)
 {
     public const string ForbiddenMessage = "You do not have access to this request.";
 
-    public static Guid PropertyId(ClaimsPrincipal user) => user.RequirePropertyId();
+    /// <summary>The caller's home, checked for <paramref name="operation"/> (030 FR-024g).</summary>
+    public Task<ResidentContext> HomeAsync(ClaimsPrincipal user, ResidentOperation operation, CancellationToken ct) =>
+        access.RequireAsync(user, operation, ct);
 
     public static string UserId(ClaimsPrincipal user) => ArcQueries.CallerId(user);
 
-    public async Task<ArchitecturalApplicationDraft> DraftAsync(ClaimsPrincipal user, Guid draftId, CancellationToken ct)
+    public async Task<ArchitecturalApplicationDraft> DraftAsync(
+        ClaimsPrincipal user, Guid draftId, ResidentOperation operation, CancellationToken ct)
     {
-        var propertyId = PropertyId(user);
+        var propertyId = (await HomeAsync(user, operation, ct)).PropertyId;
         var draft = await db.ArchitecturalApplicationDrafts
             .Include(d => d.Attachments)
             .FirstOrDefaultAsync(d => d.Id == draftId && d.PropertyId == propertyId, ct);
         return draft ?? throw Deny(user, propertyId, $"draft:{draftId}");
     }
 
-    public async Task<ArchitecturalApplication> ApplicationAsync(ClaimsPrincipal user, Guid applicationId, CancellationToken ct)
+    public async Task<ArchitecturalApplication> ApplicationAsync(
+        ClaimsPrincipal user, Guid applicationId, ResidentOperation operation, CancellationToken ct)
     {
-        var propertyId = PropertyId(user);
+        var propertyId = (await HomeAsync(user, operation, ct)).PropertyId;
         var app = await db.ArchitecturalApplications
             .Include(a => a.Attachments)
             .Include(a => a.InfoRequests)

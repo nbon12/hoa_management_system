@@ -70,13 +70,21 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
     /// </summary>
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
 
+    /// <summary>
+    /// The database the host uses. Override to point a test class at its own database (030: the
+    /// setup step reads the deployment's single company, so its tests each need a fresh one). Runs
+    /// from the base constructor, after <see cref="Fixture"/> is set.
+    /// </summary>
+    protected virtual string DatabaseConnectionString() => Fixture.ConnectionString;
+
     protected IntegrationTestBase(TestDatabaseFixture fixture)
     {
         Fixture = fixture;
+        var connectionString = DatabaseConnectionString();
 
         // Set env vars before WebApplicationFactory starts so Program.cs reads them via builder.Configuration
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Test");
-        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", fixture.ConnectionString);
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", connectionString);
         Environment.SetEnvironmentVariable("Storage__ServiceUrl", fixture.MinioEndpoint);
 
         _factory = new WebApplicationFactory<Program>()
@@ -88,7 +96,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                 {
                     cfg.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["ConnectionStrings:DefaultConnection"] = fixture.ConnectionString,
+                        ["ConnectionStrings:DefaultConnection"] = connectionString,
                         // Allow Information-level logs so observability tests can read the
                         // structured request log from the in-memory Serilog sink.
                         ["Serilog:MinimumLevel:Default"] = "Information",
@@ -141,7 +149,7 @@ public abstract class IntegrationTestBase : IClassFixture<TestDatabaseFixture>, 
                     // internal service provider each time (ManyServiceProvidersCreatedWarning);
                     // a shared instance keeps EF's provider cache warm and avoids pool churn.
                     var tracedDataSource = SharedTracedDataSources.GetOrAdd(
-                        fixture.ConnectionString, ObservabilityNpgsql.BuildTracedDataSource);
+                        connectionString, ObservabilityNpgsql.BuildTracedDataSource);
                     services.AddSingleton(tracedDataSource);
                     // Each test builds a fresh WebApplicationFactory (its own root provider), so
                     // EF spins up a new internal provider per factory — benign in tests but it

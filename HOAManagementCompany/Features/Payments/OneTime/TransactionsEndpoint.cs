@@ -3,11 +3,12 @@ using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using PaymentMethod = HOAManagementCompany.Domain.Enums.PaymentMethod;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.OneTime;
 
 /// <summary>GET /payments/transactions — paged payment history for the caller's property (FR-007g).</summary>
-public class TransactionsEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<TransactionsResponse>
+public class TransactionsEndpoint(ResidentAccess access, ApplicationDbContext db) : EndpointWithoutRequest<TransactionsResponse>
 {
     public override void Configure()
     {
@@ -17,7 +18,9 @@ public class TransactionsEndpoint(ApplicationDbContext db) : EndpointWithoutRequ
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.ReadHistory, ct);
+        var propertyId = home.PropertyId;
         var limit = Math.Clamp(Query<int?>("limit", isRequired: false) ?? 50, 1, 200);
         var offset = Math.Max(0, Query<int?>("offset", isRequired: false) ?? 0);
 

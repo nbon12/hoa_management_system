@@ -45,6 +45,55 @@ In short:
 4. **Wire GitHub** from `tofu output` (see
    [`contracts/github-actions-wiring.md`](../specs/010-dev-env-iac-opentofu/contracts/github-actions-wiring.md)).
 5. Set `DEV_DEPLOY_ENABLED=true` **last**.
+6. After the first deploy, create the first **Company Administrator** — see
+   [First Company Administrator](#first-company-administrator-setup-step-spec-030).
+
+## First Company Administrator (setup step, spec 030)
+
+The first Company Administrator of a deployment is created by a one-time command-line step built
+into the API image ([030 FR-038](../specs/030-company-administration/spec.md);
+[contract](../specs/030-company-administration/contracts/company.md#setup-step-command-line-never-http-fr-038)).
+It never runs through an HTTP endpoint and is allowed in every environment, because it is the
+operator path. It applies pending migrations first.
+
+```text
+dotnet HOAManagementCompany.dll --grant-company-admin <email> [--company-name "<name>"]
+dotnet HOAManagementCompany.dll --grant-company-admin <email> --recover
+```
+
+| Situation | What the step does |
+|-----------|--------------------|
+| No live Company Administrator grant | If `<email>` has an account, grants it the role (`Source = Setup`), logs `CompanyAdminChange Actor=setup Change=Granted` and prints `Granted Company Administrator to <userId>.` Otherwise emails a Company Administrator invitation (72 hours, single use, bound to that email) and prints `Invitation sent; it expires <time UTC>.` |
+| A live grant exists, without `--recover` | Prints `A Company Administrator already exists; nothing changed.`, writes nothing and exits 0, so re-running it is safe. |
+| A live grant exists, with `--recover` | For when every Company Administrator is unavailable or compromised. Grants or invites as above with `Source = Recovery`, logs `CompanyAdminChange Change=Recovery`, and emails every current Company Administrator (`co_admin_recovery`, queued through the outbox). |
+
+`--company-name` sets the management company's name, which emails and the company sign-in page use.
+
+| Exit code | Meaning |
+|-----------|---------|
+| `0` | Done, including "nothing changed". |
+| `1` | Failure, e.g. a database error or the invitation email couldn't be sent. Fix the cause and run it again; a re-run resends the same invitation with a new link. |
+| `2` | Bad arguments, e.g. a missing or invalid email or an empty `--company-name`. The reason is printed. |
+
+**Deployed environments.** Run the step as a **Cloud Run job execution of the service image** with
+these arguments. The image's entrypoint is `dotnet HOAManagementCompany.dll`, so the arguments pass
+straight through. The job needs the same `ASPNETCORE_ENVIRONMENT`, Secret Manager references and
+runtime service account as the environment's `nekohoa-api-${env_name}` service, because the step
+connects to the database and sends email. This tree does **not** provision the job; create it once
+per environment from the service's current image before executing it. Then:
+
+```bash
+gcloud run jobs execute <service>-admin-setup --region <region> \
+  --args="--grant-company-admin,owner@example.com"
+
+# Recovery mode
+gcloud run jobs execute <service>-admin-setup --region <region> \
+  --args="--grant-company-admin,owner@example.com,--recover"
+```
+
+What the step printed is in the execution's logs; a non-zero exit code fails the execution. Locally,
+run `dotnet run --project HOAManagementCompany -- --grant-company-admin owner@example.com` (see
+[030 quickstart](../specs/030-company-administration/quickstart.md#the-setup-step-first-company-administrator-fr-038)).
 
 ## Layout
 

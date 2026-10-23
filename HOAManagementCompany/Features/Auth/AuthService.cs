@@ -49,6 +49,12 @@ public class AuthService(
             || await db.UserProperties.AnyAsync(up => up.PropertyId == claimCode.PropertyId, ct))
             throw new DomainException(RegistrationFailed, "Registration could not be completed.", 422);
 
+        // 030 FR-012a: a home in an Onboarding community isn't live yet. Refused only after the
+        // proof and the code check out, and neither is used up, so the code works once it's live.
+        if (await claimCodes.IsInOnboardingCommunityAsync(claimCode.PropertyId, ct))
+            throw new DomainException("COMMUNITY_NOT_ACTIVE",
+                "This home's community isn't live yet, so the claim code can't be used now. Your code has not been used up.", 409);
+
         var user = new ApplicationUser
         {
             Email = email,
@@ -99,8 +105,15 @@ public class AuthService(
         }
 
         await userManager.ResetAccessFailedCountAsync(user);
-        var property = await GetActivePropertyAsync(user.Id, ct);
+        var property = await FindUsablePropertyAsync(user.Id, ct);
         logger.LogInformation("User logged in: {Email}", req.Email);
+        return await CreateTokenPairAsync(user, property, ct);
+    }
+
+    // 030 FR-022a: sign in an account just created from an invitation link, as /auth/login does.
+    public async Task<AuthResult> SignInAsync(ApplicationUser user, CancellationToken ct = default)
+    {
+        var property = await FindUsablePropertyAsync(user.Id, ct);
         return await CreateTokenPairAsync(user, property, ct);
     }
 
@@ -115,18 +128,27 @@ public class AuthService(
     public async Task<AuthResult> RefreshAsync(string rawToken, CancellationToken ct = default)
     {
         var hash = HashToken(rawToken);
-        var stored = await db.RefreshTokens
-            .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
 
-        if (stored is null || !stored.IsActive)
-            throw new DomainException("INVALID_REFRESH_TOKEN", "The refresh token is invalid or has expired.", 401);
+        // 030 R11: the old token's deletion and the new pair's mint commit together, so a failure
+        // between them can't leave the user without a usable refresh token.
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            var stored = await db.RefreshTokens
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
 
-        db.RefreshTokens.Remove(stored);
-        await db.SaveChangesAsync(ct);
+            if (stored is null || !stored.IsActive)
+                throw new DomainException("INVALID_REFRESH_TOKEN", "The refresh token is invalid or has expired.", 401);
 
-        var property = await GetActivePropertyAsync(stored.UserId, ct);
-        return await CreateTokenPairAsync(stored.User, property, ct);
+            db.RefreshTokens.Remove(stored);
+            var property = await FindUsablePropertyAsync(stored.UserId, ct);
+            var result = await CreateTokenPairAsync(stored.User, property, ct);
+            await tx.CommitAsync(ct);
+            return result;
+        });
     }
 
     public async Task<AuthResult> SwitchPropertyAsync(string userId, Guid propertyId, CancellationToken ct = default)
@@ -137,6 +159,15 @@ public class AuthService(
 
         if (link is null)
             throw new DomainException("PROPERTY_ACCESS_DENIED", "You are not linked to the requested property.", 403);
+
+        // 030 FR-012a: an Onboarding home isn't live yet; an Archived one stays selectable read-only.
+        var status = await db.Communities
+            .Where(c => c.Id == link.Property.CommunityId)
+            .Select(c => c.Status)
+            .FirstAsync(ct);
+        if (status == CommunityStatus.Onboarding)
+            throw new DomainException("COMMUNITY_NOT_ACTIVE",
+                "This community isn't live yet. Your community manager will let you know when it is.", 409);
 
         var user = await userManager.FindByIdAsync(userId)
             ?? throw new DomainException("NOT_FOUND", "User not found.", 404);
@@ -159,7 +190,8 @@ public class AuthService(
     // 025 FR-018/FR-020/FR-022/FR-023: switch the caller's active UI mode. Board mode
     // requires an active non-resident membership, verified server-side (never from the
     // client's requested mode — FR-014). Persists LastActiveMode and rotates refresh
-    // tokens, mirroring SwitchPropertyAsync.
+    // tokens, mirroring SwitchPropertyAsync. 030 FR-036b: memberships in Onboarding
+    // communities count, and a user with no home can switch.
     public async Task<AuthResult> SwitchModeAsync(string userId, UserMode mode, CancellationToken ct = default)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct)
@@ -174,47 +206,69 @@ public class AuthService(
             .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, DateTimeOffset.UtcNow), ct);
 
-        var property = await GetActivePropertyAsync(userId, ct);
+        var property = await FindUsablePropertyAsync(userId, ct);
         return await CreateTokenPairAsync(user, property, ct);
     }
 
-    private async Task<bool> HasActiveBoardMembershipAsync(string userId, CancellationToken ct)
+    private Task<bool> HasActiveBoardMembershipAsync(string userId, CancellationToken ct) =>
+        EffectiveMemberships(userId).AnyAsync(m => m.Role != CommunityRole.Resident, ct);
+
+    // 030 FR-036b: effective memberships in Onboarding and Active communities; Archived ones are left out.
+    private IQueryable<CommunityMembership> EffectiveMemberships(string userId)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        return await db.CommunityMemberships.AnyAsync(m =>
+        return db.CommunityMemberships.Where(m =>
             m.UserId == userId
-            && m.Role != CommunityRole.Resident
             && m.Status == MembershipStatus.Active
             && (m.EndDate == null || m.EndDate >= today)
-            && m.Community.Status == CommunityStatus.Active, ct);
+            && m.Community.Status != CommunityStatus.Archived);
     }
 
     private async Task<CurrentUserDto> BuildCurrentUserAsync(ApplicationUser user, CancellationToken ct)
     {
-        var properties = await db.UserProperties
-            .Include(up => up.Property)
+        // 030 R11: homes in Active and Archived communities, in the order FindUsablePropertyAsync
+        // picks from; Onboarding homes aren't live yet and are left out.
+        var links = await db.UserProperties
             .Where(up => up.UserId == user.Id)
-            .Select(up => new PropertySummaryDto(up.Property.Id, up.Property.AccountNumber, up.Property.Address))
+            .OrderBy(up => up.Property.Community.Status == CommunityStatus.Active ? 0 : 1)
+            .ThenBy(up => up.LinkedAt)
+            .Select(up => new
+            {
+                up.Property.Community.Status,
+                Summary = new PropertySummaryDto(up.Property.Id, up.Property.AccountNumber, up.Property.Address,
+                    up.Property.CommunityId, up.Property.Community.CommunityName, up.Property.Community.Status.ToString()),
+            })
+            .ToListAsync(ct);
+        var properties = links.Where(l => l.Status != CommunityStatus.Onboarding).Select(l => l.Summary).ToList();
+
+        var memberships = await EffectiveMemberships(user.Id)
+            .OrderBy(m => m.Community.CommunityName)
+            .Select(m => new MembershipSummaryDto(
+                m.CommunityId, m.Community.CommunityName, m.Role.ToString(), m.Community.Status.ToString()))
             .ToListAsync(ct);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var memberships = await db.CommunityMemberships
-            .Where(m => m.UserId == user.Id
-                     && m.Status == MembershipStatus.Active
-                     && (m.EndDate == null || m.EndDate >= today)
-                     && m.Community.Status == CommunityStatus.Active)
-            .Select(m => new MembershipSummaryDto(m.CommunityId, m.Community.CommunityName, m.Role.ToString()))
-            .ToListAsync(ct);
+        var isCompanyAdministrator = await db.CompanyAdministratorGrants
+            .AnyAsync(g => g.UserId == user.Id && g.RevokedAt == null, ct);
 
         // FR-023: when the user holds no active non-resident membership, they are
         // returned to resident mode on their next request — even if LastActiveMode
         // is still Board (e.g. a board term expired mid-session). Reporting Board
         // without an active membership would strand them in a board shell with no
         // way out, since every board endpoint would then deny them.
+        // 030 FR-036a: a user with no usable home has no resident mode to be in, so a board
+        // membership puts them in board mode whatever they last chose.
         var hasBoardMembership = memberships.Any(m => m.Role != CommunityRole.Resident.ToString());
-        var effectiveMode = user.LastActiveMode == UserMode.Board && hasBoardMembership
+        var effectiveMode = hasBoardMembership && (user.LastActiveMode == UserMode.Board || properties.Count == 0)
             ? UserMode.Board
             : UserMode.Resident;
+
+        var landing = LandingRule.Decide(new LandingRule.Input(
+            HasUsableHome: properties.Count > 0,
+            HasOnlyOnboardingHomes: links.Count > 0 && properties.Count == 0,
+            HasBoardMembership: hasBoardMembership,
+            IsCompanyAdministrator: isCompanyAdministrator,
+            LastActiveMode: user.LastActiveMode,
+            CompanySignInPage: false));
 
         return new CurrentUserDto(
             user.Id,
@@ -224,30 +278,36 @@ public class AuthService(
             $"{user.FirstName[0]}{user.LastName[0]}",
             properties,
             effectiveMode.ToString(),
-            memberships);
+            memberships,
+            isCompanyAdministrator,
+            landing.ToString());
     }
 
-    private async Task<Domain.Entities.Property> GetActivePropertyAsync(string userId, CancellationToken ct)
-    {
-        return await db.UserProperties
-            .Include(up => up.Property)
-            .Where(up => up.UserId == userId)
+    // 030 R11: the home a sign-in selects — Active first, then Archived, oldest link first so the
+    // choice is stable, never Onboarding. Null when the user has no usable home; they still sign in.
+    private Task<Domain.Entities.Property?> FindUsablePropertyAsync(string userId, CancellationToken ct) =>
+        db.UserProperties
+            .Where(up => up.UserId == userId && up.Property.Community.Status != CommunityStatus.Onboarding)
+            .OrderBy(up => up.Property.Community.Status == CommunityStatus.Active ? 0 : 1)
+            .ThenBy(up => up.LinkedAt)
             .Select(up => up.Property)
-            .FirstOrDefaultAsync(ct)
-            ?? throw new DomainException("NO_PROPERTY", "User has no linked property.", 422);
-    }
+            .FirstOrDefaultAsync(ct);
 
-    private async Task<AuthResult> CreateTokenPairAsync(ApplicationUser user, Domain.Entities.Property property, CancellationToken ct)
+    private async Task<AuthResult> CreateTokenPairAsync(ApplicationUser user, Domain.Entities.Property? property, CancellationToken ct)
     {
         var expiry = DateTimeOffset.UtcNow.AddMinutes(AccessTokenExpiryMinutes);
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-            new Claim("propertyId", property.Id.ToString()),
-            new Claim("communityId", property.CommunityId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+        // 030 FR-036a: a user with no usable home signs in with no home claims.
+        if (property is not null)
+        {
+            claims.Add(new Claim("propertyId", property.Id.ToString()));
+            claims.Add(new Claim("communityId", property.CommunityId.ToString()));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret));
         var token = new JwtSecurityToken(
@@ -281,8 +341,23 @@ public class AuthService(
     }
 }
 
-public class DomainException(string code, string message, int statusCode) : Exception(message)
+public class DomainException(
+    string code, string message, int statusCode, IReadOnlyDictionary<string, object?>? extensions = null)
+    : Exception(message)
 {
     public string Code { get; } = code;
     public int StatusCode { get; } = statusCode;
+
+    // 030: extra body members for codes that carry detail, such as OPEN_WORK's items[] or
+    // INVITATION_PENDING's invitationId. Written beside code and message.
+    public IReadOnlyDictionary<string, object?>? Extensions { get; } = extensions;
+
+    public Dictionary<string, object?> ToBody()
+    {
+        var body = new Dictionary<string, object?> { ["code"] = Code, ["message"] = Message };
+        if (Extensions is not null)
+            foreach (var (key, value) in Extensions)
+                body[key] = value;
+        return body;
+    }
 }

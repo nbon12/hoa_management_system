@@ -4,6 +4,7 @@ using HOAManagementCompany.Infrastructure.Payments;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.Recurring;
 
@@ -12,7 +13,7 @@ namespace HOAManagementCompany.Features.Payments.Recurring;
 /// SetupIntent so the browser's Stripe Elements can vault a payment method on file (FR-009). Returns
 /// the client secret + publishable key; no raw card/bank data ever transits the backend (SC-001).
 /// </summary>
-public class SetupIntentEndpoint(
+public class SetupIntentEndpoint(ResidentAccess access, 
     IStripeGateway gateway, ApplicationDbContext db, IOptions<StripeOptions> stripeOptions)
     : EndpointWithoutRequest<SetupIntentResponse>
 {
@@ -25,7 +26,9 @@ public class SetupIntentEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct);
         if (owner is null) { await SendNotFoundAsync(ct); return; }
 

@@ -14,6 +14,46 @@ internal static class BoardHttp
             new { code = "FORBIDDEN", message = "You do not have access to this community." }, ct);
     }
 
+    // 030 FR-004a: write the refusal a scope decision calls for, with a plain-language message
+    // (FR-042). Forbidden keeps the non-disclosing 025 body. Returns false when the caller may proceed.
+    public static async Task<bool> SendDecisionAsync(HttpContext ctx, ScopeDecision decision, CancellationToken ct)
+    {
+        switch (decision)
+        {
+            case ScopeDecision.Allowed:
+                return false;
+            case ScopeDecision.Archived:
+                await ErrorAsync(ctx, StatusCodes.Status409Conflict, "COMMUNITY_ARCHIVED",
+                    "This community is archived, so it can't be changed.", ct);
+                return true;
+            case ScopeDecision.NotActive:
+                await ErrorAsync(ctx, StatusCodes.Status409Conflict, "COMMUNITY_NOT_ACTIVE",
+                    "This community isn't live yet.", ct);
+                return true;
+            default:
+                await ForbiddenAsync(ctx, ct);
+                return true;
+        }
+    }
+
+    // The same refusals as SendDecisionAsync, as an exception for code running inside a lock body.
+    // Null when the caller may proceed.
+    public static Auth.DomainException? RefusalFor(ScopeDecision decision) => decision switch
+    {
+        ScopeDecision.Allowed => null,
+        ScopeDecision.Archived => new Auth.DomainException("COMMUNITY_ARCHIVED",
+            "This community is archived, so it can't be changed.", StatusCodes.Status409Conflict),
+        ScopeDecision.NotActive => new Auth.DomainException("COMMUNITY_NOT_ACTIVE",
+            "This community isn't live yet.", StatusCodes.Status409Conflict),
+        _ => new Auth.DomainException("FORBIDDEN", "You do not have access to this community.", StatusCodes.Status403Forbidden),
+    };
+
+    public static async Task ErrorAsync(HttpContext ctx, int status, string code, string message, CancellationToken ct)
+    {
+        ctx.Response.StatusCode = status;
+        await ctx.Response.WriteAsJsonAsync(new { code, message }, ct);
+    }
+
     // Every board response is authenticated and community-specific — never edge-cached
     // (constitution §8). Call before writing the body.
     public static void NoStore(HttpContext ctx) => ctx.Response.Headers.CacheControl = "no-store";

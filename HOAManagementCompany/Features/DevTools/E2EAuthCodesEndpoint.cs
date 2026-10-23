@@ -6,7 +6,8 @@ namespace HOAManagementCompany.Features.DevTools;
 
 /// <summary>
 /// Test-support endpoint (020-D FR-D11): returns the last verification/claim code the notifier
-/// delivered to a contact, from the in-memory <see cref="AuthCodeVault"/>. Gate parity with
+/// delivered to a contact, and (030 T054) the newest invitation link emailed to it, from the
+/// in-memory <see cref="AuthCodeVault"/>. Gate parity with
 /// <see cref="E2ECleanupEndpoint"/>: Production/Staging hard block, DevTools flag, constant-time
 /// shared secret.
 /// </summary>
@@ -28,12 +29,13 @@ public class E2EAuthCodesEndpoint(
         var contact = Query<string>("contact", isRequired: false) ?? "";
         var verification = vault.GetVerification(contact);
         var claim = vault.GetClaim(contact);
-        if (verification is null && claim is null)
+        var invitationLink = vault.GetInvitationLink(contact);
+        if (verification is null && claim is null && invitationLink is null)
         {
             await SendNotFoundAsync(ct);
             return;
         }
 
-        await SendAsync(new { contact, verificationCode = verification, claimCode = claim }, 200, ct);
+        await SendAsync(new { contact, verificationCode = verification, claimCode = claim, invitationLink }, 200, ct);
     }
 }

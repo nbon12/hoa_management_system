@@ -20,10 +20,11 @@ internal static class ArcLog
             "ArcOutcomeRecorded: Actor={ActorId} Community={CommunityId} Application={ApplicationId} Outcome={Outcome} Wording={Wording} At={UtcNow:o}",
             actorId, communityId, applicationId, outcome, wording, at);
 
-    public static void SettingsChanged(ILogger logger, string actorId, Guid communityId, string oldSettings, string newSettings, DateTimeOffset at) =>
+    public static void SettingsChanged(ILogger logger, string actorId, Guid communityId, string oldSettings, string newSettings,
+        DateTimeOffset at, string? cause = null) =>
         logger.LogInformation(
-            "ArcSettingsChanged: Actor={ActorId} Community={CommunityId} Old={OldSettings} New={NewSettings} At={UtcNow:o}",
-            actorId, communityId, oldSettings, newSettings, at);
+            "ArcSettingsChanged: Actor={ActorId} Community={CommunityId} Old={OldSettings} New={NewSettings} Cause={Cause} At={UtcNow:o}",
+            actorId, communityId, oldSettings, newSettings, cause, at);
 
     public static void LapseApplied(ILogger logger, Guid communityId, Guid applicationId, string rule, DateTimeOffset at) =>
         logger.LogInformation(

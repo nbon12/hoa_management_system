@@ -195,6 +195,14 @@ A homeowner whose request was denied (wording "Revisions requested" or "Denied")
 - **FR-023**: Resident-scoped access MUST NOT widen because the user also holds a board or manager membership (025 FR-015); board/manager access to these applications is governed entirely by 027.
 - **FR-024**: Every request MUST be scoped to the community of its property (`CommunityId` denormalized to equal `Property.CommunityId`, per 027); cross-community access to a request MUST be denied by default.
 
+> **Changed by 030 (2026-10-18; 030 FR-024g, FR-012a).** These endpoints no longer trust the token's `propertyId` claim, which now only says which home is selected. On every request, `ResidentArcScope` first calls 030's `ResidentAccess`, which checks from stored data that the caller still has a resident link (`UserProperty`) to the selected property, and applies the status of the home's current community:
+>
+> - no resident link to the selected property (or no `propertyId` claim) → 403 `PROPERTY_ACCESS_DENIED`, so a removed resident is refused on their very next request;
+> - the community is **Onboarding** → 409 `COMMUNITY_NOT_ACTIVE`, for every read and write;
+> - the community is **Archived** → 409 `COMMUNITY_ARCHIVED`, except reading the home's submitted requests (the list, the detail and attachment links), which stay readable. Drafts and every write are refused.
+>
+> Only then do FR-022–FR-024 apply: a request that isn't the selected home's still gets the non-disclosing 403 `FORBIDDEN`.
+
 **Notifications**
 
 - **FR-025**: On submission, the system MUST send the submitting resident a plain-template submission-confirmation email identifying the request by its `ARC-<number>` ID, queued through the existing OutboxMessage pipeline under a new `Kind` (e.g. `arc_owner_submitted`, within the existing 30-character limit) addressed by `RecipientUserId`. (Approved/denied/revisions-requested outcome emails are owned by 027 and are out of scope here.)

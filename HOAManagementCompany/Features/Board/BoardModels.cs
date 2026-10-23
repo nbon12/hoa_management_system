@@ -39,25 +39,35 @@ public sealed record MembershipDto(
     Guid Id, string UserId, string UserDisplayName, string Role, string Status,
     DateOnly StartDate, DateOnly? EndDate);
 
-// POST /communities/{communityId}/memberships
+// POST /communities/{communityId}/memberships — exactly one of UserId (direct) or Email
+// (invitation, 030 FR-018). StartDate defaults to today.
 public sealed record MembershipCreateRequest
 {
     public Guid CommunityId { get; init; }
-    public string UserId { get; init; } = string.Empty;
+    public string? UserId { get; init; }
+    public string? Email { get; init; }
     public CommunityRole Role { get; init; }
-    public DateOnly StartDate { get; init; }
+    public DateOnly? StartDate { get; init; }
     public DateOnly? EndDate { get; init; }
 }
 
-// PATCH /communities/{communityId}/memberships/{membershipId}
+// PATCH /communities/{communityId}/memberships/{membershipId} — exactly one of End,
+// DowngradeTo or EndDate (030 contract). EndDate is raw JSON so an explicit null (clear the
+// end date) can be told apart from an absent field.
 public sealed record MembershipUpdateRequest
 {
     public Guid CommunityId { get; init; }
     public Guid MembershipId { get; init; }
-    public CommunityRole? Role { get; init; }
-    public MembershipStatus? Status { get; init; }
-    public DateOnly? EndDate { get; init; }
+    public bool? End { get; init; }
+    public CommunityRole? DowngradeTo { get; init; }
+    public System.Text.Json.JsonElement EndDate { get; init; }
 }
+
+// GET /communities/{communityId}/memberships item (030): what the caller may change, and why not.
+public sealed record MembershipListItem(
+    Guid Id, string UserId, string UserDisplayName, string Role, string Status,
+    DateOnly StartDate, DateOnly? EndDate, bool OpenEnded, bool Effective,
+    bool CanEnd, bool CanDowngrade, bool CanEditEndDate, string? ReasonCode);
 
 // GET /board/metrics
 public sealed record BoardMetricsQuery

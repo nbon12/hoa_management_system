@@ -91,10 +91,13 @@ public sealed class RecurringDraftService(
     /// </summary>
     public async Task<RunDraftsResponse> RunDueDraftsAsync(DateOnly asOf, CancellationToken ct = default)
     {
+        // 030 R9 (defense in depth): only properties in Active communities draft, so a schedule left
+        // active in an Onboarding or Archived community never charges (SC-005).
         var due = await db.RecurringPayments
             .Where(r => r.Status == "active"
                 && r.DraftDay == asOf.Day
-                && r.VaultedPaymentMethodId != null)
+                && r.VaultedPaymentMethodId != null
+                && r.Property.Community.Status == Domain.Enums.CommunityStatus.Active)
             .ToListAsync(ct);
 
         int charged = 0, failed = 0, skipped = 0;

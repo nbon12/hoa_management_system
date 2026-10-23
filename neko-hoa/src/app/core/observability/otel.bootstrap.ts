@@ -5,12 +5,17 @@
 // outbound XHRs to the API origin via `propagateTraceHeaderCorsUrls`, linking the
 // browser span to the backend server span. Initialization must never throw or block app
 // startup; failures are swallowed.
+//
+// 030 R6: invitation links carry their token in the URL fragment (`/invite#t=…`). Every span URL
+// attribute has its fragment stripped before export, so the token never reaches telemetry.
 // <!-- REPOWISE:END -->
 
+import type { Attributes, AttributeValue, Context } from '@opentelemetry/api';
 import {
   BatchSpanProcessor,
   WebTracerProvider,
 } from '@opentelemetry/sdk-trace-web';
+import type { ReadableSpan, Span, SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-web';
 import { ZoneContextManager } from '@opentelemetry/context-zone';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -30,6 +35,60 @@ export interface ObservabilityConfig {
 
 let provider: WebTracerProvider | undefined;
 
+/** Attribute keys that hold a URL or part of one (`http.url`, `url.full`, `http.target`, `url.path`, …). */
+const URL_ATTRIBUTE_KEY = /url|uri|href|target|path|referr?er|location/i;
+/** OTel semconv's dedicated fragment attribute: dropped outright. */
+const FRAGMENT_ATTRIBUTE = 'url.fragment';
+
+/** `https://app/invite#t=abc` → `https://app/invite`. Values without a `#` are returned unchanged. */
+export function stripUrlFragment(value: string): string {
+  const hash = value.indexOf('#');
+  return hash === -1 ? value : value.slice(0, hash);
+}
+
+function stripValue(value: AttributeValue | undefined): AttributeValue | undefined {
+  if (typeof value === 'string') return stripUrlFragment(value);
+  if (Array.isArray(value)) {
+    return value.map(v => (typeof v === 'string' ? stripUrlFragment(v) : v)) as AttributeValue;
+  }
+  return value;
+}
+
+/** Removes URL fragments from every URL attribute, in place. */
+export function stripUrlFragments(attributes: Attributes | undefined): void {
+  if (!attributes) return;
+  for (const key of Object.keys(attributes)) {
+    if (key === FRAGMENT_ATTRIBUTE) {
+      delete attributes[key];
+    } else if (URL_ATTRIBUTE_KEY.test(key)) {
+      attributes[key] = stripValue(attributes[key]);
+    }
+  }
+}
+
+/**
+ * Strips URL fragments from span (and span event) URL attributes when a span ends, before any
+ * exporter sees it. It runs first in the processor list; attributes are set throughout a span's
+ * life (document-load sets `http.url` from `location.href`), so `onEnd` is the place to clean them.
+ */
+export class FragmentStrippingSpanProcessor implements SpanProcessor {
+  onStart(_span: Span, _parentContext: Context): void { /* attributes are cleaned when the span ends */ }
+
+  onEnd(span: ReadableSpan): void {
+    stripUrlFragments(span.attributes);
+    for (const event of span.events) stripUrlFragments(event.attributes);
+  }
+
+  forceFlush(): Promise<void> { return Promise.resolve(); }
+
+  shutdown(): Promise<void> { return Promise.resolve(); }
+}
+
+/** The processors every provider uses: fragment stripping first, then batched export. */
+export function buildSpanProcessors(exporter: SpanExporter): SpanProcessor[] {
+  return [new FragmentStrippingSpanProcessor(), new BatchSpanProcessor(exporter)];
+}
+
 /**
  * Initializes the Web Tracer once. Safe to call during app bootstrap: any failure is
  * logged and swallowed so telemetry can never prevent the app from starting (FR-030).
@@ -46,7 +105,7 @@ export function initObservability(config: ObservabilityConfig): WebTracerProvide
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: config.serviceName ?? 'neko-hoa-web',
       }),
-      spanProcessors: [new BatchSpanProcessor(exporter)],
+      spanProcessors: buildSpanProcessors(exporter),
     });
 
     // ZoneContextManager keeps the active span across Angular's Zone.js async boundaries;

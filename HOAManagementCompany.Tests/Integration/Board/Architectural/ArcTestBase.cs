@@ -12,16 +12,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace HOAManagementCompany.Tests.Integration.Board.Architectural;
 
 /// <summary>
-/// Hand-written controllable clock (no Microsoft.Extensions.TimeProvider.Testing package — 027 plan
-/// "no new packages"). Registered as the app's <see cref="TimeProvider"/> for every ARC test.
-/// </summary>
-public sealed class TestClock : TimeProvider
-{
-    public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.UtcNow;
-    public override DateTimeOffset GetUtcNow() => UtcNow;
-}
-
-/// <summary>
 /// Shared harness for 027 architectural review tests (T020). Every helper creates only its own rows,
 /// keyed by fresh GUIDs, so tests are order-independent and safe against prior-run data.
 /// </summary>

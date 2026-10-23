@@ -29,11 +29,10 @@ public class AttachmentUrlEndpoint(
     public override async Task HandleAsync(ArcAttachmentRoute req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
-        if (!await scope.CanAccessAsync(User, req.CommunityId, CommunityCapability.ViewArchitecturalApplications, ct))
-        {
-            await BoardHttp.ForbiddenAsync(HttpContext, ct);
+        // 030 FR-004a: forbidden, archived or allowed, decided in one place.
+        if (await BoardHttp.SendDecisionAsync(HttpContext,
+                await scope.DecideAsync(User, req.CommunityId, CommunityCapability.ViewArchitecturalApplications, ScopeOperation.Read, ct), ct))
             return;
-        }
 
         var key = await db.ArchitecturalAttachments
             .Where(x => x.Id == req.AttachmentId

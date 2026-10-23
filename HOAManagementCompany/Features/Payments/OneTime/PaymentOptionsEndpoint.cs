@@ -3,11 +3,12 @@ using HOAManagementCompany.Features.Payments.Ledger;
 using HOAManagementCompany.Features.Payments.Services;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments.OneTime;
 
 /// <summary>GET /payments/options — balance, next assessment, credit balance, and fee policy (FR-007).</summary>
-public class PaymentOptionsEndpoint(LedgerService ledger, PaymentConfigService config, ApplicationDbContext db)
+public class PaymentOptionsEndpoint(ResidentAccess access, LedgerService ledger, PaymentConfigService config, ApplicationDbContext db)
     : EndpointWithoutRequest<PaymentOptionsResponse>
 {
     public override void Configure()
@@ -18,8 +19,9 @@ public class PaymentOptionsEndpoint(LedgerService ledger, PaymentConfigService c
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
-
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Read, ct);
+        var propertyId = home.PropertyId;
         var property = await db.Properties
             .Where(p => p.Id == propertyId)
             .Select(p => new { p.MonthlyAssessment, p.AssessmentDueDay })

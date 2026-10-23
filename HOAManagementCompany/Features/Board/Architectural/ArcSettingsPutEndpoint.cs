@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FastEndpoints;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
@@ -20,7 +19,7 @@ public class ArcSettingsPutEndpoint(
     ILogger<ArcSettingsPutEndpoint> logger)
     : Endpoint<ArcSettingsPutRequest, ArcSettingsDto>
 {
-    public const int MaxStatementLength = 1000;
+    public const int MaxStatementLength = ArcRuleValidator.MaxStatementLength;
 
     public override void Configure()
     {
@@ -31,70 +30,35 @@ public class ArcSettingsPutEndpoint(
     public override async Task HandleAsync(ArcSettingsPutRequest req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
-        if (!await scope.CanAccessAsync(User, req.CommunityId, CommunityCapability.ManageArchitecturalReview, ct))
-        {
-            await BoardHttp.ForbiddenAsync(HttpContext, ct);
+        // 030 FR-030: Community Managers and Company Administrators; COMMUNITY_ARCHIVED while archived.
+        if (await BoardHttp.SendDecisionAsync(HttpContext,
+                await scope.DecideAsync(User, req.CommunityId, CommunityCapability.ManageArcSettings, ScopeOperation.Write, ct), ct))
             return;
-        }
 
-        var error = Validate(req, out var lapse, out var rule);
+        var error = ArcRuleValidator.Validate(req.ReviewPeriodDays, req.LapseRule, req.DecisionRule, req.ReminderDays,
+            req.TimeZoneId, req.FormalDisapprovalStatement, out var rules);
         if (error is not null)
         {
-            await ArcHttp.ValidationAsync(HttpContext, error, ct);
+            await ArcHttp.ValidationAsync(HttpContext, error.Message, ct);
             return;
         }
 
         var settings = await factory.GetOrCreateSettingsAsync(req.CommunityId, ct);
-        var before = JsonSerializer.Serialize(ArcSettingsMapping.ToDto(settings, true) with { UpdatedAt = null });
+        var before = ArcSettingsSection.Rules(settings);
 
-        settings.ReviewPeriodDays = req.ReviewPeriodDays;
-        settings.LapseRule = lapse;
-        settings.DecisionRule = rule;
-        settings.ReminderDays = req.ReminderDays;
-        settings.TimeZoneId = req.TimeZoneId!.Trim();
-        settings.FormalDisapprovalStatement = req.FormalDisapprovalStatement!.Trim();
+        settings.ReviewPeriodDays = rules.ReviewPeriodDays;
+        settings.LapseRule = rules.LapseRule;
+        settings.DecisionRule = rules.DecisionRule;
+        settings.ReminderDays = rules.ReminderDays;
+        settings.TimeZoneId = rules.TimeZoneId;
+        settings.FormalDisapprovalStatement = rules.FormalDisapprovalStatement;
         settings.UpdatedAt = queries.Now;
         settings.UpdatedByUserId = ArcQueries.CallerId(User);
         await db.SaveChangesAsync(ct);
 
         var dto = ArcSettingsMapping.ToDto(settings, true);
-        ArcLog.SettingsChanged(logger, settings.UpdatedByUserId, req.CommunityId, before,
-            JsonSerializer.Serialize(dto with { UpdatedAt = null }), queries.Now);
+        ArcLog.SettingsChanged(logger, settings.UpdatedByUserId, req.CommunityId, before, ArcSettingsSection.Rules(settings),
+            queries.Now);
         await SendOkAsync(dto, ct);
-    }
-
-    private static string? Validate(ArcSettingsPutRequest req, out ArcLapseRule lapse, out ArcDecisionRule rule)
-    {
-        lapse = default;
-        rule = default;
-        if (req.ReviewPeriodDays is < 1 or > 365)
-            return "reviewPeriodDays must be between 1 and 365.";
-        if (req.ReminderDays is < 0 or > 30)
-            return "reminderDays must be between 0 and 30 (0 turns reminders off).";
-        if (!ParseEnum(req.LapseRule, out lapse))
-            return "lapseRule must be FlagOverdueOnly, DeemedApproved or DeemedDenied.";
-        if (!ParseEnum(req.DecisionRule, out rule))
-            return "decisionRule must be MajorityOfMembers or MajorityOfVotesCastWithQuorum.";
-        if (string.IsNullOrWhiteSpace(req.TimeZoneId) || !IsTimeZone(req.TimeZoneId.Trim()))
-            return "timeZoneId must be a valid IANA time zone, e.g. America/New_York.";
-        var statement = req.FormalDisapprovalStatement?.Trim();
-        if (string.IsNullOrEmpty(statement))
-            return "formalDisapprovalStatement is required.";
-        if (statement.Length > MaxStatementLength)
-            return $"formalDisapprovalStatement must be at most {MaxStatementLength} characters.";
-        return null;
-    }
-
-    private static bool ParseEnum<T>(string? value, out T result) where T : struct, Enum
-    {
-        result = default;
-        return !string.IsNullOrWhiteSpace(value) && !int.TryParse(value, out _)
-               && Enum.TryParse(value.Trim(), ignoreCase: true, out result) && Enum.IsDefined(result);
-    }
-
-    private static bool IsTimeZone(string id)
-    {
-        try { TimeZoneInfo.FindSystemTimeZoneById(id); return true; }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException) { return false; }
     }
 }

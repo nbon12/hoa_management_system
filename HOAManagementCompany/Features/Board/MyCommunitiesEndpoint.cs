@@ -9,7 +9,8 @@ namespace HOAManagementCompany.Features.Board;
 // GET /api/v1/me/communities — backs the "My Communities" nav item (FR-025). Returns
 // only communities where the caller holds an ACTIVE membership; summary fields only
 // (the constitution's intentional cross-community exception). Inherently self-scoped,
-// so no resolver gate is needed.
+// so no resolver gate is needed. 030 FR-036b: Onboarding communities are listed and
+// Archived ones are left out.
 public class MyCommunitiesEndpoint(ApplicationDbContext db)
     : Endpoint<MyCommunitiesQuery, PagedResponse<CommunitySummaryDto>>
 {
@@ -31,7 +32,7 @@ public class MyCommunitiesEndpoint(ApplicationDbContext db)
             .Where(m => m.UserId == userId
                      && m.Status == MembershipStatus.Active
                      && (m.EndDate == null || m.EndDate >= today)
-                     && m.Community.Status == CommunityStatus.Active)
+                     && m.Community.Status != CommunityStatus.Archived)
             .Select(m => new { m.CommunityId, m.Community.CommunityName, m.Role, m.Community.Status })
             .ToListAsync(ct);
 

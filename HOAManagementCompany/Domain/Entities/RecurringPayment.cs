@@ -30,9 +30,26 @@ public class RecurringPayment
     /// <summary>FK → the active immutable mandate authorization (FR-011b).</summary>
     public Guid? CurrentAuthorizationId { get; set; }
 
+    /// <summary>
+    /// The user who enrolled (or last re-enrolled) this schedule (030 R9). Removing that resident
+    /// cancels it; a schedule with no recorded enroller predates 030 and is cancelled too (FR-024c).
+    /// </summary>
+    public string? EnrolledByUserId { get; set; }
+
+    /// <summary>Why the schedule became inactive: one of <see cref="RecurringCancellationReasons"/>.</summary>
+    public string? CancellationReason { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Property Property { get; set; } = null!;
     public ICollection<DraftEntry> DraftEntries { get; set; } = [];
     public ICollection<PaymentAuthorization> Authorizations { get; set; } = [];
+}
+
+/// <summary>The recorded reasons a recurring schedule was cancelled (030 R9).</summary>
+public static class RecurringCancellationReasons
+{
+    public const string OwnerCancelled = "owner_cancelled";
+    public const string CommunityArchived = "community_archived";
+    public const string ResidentRemoved = "resident_removed";
 }

@@ -42,20 +42,12 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
             return;
         }
 
-        // Login needs a linked property; co-home the extra demo users on board@'s property, which the
-        // seeded applications never use, so nobody is recused.
-        var homeProperty = await db.UserProperties.Where(up => up.UserId == boardUser.Id)
-            .Select(up => (Guid?)up.PropertyId).FirstOrDefaultAsync(ct);
-        if (homeProperty is null)
-        {
-            logger.LogWarning("ArchitecturalSeeder skipped — board user has no linked property.");
-            return;
-        }
-
+        // 030 FR-036a: staff sign in without a home, so the demo users get a membership only — no
+        // co-home on another user's property. Databases seeded earlier keep the links they have.
         var boardIds = new List<string> { boardUser.Id };
         foreach (var (email, first, last) in ExtraBoard)
-            boardIds.Add(await EnsureUserWithRoleAsync(community.Id, homeProperty.Value, email, first, last, CommunityRole.BoardMember, ct));
-        await EnsureUserWithRoleAsync(community.Id, homeProperty.Value, ManagerEmail, "Morgan", "Manager", CommunityRole.CommunityManager, ct);
+            boardIds.Add(await EnsureUserWithRoleAsync(community.Id, email, first, last, CommunityRole.BoardMember, ct));
+        await EnsureUserWithRoleAsync(community.Id, ManagerEmail, "Morgan", "Manager", CommunityRole.CommunityManager, ct);
 
         // Independent of the board demo below, so it also lands on dev databases seeded before 029.
         await EnsureResidentDemoAsync(boardUser.Id, ct);
@@ -240,7 +232,7 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
     }
 
     private async Task<string> EnsureUserWithRoleAsync(
-        Guid communityId, Guid homePropertyId, string email, string first, string last, CommunityRole role, CancellationToken ct)
+        Guid communityId, string email, string first, string last, CommunityRole role, CancellationToken ct)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
         if (user is null)
@@ -254,12 +246,6 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
             if (!result.Succeeded)
                 throw new InvalidOperationException(
                     $"Could not create seed user {email}: {string.Join("; ", result.Errors.Select(e => e.Description))}");
-        }
-
-        if (!await db.UserProperties.AnyAsync(up => up.UserId == user.Id, ct))
-        {
-            db.UserProperties.Add(new UserProperty { UserId = user.Id, PropertyId = homePropertyId });
-            await db.SaveChangesAsync(ct);
         }
 
         if (!await db.CommunityMemberships.AnyAsync(

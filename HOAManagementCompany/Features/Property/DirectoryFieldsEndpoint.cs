@@ -1,10 +1,11 @@
 using FastEndpoints;
 using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Property.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Property;
 
-public class DirectoryFieldsEndpoint(PropertyService propertyService) : EndpointWithoutRequest<IEnumerable<DirectoryFieldDto>>
+public class DirectoryFieldsEndpoint(ResidentAccess access, PropertyService propertyService) : EndpointWithoutRequest<IEnumerable<DirectoryFieldDto>>
 {
     public override void Configure()
     {
@@ -14,7 +15,9 @@ public class DirectoryFieldsEndpoint(PropertyService propertyService) : Endpoint
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = User.RequirePropertyId();
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Read, ct);
+        var propertyId = home.PropertyId;
         await SendOkAsync(await propertyService.GetDirectoryFieldsAsync(propertyId, ct), ct);
     }
 }
