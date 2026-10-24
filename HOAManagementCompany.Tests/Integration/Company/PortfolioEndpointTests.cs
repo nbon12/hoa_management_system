@@ -214,8 +214,8 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal(31, noManager.GetProperty("counts").GetProperty("all").GetInt32());
     }
 
-    // US6-S7: sorting by parent puts communities without one first, then groups each parent's
-    // subs; names break ties, in the same direction.
+    // contracts/company.md § GET /company/communities, sort=parent: communities without a parent
+    // first, then each parent's subs together; names break ties, in the same direction.
     [Fact]
     public async Task SortingByParent_GroupsSubsUnderTheirParent_InBothDirections()
     {

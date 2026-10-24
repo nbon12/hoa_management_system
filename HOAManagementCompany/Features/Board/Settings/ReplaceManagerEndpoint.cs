@@ -31,6 +31,8 @@ public class ReplaceManagerEndpoint(ApplicationDbContext db, ICommunityScopeReso
         Description(x => x.WithName("ReplaceManager").WithTags("Community settings").RequireRateLimiting("board-writes"));
     }
 
+    private const string NotACurrentManager = "That person isn't a current Community Manager of this community.";
+
     public override async Task HandleAsync(ReplaceManagerRequest req, CancellationToken ct)
     {
         BoardHttp.NoStore(HttpContext);
@@ -39,8 +41,9 @@ public class ReplaceManagerEndpoint(ApplicationDbContext db, ICommunityScopeReso
             return;
 
         var actorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")!.Value;
-        if (string.IsNullOrWhiteSpace(req.CurrentManagerUserId) || string.IsNullOrWhiteSpace(req.ReplacementUserId)
-            || req.CurrentManagerUserId == req.ReplacementUserId)
+        if (string.IsNullOrWhiteSpace(req.CurrentManagerUserId))
+            throw CompanyErrors.Validation(new CompanyErrors.FieldError("currentManagerUserId", NotACurrentManager));
+        if (string.IsNullOrWhiteSpace(req.ReplacementUserId) || req.CurrentManagerUserId == req.ReplacementUserId)
             throw CompanyErrors.Validation(new CompanyErrors.FieldError("replacementUserId",
                 "Choose a different person from this community as the new manager."));
         if (req.ReplacementUserId == actorId)
@@ -52,8 +55,7 @@ public class ReplaceManagerEndpoint(ApplicationDbContext db, ICommunityScopeReso
                 && m.UserId == req.CurrentManagerUserId && m.Role == CommunityRole.CommunityManager
                 && m.Status == MembershipStatus.Active, ct);
             if (current is null || !MembershipService.IsEffective(current, memberships.Today))
-                throw CompanyErrors.Validation(new CompanyErrors.FieldError("currentManagerUserId",
-                    "That person isn't a current Community Manager of this community."));
+                throw CompanyErrors.Validation(new CompanyErrors.FieldError("currentManagerUserId", NotACurrentManager));
             if (!await memberships.InPeopleListAsync(req.CommunityId, req.ReplacementUserId, ct))
                 throw CompanyErrors.Validation(new CompanyErrors.FieldError("replacementUserId", MembershipService.NotInPeopleList));
 

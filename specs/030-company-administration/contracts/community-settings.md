@@ -151,8 +151,14 @@ The one-action replace (FR-020, US2 #11).
 
 ### GET /communities/{communityId}/invitations
 
-- **Auth**: `ManageMemberships`, read (allowed while Archived for Company Administrators).
-- **Query**: `kind=membership` (the default here; residency invitations come from the Residents endpoints), `state`, `limit`/`offset`.
+- **Auth**: read, allowed while Archived for Company Administrators. `ManageMemberships` for `kind=membership`; `ManageResidents` for `kind=residency`.
+- **Query**:
+  - `kind`: `membership` (the default) or `residency`. The Residents pages also show residency invitations per property.
+  - `state`: `scheduled`, `pending`, `expired` (pending and past its expiry) or `revoked`. With no `state`, every invitation except Accepted ones is listed; an accepted person is listed as a member or resident instead.
+  - `limit`/`offset`.
+
+  Newest first.
+- **Errors**: 403; 422 `VALIDATION_ERROR` on `kind` ("kind must be membership or residency.") or `state` ("state must be scheduled, pending, expired or revoked.").
 - **200**: `{ items: [{ id, kind, email, role, termEndDate, state, effectiveState, revokeReason, sentBy, sentAt, expiresAt, lastSendError, canResend, canRevoke, resendBlockedReason }], total, limit, offset }`.
   - `effectiveState` adds `Expired`.
   - `resendBlockedReason` is `COMMUNITY_NOT_ACTIVE` for scheduled invitations.

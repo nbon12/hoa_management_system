@@ -77,6 +77,8 @@ The portfolio (US6, FR-034, FR-035).
   | `dir` | `asc`, `desc` | `asc` |
   | `limit` / `offset` | 25 / 0; limits above 100 are clamped | |
 
+  Names sort naturally (ICU `natural_sort`). `sort=status` orders Onboarding, Active, Archived. `sort=parent` orders by the parent's name, where a community with no parent counts as an empty name: those come first ascending and last descending. Both break ties by community name, and `dir` applies to both keys. An unknown `status`, `sort` or `dir`, or a search over 100 characters, is 422 `VALIDATION_ERROR` on that field.
+
 - **200**:
 
 ```json

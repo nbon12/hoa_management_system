@@ -49,8 +49,8 @@ public class CompanyAdminConcurrencyTests(TestDatabaseFixture fixture) : Company
         }
     }
 
-    // US7-S4 with a third administrator: B revokes A while A's revoke of B waits for the company
-    // lock. A's grant still counts toward the rule, so B is refused for having lost their own.
+    // US7-S4 with a third administrator: A's revoke of B commits while B's revoke of A waits for the
+    // company lock. A's grant still counts toward the rule, so B is refused for having lost their own.
     [Fact]
     public async Task ARevokerWhoseOwnGrantIsRevokedWhileWaitingForTheLock_IsForbidden_AndTheTargetKeepsTheirs()
     {

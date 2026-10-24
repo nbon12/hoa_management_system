@@ -167,7 +167,7 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
         Assert.Equal((leeId, "CommunityManager", JsonValueKind.Null), (body.GetProperty("appointed").GetProperty("userId").GetString(),
             body.GetProperty("appointed").GetProperty("role").GetString(), body.GetProperty("appointed").GetProperty("endDate").ValueKind));
         var (pat, lee) = await ManagerRowsAsync(community, patId, leeId);
-        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)Today()), (pat!.Status, pat.EndDate));
+        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)ClockToday()), (pat!.Status, pat.EndDate));
         Assert.Equal((MembershipStatus.Active, (DateOnly?)null), (lee!.Status, lee.EndDate));
 
         var events = LogSink.Events.Where(e => e.MessageTemplate.Text.StartsWith("BoardMembershipChange")
@@ -332,7 +332,7 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
         Assert.Equal(HttpStatusCode.Created, res.StatusCode);
         Assert.Equal(oldRow, (await JsonAsync(res)).GetProperty("id").GetGuid());
         var row = await WithDbAsync(db => db.CommunityMemberships.AsNoTracking().SingleAsync(m => m.Id == oldRow));
-        Assert.Equal((MembershipStatus.Active, Today(), (DateOnly?)null), (row.Status, row.StartDate, row.EndDate));
+        Assert.Equal((MembershipStatus.Active, ClockToday(), (DateOnly?)null), (row.Status, row.StartDate, row.EndDate));
         Assert.Equal(1, await WithDbAsync(db => db.CommunityMemberships.CountAsync(m => m.UserId == formerId
                                                                                    && m.Role == CommunityRole.CommunityManager)));
     }
@@ -361,21 +361,15 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
         Assert.Equal(first.GetProperty("invitationId").GetGuid(), body.GetProperty("invitationId").GetGuid());
     }
 
-    // US2-S11: the replacement is a different person, and both people are named.
+    // US2-S11: the replacement is named, and is a different person.
     [Theory]
     [InlineData("same")]
     [InlineData("blankReplacement")]
-    [InlineData("noCurrent")]
-    public async Task Replace_WithTheSamePersonOrAMissingId_Is422_OnReplacementUserId(string shape)
+    public async Task Replace_WithTheSamePersonOrNoReplacement_Is422_OnReplacementUserId(string shape)
     {
         var (_, community, patId, _, adminEmail) = await ReplaceSetupAsync();
         using var admin = await ClientForAsync(adminEmail);
-        object request = shape switch
-        {
-            "same" => new { currentManagerUserId = (string?)patId, replacementUserId = patId },
-            "blankReplacement" => new { currentManagerUserId = (string?)patId, replacementUserId = "  " },
-            _ => new { currentManagerUserId = (string?)null, replacementUserId = patId },
-        };
+        var request = new { currentManagerUserId = patId, replacementUserId = shape == "same" ? patId : "  " };
 
         var res = await admin.PostAsJsonAsync(ReplaceUrl(community), request);
 
@@ -417,11 +411,13 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
     [InlineData("boardMember")]
     [InlineData("lapsedManager")]
     [InlineData("unknownId")]
+    [InlineData("missing")]
     public async Task Replace_WhenTheCurrentIsntAnEffectiveManager_Is422_OnCurrentManagerUserId(string current)
     {
         var (_, community, patId, leeId, adminEmail) = await ReplaceSetupAsync();
-        var currentId = current switch
+        string? currentId = current switch
         {
+            "missing" => null,
             "boardMember" => (await CreateStaffAsync(community, CommunityRole.BoardMember)).UserId,
             "lapsedManager" => (await CreateManagerAsync(community, endDate: DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime).AddDays(-1))).UserId,
             _ => Guid.NewGuid().ToString(),
@@ -461,7 +457,7 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
             (appointed.GetProperty("id").GetGuid(), appointed.GetProperty("userId").GetString(),
              appointed.GetProperty("status").GetString(), appointed.GetProperty("endDate").ValueKind));
         var (pat, lee) = await ManagerRowsAsync(community, patId, leeId);
-        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)Today()), (pat!.Status, pat.EndDate));
+        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)ClockToday()), (pat!.Status, pat.EndDate));
         Assert.Equal((leeRow, MembershipStatus.Active, (DateOnly?)null), (lee!.Id, lee.Status, lee.EndDate));
 
         var events = LogSink.Events.Where(e => e.MessageTemplate.Text.StartsWith("BoardMembershipChange")
@@ -637,7 +633,8 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
 
     private static string NewEmail(string name) => $"{name}-{Guid.NewGuid():N}@example.com";
 
-    private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
+    // The date the app stamps: the test clock's, not the wall clock's.
+    private DateOnly ClockToday() => DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime);
 
     /// <summary>Fails the save that ends a Community Manager row, after it reaches the database, once armed.</summary>
     private sealed class FailEndingAManager : SaveChangesInterceptor

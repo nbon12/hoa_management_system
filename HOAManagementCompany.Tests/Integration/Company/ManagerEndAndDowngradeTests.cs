@@ -61,7 +61,7 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
 
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var row = await RowAsync(selfRow);
-        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)Today()), (row.Status, row.EndDate));
+        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)ClockToday()), (row.Status, row.EndDate));
         // Their very next manager request, on the same session.
         var next = await self.GetAsync($"/api/v1/communities/{community}/memberships");
         Assert.Equal(HttpStatusCode.Forbidden, next.StatusCode);
@@ -87,7 +87,7 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
         Assert.Equal((boardRow, "BoardMember", "Active"),
             (body.GetProperty("id").GetGuid(), body.GetProperty("role").GetString(), body.GetProperty("status").GetString()));
         var ended = await RowAsync(coRow);
-        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)Today()), (ended.Status, ended.EndDate));
+        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)ClockToday()), (ended.Status, ended.EndDate));
         Assert.Equal(MembershipStatus.Active, (await RowAsync(boardRow)).Status);
 
         using var co = await ClientForAsync(coEmail);
@@ -130,7 +130,7 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var board = await WithDbAsync(db => db.CommunityMemberships.AsNoTracking()
             .SingleAsync(m => m.CommunityId == community && m.UserId == coId && m.Role == CommunityRole.BoardMember));
-        Assert.Equal((MembershipStatus.Active, Today(), (DateOnly?)null), (board.Status, board.StartDate, board.EndDate));
+        Assert.Equal((MembershipStatus.Active, ClockToday(), (DateOnly?)null), (board.Status, board.StartDate, board.EndDate));
     }
 
     // FR-022 / US2-S15 set-up: an ended or downgraded manager's open invitations are revoked.
@@ -211,5 +211,6 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
     private static string MembershipUrl(Guid community, Guid membershipId) =>
         $"/api/v1/communities/{community}/memberships/{membershipId}";
 
-    private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
+    // The date the app stamps: the test clock's, not the wall clock's.
+    private DateOnly ClockToday() => DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime);
 }

@@ -1180,12 +1180,19 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - refresh the Storybook stories;
   - if brief 01 keeps the company name on the company sign-in page, add it as a runtime-config value, with its rule in `neko-hoa/src/app/core/config/runtime-config.validator.ts` (constitution §8);
   - re-run T148 and T150.
-- [ ] T161 Run the full backend suite (`dotnet test`) and frontend (`cd neko-hoa && npm run test:ci && npm run build`). Confirm:
+- [X] T161 Run the full backend suite (`dotnet test`) and frontend (`cd neko-hoa && npm run test:ci && npm run build`). Confirm:
   - coverage on new files is at least 95%;
   - the payment, ARC and auth suites still pass after the access and sign-in changes;
   - Sonar passes;
   - the new endpoints appear in the development Swagger UI and match the contracts (constitution §4);
   - the `ArchivedWriteEndpoints` registry of T095 lists every write endpoint in the permissions table.
+
+  Result (2026-10-24):
+  - full backend suite 1537/1537 passing; frontend `test:ci` 866/866, and `build` and `build-storybook` succeed.
+  - New backend files reach at least 95% line coverage each. The exception is `Invitation.cs`, whose three EF navigation properties are only used by the model and in SQL-translated queries. The coverage tests found and fixed the people search's LIKE escaping.
+  - Sonar isn't configured for this repository, so CI skips its steps. CI's own gate, at least 90% coverage of changed lines, passes.
+  - All 33 new routes are in the development Swagger document and match the contracts.
+  - The registry lists every community write.
 - [X] T162 Walk through `specs/030-company-administration/quickstart.md` against a local stack, and fix any drift in the quickstart or the code
 - [X] T163 NLT audit per CLAUDE.md. For every `USn-Sm` and Independent Test in `spec.md`, confirm that the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.
 - [X] T164 Keep the spec truthful:
