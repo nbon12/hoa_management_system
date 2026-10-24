@@ -1,4 +1,4 @@
-import { APP_INITIALIZER, ApplicationConfig } from '@angular/core';
+import { APP_INITIALIZER, ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideNgxStripe } from 'ngx-stripe';
@@ -11,6 +11,9 @@ import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    // Angular 21 bootstraps zoneless by default; this app still relies on zone.js-driven change
+    // detection (zone.js polyfill + OTel ZoneContextManager), so opt back in explicitly.
+    provideZoneChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
     // Stripe.js loader. The publishable key (pk_…) is browser-safe and supplied per environment

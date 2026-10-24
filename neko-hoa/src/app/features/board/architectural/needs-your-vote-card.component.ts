@@ -75,7 +75,7 @@ export class NeedsYourVoteCardComponent {
   constructor() {
     effect(() => {
       if (this.ctx.communityId()) untracked(() => void this.load());
-    }, { allowSignalWrites: true });
+    });
   }
 
   private async load(): Promise<void> {

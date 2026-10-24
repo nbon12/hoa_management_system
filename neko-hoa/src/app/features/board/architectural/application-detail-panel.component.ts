@@ -168,7 +168,7 @@ export class ApplicationDetailPanelComponent {
       const cid = this.communityId();
       const id = this.applicationId();
       untracked(() => void this.load(cid, id));
-    }, { allowSignalWrites: true });
+    });
     // The vote card only exists once the detail has loaded, so focus is applied when it appears.
     effect(() => {
       const card = this.voteCard();
