@@ -333,3 +333,92 @@ fieldset.dlg-fieldset { border: none; display: flex; flex-direction: column; gap
 fieldset.dlg-fieldset legend { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
 .dlg-radio { display: flex; gap: 8px; align-items: flex-start; }
 .dlg-radio input { margin-top: 3px; }
+
+
+/* ── App shell frame (025; moved here from ShellComponent in 030 T150 so the phone layout fits the
+   component style budget). Class names are the shell's own BEM block. ── */
+.shell {
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  font-family: 'Geist', system-ui, sans-serif;
+}
+
+/* top bar */
+.shell__top {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1.5px dashed var(--line);
+  background: linear-gradient(180deg, var(--pink) 0%, var(--paper) 100%);
+  flex-shrink: 0;
+}
+.shell__logo {
+  display: flex; align-items: center; gap: 8px; color: var(--ink);
+}
+
+/* property strip */
+.shell__strip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 22px;
+  background: var(--lav); border-bottom: 1.5px solid var(--line-soft);
+  font-size: 12px; color: var(--ink-soft); flex-shrink: 0;
+  b { color: var(--ink); font-weight: 600; }
+}
+
+/* sidebar + content */
+.shell__body { display: flex; flex: 1; min-height: 0; }
+
+.shell__side {
+  width: 180px; background: var(--lav);
+  border-right: 1.5px dashed var(--line);
+  padding: 18px 10px; display: flex; flex-direction: column; gap: 2px;
+  flex-shrink: 0; overflow-y: auto;
+}
+.shell__side-group {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--ink-mute); padding: 10px 12px 4px; font-weight: 600;
+}
+.shell__side-item {
+  display: block; padding: 8px 12px; border-radius: 10px;
+  color: var(--ink-soft); font-size: 12.5px; text-decoration: none;
+  transition: background .1s; border: 1.5px solid transparent;
+  &:hover { background: var(--lav-2); }
+}
+.shell__side-item--active {
+  background: var(--paper); color: var(--ink); font-weight: 500;
+  border-color: var(--ink);
+}
+.shell__side-item--disabled {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--ink-mute); cursor: default;
+  &:hover { background: transparent; }
+}
+.shell__side-item--locked { color: var(--ink-mute); }
+.shell__side-soon {
+  font-size: 9px; padding: 1px 6px; border-radius: 999px;
+  background: var(--lav-2); border: 1px solid var(--line); color: var(--ink-mute);
+}
+
+.shell__nav { display: flex; flex-direction: column; gap: 2px; }
+.shell__content {
+  flex: 1; overflow: auto; padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+  /* Positioned, so absolutely positioned descendants (the sr-only text in tables) stay inside
+     this scroll container instead of widening the page (030 T150). */
+  position: relative; min-width: 0;
+}
+.shell__account { flex-wrap: wrap; justify-content: flex-end; }
+
+/* 030 T150 / conventions §2, §8: below 768 px the side nav becomes a strip above the content that
+   scrolls inside itself, and the top bar and strip wrap, so no page scrolls sideways at 320 px. */
+@media (max-width: 767.98px) {
+  .shell__top { flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
+  .shell__strip { flex-wrap: wrap; padding: 8px 16px; }
+  .shell__body { flex-direction: column; }
+  .shell__side {
+    width: auto; padding: 6px 10px; border-right: none; border-bottom: 1.5px dashed var(--line);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  .shell__nav { flex-direction: row; align-items: center; }
+  .shell__side-group { display: none; }
+  .shell__side-item { white-space: nowrap; }
+  .shell__content { padding: 16px; }
+}

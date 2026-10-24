@@ -1,0 +1,25 @@
+<!-- 030 T149: the "Dark" theme of the Storybook toolbar. It redefines the design tokens of
+     src/styles.scss only; components must not need anything else to read well in it. -->
+<style>
+  html[data-theme='dark'] {
+    --paper: #1f1a22;
+    --ink: #f3edf5;
+    --ink-soft: #cdc1d3;
+    --ink-mute: #a294a8;
+    --pink: oklch(0.32 0.04 350);
+    --pink-2: oklch(0.40 0.06 350);
+    --rose: oklch(0.74 0.10 350);
+    --lav: oklch(0.29 0.04 300);
+    --lav-2: oklch(0.37 0.06 300);
+    --violet: oklch(0.74 0.10 300);
+    --line: #4b4051;
+    --line-soft: #362e3b;
+    --warn: oklch(0.74 0.12 30);
+    --ok: oklch(0.74 0.10 160);
+    --ok-bg: oklch(0.33 0.06 160);
+    --warn-bg: oklch(0.35 0.07 30);
+    --social: oklch(0.45 0.06 80);
+    --maintenance: oklch(0.42 0.07 200);
+    color-scheme: dark;
+  }
+</style>

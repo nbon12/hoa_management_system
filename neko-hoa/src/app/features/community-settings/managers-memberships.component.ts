@@ -223,7 +223,7 @@ type Area = 'managers' | 'board-members-and-accountants' | 'invitations';
     .mm__state { padding-bottom: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
     .mm__name { text-align: left; font-weight: 600; background: transparent; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--ink); }
     .mm__ended { text-align: left; background: var(--lav); }
-    .mm__scroll { overflow-x: auto; }
+    .mm__scroll { overflow-x: auto; position: relative; }
     .mm__inv-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   `],
 })

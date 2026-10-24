@@ -74,8 +74,11 @@ import { refusalCodeOf, refusalMessage } from '../shared/refusal-messages';
   `],
 })
 export class HomeSwitcherComponent {
-  /** `GET /property`, for backends that don't send the home list yet. */
-  @Input() fallback: { communityName: string; address: string } | null = null;
+  /** `GET /property`, for backends that don't send the home list yet (or a token with no home claim). */
+  @Input() set fallback(value: { communityName: string; address: string } | null) {
+    this.fallbackHome.set(value);
+  }
+  private readonly fallbackHome = signal<{ communityName: string; address: string } | null>(null);
   /** After another home was chosen, so the shell re-reads it. */
   @Output() readonly switched = new EventEmitter<string>();
 
@@ -92,8 +95,8 @@ export class HomeSwitcherComponent {
   readonly archived = this.home.archived;
   readonly open = signal(false);
 
-  readonly communityName = computed(() => this.current()?.communityName ?? this.fallback?.communityName ?? '');
-  readonly address = computed(() => this.current()?.address ?? this.fallback?.address ?? '');
+  readonly communityName = computed(() => this.current()?.communityName ?? this.fallbackHome()?.communityName ?? '');
+  readonly address = computed(() => this.current()?.address ?? this.fallbackHome()?.address ?? '');
 
   toggle(): void {
     if (this.open()) this.close(true);

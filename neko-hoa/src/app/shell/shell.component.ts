@@ -4,6 +4,7 @@ import { NavigationEnd, Router, RouterOutlet, RouterLink, RouterLinkActive } fro
 import { filter, map } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
 import { PropertyService } from '../core/services/property.service';
+import { TokenService } from '../core/services/token.service';
 import { BoardNavigationService } from '../core/services/board-navigation.service';
 import { isBoardMode } from '../core/services/landing';
 import { COMPANY_NAV, CompanyMenuComponent } from './company-menu.component';
@@ -31,7 +32,7 @@ interface NavGroup {
           <span class="logo-mark"></span>
           <span class="hand" style="font-size:22px;font-weight:700;">NekoHOA</span>
         </div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <div class="shell__account" style="margin-left:auto;display:flex;align-items:center;gap:8px;">
           <!-- 030 FR-036 (brief 01): Company Administrators only, left of the mode control. -->
           @if (isCompanyAdministrator()) {
             <app-company-menu [current]="companyArea()" />
@@ -127,77 +128,11 @@ interface NavGroup {
       </div>
     </div>
   `,
-  styles: [`
-    .shell {
-      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
-      font-family: 'Geist', system-ui, sans-serif;
-    }
-
-    /* top bar */
-    .shell__top {
-      display: flex; align-items: center; gap: 16px;
-      padding: 14px 22px;
-      border-bottom: 1.5px dashed var(--line);
-      background: linear-gradient(180deg, var(--pink) 0%, var(--paper) 100%);
-      flex-shrink: 0;
-    }
-    .shell__logo {
-      display: flex; align-items: center; gap: 8px; color: var(--ink);
-    }
-
-    /* property strip */
-    .shell__strip {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 22px;
-      background: var(--lav); border-bottom: 1.5px solid var(--line-soft);
-      font-size: 12px; color: var(--ink-soft); flex-shrink: 0;
-      b { color: var(--ink); font-weight: 600; }
-    }
-
-    /* sidebar + content */
-    .shell__body { display: flex; flex: 1; min-height: 0; }
-
-    .shell__side {
-      width: 180px; background: var(--lav);
-      border-right: 1.5px dashed var(--line);
-      padding: 18px 10px; display: flex; flex-direction: column; gap: 2px;
-      flex-shrink: 0; overflow-y: auto;
-    }
-    .shell__side-group {
-      font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--ink-mute); padding: 10px 12px 4px; font-weight: 600;
-    }
-    .shell__side-item {
-      display: block; padding: 8px 12px; border-radius: 10px;
-      color: var(--ink-soft); font-size: 12.5px; text-decoration: none;
-      transition: background .1s; border: 1.5px solid transparent;
-      &:hover { background: var(--lav-2); }
-    }
-    .shell__side-item--active {
-      background: var(--paper); color: var(--ink); font-weight: 500;
-      border-color: var(--ink);
-    }
-    .shell__side-item--disabled {
-      display: flex; align-items: center; gap: 6px;
-      color: var(--ink-mute); cursor: default;
-      &:hover { background: transparent; }
-    }
-    .shell__side-item--locked { color: var(--ink-mute); }
-    .shell__side-soon {
-      font-size: 9px; padding: 1px 6px; border-radius: 999px;
-      background: var(--lav-2); border: 1px solid var(--line); color: var(--ink-mute);
-    }
-
-    .shell__nav { display: flex; flex-direction: column; gap: 2px; }
-    .shell__content {
-      flex: 1; overflow: auto; padding: 22px 24px;
-      display: flex; flex-direction: column; gap: 16px;
-    }
-  `]
 })
 export class ShellComponent implements OnInit {
   private auth = inject(AuthService);
   private propertySvc = inject(PropertyService);
+  private tokens = inject(TokenService);
   private boardNavSvc = inject(BoardNavigationService);
   private router = inject(Router);
 
@@ -235,6 +170,13 @@ export class ShellComponent implements OnInit {
   }
 
   async loadProperty(): Promise<void> {
+    // 030 FR-036a: a session with no selected home (a Company Administrator or a board-only
+    // member) has no property to show, and GET /property would refuse it with
+    // PROPERTY_ACCESS_DENIED, whose recovery moves the person off the page they opened.
+    if (!this.tokens.claim(this.tokens.getAccessToken(), 'propertyId')) {
+      this.property.set(null);
+      return;
+    }
     try {
       this.property.set(await this.propertySvc.getProperty());
     } catch { /* user may not have a property yet */ }

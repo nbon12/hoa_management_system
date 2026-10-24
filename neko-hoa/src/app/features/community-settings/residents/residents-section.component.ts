@@ -239,7 +239,7 @@ function sortInvitations(list: PropertyInvitation[]): PropertyInvitation[] {
     .rs__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
     .rs__ph { height: 160px; }
     .rs__error { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-    .rs__table-wrap { overflow-x: auto; }
+    .rs__table-wrap { overflow-x: auto; position: relative; }
     .rs__row { cursor: pointer; }
     .rs__row--selected { background: var(--lav); }
     .rs__address { background: none; border: 0; padding: 0; font: inherit; text-align: left; }

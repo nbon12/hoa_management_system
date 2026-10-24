@@ -149,7 +149,7 @@ function communities(n: number): string {
     .pf > .section-title { padding: 14px 16px 6px; }
     .pf__ph { height: 120px; margin: 0 16px 16px; }
     .pf__state { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding: 8px 16px 16px; }
-    .pf__scroll { overflow-x: auto; }
+    .pf__scroll { overflow-x: auto; position: relative; }
     .pf__name { text-align: left; font-weight: 600; background: transparent; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--ink); }
     .pf__sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; text-decoration: underline dotted; }
     .pf__managers { list-style: none; display: flex; flex-direction: column; gap: 2px; }

@@ -213,7 +213,7 @@ type ListState = 'loading' | 'ready' | 'error';
     .ca__invite { margin-left: auto; }
     .ca__ph { height: 120px; }
     .ca__error { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-    .ca__table-wrap { overflow-x: auto; }
+    .ca__table-wrap { overflow-x: auto; position: relative; }
     .ca__actions { display: inline-flex; gap: 6px; }
     .ca__action { min-height: 32px; }
   `],

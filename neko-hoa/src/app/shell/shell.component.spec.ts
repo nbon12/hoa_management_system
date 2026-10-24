@@ -334,6 +334,7 @@ describe('ShellComponent — home list (030 T102)', () => {
   let fixture: ComponentFixture<ShellComponent>;
   let el: HTMLElement;
   let switchProperty: jasmine.Spy;
+  let getProperty: jasmine.Spy;
 
   const P29: UserPropertySummary = { id: 'p29', accountNumber: 'A-29', address: '711 Keystone Park Dr #29', communityId: 'sh', communityName: 'Sakura Heights', communityStatus: 'Active' };
   const P16: UserPropertySummary = { id: 'p16', accountNumber: 'A-16', address: '16 Old Mill Ln', communityId: 'om', communityName: 'Old Mill Commons', communityStatus: 'Archived' };
@@ -367,6 +368,7 @@ describe('ShellComponent — home list (030 T102)', () => {
   beforeEach(async () => {
     userSig.set(null);
     TestBed.resetTestingModule();
+    getProperty = jasmine.createSpy('getProperty').and.resolveTo(null);
     switchProperty = jasmine.createSpy('switchProperty').and.callFake(async (id: string) => {
       TestBed.inject(TokenService).setAccessToken(jwt({ propertyId: id }));
     });
@@ -375,7 +377,7 @@ describe('ShellComponent — home list (030 T102)', () => {
       providers: [
         provideRouter([{ path: '**', component: PageStubComponent }]),
         { provide: AuthService, useValue: { user: userSig.asReadonly(), logout: () => {}, switchMode: () => Promise.resolve(), switchProperty } },
-        { provide: PropertyService, useValue: { getProperty: () => Promise.resolve(null) } },
+        { provide: PropertyService, useValue: { getProperty } },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(ShellComponent);
@@ -474,6 +476,36 @@ describe('ShellComponent — home list (030 T102)', () => {
     el.querySelector<HTMLElement>('[role="menuitem"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     fixture.detectChanges();
     expect(el.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('shows the home from GET /property when the home list has no current home (a token with no home claim)', async () => {
+    getProperty.and.resolveTo({ accountNumber: 'A-29', communityName: 'Sakura Heights', address: '711 Keystone Park Dr #29' });
+    await signInAs([], 'none');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const strip = el.querySelector<HTMLElement>('.shell__strip')!;
+    expect(strip.textContent).toContain('Sakura Heights');
+    expect(strip.textContent).toContain('711 Keystone Park Dr #29');
+    expect(switcher()).toBeNull();
+  });
+
+  it('asks for no property when the session has no selected home, so a deep link is not redirected (FR-036a)', async () => {
+    userSig.set({
+      id: 'u-robin', firstName: 'Robin', lastName: 'Hale', email: 'company@example.com', initials: 'RH',
+      lastActiveMode: 'Resident', memberships: [], properties: [], isCompanyAdministrator: true, landing: 'Company',
+    });
+    TestBed.inject(TokenService).setAccessToken(jwt({}));
+    await TestBed.inject(NgZone).run(() => TestBed.inject(Router).navigateByUrl('/app/company/administrators'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(getProperty).not.toHaveBeenCalled();
+    expect(TestBed.inject(Router).url).toBe('/app/company/administrators');
+  });
+
+  it('asks for the property when the session has a selected home', async () => {
+    await signInAs([P29], 'p29');
+    expect(getProperty).toHaveBeenCalledTimes(1);
   });
 
   it('moves with the arrow keys and closes with Esc, returning focus to the button', async () => {

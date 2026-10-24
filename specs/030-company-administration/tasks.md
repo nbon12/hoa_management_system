@@ -1123,25 +1123,25 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
 
 ## Phase 12: Polish and cross-cutting
 
-- [ ] T146 [P] Add Playwright journeys tagged `@company` in `neko-hoa/e2e/company-administration.spec.ts`. They read links from the dev vault (T054) and use fresh emails on each run, so the shared seed isn't damaged. The first two journeys are the automated proxies for SC-001 and SC-010:
+- [X] T146 [P] Add Playwright journeys tagged `@company` in `neko-hoa/e2e/company-administration.spec.ts`. They read links from the dev vault (T054) and use fresh emails on each run, so the shared seed isn't damaged. The first two journeys are the automated proxies for SC-001 and SC-010:
   - "add community → invite manager → accept → activate";
   - "invite resident → sign up from the link → see the home";
   - a Board Member is refused `/app/board/settings/profile` and taken to their landing page;
   - the company sign-in page lands an administrator on the portfolio.
-- [ ] T147 [P] Add a Cypress journey in `neko-hoa/cypress/e2e/company-admin.cy.ts`: sign in as `company@nekohoa.dev` (no home) → portfolio → Keystone Ridge → Community settings
-- [ ] T148 [P] Add accessibility checks in `neko-hoa/e2e/company-administration.spec.ts` for every surface in the spec's Accessibility list. Use axe through the existing Playwright setup if present; otherwise use explicit role and label assertions.
+- [X] T147 [P] Add a Cypress journey in `neko-hoa/cypress/e2e/company-admin.cy.ts`: sign in as `company@nekohoa.dev` (no home) → portfolio → Keystone Ridge → Community settings
+- [X] T148 [P] Add accessibility checks in `neko-hoa/e2e/company-administration.spec.ts` for every surface in the spec's Accessibility list. Use axe through the existing Playwright setup if present; otherwise use explicit role and label assertions.
   - keyboard reach for every control;
   - labels, visible focus, and errors tied to their fields;
   - status and flags conveyed as text;
   - the disabled-reason tooltip shown on focus;
   - the drawer's focus handling.
-- [ ] T149 [P] Add Storybook stories, in both themes and at phone, tablet and desktop viewports, using tokens only, in a `*.stories.ts` beside each new component:
+- [X] T149 [P] Add Storybook stories, in both themes and at phone, tablet and desktop viewports, using tokens only, in a `*.stories.ts` beside each new component:
   - every company page;
   - every settings section;
   - the property drawer and the dialogs;
   - the invitation page's states;
   - the landing pages.
-- [ ] T150 [P] Add responsive checks (constitution §6) to `neko-hoa/e2e/company-administration.spec.ts`. Every new page at 390, 834 and 1360 px wide:
+- [X] T150 [P] Add responsive checks (constitution §6) to `neko-hoa/e2e/company-administration.spec.ts`. Every new page at 390, 834 and 1360 px wide:
   - has no sideways page scrolling;
   - keeps its tables usable: they scroll inside their own container or stack into rows;
   - collapses the settings side list into a menu below 768 px;
@@ -1186,7 +1186,7 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - Sonar passes;
   - the new endpoints appear in the development Swagger UI and match the contracts (constitution §4);
   - the `ArchivedWriteEndpoints` registry of T095 lists every write endpoint in the permissions table.
-- [ ] T162 Walk through `specs/030-company-administration/quickstart.md` against a local stack, and fix any drift in the quickstart or the code
+- [X] T162 Walk through `specs/030-company-administration/quickstart.md` against a local stack, and fix any drift in the quickstart or the code
 - [X] T163 NLT audit per CLAUDE.md. For every `USn-Sm` and Independent Test in `spec.md`, confirm that the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.
 - [X] T164 Keep the spec truthful:
   - update `spec.md`, `plan.md` and the contracts for any change made during implementation;
