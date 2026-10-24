@@ -174,6 +174,7 @@ The dialogs ask the server first, then act (brief 04 D4).
 
 - **Auth**: `ManageCommunityLifecycle`, write.
 - **Body**: `{ "parentCommunityId": "guid" | null }`.
+- **200**: `{ "parentCommunityId": "guid" | null }`, the link as saved.
 - **Errors**:
   - 403;
   - 409 `COMMUNITY_ARCHIVED` (this community is archived);
@@ -246,6 +247,7 @@ The Company Administrator invitations shown on the same page.
   - 409 `INVITATION_PENDING`;
   - 409 `ALREADY_MEMBER` (the email belongs to a current Company Administrator, who is visible on the same page);
   - 422 `SELF_GRANT_NOT_ALLOWED`;
+  - 422 `VALIDATION_ERROR` on `email` (see [invitations-and-auth.md § Invitation emails](./invitations-and-auth.md#invitation-emails));
   - 429 `RATE_LIMITED`.
 
 ### POST /company/administrators/{userId}/revoke
@@ -273,8 +275,12 @@ dotnet HOAManagementCompany.dll --grant-company-admin <email> --recover
 2. Resolve the company, and set its name if `--company-name` is given.
 3. Then:
    - **no live grant exists**: if the email has an account, grant the role (`Source = Setup`), log `CompanyAdminChange Actor=setup Change=Granted`, print `Granted Company Administrator to <userId>.` and exit 0. Otherwise create and send a `CompanyAdministrator` invitation (sender: the system), print `Invitation sent; it expires <time UTC>.` and exit 0;
-   - **a live grant exists, without `--recover`**: print `A Company Administrator already exists; nothing changed.`, write nothing and exit 0;
-   - **a live grant exists, with `--recover`**: grant or invite as above (`Source = Recovery`), log `CompanyAdminChange Change=Recovery`, enqueue `co_admin_recovery` for every current Company Administrator, and exit 0.
+   - **a live grant exists, without `--recover`**: print `A Company Administrator already exists; nothing changed.`, write nothing, log `CompanyAdminChange Change=NoChange` and exit 0;
+   - **a live grant exists, with `--recover`**: grant or invite as above (`Source = Recovery`), log `CompanyAdminChange Change=Recovery`, enqueue `co_admin_recovery` for every current Company Administrator, and exit 0. If the email itself already has a live grant, print `<email> is already a Company Administrator; nothing changed.`, log `Change=NoChange` and exit 0.
+
+A run that has to invite while an invitation for that email is still pending resends it with a new link rather than creating another, and doesn't email the current administrators a second time. A resend refused by the invitation rate limit logs `Change=RateLimited`, prints the wait message and exits 1. An invitation created but whose email couldn't be sent prints that and exits 1, so the operator runs the step again.
+
+Every run is logged, so the trail shows each use of the operator path: `Granted`, `Invited`, `Recovery`, `NoChange` or `RateLimited`. A company rename by `--company-name` is logged as `CompanyRenamed`.
 
 An invalid email argument prints the reason and exits 2. A database failure exits 1.
 

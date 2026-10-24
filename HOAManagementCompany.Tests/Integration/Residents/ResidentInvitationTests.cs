@@ -82,6 +82,11 @@ public partial class ResidentInvitationTests(TestDatabaseFixture fixture) : Comp
         Assert.Equal(forNewcomer.StatusCode, forSam.StatusCode);
         Assert.Equal(Shape(await JsonAsync(forNewcomer)), Shape(await JsonAsync(forSam)));
         Assert.False(await WithDbAsync(db => db.UserProperties.AnyAsync(up => up.UserId == samId && up.PropertyId == home)));
+        // Sam is asked to sign in and accept; the newcomer to create an account.
+        var toSam = Assert.Single(Email.Sent, m => m.Target == samEmail);
+        Assert.Contains("Sign in with it, then accept. Nothing changes until you accept.", toSam.Body);
+        Assert.DoesNotContain("create an account", toSam.Body);
+        Assert.Contains("To accept, create an account", Assert.Single(Email.Sent, m => m.Target == newcomer).Body);
 
         using var sam = await ClientForAsync(samEmail);
         var accept = await sam.PostAsJsonAsync("/api/v1/invitations/accept", new { token = TokensSentTo(samEmail).Single() });

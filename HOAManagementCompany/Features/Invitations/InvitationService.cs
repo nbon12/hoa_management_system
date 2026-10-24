@@ -19,6 +19,8 @@ namespace HOAManagementCompany.Features.Invitations;
 // accept and a revoke of the same invitation can't both win. A link token exists in plain text only
 // in memory: the row keeps its SHA-256 hash, and the email is sent directly, after the commit, never
 // through the outbox. Refusals follow FR-022's order: invalid, expired, sender authority, email.
+// The sender's authority is checked again under the lock on create, resend and revoke, so a revoke or
+// an archive that committed while the request waited wins.
 // <!-- REPOWISE:END -->
 
 /// <summary>A new invitation as the caller asks for it. The kind's handler validates the target.</summary>

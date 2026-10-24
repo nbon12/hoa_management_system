@@ -1187,8 +1187,8 @@ US5-S3 is covered by T065 and T067, and US5-S8 by T081.
   - the new endpoints appear in the development Swagger UI and match the contracts (constitution §4);
   - the `ArchivedWriteEndpoints` registry of T095 lists every write endpoint in the permissions table.
 - [ ] T162 Walk through `specs/030-company-administration/quickstart.md` against a local stack, and fix any drift in the quickstart or the code
-- [ ] T163 NLT audit per CLAUDE.md. For every `USn-Sm` and Independent Test in `spec.md`, confirm that the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.
-- [ ] T164 Keep the spec truthful:
+- [X] T163 NLT audit per CLAUDE.md. For every `USn-Sm` and Independent Test in `spec.md`, confirm that the citing test exists, asserts the stated Then, and isn't skipped. Record the mapping table at the end of this file.
+- [X] T164 Keep the spec truthful:
   - update `spec.md`, `plan.md` and the contracts for any change made during implementation;
   - mark this file's tasks done;
   - refresh the Repowise marker regions listed in `plan.md`.
@@ -1266,4 +1266,125 @@ T110, T111, T112, T113, T114, T115, T116
 
 ## NLT mapping (T163)
 
-To be filled in by T163 during implementation. Every scenario above already names its planned test task.
+Every acceptance scenario and Independent Test in `spec.md`, mapped to the automated tests that cover it. Backend paths are under `HOAManagementCompany.Tests/`, frontend paths under `neko-hoa/src/app/`. Audited 2026-10-23; no cited test is skipped or focused. Rows marked † were partial in the audit and were strengthened in the same change.
+
+| Scenario | Covering test(s) |
+|---|---|
+| US1-S1 | `Integration/Company/AddCommunityTests.cs::CompanyAdministrator_AddsACommunity_OnboardingWithTheDefaultsAndNoManager`; `features/company/add-community.component.spec.ts` (US1-S1) |
+| US1-S2 | `AddCommunityTests::CompanyAdministrator_AddingATakenName_IsRefused_NamingTheOtherCommunity`; add-community spec (US1-S2) |
+| US1-S3 † | `AddCommunityTests::CommunityManager_AddingATakenName_IsToldOnlyThatItIsUnavailable` (now asserts `COMMUNITY_NAME_TAKEN` and that nothing describes the other community); add-community spec (US1-S3) |
+| US1-S4 † | `AddCommunityTests::CommunityManager_AddsACommunity_BecomesItsManager_AndEveryAdministratorIsEmailed` (now asserts each email's subject and the manager's name); `Unit/Company/CompanyEmailRendererTests::CommunityAdded_NamesTheManager_AndLinksToTheSettingsPage` |
+| US1-S5 | `AddCommunityTests::WithoutTheRight_IsForbidden_AndNothingIsCreated`; `CompanyCapabilityTheoryTests::CompanyCapabilities_FollowTheGrantAndEffectiveManagerRule` |
+| US1-S6 | `AddCommunityTests::AManagerOfOnlyAnArchivedCommunity_IsForbidden` |
+| US1-S7 | `AddCommunityTests::CompanyAdministrator_AddsASubAssociation_AndTheMastersBoardGetsNoAccess`; `ScopeDecisionTheoryTests::MembershipInParent_NeverReachesTheSubAssociation` |
+| US1-S8 | `AddCommunityTests::CommunityManager_ChoosingAParentTheyDontManage_IsForbidden_LikeANonexistentParent`; add-community spec (parent picker) |
+| US1-S9 | `AddCommunityTests::InvalidFields_Are422_NamingExactlyTheFieldsAtFault`; add-community spec (US1-S9) |
+| US1-IT | Union of US1-S1, S2–S5 |
+| US2-S1 | `Integration/Company/ManagerAppointmentTests.cs::CompanyAdministrator_AppointsAManagerByEmail_SendsAPendingInvitation`; `Integration/Invitations/MembershipInvitationAcceptanceTests.cs::PatAcceptsWithin72Hours_AndBecomesAnOpenEndedManagerFromToday` |
+| US2-S2 | `MembershipInvitationAcceptanceTests::PatRegistersFromTheLink_WithNoClaimCode_AndLandsInBoardMode`; `features/invitations/invitation-page.component.spec.ts` |
+| US2-S3 | `ManagerAppointmentTests::CommunityManager_AppointsABoardMemberFromThePeopleList_AsAnOpenEndedCoManager` |
+| US2-S4 † | `ManagerAppointmentTests::AppointingByEmail_GivesTheSameResponse_WithOrWithoutAnAccount` (now as Community Manager, `Pending`, equal expiry) |
+| US2-S5 | `MembershipInvitationAcceptanceTests::ALinkUsed72HoursAnd1MinuteLater_IsExpired_AndNoMembershipIsCreated` |
+| US2-S6 | `MembershipInvitationAcceptanceTests::ResendingAPendingOrExpiredInvitation_SendsANewLinkFor72Hours` |
+| US2-S7 | `MembershipInvitationAcceptanceTests::BobSignedIn_AcceptingAnnsInvitation_IsAnEmailMismatch_WithoutAnnsEmail`; invitation-page spec (US2-S7) |
+| US2-S8 † | `ManagerAppointmentTests::ManagerOfA_AppointingInB_IsForbiddenLikeANonexistentCommunity` (now asserts `FORBIDDEN`) |
+| US2-S9 | `Integration/Company/ManagerEndAndDowngradeTests.cs::EndingTheOnlyOpenEndedManager_IsLastManager_AndTheManagerStaysActive`; `Unit/Company/ManagerRuleTheoryTests::Evaluate_AppliesTheOpenEndedManagerRule` |
+| US2-S10 | `ManagerEndAndDowngradeTests::GivingTheOnlyOpenEndedManagerAnEndDate_IsLastManager_AndTheEndDateStaysNull` |
+| US2-S11 | `ManagerAppointmentTests::CompanyAdministrator_ReplacesTheLastManager_InOneAction`, `::Replace_FailingAfterTheGrant_LeavesBothManagersUnchanged`, `::Replace_WithAnOutsider_Is422_AndByAManager_Is403` |
+| US2-S12 † | `ManagerEndAndDowngradeTests::AManagerEndsTheirOwnMembership_WhileAnotherOpenEndedManagerExists` (now the same session's next request, `FORBIDDEN`) |
+| US2-S13 | `ManagerEndAndDowngradeTests::DowngradingACoManagerWhoIsAlsoABoardMember_EndsTheManagerRow_AndKeepsTheBoardRow` |
+| US2-S14 | `Integration/Company/ManagerConcurrencyTests.cs::TwoManagersEndingEachOther_ExactlyOneWins_EveryTime` |
+| US2-S15 † | `MembershipInvitationAcceptanceTests::ACoManagerIsRemovedAfterInviting_SoTheLinkIsInvalid` (now a theory over Community Manager and Board Member invitations), `::ASenderWhoLostAuthorityOtherwise_IsCaughtAtAcceptance` |
+| US2-S16 † | `ManagerAppointmentTests::CommunityManager_InvitesABoardMemberWithATermEnd`; `MembershipInvitationAcceptanceTests::ABoardMemberInvitationWithATerm_IsActiveFromAcceptanceToItsEnd` (now sent by a manager and accepted 71 hours later) |
+| US2-S17 | `ManagerAppointmentTests::AManager_AppointingThemself_IsRefused_AndNothingIsCreated` |
+| US2-S18 | `ManagerAppointmentTests::OtherRoles_CantCreateOrEndAManager` |
+| US2-S19 † | `Integration/Company/MembershipSensitiveEventTests.cs::EachChange_LogsExactlyOneEvent_WithoutEmailsNamesOrTokens` (now asserts the UTC time values, the failed acceptance's community and the acceptance's grant event) |
+| US2-IT | Union of US2-S2, S5, S9, S10 |
+| US3-S1 | `Integration/Residents/ResidentAccessTheoryTests.cs::EveryResidentEndpoint_RechecksTheLinkAndTheCommunityStatus`; `Integration/Residents/ArchivedResidentHomeTests.cs::AClaimCode_ForAHomeInAnOnboardingCommunity_IsRefused_AndNotUsedUp`; `Integration/Auth/SignInWithoutHomeTests.cs::HomesOnlyInOnboardingCommunities_SignInToNotLive` |
+| US3-S2 † | `Integration/Company/OnboardingCommunityWorkTests.cs::MembersOfAnOnboardingCommunity_WorkWithTheirNormalCapabilities` (now a Board Member with no other role) |
+| US3-S3 | `Integration/Company/LifecycleActivateTests.cs::Activating_WithAnOpenEndedManager_GoesLive_AndSendsTheScheduledInvitations`, `::Activating_RevokesAScheduledInvitationWhoseSenderLostAuthority` |
+| US3-S4 | `LifecycleActivateTests::Activating_WithoutAnOpenEndedManager_IsRefused_AndThePreviewAndSettingsSaySo`; `features/community-settings/profile-section.component.spec.ts` (8.04.l) |
+| US3-S5 | `Integration/Company/LifecycleArchiveTests.cs::Archiving_HidesItFromMembers_RevokesOpenInvitations_AndKeepsEveryRecordReadable` |
+| US3-S6 | `Integration/Company/ArchivedCommunityWritesTheoryTests.cs::AWrite_ByAnAuthorizedMember_IsRefusedAsArchived_AndChangesNothing`, `::AWrite_ByAnOutsider_GetsTheSame403_AsForACommunityThatDoesntExist` |
+| US3-S7 | `LifecycleArchiveTests::Archiving_CancelsEveryAutopay_AndEmailsEachResidentOnce`; `CompanyEmailRendererTests::CommunityArchived_ListsEachHome_AndSaySWhereAutopayEnded` |
+| US3-S8 † | `ArchivedResidentHomeTests::AfterTheArchive_JaneStillSeesHerHistory_AndHerSubmittedRequests_ButNotHerDraft`; `ResidentAccessTheoryTests` (unpaid assessments are now refused on an archived home, per FR-012a); `SignInWithoutHomeTests::HomesInActiveAndArchivedCommunities_TokenCarriesTheActiveHome` |
+| US3-S9 | `ArchivedResidentHomeTests::ATokenFromBeforeTheArchive_CantEnrollOrPay` |
+| US3-S10 | `LifecycleArchiveTests::Archiving_WithOpenApplications_IsOpenWork_ListingEach_AndChangesNothing` |
+| US3-S11 † | `LifecycleArchiveTests::ArchivingAMaster_WithALiveSubAssociation_IsOpenWork` (now asserts `OPEN_WORK` and the message naming the sub-association) |
+| US3-S12 | `Integration/Company/LifecycleRestoreTests.cs::Restoring_ACommunityThatWasActive_WithAnOpenEndedManager_ReturnsItToActive_AsItWas` |
+| US3-S13 † | `LifecycleRestoreTests::Restoring_ACommunityArchivedWhileOnboarding_ReturnsItToOnboarding` (now also asserts the home is left out of the resident's home list) |
+| US3-S14 | `LifecycleRestoreTests::Restoring_AfterTheOnlyManagersEndDatePassed_ReturnsToOnboarding_AndActivatingIsRefused` |
+| US3-S15 | `LifecycleRestoreTests::ACompanyAdministrator_EndsTheManagerWhileArchived_AndAfterRestoreTheyHaveNoAccess` |
+| US3-S16 | `LifecycleRestoreTests::ASubAssociation_CantBeRestoredWhileItsParentIsArchived_AndRestoringTheParentLeavesItArchived` |
+| US3-S17 | `Integration/Company/CommunityProfileTests.cs::AManager_ChangesTheCounty_AndOnlyTheCountyChanges`, `::AnInvalidValue_IsRefusedWithItsField_AndNothingIsSaved`; profile-section spec (US3-S17) |
+| US3-S18 | `CommunityProfileTests::RenamingToAnotherCommunitysName_IgnoringCaseAndSpaces_IsRefused` |
+| US3-S19 | `CommunityProfileTests::ABackfilledCommunity_SavesOtherFields_AndListsWhatIsStillMissing` |
+| US3-S20 | `CommunityProfileTests::AManager_CantActivateArchiveRestoreOrChangeTheParent`; `LifecycleActivateTests::ACommunityManager_CantActivate`; `LifecycleRestoreTests::ACommunityManager_CantRestore_OrPreviewARestore`; `CommunityParentTests::ACommunityManager_CantChangeTheParent` |
+| US3-S21 | `CommunityProfileTests::AManagerOfAnotherCommunity_GetsTheSame403_AsForACommunityThatDoesntExist` |
+| US3-IT | Union of US3-S1, S3, S5–S9, S12 |
+| US4-S1 | `Integration/Company/CompanyDefaultsEndpointTests.cs::ANewCommunity_CopiesTheChangedDefault_AndExistingOnesKeepTheirs`; `features/company/company-defaults.component.spec.ts` |
+| US4-S2 | `CompanyDefaultsEndpointTests::ChangingEveryDefault_LeavesExistingCommunitiesAndTheirApplicationsUntouched` |
+| US4-S3 | `CompanyDefaultsEndpointTests::ACommunityManager_ReadsTheDefaults_ButCantChangeThem`; company-defaults spec; `app.routes.spec.ts` |
+| US4-S4 | `CompanyDefaultsEndpointTests::OtherRoles_CantReadTheDefaults` |
+| US4-S5 | `CompanyDefaultsEndpointTests::AnOutOfRangeValue_IsRefused_NamingTheAllowedRange`; company-defaults spec (US4-S5) |
+| US4-S6 | company-defaults spec (US4-S6) |
+| US4-IT | Union of US4-S1–S3 |
+| US5-S1 | `Integration/Company/CommunitySettingsShellTests.cs::CompanyAdministrator_WithNoMembership_GetsEverySectionAndTheStatusActions`; `Integration/Company/ArcSettingsSectionTests.cs::ACompanyAdministratorWithNoMembership_EditsAndResetsTheRules_ButCantReviewApplications`; `features/community-settings/community-settings-page.component.spec.ts` |
+| US5-S2 | `CommunitySettingsShellTests::CommunityManager_GetsNoStatusOrParentActions`; `ArcSettingsSectionTests::TheManagerEditsTheRules_EachSaveIsLogged_AndABoardMemberOnlyReadsThem`; profile-section spec (US5-S2) |
+| US5-S3 | `CommunitySettingsShellTests::BoardMemberAccountantResidentAndOtherManagers_AreRefusedLikeANonexistentCommunity`; community-settings-page spec (US5-S3) |
+| US5-S4 | `ArcSettingsSectionTests::TheManagerEditsTheRules_EachSaveIsLogged_AndABoardMemberOnlyReadsThem`; `CommunityProfileTests::AManager_ChangesTheCounty_AndOnlyTheCountyChanges`; `CommunityParentTests::ACompanyAdministrator_SetsAndClearsTheParent_AndEachChangeIsLogged` |
+| US5-S5 | `ArcSettingsSectionTests::ResettingToTheDefaults_CopiesTheSixRulesOnly`; `features/community-settings/architectural-review-section.component.spec.ts` (US5-S5) |
+| US5-S6 | `app.routes.spec.ts` (US5-S6) |
+| US5-S7 | `ArcSettingsSectionTests::InAnArchivedCommunity_TheAdministratorReadsEverySection_AndCanOnlyRestoreOrEnd`; community-settings-page spec (US5-S7); residents-section spec (8.06.v) |
+| US5-S8 | `Integration/Company/MembershipInvitationsListTests.cs::APendingBoardMemberAndAnExpiredManagerInvitation_AreBothListed_WithResendAndRevoke`; `features/community-settings/managers-memberships.component.spec.ts` |
+| US5-S9 | `features/community-settings/settings-side-nav.component.spec.ts` (US5-S9); community-settings-page spec (focus) |
+| US5-IT | Union of US5-S1–S3 |
+| US6-S1 | `Integration/Company/PortfolioEndpointTests.cs::ACommunityWithNoOpenEndedManager_IsFlaggedNoManager`; `features/company/portfolio.component.spec.ts` |
+| US6-S2 | `PortfolioEndpointTests::OnlyAPendingManagerInvitation_IsStillNoManager_AndIsListed` |
+| US6-S3 | `PortfolioEndpointTests::ARuleThatDiffersFromTheDefaults_IsFlagged` |
+| US6-S4 | `PortfolioEndpointTests::TheStatusFilterAndSearch_NarrowTheList`; portfolio spec (US6-S4) |
+| US6-S5 | `PortfolioEndpointTests::TheStatusFilterAndSearch_NarrowTheList`; portfolio spec (US6-S5) |
+| US6-S6 † | `PortfolioEndpointTests::CommunityManager_IsForbidden` (now also asserts the manager's switcher still lists their community); `core/guards/company-admin.guard.spec.ts`; `shell/shell.component.spec.ts`; `core/services/board-navigation.service.spec.ts` |
+| US6-S7 | `PortfolioEndpointTests::With31Communities_TheListSortsFiltersAndCounts`; portfolio spec (US6-S7) |
+| US6-IT | Union of US6-S1, S3–S6 |
+| US7-S1 | `Integration/Company/CompanyAdministratorsTests.cs::AnAdministratorInvitesOps_WhoRegistersAndCanOpenTheCompanyArea`; `Integration/Invitations/InvitationLifecycleTests.cs` (single use, bound to the email) |
+| US7-S2 | `CompanyAdministratorsTests::RevokingAnotherAdministrator_EndsTheirCompanyAccess_AndTheInvitationsOnlyTheyCouldSend` |
+| US7-S3 | `CompanyAdministratorsTests::TheOnlyAdministrator_CantRevokeThemself` |
+| US7-S4 | `Integration/Company/CompanyAdminConcurrencyTests.cs::TwoAdministratorsRevokingEachOther_ExactlyOneWins_EveryTime` |
+| US7-S5 | `CompanyAdministratorsTests::ACommunityManager_CantListInviteOrRevokeAdministrators` |
+| US7-S6 | `Integration/Company/SetupStepTests.cs::NoAdministrator_AndAnAccount_GrantsTheRole`, `::NoAdministrator_AndNoAccount_SendsAnInvitationFromTheSetupStep` |
+| US7-S7 | `SetupStepTests::ASecondRun_ChangesNothing` |
+| US7-S8 | `Integration/Company/SetupStepRecoveryTests.cs::WithAnAdministratorPresent_RecoverGrantsTheRole_AndTellsEveryCurrentAdministrator`, `::WithAnAdministratorPresent_RecoverInvitesAnEmailWithNoAccount` |
+| US7-S9 | `Integration/Company/CompanyAdminNoBoardPowersTests.cs::ACompanyAdministratorWithNoBoardSeat_GetsTheSame403AsAnOutsider` |
+| US7-S10 | `CompanyAdministratorsTests::AnAdministrator_CantGrantThemselfABoardSeat_OrInviteThemself`; `ResidentInvitationTests::InvitingYourOwnEmail_InAnyCase_IsASelfGrant` |
+| US7-S11 † | `CompanyAdministratorsTests::EachGrantRevokeAndInvitation_LogsOneCompanyAdminChange_WithoutEmails`; `SetupStepTests` and `SetupStepRecoveryTests` (now assert one `CompanyAdminChange` per setup run, with actor `setup` and its UTC time) |
+| US7-IT | Union of US7-S1–S4, S6, S7, S9 |
+| US8-S1 | `Integration/Residents/ResidentInvitationTests.cs::AManagerInvitesJane_AndSheRegistersFromTheLink_WithNoClaimCode`; `features/community-settings/residents/residents-section.component.spec.ts` |
+| US8-S2 | `ResidentInvitationTests::ASecondInvitee_JoinsAHomeThatAlreadyHasAResident` |
+| US8-S3 † | `ResidentInvitationTests::InvitingSomeoneWithAnAccount_LooksTheSame_AndLinksNothingUntilTheyAccept` (now asserts Sam's email asks him to sign in and accept) |
+| US8-S4 | `ResidentInvitationTests::InAnOnboardingCommunity_TheInvitationIsScheduled_AndSentWhenItGoesLive`, `::AtActivation_AScheduledInvitationWhoseSenderLostAuthority_IsRevokedInstead` |
+| US8-S5 | `ResidentInvitationTests::ALinkUsedAfter72Hours_IsExpired_AndAResendSendsANewOne` |
+| US8-S6 † | `Integration/Residents/ResidentRemovalTests.cs::RemovingJane_WhoEnrolledAutopay_EndsHerAccessAndTheAutopay_AndTellsEveryone` (now also signs Jane in and reads her other home) |
+| US8-S7 | `ResidentRemovalTests::RemovingJane_WhenSamEnrolled_LeavesTheAutopayRunning` |
+| US8-S8 | `ResidentRemovalTests::RemovingJanesOnlyHome_KeepsHerBoardMembership_AndSheLandsInBoardMode` |
+| US8-S9 | `ResidentInvitationTests::InvitingSomeoneWhoAlreadyLivesThere_IsAlreadyResident` |
+| US8-S10 † | `ResidentInvitationTests::InvitingKimAgain_WhileHerInvitationIsOpen_IsInvitationPending`; residents-section spec (Resend offered for a pending one, not for a scheduled one; the scenario's wording was corrected to match US8-S4) |
+| US8-S11 | `Integration/Residents/ResidentAuthorizationTheoryTests.cs::AManagerOfAnotherCommunity_GetsTheSame403_AsForAPropertyOrCommunityThatDoesntExist` |
+| US8-S12 | `ResidentAuthorizationTheoryTests::OnlyManagersAndCompanyAdministrators_InviteAndRemove`; `PermissionsMatrixTheoryTests` |
+| US8-S13 | `Integration/Residents/ResidentsAreaEndpointTests.cs::TheList_PagesSearchesAndFilters_TheCommunitysProperties`, `::TheDrawer_ListsResidents_AndEveryInvitationWithWhoSentIt` |
+| US8-S14 | `ResidentsAreaEndpointTests::ACommunityWithNoProperties_SaysSo`; residents-section spec (US8-S14) |
+| US8-S15 | `ResidentInvitationTests::ARevokedInvitationsLink_IsInvalid` |
+| US8-S16 | `ResidentInvitationTests::ACompanyAdministratorWithNoMembership_InvitesAndLaterRemoves`; `PermissionsMatrixTheoryTests` (view the Residents area) |
+| US8-S17 | `ResidentInvitationTests::InvitingYourOwnEmail_InAnyCase_IsASelfGrant` |
+| US8-S18 | `ResidentsAreaEndpointTests::TheList_PagesSearchesAndFilters_TheCommunitysProperties`, `::EachLoad_LogsWhoReadWhatAndWhen` |
+| US8-S19 † | `Integration/Residents/ResidentSensitiveEventTests.cs::EachChange_LogsExactlyOneEvent_WithoutEmailsNamesAddressesOrTokens` (now asserts the UTC time values, the failed acceptance's community and the revoke's property), `::ARefusedSignUpFromTheLink_IsLoggedAsAFailedAcceptance` |
+| US8-IT | Union of US8-S1, S4, S6, S8 |
+| US9-S1 | `Integration/Auth/SignInWithoutHomeTests.cs::CompanyAdministrator_WithNoHome_SignsInToTheCompanyArea`; `core/services/landing.spec.ts` (US9-S1) |
+| US9-S2 | `SignInWithoutHomeTests::ManagerOfAnOnboardingCommunity_WithNoHome_LandsOnTheBoard` |
+| US9-S3 | `SignInWithoutHomeTests::NoHomeNoMembershipNoGrant_SignsInToNoHome`; `features/landing/no-home.component.spec.ts` |
+| US9-S4 | `ResidentAccessTheoryTests::EveryResidentEndpoint_RechecksTheLinkAndTheCommunityStatus`; `core/interceptors/auth.interceptor.spec.ts` (US9-S4) |
+| US9-S5 | `SignInWithoutHomeTests::HomesOnlyInOnboardingCommunities_SignInToNotLive`; `features/landing/not-live.component.spec.ts` |
+| US9-S6 | `SignInWithoutHomeTests::HomesInActiveAndArchivedCommunities_TokenCarriesTheActiveHome` |
+| US9-S7 † | `features/auth/company-sign-in.component.spec.ts` (now also an administrator who has a home and a membership); `Unit/Company/LandingRuleTheoryTests::Decide_FollowsTheFR036aOrder` |
+| US9-S8 | company-sign-in spec (US9-S8) |
+| US9-IT † | Union of US9-S1–S3, S5; `SignInWithoutHomeTests::ABoardMemberOrAccountantWithNoHome_LandsOnTheBoard` (added); `ResidentRemovalTests::RemovingJanesOnlyHome_KeepsHerBoardMembership_AndSheLandsInBoardMode` |

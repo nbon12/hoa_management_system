@@ -84,6 +84,19 @@ describe('CompanySignInComponent (030 T121)', () => {
     expect(TestBed.inject(AuthService).user()!.isCompanyAdministrator).toBeTrue();
   });
 
+  it('routes a Company Administrator who also has a home and a board role to the portfolio, with no notice (US9-S7)', async () => {
+    await setup();
+    signIn();
+    http.expectOne(`${BASE}/auth/login`).flush(session({
+      landing: 'Board', lastActiveMode: 'Board',
+      properties: [{ id: 'p-29', accountNumber: 'KP-29', address: '711 Keystone Park Dr #29', communityId: 'c-kp',
+        communityName: 'Keystone Park', communityStatus: 'Active' }],
+      memberships: [{ communityId: 'c-sh', communityName: 'Sakura Heights', role: 'CommunityManager', communityStatus: 'Active' }],
+    }));
+    await until(() => url() === '/app/company/portfolio');
+    expect(url()).not.toContain('notice');
+  });
+
   it('routes anyone else to their usual landing with ?notice=not-company-admin, which shows the notice (US9-S8, 8.01.b)', async () => {
     localStorage.clear();
     TestBed.configureTestingModule({

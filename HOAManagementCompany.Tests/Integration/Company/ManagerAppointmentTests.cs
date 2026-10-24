@@ -94,14 +94,15 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
         var withoutAccount = NewEmail("no-account");
         using var manager = await ClientForAsync(managerEmail);
 
-        var a = await manager.PostAsJsonAsync(Url(community), new { role = (int)CommunityRole.BoardMember, email = withAccount });
-        var b = await manager.PostAsJsonAsync(Url(community), new { role = (int)CommunityRole.BoardMember, email = withoutAccount });
+        var a = await manager.PostAsJsonAsync(Url(community), new { role = (int)CommunityRole.CommunityManager, email = withAccount });
+        var b = await manager.PostAsJsonAsync(Url(community), new { role = (int)CommunityRole.CommunityManager, email = withoutAccount });
 
         Assert.Equal((HttpStatusCode.Created, HttpStatusCode.Created), (a.StatusCode, b.StatusCode));
         var (bodyA, bodyB) = (await JsonAsync(a), await JsonAsync(b));
         Assert.Equal(["expiresAt", "invitationId", "state"], bodyA.EnumerateObject().Select(p => p.Name).Order());
         Assert.Equal(bodyA.EnumerateObject().Select(p => p.Name).Order(), bodyB.EnumerateObject().Select(p => p.Name).Order());
-        Assert.Equal(bodyA.GetProperty("state").GetString(), bodyB.GetProperty("state").GetString());
+        Assert.Equal(("Pending", "Pending"), (bodyA.GetProperty("state").GetString(), bodyB.GetProperty("state").GetString()));
+        Assert.Equal(bodyA.GetProperty("expiresAt").GetDateTimeOffset(), bodyB.GetProperty("expiresAt").GetDateTimeOffset());
         Assert.DoesNotContain("Board Tester", bodyA.GetRawText());
         Assert.Single(Email.Sent, m => m.Target == withAccount);
         Assert.Single(Email.Sent, m => m.Target == withoutAccount);
@@ -123,6 +124,7 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
         var missing = await manager.PostAsJsonAsync(Url(Guid.NewGuid()), body);
 
         Assert.Equal((HttpStatusCode.Forbidden, HttpStatusCode.Forbidden), (inB.StatusCode, missing.StatusCode));
+        Assert.Equal("FORBIDDEN", (await JsonAsync(inB)).GetProperty("code").GetString());
         Assert.Equal(await missing.Content.ReadAsStringAsync(), await inB.Content.ReadAsStringAsync());
         Assert.False(await WithDbAsync(db => db.CommunityMemberships.AnyAsync(m => m.CommunityId == b && m.UserId == targetId
                                                                               && m.Role == CommunityRole.CommunityManager)));

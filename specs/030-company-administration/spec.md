@@ -5,6 +5,10 @@
 **Status**: Draft
 **Input**: User description: "Company Administration: communities, managers, and community settings" — GitHub issue [nbon12/hoa_management_system#213](https://github.com/nbon12/hoa_management_system/issues/213) "(Community Manager) Initialize administration", including the owner's clarification comment on that issue.
 
+<!-- REPOWISE:START section=summary -->
+Adds the Company Administrator, a business role for the HOA management company's staff, above the per-community roles of spec 025. Company Administrators add communities and take them through Onboarding, Active and Archived (with restore); appoint and replace Community Managers under an open-ended-manager rule; invite members, residents and other administrators by single-use emailed links; set company-wide defaults that new communities copy; and see a portfolio of every community. Each community gets one settings page (profile, managers and memberships, residents, architectural review). Resident access is re-checked from stored data on every request, so a removal or archive applies on the next request, and users can sign in without a linked home.
+<!-- REPOWISE:END -->
+
 ## Context
 
 Today a community can only be created by seed data. The Community Manager role (spec 025) works inside one community at a time. It manages memberships there and, since spec 027, that community's architectural review (ARC) rules. Nobody sits above that level. Nobody can add a new HOA the company has taken on, take it live, retire it when the company stops managing it, or keep settings consistent across the portfolio.
@@ -346,7 +350,7 @@ As a Community Manager, or a Company Administrator, I open the **Residents** are
 7. **Given** Sam and Jane are residents of #29 and Sam enrolled its autopay, **When** I remove Jane, **Then** #29's autopay stays active.
 8. **Given** Jane is also a Board Member of A and #29 was her only home, **When** I remove her as a resident of #29, **Then** her Board Member membership is unchanged, and she can still sign in, landing in board mode (FR-036a).
 9. **Given** "jane@example.com" is already a resident of #29, **When** I invite that email to #29, **Then** it is refused with `ALREADY_RESIDENT`.
-10. **Given** "kim@example.com" has a scheduled or pending invitation to #29, **When** I invite that email to #29 again, **Then** it is refused with `INVITATION_PENDING`, and Resend is offered instead.
+10. **Given** "kim@example.com" has a scheduled or pending invitation to #29, **When** I invite that email to #29 again, **Then** it is refused with `INVITATION_PENDING`. For a pending invitation, Resend is offered instead; a scheduled one says it will be sent when the community is marked Active, since it can't be resent until then (#4).
 11. **Given** I am a Community Manager of A only, **When** I try to invite or remove a resident of a property in community B, **Then** I am refused with 403 `FORBIDDEN`, and the response is the same as for a property or community that does not exist.
 12. **Given** I am a Board Member, an Accountant or a Resident (and not a Community Manager there or a Company Administrator), **When** I try to invite or remove a resident, **Then** I am refused with 403 `FORBIDDEN`.
 13. **Given** community A has 120 properties, 7 of which have no resident, **When** I open the Residents area:

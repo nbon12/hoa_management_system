@@ -125,9 +125,12 @@ public partial class MembershipInvitationAcceptanceTests(TestDatabaseFixture fix
             await WithDbAsync(db => db.Invitations.Where(i => i.CommunityId == community).Select(i => i.State).SingleAsync()));
     }
 
-    // US2-S15: the sender's removal revokes their invitation, and the link is then invalid.
-    [Fact]
-    public async Task ACoManagerIsRemovedAfterInviting_SoTheLinkIsInvalid()
+    // US2-S15: the sender's removal revokes their invitation, and the link is then invalid. The
+    // scenario's Community Manager invitation is checked through its own capability, so both roles run.
+    [Theory]
+    [InlineData(CommunityRole.CommunityManager)]
+    [InlineData(CommunityRole.BoardMember)]
+    public async Task ACoManagerIsRemovedAfterInviting_SoTheLinkIsInvalid(CommunityRole role)
     {
         var companyId = await CreateCompanyAsync();
         var community = await CreateCommunityInAsync(companyId);
@@ -135,7 +138,7 @@ public partial class MembershipInvitationAcceptanceTests(TestDatabaseFixture fix
         var (xId, xEmail) = await CreateManagerAsync(community);
         var inviteeId = await WithDbAsync(CreateUserAsync);
         using var x = await ClientForAsync(xEmail);
-        var token = await InviteAsync(x, community, CommunityRole.BoardMember, EmailOf(inviteeId));
+        var token = await InviteAsync(x, community, role, EmailOf(inviteeId));
         var xRow = await WithDbAsync(db => db.CommunityMemberships.Where(m => m.UserId == xId).Select(m => m.Id).SingleAsync());
         using var manager = await ClientForAsync(managerEmail);
         Assert.Equal(HttpStatusCode.OK,
@@ -148,7 +151,7 @@ public partial class MembershipInvitationAcceptanceTests(TestDatabaseFixture fix
         var res = await invitee.PostAsJsonAsync("/api/v1/invitations/accept", new { token });
         Assert.Equal(HttpStatusCode.Gone, res.StatusCode);
         Assert.Equal("INVITATION_INVALID", (await JsonAsync(res)).GetProperty("code").GetString());
-        Assert.Null(await MembershipAsync(community, inviteeId, CommunityRole.BoardMember));
+        Assert.Null(await MembershipAsync(community, inviteeId, role));
     }
 
     // US2-S15: authority lost another way is caught when the link is used.
@@ -181,9 +184,13 @@ public partial class MembershipInvitationAcceptanceTests(TestDatabaseFixture fix
     [Fact]
     public async Task ABoardMemberInvitationWithATerm_IsActiveFromAcceptanceToItsEnd()
     {
-        var (community, admin, _) = await CommunityWithAdminAsync(CommunityStatus.Active);
+        var community = await CreateCommunityInAsync(await CreateCompanyAsync());
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        using var manager = await ClientForAsync(managerEmail);
         var inviteeId = await WithDbAsync(CreateUserAsync);
-        var token = await InviteAsync(admin, community, CommunityRole.BoardMember, EmailOf(inviteeId), "2027-12-31");
+        var token = await InviteAsync(manager, community, CommunityRole.BoardMember, EmailOf(inviteeId), "2027-12-31");
+        // Accepted within 72 hours, on a later day than it was sent.
+        Clock.UtcNow = Clock.UtcNow.AddHours(71);
         using var invitee = await ClientForAsync(EmailOf(inviteeId));
 
         Assert.Equal(HttpStatusCode.OK, (await invitee.PostAsJsonAsync("/api/v1/invitations/accept", new { token })).StatusCode);

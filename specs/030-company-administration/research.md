@@ -201,7 +201,7 @@ WHERE up."UserId" = @user AND up."PropertyId" = @property
 - No row: `PROPERTY_ACCESS_DENIED`.
 - Onboarding: `COMMUNITY_NOT_ACTIVE`.
 - Archived:
-  - `ReadHistory` (ledger, statements, receipts, transactions, unpaid assessments, and the home's submitted architectural requests from spec 029): allowed;
+  - `ReadHistory` (ledger, statements, receipts, transactions, and the home's submitted architectural requests from spec 029): allowed. Unpaid assessments are not history and are refused like other reads (spec FR-012a; corrected during implementation);
   - every other operation: `COMMUNITY_ARCHIVED`.
 
 It returns the property and **community from the database, not the token** (FR-012a: "never from the token").

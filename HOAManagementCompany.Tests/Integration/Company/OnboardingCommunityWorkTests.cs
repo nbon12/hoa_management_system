@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Tests.Fixtures;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace HOAManagementCompany.Tests.Integration.Company;
@@ -20,7 +21,7 @@ public class OnboardingCommunityWorkTests(TestDatabaseFixture fixture) : Company
         var companyId = await CreateCompanyAsync();
         var community = await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding);
         var (_, managerEmail) = await CreateManagerAsync(community);
-        var (personId, personEmail) = await CreateStaffAsync(community, CommunityRole.Accountant);
+        var (personId, _) = await CreateStaffAsync(community, CommunityRole.Accountant);
         using var manager = await ClientForAsync(managerEmail);
         var settings = new
         {
@@ -34,8 +35,12 @@ public class OnboardingCommunityWorkTests(TestDatabaseFixture fixture) : Company
 
         Assert.Equal(HttpStatusCode.Created, grant.StatusCode);
         Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        Assert.True(await WithDbAsync(db => db.CommunityMemberships.AnyAsync(m => m.CommunityId == community && m.UserId == personId
+            && m.Role == CommunityRole.BoardMember && m.Status == MembershipStatus.Active)));
 
-        using var board = await ClientForAsync(personEmail);
+        // A Board Member with no other role here, so the reads below rest on the Board Member role alone.
+        var (_, boardOnlyEmail) = await CreateStaffAsync(community, CommunityRole.BoardMember);
+        using var board = await ClientForAsync(boardOnlyEmail);
         var metrics = await board.GetAsync($"/api/v1/board/metrics?communityId={community}&surface=CommunityMetrics");
         Assert.Equal(HttpStatusCode.OK, metrics.StatusCode);
 

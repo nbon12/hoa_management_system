@@ -33,6 +33,8 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         using var manager = await ClientForAsync(managerEmail);
         using var admin = await ClientForAsync(adminEmail);
 
+        var t0 = Clock.UtcNow;
+
         // Appoint directly, end-date, end, downgrade and replace.
         var leeManager = (await JsonAsync(await manager.PostAsJsonAsync(Url(community),
             new { role = (int)CommunityRole.CommunityManager, userId = leeId }))).GetProperty("id").GetGuid();
@@ -51,6 +53,7 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         var invitationId = (await JsonAsync(await sam.PostAsJsonAsync(Url(community),
             new { role = (int)CommunityRole.BoardMember, email = EmailOf(invitee) }))).GetProperty("invitationId").GetGuid();
         Clock.UtcNow = Clock.UtcNow.AddMinutes(2);
+        var t1 = Clock.UtcNow;
         Assert.Equal(HttpStatusCode.OK, (await sam.PostAsync($"/api/v1/communities/{community}/invitations/{invitationId}/resend", null)).StatusCode);
         var token = Tokens(EmailOf(invitee)).Last();
         using var bobClient = await ClientForAsync(EmailOf(bob));
@@ -68,16 +71,21 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         AssertOne(memberships, leeId, "downgrade", managerId);
         AssertOne(memberships, samId, "replace-grant", adminId);
         AssertOne(memberships, managerId, "replace-end", adminId);
-        Assert.All(memberships, e => Assert.True(e.Properties.ContainsKey("UtcNow")));
+        // The acceptance's grant is its own event, caused by the invitation.
+        var accepted = Assert.Single(memberships, e => Prop(e, "TargetUserId") == invitee && Prop(e, "Kind") == "grant");
+        Assert.Equal((invitee, $"invitation:{invitationId}", t1), (Prop(accepted, "ActorId"), Prop(accepted, "Cause"), At(accepted)));
+        Assert.All(memberships.Where(e => e != accepted), e => Assert.Equal(t0, At(e)));
 
         var invitations = Events("InvitationChange", community).Where(e => Prop(e, "InvitationId") == invitationId.ToString()).ToList();
         Assert.Equal(["Created", "Resent", "Accepted"], invitations.Select(e => Prop(e, "Change")));
         Assert.Equal([samId, samId, invitee], invitations.Select(e => Prop(e, "ActorId")));
+        Assert.Equal([t0, t1, t1], invitations.Select(At));
         var revoked = Assert.Single(Events("InvitationChange", community), e => Prop(e, "InvitationId") == revokedId.ToString() && Prop(e, "Change") == "Revoked");
-        Assert.Equal(("Manual", samId), (Prop(revoked, "Reason"), Prop(revoked, "ActorId")));
+        Assert.Equal(("Manual", samId, t1), (Prop(revoked, "Reason"), Prop(revoked, "ActorId"), At(revoked)));
         var failed = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("InvitationAcceptFailed")
                                                         && Prop(e, "InvitationId") == invitationId.ToString());
-        Assert.Equal(("INVITATION_EMAIL_MISMATCH", bob), (Prop(failed, "Reason"), Prop(failed, "UserId")));
+        Assert.Equal(("INVITATION_EMAIL_MISMATCH", bob, community.ToString(), t1),
+            (Prop(failed, "Reason"), Prop(failed, "UserId"), Prop(failed, "CommunityId"), At(failed)));
 
         var rendered = string.Join("\n", memberships.Concat(Events("InvitationChange", community)).Append(failed)
             .Select(e => e.RenderMessage() + " " + string.Join(" ", e.Properties.Values)));
@@ -94,6 +102,8 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         var e = Assert.Single(events, x => Prop(x, "TargetUserId") == target && Prop(x, "Kind") == kind);
         Assert.Equal(actor, Prop(e, "ActorId"));
     }
+
+    private static DateTimeOffset At(LogEvent e) => (DateTimeOffset)((ScalarValue)e.Properties["UtcNow"]).Value!;
 
     private static string? Prop(LogEvent e, string name) =>
         e.Properties.TryGetValue(name, out var v) ? v.ToString().Trim('"') : null;

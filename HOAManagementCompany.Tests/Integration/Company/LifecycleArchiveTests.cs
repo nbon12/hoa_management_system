@@ -163,7 +163,10 @@ public class LifecycleArchiveTests(TestDatabaseFixture fixture) : CompanyTestBas
         var res = await admin.PostAsync($"/api/v1/communities/{master}/archive", null);
 
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
-        var item = Assert.Single((await JsonAsync(res)).GetProperty("items").EnumerateArray());
+        var body = await JsonAsync(res);
+        Assert.Equal("OPEN_WORK", body.GetProperty("code").GetString());
+        Assert.Contains(subName, body.GetProperty("message").GetString());
+        var item = Assert.Single(body.GetProperty("items").EnumerateArray());
         Assert.Equal(("SubAssociation", subName, "Active"),
             (item.GetProperty("kind").GetString(), item.GetProperty("label").GetString(), item.GetProperty("status").GetString()));
         Assert.Equal(CommunityStatus.Active, await StatusAsync(master));

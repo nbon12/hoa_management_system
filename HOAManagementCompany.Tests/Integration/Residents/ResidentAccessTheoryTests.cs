@@ -52,13 +52,14 @@ public class ResidentAccessTheoryTests(TestDatabaseFixture fixture) : CompanyTes
         ["GET", "/api/v1/payments/options", Op.Read, null],
         ["GET", "/api/v1/payments/recurring", Op.Read, null],
         ["GET", "/api/v1/payments/drafts", Op.Read, null],
+        // FR-012a: unpaid assessments aren't history; an Archived home refuses them.
+        ["GET", "/api/v1/payments/unpaid-assessments", Op.Read, null],
         ["GET", "/api/v1/payments/alert-preferences", Op.Read, null],
         ["GET", $"{Arc}/drafts/{Id}", Op.Read, null],
         ["GET", $"{Arc}/drafts/{Id}/attachments/{Id2}/url", Op.Read, null],
         // Payment history and submitted architectural requests stay readable when Archived.
         ["GET", "/api/v1/payments/ledger?page=1&pageSize=20", Op.ReadHistory, null],
         ["GET", "/api/v1/payments/statements", Op.ReadHistory, null],
-        ["GET", "/api/v1/payments/unpaid-assessments", Op.ReadHistory, null],
         ["GET", "/api/v1/payments/transactions", Op.ReadHistory, null],
         ["GET", $"/api/v1/payments/receipts/{Id}", Op.ReadHistory, null],
         ["GET", Arc, Op.ReadHistory, null],

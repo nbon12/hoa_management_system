@@ -270,7 +270,7 @@ neko-hoa/src/app/
 
 ## Repowise Documentation
 
-**Status**: In progress. Marker regions are planned for the files below; the `repowise-gate` CI job regenerates them.
+**Status**: Done. The marker regions below are in place; the `repowise-gate` CI job regenerates them.
 
 ### Configuration
 

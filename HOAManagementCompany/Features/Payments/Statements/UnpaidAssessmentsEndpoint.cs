@@ -21,7 +21,8 @@ public class UnpaidAssessmentsEndpoint(ResidentAccess access, StatementService s
     public override async Task HandleAsync(CancellationToken ct)
     {
         // 030 FR-024g: re-check the resident link and the community status on every request.
-        var home = await access.RequireAsync(User, ResidentOperation.ReadHistory, ct);
+        // FR-012a: not part of an Archived home's readable history (ledger, statements, receipts, transactions).
+        var home = await access.RequireAsync(User, ResidentOperation.Read, ct);
         var propertyId = home.PropertyId;
         var result = await statementService.GetUnpaidAssessmentsAsync(propertyId, ct);
         await SendOkAsync(result, ct);

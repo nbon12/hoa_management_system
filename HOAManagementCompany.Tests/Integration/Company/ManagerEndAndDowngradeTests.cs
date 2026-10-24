@@ -62,9 +62,10 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var row = await RowAsync(selfRow);
         Assert.Equal((MembershipStatus.Inactive, (DateOnly?)Today()), (row.Status, row.EndDate));
-        using var again = await ClientForAsync(selfEmail);
-        var next = await again.GetAsync($"/api/v1/communities/{community}/memberships");
+        // Their very next manager request, on the same session.
+        var next = await self.GetAsync($"/api/v1/communities/{community}/memberships");
         Assert.Equal(HttpStatusCode.Forbidden, next.StatusCode);
+        Assert.Equal("FORBIDDEN", (await JsonAsync(next)).GetProperty("code").GetString());
     }
 
     // US2-S13

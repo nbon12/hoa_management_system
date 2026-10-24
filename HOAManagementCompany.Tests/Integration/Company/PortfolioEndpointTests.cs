@@ -79,13 +79,18 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
     public async Task CommunityManager_IsForbidden()
     {
         var companyId = await CreateCompanyAsync();
-        var (_, email) = await CreateManagerAsync(await CreateCommunityInAsync(companyId));
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, email) = await CreateManagerAsync(community);
         using var client = await ClientForAsync(email);
 
         var res = await client.GetAsync("/api/v1/company/communities");
 
         Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
         Assert.Equal("FORBIDDEN", (await JsonAsync(res)).GetProperty("code").GetString());
+        // Their own communities stay in their switcher.
+        var mine = await client.GetAsync("/api/v1/me/communities");
+        Assert.Equal(HttpStatusCode.OK, mine.StatusCode);
+        Assert.Contains((await JsonAsync(mine)).GetProperty("items").EnumerateArray(), i => i.GetProperty("id").GetGuid() == community);
     }
 
     // US6-S1

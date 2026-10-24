@@ -31,10 +31,13 @@ public partial class ResidentSensitiveEventTests(TestDatabaseFixture fixture) : 
         var janeId = await WithDbAsync(CreateUserAsync);
         var bobId = await WithDbAsync(CreateUserAsync);
 
+        var t0 = Clock.UtcNow;
+
         // Invite, resend, a failed accept (wrong account), an accept, then a removal.
         var invitationId = (await JsonAsync(await InviteAsync(manager, community, home, EmailOf(janeId))))
             .GetProperty("invitationId").GetGuid();
         Clock.UtcNow = Clock.UtcNow.AddMinutes(2);
+        var t1 = Clock.UtcNow;
         Assert.Equal(HttpStatusCode.OK,
             (await manager.PostAsync($"/api/v1/communities/{community}/invitations/{invitationId}/resend", null)).StatusCode);
         var token = Tokens(EmailOf(janeId)).Last();
@@ -58,19 +61,21 @@ public partial class ResidentSensitiveEventTests(TestDatabaseFixture fixture) : 
         Assert.All(invitations, e => Assert.Equal((home.ToString(), "Residency"), (Prop(e, "PropertyId"), Prop(e, "Kind"))));
         var revoked = Assert.Single(Events("InvitationChange", community),
             e => Prop(e, "InvitationId") == revokedId.ToString() && Prop(e, "Change") == "Revoked");
-        Assert.Equal(("Manual", managerId), (Prop(revoked, "Reason"), Prop(revoked, "ActorId")));
+        Assert.Equal(("Manual", managerId, home.ToString()), (Prop(revoked, "Reason"), Prop(revoked, "ActorId"), Prop(revoked, "PropertyId")));
 
         var failed = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("InvitationAcceptFailed")
                                                         && Prop(e, "InvitationId") == invitationId.ToString());
-        Assert.Equal(("INVITATION_EMAIL_MISMATCH", bobId, home.ToString()),
-            (Prop(failed, "Reason"), Prop(failed, "UserId"), Prop(failed, "PropertyId")));
+        Assert.Equal(("INVITATION_EMAIL_MISMATCH", bobId, home.ToString(), community.ToString()),
+            (Prop(failed, "Reason"), Prop(failed, "UserId"), Prop(failed, "PropertyId"), Prop(failed, "CommunityId")));
 
         var links = Events("ResidentLinkChange", community);
         Assert.Equal([("Linked", janeId), ("Removed", managerId)], links.Select(e => (Prop(e, "Change"), Prop(e, "ActorId"))));
         Assert.All(links, e => Assert.Equal((home.ToString(), janeId), (Prop(e, "PropertyId"), Prop(e, "TargetUserId"))));
 
         var all = invitations.Append(revoked).Append(failed).Concat(links).ToList();
-        Assert.All(all, e => Assert.True(e.Properties.ContainsKey("UtcNow")));
+        // UTC times: the invite before the clock moved, everything after it at the new time.
+        Assert.Equal(t0, At(invitations[0]));
+        Assert.All(all.Skip(1), e => Assert.Equal(t1, At(e)));
         var rendered = string.Join("\n", all.Select(e => e.RenderMessage() + " " + string.Join(" ", e.Properties.Values)));
         foreach (var secret in Tokens(EmailOf(janeId)).Concat([EmailOf(janeId), EmailOf(bobId), revokedEmail, managerEmail,
                      "Board Tester", "Keystone Park", "@"]))
@@ -104,6 +109,8 @@ public partial class ResidentSensitiveEventTests(TestDatabaseFixture fixture) : 
     private List<LogEvent> Events(string template, Guid community) => LogSink.Events
         .Where(e => e.MessageTemplate.Text.StartsWith(template) && Prop(e, "CommunityId") == community.ToString())
         .ToList();
+
+    private static DateTimeOffset At(LogEvent e) => (DateTimeOffset)((ScalarValue)e.Properties["UtcNow"]).Value!;
 
     private static string? Prop(LogEvent e, string name) =>
         e.Properties.TryGetValue(name, out var v) ? v.ToString().Trim('"') : null;

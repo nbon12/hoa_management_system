@@ -32,10 +32,9 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
         Assert.Equal((userId, CompanyGrantSource.Setup, (string?)null, (DateTimeOffset?)null),
             (grant.UserId, grant.Source, grant.GrantedByUserId, grant.RevokedAt));
         Assert.Equal(await WithDbAsync(db => DeploymentCompany.IdAsync(db)), grant.CompanyId);
-        Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
-            && e.Properties["ActorId"].ToString() == "\"setup\""
-            && e.Properties["Change"].ToString() == "\"Granted\""
-            && e.Properties["TargetUserId"].ToString() == $"\"{userId}\"");
+        // US7-S11: one event for the run, with the actor "setup", the target and the time.
+        var logged = Assert.Single(SetupEvents());
+        Assert.Equal(("Granted", userId, Clock.UtcNow), (Prop(logged, "Change"), Prop(logged, "TargetUserId"), At(logged)));
         Assert.Empty(Email.Sent);
     }
 
@@ -56,6 +55,10 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
         Assert.Equal(email, sent.Target);
         Assert.Contains("Sent by: Setup step", sent.Body);
         Assert.Empty(await WithDbAsync(db => db.CompanyAdministratorGrants.ToListAsync()));
+        // US7-S11: one event for the run, naming the invitation.
+        var logged = Assert.Single(SetupEvents());
+        Assert.Equal(("Invited", invitation.Id.ToString(), Clock.UtcNow),
+            (Prop(logged, "Change"), Prop(logged, "InvitationId"), At(logged)));
     }
 
     // US7-S7: once an administrator exists, the step changes nothing.
@@ -73,6 +76,8 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
         Assert.Equal(again, other);
         Assert.Equal(before, await CountsAsync());
         Assert.Empty(Email.Sent);
+        // US7-S11: each run is logged, including the two that changed nothing.
+        Assert.Equal(["Granted", "NoChange", "NoChange"], SetupEvents().Select(e => Prop(e, "Change")));
     }
 
     [Fact]
@@ -102,6 +107,15 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
         Assert.Contains("isn't a valid email address", result.Output);
         Assert.Equal(before, await CountsAsync());
     }
+
+    private List<Serilog.Events.LogEvent> SetupEvents() => LogSink.Events
+        .Where(e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange") && Prop(e, "ActorId") == "setup").ToList();
+
+    private static string? Prop(Serilog.Events.LogEvent e, string name) =>
+        e.Properties.TryGetValue(name, out var v) ? v.ToString().Trim('"') : null;
+
+    private static DateTimeOffset At(Serilog.Events.LogEvent e) =>
+        (DateTimeOffset)((Serilog.Events.ScalarValue)e.Properties["UtcNow"]).Value!;
 
     private async Task<SetupResult> SetupAsync(string email, bool recover = false, string? companyName = null)
     {

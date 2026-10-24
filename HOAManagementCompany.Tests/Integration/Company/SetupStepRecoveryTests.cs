@@ -35,6 +35,8 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         var grant = await WithDbAsync(db => db.CompanyAdministratorGrants.AsNoTracking().SingleAsync(g => g.UserId == ownerId));
         Assert.Equal((CompanyGrantSource.Recovery, (DateTimeOffset?)null), (grant.Source, grant.RevokedAt));
         Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
+            && e.Properties["ActorId"].ToString() == "\"setup\""
+            && (DateTimeOffset)((Serilog.Events.ScalarValue)e.Properties["UtcNow"]).Value! == Clock.UtcNow
             && e.Properties["Change"].ToString() == "\"Recovery\""
             && e.Properties["TargetUserId"].ToString() == $"\"{ownerId}\"");
         var rows = await RecoveryRowsAsync();
@@ -59,6 +61,8 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
             (invitation.Kind, invitation.State, invitation.SenderUserId));
         Assert.Single(Email.Sent, m => m.Target == email);
         Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
+            && e.Properties["ActorId"].ToString() == "\"setup\""
+            && (DateTimeOffset)((Serilog.Events.ScalarValue)e.Properties["UtcNow"]).Value! == Clock.UtcNow
             && e.Properties["Change"].ToString() == "\"Recovery\""
             && e.Properties["InvitationId"].ToString() == invitation.Id.ToString());
         var row = Assert.Single(await RecoveryRowsAsync());
@@ -102,6 +106,7 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal(2, Email.Sent.Count(m => m.Target == email));
         Assert.Equal(adminId, Assert.Single(await RecoveryRowsAsync()).RecipientUserId);
         Assert.Equal(2, LogSink.Events.Count(e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
+            && e.Properties["ActorId"].ToString() == "\"setup\""
             && e.Properties["Change"].ToString() == "\"Recovery\""));
     }
 

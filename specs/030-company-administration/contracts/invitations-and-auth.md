@@ -6,6 +6,10 @@
 
 ---
 
+## Invitation emails
+
+Every invitation create (membership, residency and Company Administrator) checks the email the same way. It is trimmed, must parse as an address, and must be at most 256 characters (`Invitation.MaxEmailLength`). Otherwise the create returns **422 `VALIDATION_ERROR`** with `errors[].field = "email"`, and nothing is written or sent.
+
 ## Invitation links
 
 **Email link**: `{App:BaseUrl}/invite#t={token}`. The token is 43 base64url characters (256 bits).
@@ -112,8 +116,8 @@ Every resident endpoint calls `ResidentAccess.RequireAsync(User, op)` first (R8)
 
 | Operation | Endpoints |
 |---|---|
-| `ReadHistory` | `GET /payments/ledger`, `/payments/statements`, `/payments/statements/{id}` (if present), `/payments/unpaid-assessments`, `/payments/transactions`, `/payments/receipts/{id}`; spec 029's submitted requests: `/property/architectural-applications`, `/property/architectural-applications/{id}`, `/property/architectural-applications/{id}/attachments/{attachmentId}/url` |
-| `Read` | `GET /dashboard`, `/property`, `/property/owner`, `/property/address-history`, `/property/directory-fields`, `/community/announcements`, `/community/announcements/{id}`, `/community/events`, `/community/documents`, `/community/documents/{id}/download`, `/community/poll`, `/community/directory`, `/community/violations`, `/payments/options`, `/payments/recurring`, `/payments/drafts`, `/payments/alert-preferences`; spec 029's drafts: `/property/architectural-applications/drafts/{draftId}`, `/property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}/url` |
+| `ReadHistory` | `GET /payments/ledger`, `/payments/statements`, `/payments/statements/{id}` (if present), `/payments/transactions`, `/payments/receipts/{id}`; spec 029's submitted requests: `/property/architectural-applications`, `/property/architectural-applications/{id}`, `/property/architectural-applications/{id}/attachments/{attachmentId}/url` |
+| `Read` | `GET /dashboard`, `/property`, `/property/owner`, `/property/address-history`, `/property/directory-fields`, `/community/announcements`, `/community/announcements/{id}`, `/community/events`, `/community/documents`, `/community/documents/{id}/download`, `/community/poll`, `/community/directory`, `/community/violations`, `/payments/options`, `/payments/recurring`, `/payments/drafts`, `/payments/unpaid-assessments`, `/payments/alert-preferences`; spec 029's drafts: `/property/architectural-applications/drafts/{draftId}`, `/property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}/url` |
 | `Write` | `PATCH /property/owner`, `PATCH /property/directory-fields/{key}`, `POST /community/events/{id}/rsvp`, `POST /community/poll/{id}/vote`, `POST /payments/intent`, `POST /payments/one-time/confirm`, `POST /payments/recurring/setup-intent`, `PUT /payments/recurring`, `DELETE /payments/recurring`, `PUT /payments/alert-preferences`; spec 029: `POST /property/architectural-applications/drafts`, `PUT` and `DELETE /property/architectural-applications/drafts/{draftId}`, `POST /property/architectural-applications/drafts/{draftId}/submit`, `POST /property/architectural-applications/drafts/{draftId}/attachments`, `DELETE /property/architectural-applications/drafts/{draftId}/attachments/{attachmentId}`, `POST /property/architectural-applications/{id}/info-requests/{infoRequestId}/attachments`, `POST /property/architectural-applications/{id}/info-requests/{infoRequestId}/reply`, `POST /property/architectural-applications/{id}/withdraw`, `POST /property/architectural-applications/{id}/revise` |
 
 **Results**:

@@ -58,7 +58,7 @@ public class LifecycleRestoreTests(TestDatabaseFixture fixture) : CompanyTestBas
         var community = await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding);
         await CreateManagerAsync(community);
         var home = await CreatePropertyAsync(community);
-        var (residentId, _) = await CreateResidentAsync(home);
+        var (residentId, residentEmail) = await CreateResidentAsync(home);
         var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
         using var admin = await ClientForAsync(adminEmail);
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync($"/api/v1/communities/{community}/archive", null)).StatusCode);
@@ -66,6 +66,13 @@ public class LifecycleRestoreTests(TestDatabaseFixture fixture) : CompanyTestBas
         var body = await JsonAsync(await admin.PostAsync($"/api/v1/communities/{community}/restore", null));
 
         Assert.Equal(("Onboarding", "NeverActivated"), (body.GetProperty("status").GetString(), body.GetProperty("reason").GetString()));
+        // Hidden from residents again: left out of the home list, and refused when asked for.
+        using (var signedIn = await ClientForAsync(residentEmail))
+        {
+            var me = await JsonAsync(await signedIn.GetAsync("/api/v1/auth/me"));
+            Assert.Empty(me.GetProperty("properties").EnumerateArray());
+            Assert.Equal("NotLive", me.GetProperty("landing").GetString());
+        }
         using var resident = ClientWithToken(MintToken(residentId, home, community));
         var ledger = await resident.GetAsync("/api/v1/payments/ledger");
         Assert.Equal(HttpStatusCode.Conflict, ledger.StatusCode);

@@ -28,7 +28,8 @@ public class ResidentRemovalTests(TestDatabaseFixture fixture) : CompanyTestBase
         var (community, home, managerId, manager) = await CommunityWithHomeAsync();
         var (janeId, janeEmail) = await CreateResidentAsync(home);
         var (samId, samEmail) = await CreateResidentAsync(home);
-        var otherHome = await CreatePropertyAsync(await CreateCommunityInAsync(await CreateCompanyAsync()));
+        var otherCommunity = await CreateCommunityInAsync(await CreateCompanyAsync());
+        var otherHome = await CreatePropertyAsync(otherCommunity);
         await LinkResidentAsync(janeId, otherHome);
         using var jane = ClientWithToken(MintToken(janeId, home, community));
         var schedule = await EnrollAsync(jane);
@@ -61,7 +62,11 @@ public class ResidentRemovalTests(TestDatabaseFixture fixture) : CompanyTestBase
         Assert.Equal([CompanyEmailKinds.AutopayEnded], await KindsForAsync(samId));
 
         Assert.True(await WithDbAsync(db => db.UserProperties.AnyAsync(up => up.UserId == janeId && up.PropertyId == otherHome)));
-        Assert.True(await WithDbAsync(db => db.Users.AnyAsync(u => u.Id == janeId)));
+        // Her account still signs in, and her other home still answers.
+        Assert.Equal(HttpStatusCode.OK,
+            (await CreateClient().PostAsJsonAsync("/api/v1/auth/login", new { email = janeEmail, password = Password })).StatusCode);
+        using (var atOtherHome = ClientWithToken(MintToken(janeId, otherHome, otherCommunity)))
+            Assert.Equal(HttpStatusCode.OK, (await atOtherHome.GetAsync("/api/v1/property")).StatusCode);
         Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("ResidentLinkChange")
             && e.Properties["Change"].ToString() == "\"Removed\"" && e.Properties["ActorId"].ToString() == $"\"{managerId}\""
             && e.Properties["TargetUserId"].ToString() == $"\"{janeId}\"");

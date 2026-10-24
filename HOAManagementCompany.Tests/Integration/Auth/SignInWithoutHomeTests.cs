@@ -47,6 +47,27 @@ public class SignInWithoutHomeTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Empty(me.GetProperty("properties").EnumerateArray());
     }
 
+    // US9 Independent Test: a Board Member or an Accountant who never had a home signs in to board mode.
+    [Theory]
+    [InlineData(CommunityRole.BoardMember)]
+    [InlineData(CommunityRole.Accountant)]
+    public async Task ABoardMemberOrAccountantWithNoHome_LandsOnTheBoard(CommunityRole role)
+    {
+        var active = await CreateCommunityInAsync(await CreateCompanyAsync());
+        var (_, email) = await CreateStaffAsync(active, role);
+
+        var (body, _) = await LoginAsync(email);
+
+        AssertNoHomeClaims(body.GetProperty("token").GetString()!);
+        var me = await MeAsync(body);
+        Assert.Equal("Board", me.GetProperty("landing").GetString());
+        Assert.Empty(me.GetProperty("properties").EnumerateArray());
+        var membership = Assert.Single(me.GetProperty("memberships").EnumerateArray());
+        Assert.Equal((active, role.ToString()), (membership.GetProperty("communityId").GetGuid(), membership.GetProperty("role").GetString()));
+        using var client = ClientWithToken(body.GetProperty("token").GetString()!);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/v1/auth/board-mode", new { mode = "Board" })).StatusCode);
+    }
+
     // US9-S2
     [Fact]
     public async Task ManagerOfAnOnboardingCommunity_WithNoHome_LandsOnTheBoard()

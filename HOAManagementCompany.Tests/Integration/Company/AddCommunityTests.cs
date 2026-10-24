@@ -98,9 +98,14 @@ public class AddCommunityTests(TestDatabaseFixture fixture) : CompanyTestBase(fi
 
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
         var text = await res.Content.ReadAsStringAsync();
-        Assert.Equal("That community name is unavailable.", JsonDocument.Parse(text).RootElement.GetProperty("message").GetString());
+        var error = JsonDocument.Parse(text).RootElement;
+        Assert.Equal(("COMMUNITY_NAME_TAKEN", "That community name is unavailable."),
+            (error.GetProperty("code").GetString(), error.GetProperty("message").GetString()));
+        // Nothing describes the other community: not its name, legal name or id.
         Assert.DoesNotContain(name, text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain($"Community {taken:N}, Inc.", text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(taken.ToString(), text);
+        Assert.DoesNotContain(taken.ToString("N"), text);
         Assert.Equal(before, await CountAsync(companyId));
     }
 
@@ -110,12 +115,15 @@ public class AddCommunityTests(TestDatabaseFixture fixture) : CompanyTestBase(fi
     {
         var companyId = await CreateCompanyAsync();
         var (managerId, email) = await CreateManagerAsync(await CreateCommunityInAsync(companyId));
+        await WithDbAsync(db => db.Users.Where(u => u.Id == managerId)
+            .ExecuteUpdateAsync(u => u.SetProperty(x => x.FirstName, "Jordan").SetProperty(x => x.LastName, "Blake")));
         var (adminA, _) = await CreateCompanyAdminAsync(companyId);
         var (adminB, _) = await CreateCompanyAdminAsync(companyId);
         var (otherCompanyAdmin, _) = await CreateCompanyAdminAsync(await CreateCompanyAsync());
         using var client = await ClientForAsync(email);
+        var communityName = "Keystone Ridge " + Guid.NewGuid().ToString("N")[..8];
 
-        var res = await client.PostAsJsonAsync("/api/v1/communities", Body("Keystone Ridge " + Guid.NewGuid().ToString("N")[..8]));
+        var res = await client.PostAsJsonAsync("/api/v1/communities", Body(communityName));
 
         Assert.Equal(HttpStatusCode.Created, res.StatusCode);
         var body = await JsonAsync(res);
@@ -133,6 +141,13 @@ public class AddCommunityTests(TestDatabaseFixture fixture) : CompanyTestBase(fi
             Assert.Equal(new[] { adminA, adminB }.Order(), notices.Select(n => n.RecipientUserId!).Order());
             Assert.DoesNotContain(notices, n => n.RecipientUserId == otherCompanyAdmin || n.RecipientUserId == managerId);
             Assert.All(notices, n => Assert.Contains($"/app/company/communities/{id}/settings/profile", n.PayloadJson));
+            // "Keystone Ridge was added by me, waiting to be marked Active."
+            Assert.All(notices, n =>
+            {
+                var message = JsonSerializer.Deserialize<HOAManagementCompany.Infrastructure.Payments.Alerts.AlertMessage>(n.PayloadJson)!;
+                Assert.Equal($"{communityName} was added and is waiting to be marked Active", message.Subject);
+                Assert.Contains($"Jordan Blake added {communityName}.", message.Body);
+            });
         });
 
         var mine = await JsonAsync(await client.GetAsync("/api/v1/me/communities"));

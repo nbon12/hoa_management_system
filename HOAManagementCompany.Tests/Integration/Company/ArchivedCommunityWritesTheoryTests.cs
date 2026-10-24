@@ -35,6 +35,7 @@ public class ArchivedCommunityWritesTheoryTests(TestDatabaseFixture fixture) : C
         // US3
         ["profile PATCH"] = new(HttpMethod.Patch, "/communities/{communityId}/profile",
             _ => new { county = "Wake" }, Caller.Manager),
+        ["activate"] = new(HttpMethod.Post, "/communities/{communityId}/activate", _ => new { }, Caller.CompanyAdmin),
         ["parent change"] = new(HttpMethod.Put, "/communities/{communityId}/parent",
             _ => new { parentCommunityId = (Guid?)null }, Caller.CompanyAdmin),
         ["ARC vote"] = new(HttpMethod.Post, "/communities/{communityId}/architectural-applications/{openApplicationId}/votes",
@@ -51,6 +52,10 @@ public class ArchivedCommunityWritesTheoryTests(TestDatabaseFixture fixture) : C
         // US2 (T081)
         ["membership create"] = new(HttpMethod.Post, "/communities/{communityId}/memberships",
             a => new { userId = a.AccountantId, role = (int)CommunityRole.BoardMember }, Caller.Manager),
+        ["appoint a Community Manager"] = new(HttpMethod.Post, "/communities/{communityId}/memberships",
+            a => new { userId = a.AccountantId, role = (int)CommunityRole.CommunityManager }, Caller.Manager),
+        ["downgrade a manager"] = new(HttpMethod.Patch, "/communities/{communityId}/memberships/{managerMembershipId}",
+            _ => new { downgradeTo = (int)CommunityRole.BoardMember }, Caller.CompanyAdmin),
         ["membership invite by email"] = new(HttpMethod.Post, "/communities/{communityId}/memberships",
             _ => new { email = $"new-{Guid.NewGuid():N}@example.com", role = (int)CommunityRole.BoardMember }, Caller.Manager),
         ["membership end date"] = new(HttpMethod.Patch, "/communities/{communityId}/memberships/{managerMembershipId}",
