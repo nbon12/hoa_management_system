@@ -18,7 +18,9 @@ The dev seed (dev-like environments only; research R18) adds:
 - **An Onboarding community**, "Keystone Ridge", with `manager@nekohoa.dev` as its open-ended Community Manager and properties loaded by the seed.
 - **The existing seeded users and community**, unchanged, except that board users no longer need the co-residence workaround (they can sign in without a home).
 
-To capture invitation links locally, set `DevTools:E2ECleanupEnabled=true` (Development and Dev already do). Invitation links are then kept in the dev vault and readable at `GET /api/v1/e2e/auth-codes`, the same seam as verification codes, instead of needing SES.
+To capture invitation links locally, set `DevTools:E2ECleanupEnabled=true` (Development and Dev already do). Invitation links are then kept in the dev vault and readable at `GET /api/v1/e2e/auth-codes?contact=<email>`, the same seam as verification codes, instead of needing SES. Send the `X-Scheduler-Secret` header with `Jobs:SchedulerSharedSecret`. The vault keeps the newest link per email.
+
+Without SES (`Ses:Region` and `Ses:FromEmail` unset), sends fail locally, and that is expected. Invitations show "The email couldn't be sent." and stay resendable, and `co_` outbox rows end `Failed` with "No configured provider for channel 'email'". The links are still in the vault.
 
 ## The setup step (first Company Administrator, FR-038)
 
@@ -37,6 +39,11 @@ gcloud run jobs execute <service>-admin-setup --region <region> \
 
 `--recover` grants or invites even when administrators exist, and emails every current administrator (US7 #8). There is no HTTP equivalent.
 
+Locally:
+- With the dev seed, `company@nekohoa.dev` already holds the role. The first command therefore prints "already exists"; the `--company-name` rename still applies and is logged as `CompanyRenamed`. To see a grant or an invitation, add `--recover`, or use a database without the seed.
+- Without SES, an inviting run prints "The invitation was created, but its email couldn't be sent…" and exits 1. Running it again at once is refused by the invitation rate limit (`Change=RateLimited`, exit 1).
+- The step runs in its own process, so its link is not in the API's dev vault.
+
 ## Check the user stories
 
 1. **Sign in without a home (US9)**: sign in as `company@nekohoa.dev`.
@@ -54,15 +61,16 @@ gcloud run jobs execute <service>-admin-setup --region <region> \
 4. **Lifecycle (US3)**:
    - On Keystone Park's Profile, hover **Mark Active** before a manager exists. It is disabled, and the reason shows on hover and on keyboard focus.
    - After Pat accepts, mark it Active.
-   - **Archive** the seeded community with open ARC applications: refused, with the applications listed.
-   - Archive an empty test community. Its linked resident sees the home as "No longer managed", and the ledger is readable.
-   - **Restore** it.
+   - **Archive** the seeded community (Sakura Heights HOA) with open ARC applications: refused, with the applications listed.
+   - Keystone Ridge is Onboarding. In its **Managers and memberships → Residents**, invite `lee@example.com` to one of its homes. The invitation shows *Scheduled*, and nothing is sent. **Mark Active**: `manager@` is its open-ended manager, so this is allowed. The preview lists the invitation, which is sent now. Accept it from the vault link.
+   - Archive Keystone Ridge, which has no open work. Lee sees the home as "No longer managed". The ledger is still readable, and unpaid assessments are refused with `COMMUNITY_ARCHIVED`. A community added in step 2 has no homes, so use a seeded one here.
+   - **Restore** it. It returns to Active.
 5. **Profile per field (Clarifications 2026-10-14)**: edit County and tab out. "Saving…" then "✓ Saved" appear. Clear it and tab out: an error, and nothing saved.
-6. **Residents (US8)**: **Managers and memberships → Residents**.
-   - Search "#29" and open the property drawer.
+6. **Residents (US8)**: Sakura Heights HOA → **Managers and memberships → Residents**.
+   - Search "3 Sakura" and open the property drawer.
    - Invite `kim@example.com`, accept from the vault link, and Kim sees the home.
-   - **Remove** a resident who enrolled autopay. The schedule becomes `inactive` with reason `resident_removed`, and their next resident request returns `403 PROPERTY_ACCESS_DENIED`.
-   - In Keystone Ridge (Onboarding), invite someone. The invitation shows *Scheduled* and nothing is sent until it is marked Active.
+   - **Remove** `resident@nekohoa.dev` from 1 Sakura Drive. Its seeded autopay predates this feature and has no enroller recorded, so the preview says it will be cancelled. The schedule becomes `inactive` with reason `resident_removed`, and resident@'s next resident request returns `403 PROPERTY_ACCESS_DENIED`.
+   - Scheduled invitations in an Onboarding community are checked in step 4.
 7. **Company defaults (US4)**: change the lapse rule to *Deemed approved*, add a community, and it inherits the change. Existing communities don't change. As `manager@`, the defaults are read-only.
 8. **Settings page (US5)**:
    - In the side list, search "review". **Architectural review › Review period** is listed and jumps to the field.
@@ -73,6 +81,9 @@ gcloud run jobs execute <service>-admin-setup --region <region> \
     - Invite `ops@example.com` and accept it.
     - Revoke yourself while another administrator exists: allowed.
     - Revoke the last one: refused, `LAST_COMPANY_ADMIN`.
+    - Revoking an administrator also revokes the open invitations only an administrator could send (`SenderLostAuthority`). That is why this step comes last.
+
+These steps change the seeded data; for example, resident@ no longer has a home. To start again, run `docker compose down -v`; the next start re-seeds.
 
 ## Inspect sensitive events and emails
 
