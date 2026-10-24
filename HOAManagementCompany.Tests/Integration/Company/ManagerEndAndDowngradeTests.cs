@@ -96,6 +96,24 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
             (await co.GetAsync($"/api/v1/board/metrics?communityId={community}&surface=CommunityMetrics")).StatusCode);
     }
 
+    // contracts/community-settings.md: the settings page sends the downgrade role by name.
+    [Fact]
+    public async Task ADowngradeSentByName_IsAccepted()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        var (coId, _) = await CreateManagerAsync(community);
+        var coRow = await RowIdAsync(community, coId, CommunityRole.CommunityManager);
+        using var manager = await ClientForAsync(managerEmail);
+
+        var res = await manager.PatchAsJsonAsync(MembershipUrl(community, coRow), new { downgradeTo = "BoardMember" });
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal("BoardMember", (await JsonAsync(res)).GetProperty("role").GetString());
+        Assert.Equal(MembershipStatus.Inactive, (await RowAsync(coRow)).Status);
+    }
+
     // US2-S13, FR-019: a downgrade creates the Board Member row when there is none.
     [Fact]
     public async Task DowngradingACoManagerWithNoBoardRow_CreatesOne()

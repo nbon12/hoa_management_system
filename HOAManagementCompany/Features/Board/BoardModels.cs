@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using HOAManagementCompany.Domain.Enums;
 
 namespace HOAManagementCompany.Features.Board;
@@ -40,12 +41,14 @@ public sealed record MembershipDto(
     DateOnly StartDate, DateOnly? EndDate);
 
 // POST /communities/{communityId}/memberships — exactly one of UserId (direct) or Email
-// (invitation, 030 FR-018). StartDate defaults to today.
+// (invitation, 030 FR-018). StartDate defaults to today. The role is sent by name, as the
+// contract and the settings page do; the number is still accepted.
 public sealed record MembershipCreateRequest
 {
     public Guid CommunityId { get; init; }
     public string? UserId { get; init; }
     public string? Email { get; init; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public CommunityRole Role { get; init; }
     public DateOnly? StartDate { get; init; }
     public DateOnly? EndDate { get; init; }
@@ -59,6 +62,7 @@ public sealed record MembershipUpdateRequest
     public Guid CommunityId { get; init; }
     public Guid MembershipId { get; init; }
     public bool? End { get; init; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public CommunityRole? DowngradeTo { get; init; }
     public System.Text.Json.JsonElement EndDate { get; init; }
 }

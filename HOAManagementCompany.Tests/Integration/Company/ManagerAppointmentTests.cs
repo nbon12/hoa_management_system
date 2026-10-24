@@ -57,6 +57,27 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
              item.GetProperty("effectiveState").GetString()));
     }
 
+    // contracts/community-settings.md: the settings page sends the role by name.
+    [Theory]
+    [InlineData("CommunityManager")]
+    [InlineData("BoardMember")]
+    [InlineData("Accountant")]
+    public async Task ARoleSentByName_IsAccepted(string role)
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        using var admin = await ClientForAsync(adminEmail);
+        var email = NewEmail("named");
+
+        var res = await admin.PostAsJsonAsync(Url(community), new { role, email });
+
+        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+        var list = await JsonAsync(await admin.GetAsync($"/api/v1/communities/{community}/invitations"));
+        var item = Assert.Single(list.GetProperty("items").EnumerateArray());
+        Assert.Equal((email, role), (item.GetProperty("email").GetString(), item.GetProperty("role").GetString()));
+    }
+
     // US2-S3
     [Fact]
     public async Task CommunityManager_AppointsABoardMemberFromThePeopleList_AsAnOpenEndedCoManager()
