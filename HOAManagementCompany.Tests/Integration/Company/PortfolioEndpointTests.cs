@@ -158,6 +158,8 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding, name: "Cedar Glen");
 
         Assert.Equal(["Alder Ridge", "Briar Hollow"], Names(await ItemsAsync(companyId, "?status=archived")));
+        Assert.Equal(["Cedar Glen"], Names(await ItemsAsync(companyId, "?status=Onboarding")));
+        Assert.Equal(["keystone park"], Names(await ItemsAsync(companyId, "?status=active")));
         Assert.Equal(["Alder Ridge", "keystone park"], Names(await ItemsAsync(companyId, "?search=Keystone")));
         Assert.Equal(["Alder Ridge"], Names(await ItemsAsync(companyId, "?status=archived&search=keyStone")));
     }
@@ -210,6 +212,51 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal(2, noManager.GetProperty("total").GetInt32());
         // The counts ignore the search, the filters and paging.
         Assert.Equal(31, noManager.GetProperty("counts").GetProperty("all").GetInt32());
+    }
+
+    // US6-S7: sorting by parent puts communities without one first, then groups each parent's
+    // subs; names break ties, in the same direction.
+    [Fact]
+    public async Task SortingByParent_GroupsSubsUnderTheirParent_InBothDirections()
+    {
+        var companyId = await CreateCompanyAsync();
+        var alder = await CreateCommunityInAsync(companyId, name: "Alder Master");
+        var willow = await CreateCommunityInAsync(companyId, name: "Willow Master");
+        await CreateCommunityInAsync(companyId, name: "Cedar Glen");
+        await CreateCommunityInAsync(companyId, name: "Zeta Sub", parentId: alder);
+        await CreateCommunityInAsync(companyId, name: "Beta Sub", parentId: willow);
+        await CreateCommunityInAsync(companyId, name: "Gamma Sub", parentId: alder);
+        var (_, email) = await CreateCompanyAdminAsync(companyId);
+        using var client = await ClientForAsync(email);
+
+        var asc = await ItemsAsync(companyId, "?sort=parent", client);
+        var desc = await ItemsAsync(companyId, "?sort=Parent&dir=DESC", client);
+
+        Assert.Equal(["Alder Master", "Cedar Glen", "Willow Master", "Gamma Sub", "Zeta Sub", "Beta Sub"], Names(asc));
+        Assert.Equal(["Beta Sub", "Zeta Sub", "Gamma Sub", "Willow Master", "Cedar Glen", "Alder Master"], Names(desc));
+        Assert.Equal("Alder Master", asc[3].GetProperty("parent").GetProperty("communityName").GetString());
+    }
+
+    // contracts/company.md § Portfolio: unknown filter values and an over-long search are refused.
+    [Theory]
+    [InlineData("?status=closed", "status", "status must be onboarding, active or archived.")]
+    [InlineData("?sort=created", "sort", "sort must be name, status or parent.")]
+    [InlineData("?dir=up", "dir", "dir must be asc or desc.")]
+    [InlineData("?search=LONG", "search", "Search can be at most 100 characters.")]
+    public async Task AnUnknownFilterOrSort_OrATooLongSearch_Is422_OnThatField(string query, string field, string message)
+    {
+        var companyId = await CreateCompanyAsync();
+        await CreateCommunityInAsync(companyId);
+        var (_, email) = await CreateCompanyAdminAsync(companyId);
+        using var client = await ClientForAsync(email);
+
+        var res = await client.GetAsync($"/api/v1/company/communities{query.Replace("LONG", new string('k', 101))}");
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal((field, message), (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
     }
 
     private async Task<List<JsonElement>> ItemsAsync(Guid companyId, string query, HttpClient? client = null)

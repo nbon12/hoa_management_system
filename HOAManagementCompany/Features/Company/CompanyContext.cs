@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -54,11 +53,5 @@ public sealed class CompanyContext(ApplicationDbContext db) : ICompanyContext
             .FirstOrDefaultAsync(ct);
         _byCommunity[communityId] = companyId;
         return companyId;
-    }
-
-    public async Task<ManagementCompany> GetDeploymentCompanyAsync(CancellationToken ct = default)
-    {
-        var id = await DeploymentCompany.IdAsync(db, ct);
-        return await db.ManagementCompanies.FirstAsync(c => c.Id == id, ct);
     }
 }

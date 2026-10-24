@@ -275,6 +275,104 @@ public partial class CompanyAdministratorsTests(TestDatabaseFixture fixture) : C
         Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
     }
 
+    // contracts/company.md § GET /company/invitations: the state filter, by name, case-insensitive.
+    [Fact]
+    public async Task TheInvitationsList_FiltersByState_AndRefusesAnUnknownState()
+    {
+        var companyId = await CreateCompanyAsync();
+        var (adminId, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        var ids = new Dictionary<InvitationState, Guid>();
+        await WithDbAsync(async db =>
+        {
+            foreach (var state in new[] { InvitationState.Pending, InvitationState.Revoked, InvitationState.Accepted })
+            {
+                var invitation = new Invitation
+                {
+                    Id = Guid.NewGuid(), Kind = InvitationKind.CompanyAdministrator, CompanyId = companyId,
+                    Email = $"{state}@example.com", NormalizedEmail = $"{state}@example.com".ToLowerInvariant(), State = state,
+                    SenderUserId = adminId, CreatedAt = Clock.UtcNow, SentAt = Clock.UtcNow, ExpiresAt = Clock.UtcNow.AddHours(72),
+                };
+                db.Invitations.Add(invitation);
+                ids[state] = invitation.Id;
+            }
+            await db.SaveChangesAsync();
+        });
+        using var admin = await ClientForAsync(adminEmail);
+
+        var pending = await JsonAsync(await admin.GetAsync("/api/v1/company/invitations?state=pending"));
+        var revoked = await JsonAsync(await admin.GetAsync("/api/v1/company/invitations?state=Revoked"));
+        var all = await JsonAsync(await admin.GetAsync("/api/v1/company/invitations"));
+
+        Assert.Equal([ids[InvitationState.Pending]], Ids(pending));
+        Assert.Equal([ids[InvitationState.Revoked]], Ids(revoked));
+        Assert.Equal(new[] { ids[InvitationState.Pending], ids[InvitationState.Revoked] }.Order(), Ids(all).Order());
+        foreach (var unknown in new[] { "expired", "1", "everything" })
+        {
+            var res = await admin.GetAsync($"/api/v1/company/invitations?state={unknown}");
+            Assert.Equal((HttpStatusCode)422, res.StatusCode);
+            var body = await JsonAsync(res);
+            Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+            var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+            Assert.Equal(("state", "state must be pending, scheduled or revoked."),
+                (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+        }
+    }
+
+    // contracts/company.md § POST /company/administrators/invitations: 422 VALIDATION_ERROR on email.
+    [Theory]
+    [InlineData("not-an-email")]
+    [InlineData("Ops Lead <ops@example.com>")]
+    [InlineData("   ")]
+    [InlineData("LONG")]
+    public async Task InvitingAnInvalidEmail_Is422_OnEmail_AndNothingIsSent(string email)
+    {
+        var companyId = await CreateCompanyAsync();
+        var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        using var admin = await ClientForAsync(adminEmail);
+        if (email == "LONG")
+            email = new string('a', Invitation.MaxEmailLength - "@example.com".Length + 1) + "@example.com";
+
+        var res = await admin.PostAsJsonAsync("/api/v1/company/administrators/invitations", new { email });
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal(("email", "Enter a valid email address."),
+            (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+        Assert.False(await WithDbAsync(db => db.Invitations.AnyAsync(i => i.CompanyId == companyId)));
+        Assert.Empty(Email.Sent);
+    }
+
+    // US7-S5: the company invitation routes are Company Administrators only.
+    [Fact]
+    public async Task ACommunityManager_CantResendOrRevokeACompanyAdministratorInvitation()
+    {
+        var companyId = await CreateCompanyAsync();
+        var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        using var admin = await ClientForAsync(adminEmail);
+        using var manager = await ClientForAsync(managerEmail);
+        var ops = $"ops-{Guid.NewGuid():N}@example.com";
+        var id = (await JsonAsync(await admin.PostAsJsonAsync("/api/v1/company/administrators/invitations", new { email = ops })))
+            .GetProperty("id").GetGuid();
+        Clock.UtcNow = Clock.UtcNow.AddMinutes(2);
+
+        foreach (var action in new[] { "resend", "revoke" })
+        {
+            var res = await manager.PostAsync($"/api/v1/company/invitations/{id}/{action}", null);
+            Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+            Assert.Equal("FORBIDDEN", (await JsonAsync(res)).GetProperty("code").GetString());
+        }
+        var invitation = await WithDbAsync(db => db.Invitations.AsNoTracking().SingleAsync(i => i.Id == id));
+        Assert.Equal((InvitationState.Pending, 0), (invitation.State, invitation.ResendCount));
+        Assert.Single(TokensSentTo(ops));
+    }
+
+    private static List<Guid> Ids(JsonElement list) =>
+        list.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
+
     private List<string> TokensSentTo(string email) =>
         Email.Sent.Where(m => m.Target == email).Select(m => LinkToken().Match(m.Body))
             .Where(m => m.Success).Select(m => m.Groups[1].Value).ToList();

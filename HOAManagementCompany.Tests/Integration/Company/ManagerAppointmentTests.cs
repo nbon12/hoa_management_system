@@ -361,6 +361,258 @@ public partial class ManagerAppointmentTests(TestDatabaseFixture fixture) : Comp
         Assert.Equal(first.GetProperty("invitationId").GetGuid(), body.GetProperty("invitationId").GetGuid());
     }
 
+    // US2-S11: the replacement is a different person, and both people are named.
+    [Theory]
+    [InlineData("same")]
+    [InlineData("blankReplacement")]
+    [InlineData("noCurrent")]
+    public async Task Replace_WithTheSamePersonOrAMissingId_Is422_OnReplacementUserId(string shape)
+    {
+        var (_, community, patId, _, adminEmail) = await ReplaceSetupAsync();
+        using var admin = await ClientForAsync(adminEmail);
+        object request = shape switch
+        {
+            "same" => new { currentManagerUserId = (string?)patId, replacementUserId = patId },
+            "blankReplacement" => new { currentManagerUserId = (string?)patId, replacementUserId = "  " },
+            _ => new { currentManagerUserId = (string?)null, replacementUserId = patId },
+        };
+
+        var res = await admin.PostAsJsonAsync(ReplaceUrl(community), request);
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal(("replacementUserId", "Choose a different person from this community as the new manager."),
+            (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+        var pat = await WithDbAsync(db => db.CommunityMemberships.AsNoTracking()
+            .SingleAsync(m => m.CommunityId == community && m.UserId == patId));
+        Assert.Equal((MembershipStatus.Active, (DateOnly?)null), (pat.Status, pat.EndDate));
+        Assert.DoesNotContain(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("BoardMembershipChange"));
+    }
+
+    // US2-S17: a Company Administrator can't name themself the replacement, even from the people list.
+    [Fact]
+    public async Task Replace_NamingTheAdministratorThemself_IsSelfGrantNotAllowed()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (patId, _) = await CreateManagerAsync(community);
+        var (adminId, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        // In the people list, so only the self-grant rule stands in the way.
+        await WithDbAsync(db => AddMembershipAsync(db, adminId, community, CommunityRole.Accountant));
+        using var admin = await ClientForAsync(adminEmail);
+
+        var res = await admin.PostAsJsonAsync(ReplaceUrl(community), new { currentManagerUserId = patId, replacementUserId = adminId });
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        Assert.Equal("SELF_GRANT_NOT_ALLOWED", (await JsonAsync(res)).GetProperty("code").GetString());
+        var (pat, adminRow) = await ManagerRowsAsync(community, patId, adminId);
+        Assert.Equal((MembershipStatus.Active, (DateOnly?)null), (pat!.Status, pat.EndDate));
+        Assert.Null(adminRow);
+    }
+
+    // US2-S11: only a current Community Manager can be replaced.
+    [Theory]
+    [InlineData("boardMember")]
+    [InlineData("lapsedManager")]
+    [InlineData("unknownId")]
+    public async Task Replace_WhenTheCurrentIsntAnEffectiveManager_Is422_OnCurrentManagerUserId(string current)
+    {
+        var (_, community, patId, leeId, adminEmail) = await ReplaceSetupAsync();
+        var currentId = current switch
+        {
+            "boardMember" => (await CreateStaffAsync(community, CommunityRole.BoardMember)).UserId,
+            "lapsedManager" => (await CreateManagerAsync(community, endDate: DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime).AddDays(-1))).UserId,
+            _ => Guid.NewGuid().ToString(),
+        };
+        using var admin = await ClientForAsync(adminEmail);
+
+        var res = await admin.PostAsJsonAsync(ReplaceUrl(community), new { currentManagerUserId = currentId, replacementUserId = leeId });
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal(("currentManagerUserId", "That person isn't a current Community Manager of this community."),
+            (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+        var (pat, lee) = await ManagerRowsAsync(community, patId, leeId);
+        Assert.Equal((MembershipStatus.Active, (DateOnly?)null), (pat!.Status, pat.EndDate));
+        Assert.Null(lee);
+    }
+
+    // US2-S11: a replacement who is already an end-dated co-manager keeps their row, made open-ended.
+    [Fact]
+    public async Task Replace_ByAnEndDatedCoManager_MakesTheirRowOpenEnded_AndEndsTheCurrent()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (patId, _) = await CreateManagerAsync(community);
+        var (leeId, _) = await CreateManagerAsync(community, endDate: DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime).AddMonths(2));
+        var leeRow = await WithDbAsync(db => db.CommunityMemberships.Where(m => m.UserId == leeId).Select(m => m.Id).SingleAsync());
+        var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        using var admin = await ClientForAsync(adminEmail);
+
+        var res = await admin.PostAsJsonAsync(ReplaceUrl(community), new { currentManagerUserId = patId, replacementUserId = leeId });
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var appointed = (await JsonAsync(res)).GetProperty("appointed");
+        Assert.Equal((leeRow, leeId, "Active", JsonValueKind.Null),
+            (appointed.GetProperty("id").GetGuid(), appointed.GetProperty("userId").GetString(),
+             appointed.GetProperty("status").GetString(), appointed.GetProperty("endDate").ValueKind));
+        var (pat, lee) = await ManagerRowsAsync(community, patId, leeId);
+        Assert.Equal((MembershipStatus.Inactive, (DateOnly?)Today()), (pat!.Status, pat.EndDate));
+        Assert.Equal((leeRow, MembershipStatus.Active, (DateOnly?)null), (lee!.Id, lee.Status, lee.EndDate));
+
+        var events = LogSink.Events.Where(e => e.MessageTemplate.Text.StartsWith("BoardMembershipChange")
+                                                && e.Properties["CommunityId"].ToString() == community.ToString()).ToList();
+        var grant = Assert.Single(events, e => e.Properties["Kind"].ToString() == "\"replace-grant\"");
+        var end = Assert.Single(events, e => e.Properties["Kind"].ToString() == "\"replace-end\"");
+        Assert.Equal((leeRow.ToString(), $"\"{leeId}\""), (grant.Properties["MembershipId"].ToString(), grant.Properties["TargetUserId"].ToString()));
+        Assert.Equal(grant.Properties["Cause"].ToString(), end.Properties["Cause"].ToString());
+    }
+
+    // FR-021: a term can end today at the earliest.
+    [Fact]
+    public async Task InvitingWithAnEndDateInThePast_Is422_OnEndDate_AndNothingIsSent()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        using var manager = await ClientForAsync(managerEmail);
+        var invited = NewEmail("late");
+        var today = DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime);
+
+        var past = await manager.PostAsJsonAsync(Url(community),
+            new { role = (int)CommunityRole.BoardMember, email = invited, endDate = today.AddDays(-1).ToString("yyyy-MM-dd") });
+
+        Assert.Equal((HttpStatusCode)422, past.StatusCode);
+        var body = await JsonAsync(past);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal(("endDate", "The end date can't be in the past."),
+            (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+        Assert.False(await WithDbAsync(db => db.Invitations.AnyAsync(i => i.CommunityId == community)));
+        Assert.DoesNotContain(Email.Sent, m => m.Target == invited);
+
+        var endsToday = await manager.PostAsJsonAsync(Url(community),
+            new { role = (int)CommunityRole.BoardMember, email = invited, endDate = today.ToString("yyyy-MM-dd") });
+        Assert.Equal(HttpStatusCode.Created, endsToday.StatusCode);
+    }
+
+    // R7: a community's first open-ended manager can't be invited with an end date.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvitingAnEndDatedManager_WhenNoManagerIsOpenEnded_IsLastManager(bool withEndDatedManager)
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding, name: "Keystone Park");
+        if (withEndDatedManager)
+            await CreateManagerAsync(community, endDate: DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime).AddMonths(1));
+        var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        using var admin = await ClientForAsync(adminEmail);
+        var pat = NewEmail("pat");
+        var endDate = DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime).AddMonths(6).ToString("yyyy-MM-dd");
+
+        var res = await admin.PostAsJsonAsync(Url(community), new { role = (int)CommunityRole.CommunityManager, email = pat, endDate });
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal(("LAST_MANAGER", "Keystone Park has no Community Manager with no end date yet, so its first manager can't have an end date. Invite them with no end date."),
+            (body.GetProperty("code").GetString(), body.GetProperty("message").GetString()));
+        Assert.False(await WithDbAsync(db => db.Invitations.AnyAsync(i => i.CommunityId == community)));
+        Assert.DoesNotContain(Email.Sent, m => m.Target == pat);
+
+        // Only the end date stood in the way.
+        var openEnded = await admin.PostAsJsonAsync(Url(community), new { role = (int)CommunityRole.CommunityManager, email = pat });
+        Assert.Equal(HttpStatusCode.Created, openEnded.StatusCode);
+    }
+
+    // FR-018: the people list searches full names, case-insensitively, with % and _ taken literally.
+    [Fact]
+    public async Task ThePeopleSearch_MatchesFullNames_AndTreatsPercentAndUnderscoreLiterally()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        var percent = await NamedStaffAsync(community, "Rate", "1%Daily");
+        var lookalike = await NamedStaffAsync(community, "Rate", "100 Daily");
+        var underscore = (await CreateResidentAsync(await CreatePropertyAsync(community))).UserId;
+        await RenameAsync(underscore, "Zed_Alpha", "Smith");
+        var noUnderscore = await NamedStaffAsync(community, "ZedXAlpha", "Jones");
+        var ana = await NamedStaffAsync(community, "Ana", "Lopez");
+        using var manager = await ClientForAsync(managerEmail);
+
+        async Task<List<string>> Search(string search)
+        {
+            var res = await manager.GetAsync($"/api/v1/communities/{community}/people?search={Uri.EscapeDataString(search)}");
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            var body = await JsonAsync(res);
+            var ids = body.GetProperty("items").EnumerateArray().Select(p => p.GetProperty("userId").GetString()!).ToList();
+            Assert.Equal(ids.Count, body.GetProperty("total").GetInt32());
+            return ids;
+        }
+
+        Assert.Equal([percent], await Search("1%d"));
+        Assert.Equal([underscore], await Search("ZED_"));
+        Assert.Equal([ana], await Search("  ana lop "));
+        Assert.Equal(new[] { percent, lookalike }.Order(), (await Search("rate")).Order());
+        Assert.Equal(new[] { underscore, noUnderscore }.Order(), (await Search("alpha")).Order());
+        Assert.Equal(5, (await Search("")).Count);
+    }
+
+    [Fact]
+    public async Task ThePeopleSearch_OverOneHundredCharacters_Is422_OnSearch()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, managerEmail) = await CreateManagerAsync(community);
+        using var manager = await ClientForAsync(managerEmail);
+
+        var tooLong = await manager.GetAsync($"/api/v1/communities/{community}/people?search={new string('a', 101)}");
+        // Surrounding spaces don't count.
+        var padded = await manager.GetAsync($"/api/v1/communities/{community}/people?search={Uri.EscapeDataString($" {new string('a', 100)} ")}");
+
+        Assert.Equal((HttpStatusCode)422, tooLong.StatusCode);
+        var body = await JsonAsync(tooLong);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal(("search", "Search can be at most 100 characters."),
+            (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+        Assert.Equal(HttpStatusCode.OK, padded.StatusCode);
+    }
+
+    // FR-018: the people list of another community is refused like a community that doesn't exist.
+    [Fact]
+    public async Task ThePeopleListOfAnotherCommunity_IsForbiddenLikeANonexistentCommunity()
+    {
+        var companyId = await CreateCompanyAsync();
+        var a = await CreateCommunityInAsync(companyId);
+        var b = await CreateCommunityInAsync(companyId);
+        var (_, managerEmail) = await CreateManagerAsync(a);
+        await CreateStaffAsync(b, CommunityRole.BoardMember);
+        using var manager = await ClientForAsync(managerEmail);
+
+        var inB = await manager.GetAsync($"/api/v1/communities/{b}/people");
+        var missing = await manager.GetAsync($"/api/v1/communities/{Guid.NewGuid()}/people");
+
+        Assert.Equal((HttpStatusCode.Forbidden, HttpStatusCode.Forbidden), (inB.StatusCode, missing.StatusCode));
+        Assert.Equal("FORBIDDEN", (await JsonAsync(inB)).GetProperty("code").GetString());
+        Assert.Equal(await missing.Content.ReadAsStringAsync(), await inB.Content.ReadAsStringAsync());
+    }
+
+    private async Task<string> NamedStaffAsync(Guid community, string firstName, string lastName)
+    {
+        var (userId, _) = await CreateStaffAsync(community, CommunityRole.BoardMember);
+        await RenameAsync(userId, firstName, lastName);
+        return userId;
+    }
+
+    private Task RenameAsync(string userId, string firstName, string lastName) => WithDbAsync(db =>
+        db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s
+            .SetProperty(u => u.FirstName, firstName).SetProperty(u => u.LastName, lastName)));
+
     private async Task<(Guid CompanyId, Guid Community, string PatId, string LeeId, string AdminEmail)> ReplaceSetupAsync()
     {
         var companyId = await CreateCompanyAsync();

@@ -151,6 +151,35 @@ public class CompanyDefaultsEndpointTests(TestDatabaseFixture fixture) : Company
             .Select(d => d.UpdatedByUserId).SingleOrDefaultAsync()));
     }
 
+    // contracts/company.md § GET /company/defaults: a company with no defaults row yet reads the 027
+    // defaults, and the row is created so the next PUT has one to change.
+    [Fact]
+    public async Task ACompanyWithNoDefaultsRow_ReadsThe027Defaults_AndTheRowIsCreated()
+    {
+        var companyId = Guid.NewGuid();
+        await WithDbAsync(async db =>
+        {
+            db.ManagementCompanies.Add(new Domain.Entities.ManagementCompany { Id = companyId, Name = $"No Defaults {companyId:N}" });
+            await db.SaveChangesAsync();
+        });
+        var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
+        using var admin = await ClientForAsync(adminEmail);
+
+        var res = await admin.GetAsync(Url);
+
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal((30, "FlagOverdueOnly", "MajorityOfMembers", 7, "America/New_York",
+                "This is a formal disapproval of the plans as submitted under the community's governing documents. You may revise and resubmit.",
+                JsonValueKind.Null, true),
+            (body.GetProperty("reviewPeriodDays").GetInt32(), body.GetProperty("lapseRule").GetString(),
+             body.GetProperty("decisionRule").GetString(), body.GetProperty("reminderDays").GetInt32(),
+             body.GetProperty("timeZoneId").GetString(), body.GetProperty("formalDisapprovalStatement").GetString(),
+             body.GetProperty("updatedAt").ValueKind, body.GetProperty("canEdit").GetBoolean()));
+        var row = await WithDbAsync(db => db.CompanyDefaultSettings.AsNoTracking().SingleAsync(d => d.CompanyId == companyId));
+        Assert.Equal((30, ArcLapseRule.FlagOverdueOnly, (string?)null), (row.ReviewPeriodDays, row.LapseRule, row.UpdatedByUserId));
+    }
+
     private Task<ArcLapseRule> LapseRuleAsync(Guid community) =>
         WithDbAsync(db => db.CommunityArcSettings.Where(s => s.CommunityId == community).Select(s => s.LapseRule).SingleAsync());
 

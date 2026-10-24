@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using HOAManagementCompany.Domain.Entities;
 
 namespace HOAManagementCompany.Features.Company;
 
@@ -14,7 +13,4 @@ public interface ICompanyContext
 
     // The company a community belongs to; null for a community that doesn't exist.
     Task<Guid?> ForCommunityAsync(Guid communityId, CancellationToken ct = default);
-
-    // The deployment's company (the oldest, created by the migration). Setup step and seed only.
-    Task<ManagementCompany> GetDeploymentCompanyAsync(CancellationToken ct = default);
 }

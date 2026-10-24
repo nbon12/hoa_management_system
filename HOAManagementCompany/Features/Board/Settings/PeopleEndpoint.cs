@@ -53,7 +53,8 @@ public class PeopleEndpoint(ApplicationDbContext db, ICommunityScopeResolver sco
         if (!string.IsNullOrEmpty(search))
         {
             var pattern = $"%{search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
-            people = people.Where(u => EF.Functions.ILike(u.FirstName + " " + u.LastName, pattern));
+            // The escape character must be named: Npgsql's two-argument ILike sends ESCAPE ''.
+            people = people.Where(u => EF.Functions.ILike(u.FirstName + " " + u.LastName, pattern, "\\"));
         }
 
         var (limit, offset) = Paging.Normalize(req.Limit, req.Offset);

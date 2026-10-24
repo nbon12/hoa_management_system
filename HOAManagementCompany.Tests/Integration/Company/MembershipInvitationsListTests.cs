@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Tests.Fixtures;
@@ -122,6 +123,110 @@ public partial class MembershipInvitationsListTests(TestDatabaseFixture fixture)
         Assert.Equal(InvitationState.Pending,
             await WithDbAsync(db => db.Invitations.Where(i => i.Id == invitationInB).Select(i => i.State).SingleAsync()));
     }
+
+    // contracts/community-settings.md § Invitations: kind=residency lists residency invitations only.
+    [Fact]
+    public async Task KindResidency_ListsOnlyResidencyInvitations_AndTheDefaultListsMembershipOnes()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (managerId, managerEmail) = await CreateManagerAsync(community);
+        using var manager = await ClientForAsync(managerEmail);
+        var property = await CreatePropertyAsync(community);
+        var resident = $"res-{Guid.NewGuid():N}@example.com";
+        var (residencyId, _) = await InsertResidencyInvitationAsync(companyId, community, property, resident, managerId, InvitationState.Pending);
+        var (membershipId, _) = await InviteAsync(manager, community, CommunityRole.BoardMember, $"lee-{Guid.NewGuid():N}@example.com");
+
+        var residency = await JsonAsync(await manager.GetAsync($"/api/v1/communities/{community}/invitations?kind=Residency"));
+        var membership = await JsonAsync(await manager.GetAsync($"/api/v1/communities/{community}/invitations?kind=membership"));
+        var byDefault = await JsonAsync(await manager.GetAsync($"/api/v1/communities/{community}/invitations"));
+
+        Assert.Equal(1, residency.GetProperty("total").GetInt32());
+        var item = Assert.Single(residency.GetProperty("items").EnumerateArray());
+        Assert.Equal((residencyId, "Residency", resident, property, JsonValueKind.Null),
+            (item.GetProperty("id").GetGuid(), item.GetProperty("kind").GetString(), item.GetProperty("email").GetString(),
+             item.GetProperty("propertyId").GetGuid(), item.GetProperty("role").ValueKind));
+        Assert.Equal([membershipId], Ids(membership));
+        Assert.Equal([membershipId], Ids(byDefault));
+    }
+
+    // contracts/community-settings.md § Invitations: the state filter; Accepted is never listed.
+    [Fact]
+    public async Task TheStateFilter_ListsOnlyThatState_AndNoFilterLeavesOutAccepted()
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (managerId, managerEmail) = await CreateManagerAsync(community);
+        using var manager = await ClientForAsync(managerEmail);
+        var property = await CreatePropertyAsync(community);
+        async Task<Guid> Insert(InvitationState state) => (await InsertResidencyInvitationAsync(companyId, community, property,
+            $"{state}-{Guid.NewGuid():N}@example.com", managerId, state)).Id;
+        var ids = new Dictionary<string, Guid>
+        {
+            ["Scheduled"] = await Insert(InvitationState.Scheduled),
+            ["Pending"] = await Insert(InvitationState.Pending),
+            ["Expired"] = await Insert(InvitationState.Pending),
+            ["Revoked"] = await Insert(InvitationState.Revoked),
+        };
+        var accepted = await Insert(InvitationState.Accepted);
+        await WithDbAsync(db => db.Invitations.Where(i => i.Id == ids["Expired"])
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.ExpiresAt, Clock.UtcNow.AddMinutes(-1))));
+
+        foreach (var (state, id) in ids)
+        {
+            var res = await manager.GetAsync($"/api/v1/communities/{community}/invitations?kind=residency&state={state.ToLowerInvariant()}");
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+            var body = await JsonAsync(res);
+            Assert.Equal(1, body.GetProperty("total").GetInt32());
+            var item = Assert.Single(body.GetProperty("items").EnumerateArray());
+            Assert.Equal((id, state), (item.GetProperty("id").GetGuid(), item.GetProperty("effectiveState").GetString()));
+        }
+        var all = await JsonAsync(await manager.GetAsync($"/api/v1/communities/{community}/invitations?kind=residency"));
+        Assert.Equal(ids.Values.Order(), Ids(all).Order());
+        Assert.DoesNotContain(accepted, Ids(all));
+    }
+
+    [Theory]
+    [InlineData("?kind=company", "kind", "kind must be membership or residency.")]
+    [InlineData("?state=accepted", "state", "state must be scheduled, pending, expired or revoked.")]
+    [InlineData("?kind=residency&state=open", "state", "state must be scheduled, pending, expired or revoked.")]
+    public async Task AnUnknownKindOrState_Is422_OnThatField(string query, string field, string message)
+    {
+        var (community, manager) = await CommunityWithManagerAsync();
+
+        var res = await manager.GetAsync($"/api/v1/communities/{community}/invitations{query}");
+
+        Assert.Equal((HttpStatusCode)422, res.StatusCode);
+        var body = await JsonAsync(res);
+        Assert.Equal("VALIDATION_ERROR", body.GetProperty("code").GetString());
+        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.Equal((field, message), (error.GetProperty("field").GetString(), error.GetProperty("message").GetString()));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("?kind=residency")]
+    public async Task AManagerOfAnotherCommunity_CantListItsInvitations(string query)
+    {
+        var companyId = await CreateCompanyAsync();
+        var a = await CreateCommunityInAsync(companyId);
+        var b = await CreateCommunityInAsync(companyId);
+        var (_, managerA) = await CreateManagerAsync(a);
+        var (managerB, _) = await CreateManagerAsync(b);
+        await InsertResidencyInvitationAsync(companyId, b, await CreatePropertyAsync(b), $"x-{Guid.NewGuid():N}@example.com",
+            managerB, InvitationState.Pending);
+        using var clientA = await ClientForAsync(managerA);
+
+        var inB = await clientA.GetAsync($"/api/v1/communities/{b}/invitations{query}");
+        var missing = await clientA.GetAsync($"/api/v1/communities/{Guid.NewGuid()}/invitations{query}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, inB.StatusCode);
+        Assert.Equal("FORBIDDEN", (await JsonAsync(inB)).GetProperty("code").GetString());
+        Assert.Equal(await missing.Content.ReadAsStringAsync(), await inB.Content.ReadAsStringAsync());
+    }
+
+    private static List<Guid> Ids(JsonElement list) =>
+        list.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid()).ToList();
 
     private async Task<(Guid Community, HttpClient Manager)> CommunityWithManagerAsync()
     {

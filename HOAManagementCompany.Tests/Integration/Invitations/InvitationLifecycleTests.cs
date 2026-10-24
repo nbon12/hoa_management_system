@@ -410,6 +410,26 @@ public partial class InvitationLifecycleTests(TestDatabaseFixture fixture) : Com
     private Task<Invitation> CreateAsync(Guid companyId, string senderId, string email) =>
         WithServiceAsync(s => s.CreateAsync(Request(companyId, email), senderId, default));
 
+    // FR-018: the service refuses a membership role that isn't offered, whatever the caller, and writes nothing.
+    [Theory]
+    [InlineData(CommunityRole.Resident)]
+    [InlineData(null)]
+    public async Task AMembershipInvitationForARoleThatIsntOffered_IsRefused_AndNothingIsWritten(CommunityRole? role)
+    {
+        var companyId = await CreateCompanyAsync();
+        var (senderId, _) = await CreateCompanyAdminAsync(companyId);
+        var community = await CreateCommunityInAsync(companyId);
+        var email = $"role-{Guid.NewGuid():N}@example.com";
+
+        var refused = await RefusalAsync(s => s.CreateAsync(
+            new NewInvitation(InvitationKind.Membership, companyId, community, null, role, null, email), senderId, default));
+
+        Assert.Equal(("VALIDATION_ERROR", 422, "Choose Community Manager, Board Member or Accountant."),
+            (refused.Code, refused.StatusCode, refused.Message));
+        Assert.False(await WithDbAsync(db => db.Invitations.AnyAsync(i => i.CompanyId == companyId)));
+        Assert.DoesNotContain(Email.Sent, m => m.Target == email);
+    }
+
     private async Task<T> WithScopeAsync<T>(Func<IServiceProvider, Task<T>> f)
     {
         using var scope = NewScope();

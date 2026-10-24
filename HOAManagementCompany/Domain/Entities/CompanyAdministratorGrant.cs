@@ -20,8 +20,6 @@ public class CompanyAdministratorGrant
     public DateTimeOffset? RevokedAt { get; set; }
     public string? RevokedByUserId { get; set; }
 
-    public bool IsLive => RevokedAt == null;
-
     public ManagementCompany Company { get; set; } = null!;
     public ApplicationUser User { get; set; } = null!;
 }
