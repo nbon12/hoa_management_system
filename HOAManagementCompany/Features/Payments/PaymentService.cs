@@ -83,6 +83,8 @@ public class PaymentService(
         return await CommunityLocks.RunAsync(db, communityId, async () =>
         {
             await ResidentAccess.RecheckAsync(db, userId, propertyId, ResidentOperation.Write, ct);
+            // Set again in here: a retried attempt starts from a cleared tracker.
+            (await db.Owners.FirstAsync(o => o.Id == owner.Id, ct)).StripeCustomerId = customerId;
             return await SaveRecurringAsync(propertyId, userId, req, acceptedIp, userAgent, vaulted, method, ct);
         }, ct);
     }

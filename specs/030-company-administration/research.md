@@ -381,6 +381,13 @@ The dev seed (`DatabaseSeeder`, dev-like environments only) calls the same `Setu
 
 Tests assert them through `InMemoryLogSink`. A test also asserts that none of the events' rendered properties matches an email pattern (spec Quality gates).
 
+A change event written inside a community or company lock is held until the lock's transaction commits (`PendingEvents`). The lock body runs in the retrying execution strategy:
+- a retried attempt starts from a cleared change tracker and writes its events once;
+- an attempt that rolls back writes none;
+- when the commit itself fails, its outcome is unknown, so that attempt's events are written rather than lost.
+
+`InvitationAcceptFailed` and reads are written at once.
+
 The existing gap, where `TelemetryScrubbingEnricher` is never registered and `LoginAsync` logs `{Email}`, is out of this spec's scope and has been raised as a separate task. This spec's own events don't depend on that scrubber.
 
 ## R20. Frontend architecture (designs pending)

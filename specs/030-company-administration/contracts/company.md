@@ -221,7 +221,7 @@ The dialogs ask the server first, then act (brief 04 D4).
 }
 ```
 
-  `grantedBy` is `null` when the source is `Setup`.
+  `grantedBy` is `null` when the source is `Setup` or `Recovery`.
 
 ### GET /company/invitations
 
@@ -276,7 +276,7 @@ dotnet HOAManagementCompany.dll --grant-company-admin <email> --recover
 1. Apply pending migrations.
 2. Resolve the company, and set its name if `--company-name` is given.
 3. Then:
-   - **no live grant exists**: if the email has an account, grant the role (`Source = Setup`), log `CompanyAdminChange Actor=setup Change=Granted`, print `Granted Company Administrator to <userId>.` and exit 0. Otherwise create and send a `CompanyAdministrator` invitation (sender: the system), print `Invitation sent; it expires <time UTC>.` and exit 0;
+   - **no live grant exists**: if the email has an account, grant the role (`Source = Setup`), log `CompanyAdminChange Actor=setup Change=Granted`, print `Granted Company Administrator to <userId>.` and exit 0. Otherwise create and send a `CompanyAdministrator` invitation (sender: the system), print `Invitation sent; it expires <time UTC>.` and exit 0. Accepting that invitation grants with `Source = Setup`, or with `Source = Recovery` if other administrators hold the role by then. In that case they're told (`co_admin_recovery`) and `Change=Recovery` is logged, as for `--recover`;
    - **a live grant exists, without `--recover`**: print `A Company Administrator already exists; nothing changed.`, write nothing, log `CompanyAdminChange Change=NoChange` and exit 0;
    - **a live grant exists, with `--recover`**: grant or invite as above (`Source = Recovery`), log `CompanyAdminChange Change=Recovery`, enqueue `co_admin_recovery` for every current Company Administrator, and exit 0. If the email itself already has a live grant, print `<email> is already a Company Administrator; nothing changed.`, log `Change=NoChange` and exit 0.
 

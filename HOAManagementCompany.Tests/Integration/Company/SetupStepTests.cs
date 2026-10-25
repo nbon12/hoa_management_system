@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Company;
 using HOAManagementCompany.Tests.Fixtures;
@@ -106,6 +109,25 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("isn't a valid email address", result.Output);
         Assert.Equal(before, await CountsAsync());
+    }
+
+    // FR-038: the setup step's invitation, accepted from the link, grants as the step's direct grant
+    // does: Source = Setup, with no grantor.
+    [Fact]
+    public async Task TheSetupStepsInvitation_AcceptedFromTheLink_GrantsWithSourceSetup()
+    {
+        var email = $"owner-{Guid.NewGuid():N}@example.com";
+        await SetupAsync(email);
+        var invitationId = await WithDbAsync(db => db.Invitations.Where(i => i.Email == email).Select(i => i.Id).SingleAsync());
+        var token = Regex.Match(Email.Sent.Single(m => m.Target == email).Body, "/invite#t=([A-Za-z0-9_-]{43})").Groups[1].Value;
+
+        var res = await CreateClient().PostAsJsonAsync("/api/v1/invitations/register",
+            new { token, firstName = "Robin", lastName = "Hale", password = "Juniper#2026x" });
+
+        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+        var grant = await WithDbAsync(db => db.CompanyAdministratorGrants.AsNoTracking().SingleAsync());
+        Assert.Equal((CompanyGrantSource.Setup, (string?)null, (Guid?)invitationId, (DateTimeOffset?)null),
+            (grant.Source, grant.GrantedByUserId, grant.InvitationId, grant.RevokedAt));
     }
 
     private List<Serilog.Events.LogEvent> SetupEvents() => LogSink.Events

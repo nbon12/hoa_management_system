@@ -40,8 +40,8 @@ Exactly one row per deployment for now. Nothing in code assumes only one: every 
 | `Id` | Guid PK | |
 | `CompanyId` | Guid FK → `ManagementCompanies` | Cascade |
 | `UserId` | string FK → `AspNetUsers` | Cascade |
-| `Source` | `CompanyGrantSource` | |
-| `GrantedByUserId` | string? | Null when `Source = Setup` |
+| `Source` | `CompanyGrantSource` | `Setup`: the setup step, by a direct grant or by accepting its invitation (an invitation with no sender). `Recovery`: the same with `--recover` while other administrators hold the role; an accepted setup invitation is `Recovery` when other live grants exist at acceptance, and those administrators are then told (`co_admin_recovery`). `Invitation`: accepting an administrator's invitation. |
+| `GrantedByUserId` | string? | The inviting administrator; null when `Source` is `Setup` or `Recovery` |
 | `GrantedAt` | timestamptz | |
 | `InvitationId` | Guid? FK → `Invitations` | Set when accepted from an invitation |
 | `RevokedAt` | timestamptz? | |

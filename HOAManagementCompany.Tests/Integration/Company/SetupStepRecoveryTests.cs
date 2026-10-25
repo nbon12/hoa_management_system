@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Company;
@@ -68,6 +71,58 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         var row = Assert.Single(await RecoveryRowsAsync());
         Assert.Equal((adminId, $"co:recovery:{invitation.Id}:{adminId}"), (row.RecipientUserId, row.DedupKey));
         Assert.Equal(1, await WithDbAsync(db => db.CompanyAdministratorGrants.CountAsync()));
+    }
+
+    // US7-S8: the recovery invitation, accepted from the link, grants with Source = Recovery, as the
+    // step's direct recovery grant does, and the existing administrator keeps the role.
+    [Fact]
+    public async Task ARecoveryInvitation_AcceptedFromTheLink_GrantsWithSourceRecovery()
+    {
+        var companyId = await WithDbAsync(db => DeploymentCompany.IdAsync(db));
+        var (adminId, _) = await CreateCompanyAdminAsync(companyId);
+        var email = $"owner-{Guid.NewGuid():N}@example.com";
+        await SetupAsync(email, recover: true);
+        var invitationId = await WithDbAsync(db => db.Invitations.Where(i => i.Email == email).Select(i => i.Id).SingleAsync());
+        var token = Regex.Match(Email.Sent.Single(m => m.Target == email).Body, "/invite#t=([A-Za-z0-9_-]{43})").Groups[1].Value;
+
+        var res = await CreateClient().PostAsJsonAsync("/api/v1/invitations/register",
+            new { token, firstName = "Robin", lastName = "Hale", password = "Juniper#2026x" });
+
+        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+        var grant = await WithDbAsync(db => db.CompanyAdministratorGrants.AsNoTracking().SingleAsync(g => g.UserId != adminId));
+        Assert.Equal((CompanyGrantSource.Recovery, (string?)null, (Guid?)invitationId, (DateTimeOffset?)null),
+            (grant.Source, grant.GrantedByUserId, grant.InvitationId, grant.RevokedAt));
+        Assert.Equal(2, await WithDbAsync(db => db.CompanyAdministratorGrants.CountAsync(g => g.RevokedAt == null)));
+        // The administrator was told when the invitation was sent, and isn't told again.
+        var row = Assert.Single(await RecoveryRowsAsync());
+        Assert.Equal((adminId, $"co:recovery:{invitationId}:{adminId}"), (row.RecipientUserId, row.DedupKey));
+    }
+
+    // FR-038: a setup invitation sent while there was no administrator is accepted after another
+    // run granted someone directly. The grant is a recovery grant, and is never silent.
+    [Fact]
+    public async Task ASetupInvitation_AcceptedAfterAnotherGrant_IsARecoveryGrant_AndTheAdministratorIsTold()
+    {
+        var email = $"owner-{Guid.NewGuid():N}@example.com";
+        await SetupAsync(email, recover: false);
+        var invitationId = await WithDbAsync(db => db.Invitations.Where(i => i.Email == email).Select(i => i.Id).SingleAsync());
+        var firstId = await WithDbAsync(CreateUserAsync);
+        Assert.Equal(new SetupResult(0, $"Granted Company Administrator to {firstId}."), await SetupAsync(EmailOf(firstId), recover: false));
+        Assert.Empty(await RecoveryRowsAsync());
+        var token = Regex.Match(Email.Sent.Single(m => m.Target == email).Body, "/invite#t=([A-Za-z0-9_-]{43})").Groups[1].Value;
+
+        var res = await CreateClient().PostAsJsonAsync("/api/v1/invitations/register",
+            new { token, firstName = "Robin", lastName = "Hale", password = "Juniper#2026x" });
+
+        Assert.Equal(HttpStatusCode.Created, res.StatusCode);
+        var grant = await WithDbAsync(db => db.CompanyAdministratorGrants.AsNoTracking().SingleAsync(g => g.InvitationId == invitationId));
+        Assert.Equal((CompanyGrantSource.Recovery, (string?)null), (grant.Source, grant.GrantedByUserId));
+        var row = Assert.Single(await RecoveryRowsAsync());
+        Assert.Equal((firstId, $"co:recovery:{invitationId}:{firstId}"), (row.RecipientUserId, row.DedupKey));
+        Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
+            && e.Properties["Change"].ToString() == "\"Recovery\""
+            && e.Properties["InvitationId"].ToString() == invitationId.ToString()
+            && e.Properties["TargetUserId"].ToString() == $"\"{grant.UserId}\"");
     }
 
     [Fact]
