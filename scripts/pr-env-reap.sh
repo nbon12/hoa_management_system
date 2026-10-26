@@ -29,7 +29,7 @@
 #                 With DRY_RUN=true any token may be read-only or empty; an empty one is "not checked".
 # Output is names, ids and states only: this public repo's Actions logs are world-readable. Tokens reach
 # curl through a file descriptor, never argv.
-# shellcheck disable=SC2329 # the delete helpers below run through remove()
+# shellcheck disable=SC2317,SC2329 # the delete helpers below run through remove() (SC2317 before 0.11)
 set -euo pipefail
 
 : "${PR_NUMBER:?}" "${PROJECT:?}" "${REGION:?}" "${PREFIX:?}" "${NEON_PROJECT_ID:?}" \
