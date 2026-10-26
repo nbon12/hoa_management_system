@@ -41,8 +41,15 @@ public record CurrentUserDto(
     // The frontend derives mode-toggle visibility (FR-020) and the board nav set
     // (FR-024/FR-025) from these, with no extra endpoint (research.md R6).
     string LastActiveMode,
-    IEnumerable<MembershipSummaryDto> Memberships);
+    IEnumerable<MembershipSummaryDto> Memberships,
+    // 030 R11: whether the caller holds a live Company Administrator grant, and where the app
+    // goes next (Board, Company, Resident, NotLive or NoHome — LandingRule).
+    bool IsCompanyAdministrator,
+    string Landing);
 
-public record PropertySummaryDto(Guid Id, string AccountNumber, string Address);
+// 030: homes in Active and Archived communities, each with its community's status (FR-012a).
+public record PropertySummaryDto(
+    Guid Id, string AccountNumber, string Address, Guid CommunityId, string CommunityName, string CommunityStatus);
 
-public record MembershipSummaryDto(Guid CommunityId, string CommunityName, string Role);
+// 030 FR-036b: memberships in Onboarding and Active communities, each with its community's status.
+public record MembershipSummaryDto(Guid CommunityId, string CommunityName, string Role, string CommunityStatus);

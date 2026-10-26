@@ -2,10 +2,11 @@ using FastEndpoints;
 using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Community.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Community.Announcements;
 
-public class AnnouncementGetEndpoint(CommunityService communityService) : EndpointWithoutRequest<AnnouncementDto>
+public class AnnouncementGetEndpoint(ResidentAccess access, CommunityService communityService) : EndpointWithoutRequest<AnnouncementDto>
 {
     public override void Configure()
     {
@@ -15,7 +16,9 @@ public class AnnouncementGetEndpoint(CommunityService communityService) : Endpoi
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var communityId = User.RequireCommunityId();
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Read, ct);
+        var communityId = home.CommunityId;
         var id = Route<Guid>("id");
         try { await SendOkAsync(await communityService.GetAnnouncementAsync(communityId, id, ct), ct); }
         catch (DomainException ex) { HttpContext.Response.StatusCode = ex.StatusCode;

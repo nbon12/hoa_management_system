@@ -53,15 +53,26 @@ export class TokenService implements OnDestroy {
   broadcastLogout(): void { this.channel?.postMessage({ type: 'logout' }); }
 
   isTokenExpired(token: string): boolean {
+    const payload = TokenService.payload(token);
+    return !payload || typeof payload['exp'] !== 'number' || Date.now() >= payload['exp'] * 1000;
+  }
+
+  /** 030: one claim from a JWT's payload (for example `propertyId`), or null. Never verifies the token. */
+  claim(token: string | null | undefined, name: string): string | null {
+    const value = token ? TokenService.payload(token)?.[name] : undefined;
+    return typeof value === 'string' && value ? value : null;
+  }
+
+  private static payload(token: string): Record<string, unknown> | null {
     try {
       // 020-D FR-D6: JWT payloads are base64url — normalize before atob or valid tokens
       // containing '-'/'_' are misread as expired.
       const segment = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
       const padded = segment.padEnd(segment.length + ((4 - (segment.length % 4)) % 4), '=');
       const payload = JSON.parse(atob(padded));
-      return Date.now() >= payload.exp * 1000;
+      return payload && typeof payload === 'object' ? payload as Record<string, unknown> : null;
     } catch {
-      return true;
+      return null;
     }
   }
 }

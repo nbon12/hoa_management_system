@@ -307,6 +307,18 @@ masked content; confirm no alert is sent when the resident has not opted in.
   the schedule and the billing period so that an overlapping or re-run draft job cannot draft
   the same resident twice for the same period.
 
+> **Changed by 030 (2026-10-18; 030 FR-012, FR-013, FR-024c).** A recurring payment now records
+> who enrolled it (`EnrolledByUserId`, set on every enroll or re-enroll) and why it was cancelled
+> (`CancellationReason`: `owner_cancelled`, `community_archived` or `resident_removed`). Besides
+> the resident's own disable (FR-011), a schedule is also cancelled when its community is
+> archived, and when the resident who enrolled it is removed from the property (or, for a
+> schedule with no recorded enroller, one enrolled before 030, when any resident is removed);
+> autopay enrolled by another resident is unchanged. Each cancel works like the resident's own:
+> the status becomes inactive, the current authorization's `TerminatedAt` is set (FR-011b), and
+> no Stripe call is made. A charge already submitted settles normally, processor-driven updates
+> (refunds, ACH returns, disputes, reconciliation) keep applying, and no further draft starts.
+> The scheduled draft job also drafts only schedules whose community is Active (030 research R9).
+
 **Transaction audit trail**
 
 - **FR-012**: The system MUST maintain a transaction audit trail, separate from the
@@ -466,7 +478,8 @@ masked content; confirm no alert is sent when the resident has not opted in.
   day, amount type (Just the assessment / Whatever I owe / Fixed amount, with the fixed
   value when applicable), enabled/disabled state, a reference to the vaulted payment method,
   and a reference to the current authorization (mandate) record. No longer holds raw or
-  self-masked payment details.
+  self-masked payment details. *(Changed by 030: also records the user who enrolled it and a
+  cancellation reason; see the 030 note after FR-011d.)*
 - **Payment authorization (mandate record)**: Immutable record of a resident's recurring
   authorization — exact mandate text and version, acceptance timestamp (UTC), IP address,
   user-agent, and the agreed amount/draft-day terms. Retained at least two years after the

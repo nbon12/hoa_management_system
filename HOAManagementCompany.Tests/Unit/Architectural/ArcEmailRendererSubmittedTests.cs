@@ -1,6 +1,7 @@
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Board.Architectural;
+using HOAManagementCompany.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -10,7 +11,7 @@ namespace HOAManagementCompany.Tests.Unit.Architectural;
 public class ArcEmailRendererSubmittedTests
 {
     private static readonly ArcEmailRenderer Renderer =
-        new(Options.Create(new ArchitecturalReviewOptions { AppBaseUrl = "https://app.example.com" }));
+        new(new AppLinks(Options.Create(new AppLinksOptions { BaseUrl = "https://app.example.com" })));
 
     private static ArchitecturalApplication App(int revision = 1) => new()
     {

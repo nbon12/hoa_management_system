@@ -81,7 +81,7 @@ public class CommunityScopeResolverTests(TestDatabaseFixture fixture) : BoardTes
         using (var scope = NewScope())
         {
             var db = Db(scope);
-            communityId = await CreateCommunityAsync(db, CommunityStatus.Inactive);
+            communityId = await CreateCommunityAsync(db, CommunityStatus.Archived);
             userId = await CreateUserAsync(db);
             await AddMembershipAsync(db, userId, communityId, CommunityRole.CommunityManager);
         }

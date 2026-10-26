@@ -30,9 +30,12 @@ public sealed class ArcSweepService(
         var lapses = 0;
         var decisions = 0;
 
+        // 030 R21: only Active communities are swept (defense in depth; archiving already requires
+        // no open applications, and an Onboarding community has no residents to apply).
         var openIds = await db.ArchitecturalApplications
             .Where(a => a.Status == ArcApplicationStatus.Open
-                        && (a.ReminderSentAt == null || a.LapseProcessedAt == null))
+                        && (a.ReminderSentAt == null || a.LapseProcessedAt == null)
+                        && a.Community.Status == CommunityStatus.Active)
             .Select(a => a.Id)
             .ToListAsync(ct);
 

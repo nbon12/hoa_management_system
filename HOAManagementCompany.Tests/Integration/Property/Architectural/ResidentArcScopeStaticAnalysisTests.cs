@@ -31,7 +31,10 @@ public class ResidentArcScopeStaticAnalysisTests
     {
         var scope = File.ReadAllText(Path.Combine(Slice.FullName, "ResidentArcScope.cs"));
 
-        Assert.Contains("RequirePropertyId()", scope);
+        // 030 FR-024g: the home is re-checked from stored data on every request, never taken from
+        // the token's claim alone.
+        Assert.Contains("access.RequireAsync(user, operation, ct)", scope);
+        Assert.DoesNotContain("RequirePropertyId()", scope);
         Assert.Contains("d.Id == draftId && d.PropertyId == propertyId", scope);
         Assert.Contains("a.Id == applicationId && a.PropertyId == propertyId", scope);
     }

@@ -37,6 +37,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Community> Communities => Set<Community>();
     public DbSet<CommunityMembership> CommunityMemberships => Set<CommunityMembership>();
 
+    // Company administration (030-company-administration).
+    public DbSet<ManagementCompany> ManagementCompanies => Set<ManagementCompany>();
+    public DbSet<CompanyAdministratorGrant> CompanyAdministratorGrants => Set<CompanyAdministratorGrant>();
+    public DbSet<CompanyDefaultSettings> CompanyDefaultSettings => Set<CompanyDefaultSettings>();
+    public DbSet<Invitation> Invitations => Set<Invitation>();
+    public DbSet<InvitationDelivery> InvitationDeliveries => Set<InvitationDelivery>();
+
     // ── Board architectural review (027-board-arc-review) ───────────────────
     public DbSet<CommunityArcSettings> CommunityArcSettings => Set<CommunityArcSettings>();
     public DbSet<ArchitecturalApplication> ArchitecturalApplications => Set<ArchitecturalApplication>();
@@ -169,6 +176,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(x => x.MethodLast4).HasMaxLength(4);
             e.HasOne(x => x.Property).WithMany(p => p.RecurringPayments)
                 .HasForeignKey(x => x.PropertyId);
+            // 030 R9: who enrolled the schedule, and why it was cancelled.
+            e.Property(x => x.CancellationReason).HasMaxLength(30);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.EnrolledByUserId).OnDelete(DeleteBehavior.SetNull);
             e.ToTable("RecurringPayments");
         });
 
@@ -396,10 +407,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // ── Board member experience (025-board-overall-design) ───────────────
         builder.Entity<Community>(e =>
         {
-            // FR-002: CommunityName is the unique human-readable handle; the GUID
-            // Id is the identifier used in all queries and API paths.
-            e.HasIndex(x => x.CommunityName).IsUnique();
+            // 030 FR-007 / R15: the community name is unique per management company, compared
+            // without regard to case or surrounding spaces (NormalizedName). It replaces 025's
+            // global, case-sensitive CommunityName index. The GUID Id is the identifier used in
+            // all queries and API paths.
+            e.HasIndex(x => new { x.ManagementCompanyId, x.NormalizedName }).IsUnique();
+            e.HasIndex(x => new { x.ManagementCompanyId, x.Status });
             e.Property(x => x.Status).HasConversion<string>();
+            e.HasOne(x => x.ManagementCompany).WithMany(c => c.Communities)
+                .HasForeignKey(x => x.ManagementCompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ActivatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.ArchivedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.RestoredByUserId).OnDelete(DeleteBehavior.SetNull);
             // FR-003: self-referencing master/sub-association relation.
             e.HasOne(x => x.ParentCommunity).WithMany(c => c.SubCommunities)
                 .HasForeignKey(x => x.ParentCommunityId).OnDelete(DeleteBehavior.Restrict);
@@ -421,6 +441,100 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasOne(x => x.Community).WithMany(c => c.Memberships)
                 .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Cascade);
             e.ToTable("CommunityMemberships");
+        });
+
+        // ── Company administration (030-company-administration) ─────────────
+        builder.Entity<ManagementCompany>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.ToTable("ManagementCompanies");
+        });
+
+        builder.Entity<CompanyDefaultSettings>(e =>
+        {
+            e.HasKey(x => x.CompanyId);
+            e.Property(x => x.LapseRule).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.DecisionRule).HasConversion<string>().HasMaxLength(40);
+            e.Property(x => x.TimeZoneId).HasMaxLength(64);
+            e.Property(x => x.FormalDisapprovalStatement).HasMaxLength(1000);
+            e.HasOne(x => x.Company).WithOne(c => c.DefaultSettings)
+                .HasForeignKey<CompanyDefaultSettings>(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ApplicationUser>().WithMany()
+                .HasForeignKey(x => x.UpdatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.ToTable("CompanyDefaultSettings");
+        });
+
+        builder.Entity<CompanyAdministratorGrant>(e =>
+        {
+            // At most one live grant per user per company (R1); revoked rows are kept as history.
+            e.HasIndex(x => new { x.CompanyId, x.UserId }).IsUnique()
+                .HasFilter("\"RevokedAt\" IS NULL");
+            e.HasIndex(x => x.UserId);
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(x => x.Company).WithMany(c => c.AdministratorGrants)
+                .HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.User).WithMany()
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.GrantedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.RevokedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Invitation>().WithMany().HasForeignKey(x => x.InvitationId).OnDelete(DeleteBehavior.SetNull);
+            e.ToTable("CompanyAdministratorGrants");
+        });
+
+        builder.Entity<Invitation>(e =>
+        {
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.State).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Role).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.RevokeReason).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Email).HasMaxLength(256);
+            e.Property(x => x.NormalizedEmail).HasMaxLength(256);
+            e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.Property(x => x.LastSendError).HasMaxLength(200);
+
+            // R6: a link token matches at most one invitation, and each target has at most one
+            // open (Scheduled or Pending) invitation per kind.
+            e.HasIndex(x => x.TokenHash).IsUnique().HasFilter("\"TokenHash\" IS NOT NULL");
+            e.HasIndex(x => new { x.CommunityId, x.NormalizedEmail, x.Role }).IsUnique()
+                .HasDatabaseName("IX_Invitations_OpenMembership")
+                .HasFilter("\"Kind\" = 'Membership' AND \"State\" IN ('Scheduled','Pending')");
+            e.HasIndex(x => new { x.PropertyId, x.NormalizedEmail }).IsUnique()
+                .HasDatabaseName("IX_Invitations_OpenResidency")
+                .HasFilter("\"Kind\" = 'Residency' AND \"State\" IN ('Scheduled','Pending')");
+            e.HasIndex(x => new { x.CompanyId, x.NormalizedEmail }).IsUnique()
+                .HasDatabaseName("IX_Invitations_OpenCompanyAdministrator")
+                .HasFilter("\"Kind\" = 'CompanyAdministrator' AND \"State\" IN ('Scheduled','Pending')");
+            e.HasIndex(x => new { x.CommunityId, x.State });
+            e.HasIndex(x => x.PropertyId);
+            e.HasIndex(x => new { x.SenderUserId, x.State });
+
+            e.HasOne(x => x.Company).WithMany()
+                .HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Community).WithMany()
+                .HasForeignKey(x => x.CommunityId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Property).WithMany()
+                .HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Sender).WithMany()
+                .HasForeignKey(x => x.SenderUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.AcceptedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.RevokedByUserId).OnDelete(DeleteBehavior.SetNull);
+
+            // data-model.md: the shape each kind needs, and a sender for all but setup-step
+            // Company Administrator invitations.
+            e.ToTable("Invitations", t => t.HasCheckConstraint("CK_Invitations_KindShape",
+                "((\"Kind\" = 'Membership' AND \"CommunityId\" IS NOT NULL AND \"Role\" IS NOT NULL AND \"PropertyId\" IS NULL)"
+                + " OR (\"Kind\" = 'Residency' AND \"CommunityId\" IS NOT NULL AND \"PropertyId\" IS NOT NULL AND \"Role\" IS NULL)"
+                + " OR (\"Kind\" = 'CompanyAdministrator' AND \"CommunityId\" IS NULL AND \"PropertyId\" IS NULL AND \"Role\" IS NULL))"
+                + " AND (\"SenderUserId\" IS NOT NULL OR \"Kind\" = 'CompanyAdministrator')"));
+        });
+
+        builder.Entity<InvitationDelivery>(e =>
+        {
+            e.HasIndex(x => new { x.NormalizedEmail, x.AttemptedAt });
+            e.Property(x => x.NormalizedEmail).HasMaxLength(256);
+            e.HasOne(x => x.Invitation).WithMany(i => i.Deliveries)
+                .HasForeignKey(x => x.InvitationId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable("InvitationDeliveries");
         });
 
         // ── Board architectural review (027-board-arc-review) ───────────────

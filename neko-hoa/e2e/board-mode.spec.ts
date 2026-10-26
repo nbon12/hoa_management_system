@@ -1,8 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-import {
-  establishSession, loginAs, setMode,
-  BOARD_EMAIL, BOARD_PASSWORD, BOARD_HOME_LANDING,
-} from './helpers/auth';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { establishSession, loginAs, setMode, BOARD_HOME_LANDING } from './helpers/auth';
 
 /**
  * 025 US1 (T026) — the enter/leave board-mode journey.
@@ -13,13 +10,67 @@ import {
  *      the shell navigation changes to the board sidebar.
  *   4. Signing out and back in returns the user to the mode they were last in.
  *
- * Seeding dependency (see helpers/auth BOARD_EMAIL): these tests require a user holding an
- * active NON-resident membership. The base AuthSeeder only creates resident-only users, so the
- * E2E target must provision `board@nekohoa.dev` (or PLAYWRIGHT_BOARD_EMAIL) with an active
- * BoardMember/CommunityManager membership — the same state the manager membership-admin flow
- * (US5) produces. A resident-only user correctly sees NO toggle, which is asserted separately in
- * the mode-toggle unit spec and in the role-gate Playwright spec.
+ * Seeding dependency: the journey needs a user with a home AND an active non-resident
+ * membership, since only such a user has a resident mode to leave and come back to. Since 030
+ * (FR-036a, T043) the seeded board@nekohoa.dev has no home and signs straight in to board mode,
+ * so the suite provisions its own user once, through 030's own API: the company administrator
+ * invites a fresh `e2e+…@test.dev` resident to a seeded home, the user signs up from the link
+ * (read from the dev vault), and is appointed Board Member. The global setup's cleanup removes
+ * the user on the next run. A resident-only user correctly sees NO toggle, which is asserted
+ * separately in the mode-toggle unit spec and in the role-gate Playwright spec.
  */
+
+const API = process.env.PLAYWRIGHT_API_URL || 'http://localhost:5212';
+const SECRET = process.env.PLAYWRIGHT_SCHEDULER_SECRET || 'dev-scheduler-shared-secret-placeholder';
+const COMPANY_EMAIL = process.env.PLAYWRIGHT_COMPANY_EMAIL || 'company@nekohoa.dev';
+const COMPANY_PASSWORD = process.env.PLAYWRIGHT_COMPANY_PASSWORD || 'Password1!';
+const COMMUNITY = process.env.PLAYWRIGHT_RESIDENT_COMMUNITY || 'Sakura Heights HOA';
+// The 017 registration journey claims this home, so it must stay unclaimed.
+const REGISTRATION_HOME = '3 Sakura Drive';
+const PASSWORD = 'Password1!';
+
+/** A resident of a seeded home who is also an active Board Member there. */
+async function provisionResidentBoardMember(request: APIRequestContext): Promise<string> {
+  const email = `e2e+boardmode-${Date.now()}${Math.floor(Math.random() * 1000)}@test.dev`;
+  const login = await request.post(`${API}/api/v1/auth/login`, { data: { email: COMPANY_EMAIL, password: COMPANY_PASSWORD } });
+  expect(login.ok(), `login as ${COMPANY_EMAIL}`).toBeTruthy();
+  const headers = { Authorization: `Bearer ${(await login.json()).token}` };
+
+  const communities = await request.get(
+    `${API}/api/v1/company/communities?status=active&search=${encodeURIComponent(COMMUNITY)}`, { headers });
+  const communityId = ((await communities.json()).items as { id: string }[])[0].id;
+  const homes = await request.get(`${API}/api/v1/communities/${communityId}/residents?limit=100`, { headers });
+  const home = ((await homes.json()).items as { propertyId: string; address: string }[])
+    .find(h => h.address !== REGISTRATION_HOME)!;
+
+  const invite = await request.post(`${API}/api/v1/communities/${communityId}/residents/invitations`,
+    { headers, data: { propertyId: home.propertyId, email } });
+  expect(invite.status(), 'invite the resident').toBe(201);
+
+  let link: string | null = null;
+  for (let attempt = 0; !link && attempt < 20; attempt++) {
+    const res = await request.get(`${API}/api/v1/e2e/auth-codes?contact=${encodeURIComponent(email)}`,
+      { headers: { 'X-Scheduler-Secret': SECRET } });
+    link = res.ok() ? (await res.json()).invitationLink as string | null : null;
+    if (!link) await new Promise(r => setTimeout(r, 500));
+  }
+  expect(link, 'invitation link in the dev vault').toBeTruthy();
+  const token = new URL(link!, 'http://localhost').hash.replace(/^#t=/, '');
+  const registered = await request.post(`${API}/api/v1/invitations/register`,
+    { data: { token, firstName: 'Bea', lastName: 'Board', password: PASSWORD } });
+  expect(registered.status(), 'sign up from the link').toBe(201);
+  const userId = (await registered.json()).user.id as string;
+
+  const appoint = await request.post(`${API}/api/v1/communities/${communityId}/memberships`,
+    { headers, data: { role: 'BoardMember', userId } });
+  expect(appoint.status(), 'appoint as Board Member').toBe(201);
+  return email;
+}
+
+let boardEmail: string;
+test.beforeAll(async ({ request }) => {
+  boardEmail = await provisionResidentBoardMember(request);
+});
 
 /**
  * The shell is showing the RESIDENT sidebar: the Dashboard entry is present and no board entry
@@ -35,10 +86,10 @@ async function expectResidentSidebar(page: Page): Promise<void> {
 
 test.describe('Board mode: enter / leave journey (US1)', () => {
   test('board-eligible user can enter board mode, see the banner + board nav, and return to resident', async ({ page }) => {
-    await establishSession(page, BOARD_EMAIL, BOARD_PASSWORD);
+    await establishSession(page, boardEmail, PASSWORD);
     // Deterministically start in resident mode — a sibling test persists Board for this
     // shared user, so set the server-side mode before the app boots (no client render race).
-    await setMode(page, 'Resident');
+    await setMode(page, 'Resident', boardEmail, PASSWORD);
     await page.goto('/app/dashboard');
     await page.waitForFunction(
       () => document.querySelectorAll('.spinner').length === 0,
@@ -91,10 +142,10 @@ test.describe('Board mode: enter / leave journey (US1)', () => {
     // Deterministic starting mode: this board account is shared with the sibling test, which
     // can leave Board persisted. Force Resident server-side first, otherwise the sign-in below
     // lands on the board home (FR-026) and there is no "Enter board mode" button to click.
-    await setMode(page, 'Resident');
+    await setMode(page, 'Resident', boardEmail, PASSWORD);
 
     // Sign in (resident landing) and enter board mode so Board becomes the persisted mode.
-    await loginAs(page, BOARD_EMAIL, BOARD_PASSWORD);
+    await loginAs(page, boardEmail, PASSWORD);
     await page.getByRole('button', { name: /Enter board mode/i }).click();
     await page.waitForURL(/\/app\/board\/home/, { timeout: 15_000 });
     await expect(page.locator('.board-banner')).toBeVisible();
@@ -107,7 +158,7 @@ test.describe('Board mode: enter / leave journey (US1)', () => {
     // mode. Assert the LANDING URL as well as the chrome: FR-026 says a single-community board
     // user lands on their community's home, and checking only .board-banner/.mode-seg would
     // still pass while sign-in dumped the user on the resident dashboard.
-    await loginAs(page, BOARD_EMAIL, BOARD_PASSWORD, BOARD_HOME_LANDING);
+    await loginAs(page, boardEmail, PASSWORD, BOARD_HOME_LANDING);
     await page.waitForURL(/\/app\/board\/home/, { timeout: 15_000 });
     await expect(page.locator('.board-banner')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('.mode-seg')).toBeVisible();

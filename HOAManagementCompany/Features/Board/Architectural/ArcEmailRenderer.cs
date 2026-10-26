@@ -3,7 +3,7 @@ using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Payments.Alerts;
-using Microsoft.Extensions.Options;
+using HOAManagementCompany.Infrastructure.Configuration;
 
 namespace HOAManagementCompany.Features.Board.Architectural;
 
@@ -32,9 +32,10 @@ public static class ArcEmailKinds
 /// "Email contract"). Plain text until the designed HTML templates arrive. Owner emails never
 /// include vote counts, voter names or board comments.
 /// </summary>
-public sealed class ArcEmailRenderer(IOptions<ArchitecturalReviewOptions> options)
+public sealed class ArcEmailRenderer(AppLinks links)
 {
-    private string Base => options.Value.AppBaseUrl.TrimEnd('/');
+    // 030 R10: one origin for every emailed link (App:BaseUrl, falling back to this section's AppBaseUrl).
+    private string Base => links.BaseUrl;
 
     public string OwnerRequestLink(Guid applicationId) => $"{Base}/app/property/architectural/{applicationId}";
     public string OwnerReviseLink(Guid applicationId) => $"{Base}/app/property/architectural/{applicationId}/revise";

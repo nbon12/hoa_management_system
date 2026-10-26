@@ -6,6 +6,8 @@ using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 
+using HOAManagementCompany.Features.Residents;
+
 namespace HOAManagementCompany.Features.Property.Architectural;
 
 // <!-- REPOWISE:START domain=resident-arc -->
@@ -29,11 +31,10 @@ public sealed class ResidentArcDraftService(
 
     public async Task<ResidentArcDraftDto> CreateAsync(ClaimsPrincipal user, ResidentArcDraftBody body, CancellationToken ct)
     {
-        var propertyId = ResidentArcScope.PropertyId(user);
+        var home = await scope.HomeAsync(user, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
+        var communityId = home.CommunityId;
         var projectType = ValidateFields(body);
-        var communityId = await db.Properties.Where(p => p.Id == propertyId)
-            .Select(p => (Guid?)p.CommunityId).FirstOrDefaultAsync(ct)
-            ?? throw ResidentArcScope.Forbidden();
 
         var now = clock.GetUtcNow();
         var draft = new ArchitecturalApplicationDraft
@@ -50,11 +51,11 @@ public sealed class ResidentArcDraftService(
     }
 
     public async Task<ResidentArcDraftDto> GetAsync(ClaimsPrincipal user, Guid draftId, CancellationToken ct) =>
-        await ToDtoAsync(await scope.DraftAsync(user, draftId, ct), ct);
+        await ToDtoAsync(await scope.DraftAsync(user, draftId, ResidentOperation.Read, ct), ct);
 
     public async Task<ResidentArcDraftDto> UpdateAsync(ClaimsPrincipal user, ResidentArcDraftUpdateRequest req, CancellationToken ct)
     {
-        var draft = await scope.DraftAsync(user, req.DraftId, ct);
+        var draft = await scope.DraftAsync(user, req.DraftId, ResidentOperation.Write, ct);
         var projectType = ValidateFields(req);
 
         var removed = (req.RemovedCarriedAttachmentIds ?? []).Distinct().ToList();
@@ -74,7 +75,7 @@ public sealed class ResidentArcDraftService(
     /// <summary>Deletes the draft and the objects of its own uploads (FR-014). Carried-over objects stay.</summary>
     public async Task DeleteAsync(ClaimsPrincipal user, Guid draftId, CancellationToken ct)
     {
-        var draft = await scope.DraftAsync(user, draftId, ct);
+        var draft = await scope.DraftAsync(user, draftId, ResidentOperation.Write, ct);
         foreach (var attachment in draft.Attachments)
             await storage.DeleteAsync(attachment.StorageKey, ct);
         db.ArchitecturalApplicationDrafts.Remove(draft);
@@ -88,7 +89,7 @@ public sealed class ResidentArcDraftService(
     public async Task<ResidentArcAttachmentDto> UploadAsync(
         ClaimsPrincipal user, Guid draftId, string fileName, long length, Stream content, CancellationToken ct)
     {
-        var draft = await scope.DraftAsync(user, draftId, ct);
+        var draft = await scope.DraftAsync(user, draftId, ResidentOperation.Write, ct);
         var carried = await CarriedQuery(draft).Select(a => a.SizeBytes).ToListAsync(ct);
         var existingCount = draft.Attachments.Count + carried.Count;
         var existingTotal = draft.Attachments.Sum(a => a.SizeBytes) + carried.Sum();
@@ -114,7 +115,7 @@ public sealed class ResidentArcDraftService(
 
     public async Task DeleteAttachmentAsync(ClaimsPrincipal user, Guid draftId, Guid attachmentId, CancellationToken ct)
     {
-        var draft = await scope.DraftAsync(user, draftId, ct);
+        var draft = await scope.DraftAsync(user, draftId, ResidentOperation.Write, ct);
         var attachment = draft.Attachments.FirstOrDefault(a => a.Id == attachmentId)
             ?? throw ResidentArcScope.NotFound("The attachment");
         await storage.DeleteAsync(attachment.StorageKey, ct);
@@ -124,14 +125,14 @@ public sealed class ResidentArcDraftService(
     }
 
     /// <summary>The storage key of one of the draft's own or carried-over attachments.</summary>
-    public async Task<string> AttachmentKeyAsync(ClaimsPrincipal user, Guid draftId, Guid attachmentId, CancellationToken ct)
+    public async Task<(string Key, Guid PropertyId)> AttachmentKeyAsync(ClaimsPrincipal user, Guid draftId, Guid attachmentId, CancellationToken ct)
     {
-        var draft = await scope.DraftAsync(user, draftId, ct);
+        var draft = await scope.DraftAsync(user, draftId, ResidentOperation.Read, ct);
         var own = draft.Attachments.FirstOrDefault(a => a.Id == attachmentId);
         if (own is not null)
-            return own.StorageKey;
+            return (own.StorageKey, draft.PropertyId);
         var carriedKey = await CarriedQuery(draft).Where(a => a.Id == attachmentId).Select(a => a.StorageKey).FirstOrDefaultAsync(ct);
-        return carriedKey ?? throw ResidentArcScope.Forbidden();
+        return (carriedKey ?? throw ResidentArcScope.Forbidden(), draft.PropertyId);
     }
 
     /// <summary>
@@ -140,7 +141,7 @@ public sealed class ResidentArcDraftService(
     /// </summary>
     public async Task<ResidentArcDraftDto> CreateRevisionDraftAsync(ClaimsPrincipal user, Guid applicationId, CancellationToken ct)
     {
-        var app = await scope.ApplicationAsync(user, applicationId, ct);
+        var app = await scope.ApplicationAsync(user, applicationId, ResidentOperation.Write, ct);
         if (app.Status != ArcApplicationStatus.Closed || app.DecisionOutcome != ArcOutcome.Denied)
             throw RevisionNotAllowed("Only a closed, denied request can be revised and resubmitted.");
 

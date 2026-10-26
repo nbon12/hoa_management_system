@@ -18,7 +18,7 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.20")
+                .HasAnnotation("ProductVersion", "9.0.21")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -664,6 +664,18 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ActivatedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ArchivedByUserId")
+                        .HasColumnType("text");
+
                     b.Property<string>("CommunityName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -673,6 +685,9 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("text");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -684,11 +699,24 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("ManagementCompanyId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateOnly?>("ManagementStartDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("ParentCommunityId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RestoredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RestoredByUserId")
+                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -696,10 +724,20 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CommunityName")
-                        .IsUnique();
+                    b.HasIndex("ActivatedByUserId");
+
+                    b.HasIndex("ArchivedByUserId");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("ParentCommunityId");
+
+                    b.HasIndex("RestoredByUserId");
+
+                    b.HasIndex("ManagementCompanyId", "NormalizedName")
+                        .IsUnique();
+
+                    b.HasIndex("ManagementCompanyId", "Status");
 
                     b.ToTable("Communities", (string)null);
                 });
@@ -821,6 +859,100 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("CommunityMemberships", (string)null);
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CompanyAdministratorGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GrantedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("InvitationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GrantedByUserId");
+
+                    b.HasIndex("InvitationId");
+
+                    b.HasIndex("RevokedByUserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CompanyId", "UserId")
+                        .IsUnique()
+                        .HasFilter("\"RevokedAt\" IS NULL");
+
+                    b.ToTable("CompanyAdministratorGrants", (string)null);
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CompanyDefaultSettings", b =>
+                {
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DecisionRule")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("FormalDisapprovalStatement")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("LapseRule")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("ReminderDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReviewPeriodDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("CompanyId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.ToTable("CompanyDefaultSettings", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.DirectoryField", b =>
@@ -1061,6 +1193,156 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.ToTable("HoaPaymentConfigs", (string)null);
                 });
 
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AcceptedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("CommunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("LastSendError")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("PropertyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ResendCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RevokeReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SenderUserId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateOnly?>("TermEndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("TokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcceptedByUserId");
+
+                    b.HasIndex("PropertyId");
+
+                    b.HasIndex("RevokedByUserId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasFilter("\"TokenHash\" IS NOT NULL");
+
+                    b.HasIndex("CommunityId", "State");
+
+                    b.HasIndex("CompanyId", "NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Invitations_OpenCompanyAdministrator")
+                        .HasFilter("\"Kind\" = 'CompanyAdministrator' AND \"State\" IN ('Scheduled','Pending')");
+
+                    b.HasIndex("PropertyId", "NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Invitations_OpenResidency")
+                        .HasFilter("\"Kind\" = 'Residency' AND \"State\" IN ('Scheduled','Pending')");
+
+                    b.HasIndex("SenderUserId", "State");
+
+                    b.HasIndex("CommunityId", "NormalizedEmail", "Role")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Invitations_OpenMembership")
+                        .HasFilter("\"Kind\" = 'Membership' AND \"State\" IN ('Scheduled','Pending')");
+
+                    b.ToTable("Invitations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Invitations_KindShape", "((\"Kind\" = 'Membership' AND \"CommunityId\" IS NOT NULL AND \"Role\" IS NOT NULL AND \"PropertyId\" IS NULL) OR (\"Kind\" = 'Residency' AND \"CommunityId\" IS NOT NULL AND \"PropertyId\" IS NOT NULL AND \"Role\" IS NULL) OR (\"Kind\" = 'CompanyAdministrator' AND \"CommunityId\" IS NULL AND \"PropertyId\" IS NULL AND \"Role\" IS NULL)) AND (\"SenderUserId\" IS NOT NULL OR \"Kind\" = 'CompanyAdministrator')");
+                        });
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.InvitationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AttemptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("BypassesRecipientCap")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("InvitationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvitationId");
+
+                    b.HasIndex("NormalizedEmail", "AttemptedAt");
+
+                    b.ToTable("InvitationDeliveries", (string)null);
+                });
+
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.LedgerEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1116,6 +1398,25 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("LedgerEntries", (string)null);
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ManagementCompany", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ManagementCompanies", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.OutboxMessage", b =>
@@ -1677,11 +1978,18 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<Guid?>("CurrentAuthorizationId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("DraftDay")
                         .HasColumnType("integer");
+
+                    b.Property<string>("EnrolledByUserId")
+                        .HasColumnType("text");
 
                     b.Property<decimal?>("FixedAmount")
                         .HasColumnType("decimal(10,2)");
@@ -1719,6 +2027,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EnrolledByUserId");
 
                     b.HasIndex("PropertyId")
                         .IsUnique();
@@ -2215,10 +2525,38 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Community", b =>
                 {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActivatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ArchivedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ManagementCompany", "ManagementCompany")
+                        .WithMany("Communities")
+                        .HasForeignKey("ManagementCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HOAManagementCompany.Domain.Entities.Community", "ParentCommunity")
                         .WithMany("SubCommunities")
                         .HasForeignKey("ParentCommunityId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RestoredByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ManagementCompany");
 
                     b.Navigation("ParentCommunity");
                 });
@@ -2267,6 +2605,56 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Navigation("Community");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CompanyAdministratorGrant", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ManagementCompany", "Company")
+                        .WithMany("AdministratorGrants")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("GrantedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Invitation", null)
+                        .WithMany()
+                        .HasForeignKey("InvitationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.CompanyDefaultSettings", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ManagementCompany", "Company")
+                        .WithOne("DefaultSettings")
+                        .HasForeignKey("HOAManagementCompany.Domain.Entities.CompanyDefaultSettings", "CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.DirectoryField", b =>
@@ -2333,6 +2721,59 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Community");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Invitation", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ManagementCompany", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Property", "Property")
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Community");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("Property");
+
+                    b.Navigation("Sender");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.InvitationDelivery", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.Invitation", "Invitation")
+                        .WithMany("Deliveries")
+                        .HasForeignKey("InvitationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invitation");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.LedgerEntry", b =>
@@ -2475,6 +2916,11 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.RecurringPayment", b =>
                 {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("EnrolledByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("HOAManagementCompany.Domain.Entities.Property", "Property")
                         .WithMany("RecurringPayments")
                         .HasForeignKey("PropertyId")
@@ -2619,6 +3065,20 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Navigation("Properties");
 
                     b.Navigation("SubCommunities");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Invitation", b =>
+                {
+                    b.Navigation("Deliveries");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ManagementCompany", b =>
+                {
+                    b.Navigation("AdministratorGrants");
+
+                    b.Navigation("Communities");
+
+                    b.Navigation("DefaultSettings");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.Owner", b =>

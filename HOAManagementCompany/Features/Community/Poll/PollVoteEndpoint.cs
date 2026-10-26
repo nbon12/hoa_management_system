@@ -3,10 +3,11 @@ using HOAManagementCompany.Features.Common;
 using FluentValidation;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Community.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Community.Poll;
 
-public class PollVoteEndpoint(PollService pollService) : Endpoint<PollVoteRequest, PollDto>
+public class PollVoteEndpoint(ResidentAccess access, PollService pollService) : Endpoint<PollVoteRequest, PollDto>
 {
     public override void Configure()
     {
@@ -16,7 +17,9 @@ public class PollVoteEndpoint(PollService pollService) : Endpoint<PollVoteReques
 
     public override async Task HandleAsync(PollVoteRequest req, CancellationToken ct)
     {
-        var communityId = User.RequireCommunityId();
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var communityId = home.CommunityId;
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? string.Empty;
         var pollId = Route<Guid>("id");
 
