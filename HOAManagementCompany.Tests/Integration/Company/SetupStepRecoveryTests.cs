@@ -37,11 +37,11 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal(new SetupResult(0, $"Granted Company Administrator to {ownerId}."), result);
         var grant = await WithDbAsync(db => db.CompanyAdministratorGrants.AsNoTracking().SingleAsync(g => g.UserId == ownerId));
         Assert.Equal((CompanyGrantSource.Recovery, (DateTimeOffset?)null), (grant.Source, grant.RevokedAt));
-        Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
-            && e.Properties["ActorId"].ToString() == "\"setup\""
-            && (DateTimeOffset)((Serilog.Events.ScalarValue)e.Properties["UtcNow"]).Value! == Clock.UtcNow
-            && e.Properties["Change"].ToString() == "\"Recovery\""
-            && e.Properties["TargetUserId"].ToString() == $"\"{ownerId}\"");
+        // US7-S11: exactly one event for the run, with its change, target and UTC time.
+        var logged = Assert.Single(SetupEvents());
+        Assert.Equal(("\"Recovery\"", $"\"{ownerId}\"", Clock.UtcNow),
+            (logged.Properties["Change"].ToString(), logged.Properties["TargetUserId"].ToString(),
+             (DateTimeOffset)((Serilog.Events.ScalarValue)logged.Properties["UtcNow"]).Value!));
         var rows = await RecoveryRowsAsync();
         Assert.Equal(new[] { firstId, secondId }.Order(), rows.Select(r => r.RecipientUserId!).Order());
         Assert.All(rows, r => Assert.Equal($"co:recovery:{grant.Id}:{r.RecipientUserId}", r.DedupKey));
@@ -63,11 +63,11 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal((InvitationKind.CompanyAdministrator, InvitationState.Pending, (string?)null),
             (invitation.Kind, invitation.State, invitation.SenderUserId));
         Assert.Single(Email.Sent, m => m.Target == email);
-        Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
-            && e.Properties["ActorId"].ToString() == "\"setup\""
-            && (DateTimeOffset)((Serilog.Events.ScalarValue)e.Properties["UtcNow"]).Value! == Clock.UtcNow
-            && e.Properties["Change"].ToString() == "\"Recovery\""
-            && e.Properties["InvitationId"].ToString() == invitation.Id.ToString());
+        // US7-S11: exactly one event for the run, with its change, invitation and UTC time.
+        var logged = Assert.Single(SetupEvents());
+        Assert.Equal(("\"Recovery\"", invitation.Id.ToString(), Clock.UtcNow),
+            (logged.Properties["Change"].ToString(), logged.Properties["InvitationId"].ToString(),
+             (DateTimeOffset)((Serilog.Events.ScalarValue)logged.Properties["UtcNow"]).Value!));
         var row = Assert.Single(await RecoveryRowsAsync());
         Assert.Equal((adminId, $"co:recovery:{invitation.Id}:{adminId}"), (row.RecipientUserId, row.DedupKey));
         Assert.Equal(1, await WithDbAsync(db => db.CompanyAdministratorGrants.CountAsync()));
@@ -138,8 +138,7 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.False(await WithDbAsync(db => db.CompanyAdministratorGrants.AnyAsync(g => g.UserId == ownerId)));
         Assert.Empty(await RecoveryRowsAsync());
         // FR-039: a run that changes nothing is still a sensitive event.
-        Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
-            && e.Properties["ActorId"].ToString() == "\"setup\"" && e.Properties["Change"].ToString() == "\"NoChange\"");
+        Assert.Equal("\"NoChange\"", Assert.Single(SetupEvents()).Properties["Change"].ToString());
     }
 
     // A run whose email failed is run again: the same invitation gets a new link, and the
@@ -187,6 +186,10 @@ public class SetupStepRecoveryTests(TestDatabaseFixture fixture) : CompanyTestBa
         return await scope.ServiceProvider.GetRequiredService<CompanyAdministratorService>()
             .SetupAsync(email, recover, companyName, default);
     }
+
+    private List<Serilog.Events.LogEvent> SetupEvents() => LogSink.Events
+        .Where(e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange") && e.Properties["ActorId"].ToString() == "\"setup\"")
+        .ToList();
 
     private Task<List<OutboxMessage>> RecoveryRowsAsync() => WithDbAsync(db =>
         db.OutboxMessages.AsNoTracking().Where(m => m.Kind == CompanyEmailKinds.AdminRecovery).ToListAsync());

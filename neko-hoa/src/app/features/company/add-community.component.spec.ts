@@ -6,7 +6,7 @@ import { render, screen, fireEvent, within } from '@testing-library/angular';
 import { until } from '../board/architectural/arc-testing';
 import { AddCommunityComponent } from './add-community.component';
 import { CompanyService, PortfolioItem } from '../../core/services/company.service';
-import { BoardService } from '../../core/services/board.service';
+import { BoardService, MyCommunity } from '../../core/services/board.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BoardNavigationService } from '../../core/services/board-navigation.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -26,6 +26,12 @@ const PORTFOLIO = [
   row('c-sh', 'Sakura Heights', 'Active'),
 ];
 
+const MY_COMMUNITIES: MyCommunity[] = [
+  { id: 'c-kcm', communityName: 'Keystone Crossing Master', role: 'CommunityManager', status: 'Active' },
+  { id: 'c-sh', communityName: 'Sakura Heights', role: 'BoardMember', status: 'Active' },
+  { id: 'c-kr', communityName: 'Keystone Ridge', role: 'CommunityManager', status: 'Onboarding' },
+];
+
 const ROBIN: CurrentUser = {
   id: 'u-robin', firstName: 'Robin', lastName: 'Hale', email: 'robin@example.com', initials: 'RH', lastActiveMode: 'Resident',
   memberships: [], properties: [], isCompanyAdministrator: true, landing: 'Company',
@@ -41,18 +47,12 @@ describe('AddCommunityComponent (030 T073)', () => {
   let refreshCurrentUser: jasmine.Spy;
   let navigate: jasmine.Spy;
 
-  async function setup(variant: 'company' | 'board', user: CurrentUser = variant === 'company' ? ROBIN : JORDAN) {
+  async function setup(variant: 'company' | 'board', user: CurrentUser = variant === 'company' ? ROBIN : JORDAN,
+    myCommunities: MyCommunity[] = MY_COMMUNITIES) {
     company = jasmine.createSpyObj<CompanyService>('CompanyService', ['getCommunities', 'createCommunity']);
     company.getCommunities.and.resolveTo({ items: PORTFOLIO, total: 4, limit: 100, offset: 0, counts: { all: 4, onboarding: 1, active: 2, archived: 1, noManager: 0 } });
     board = jasmine.createSpyObj<BoardService>('BoardService', ['getMyCommunities']);
-    board.getMyCommunities.and.resolveTo({
-      items: [
-        { id: 'c-kcm', communityName: 'Keystone Crossing Master', role: 'CommunityManager', status: 'Active' },
-        { id: 'c-sh', communityName: 'Sakura Heights', role: 'BoardMember', status: 'Active' },
-        { id: 'c-kr', communityName: 'Keystone Ridge', role: 'CommunityManager', status: 'Onboarding' },
-      ],
-      total: 3, limit: 100, offset: 0,
-    });
+    board.getMyCommunities.and.resolveTo({ items: myCommunities, total: myCommunities.length, limit: 100, offset: 0 });
     refreshCurrentUser = jasmine.createSpy('refreshCurrentUser').and.resolveTo(user);
     const r = await render(AddCommunityComponent, {
       componentInputs: { variant },
@@ -164,8 +164,8 @@ describe('AddCommunityComponent (030 T073)', () => {
   });
 
   describe('the parent picker (FR-016, US1-S8)', () => {
-    async function openPicker(variant: 'company' | 'board') {
-      const r = await setup(variant);
+    async function openPicker(variant: 'company' | 'board', myCommunities?: MyCommunity[]) {
+      const r = await setup(variant, undefined, myCommunities);
       const combo = screen.getByRole('combobox', { name: 'Parent association (optional)' });
       fireEvent.focus(combo);
       fireEvent.keyDown(combo, { key: 'ArrowDown', altKey: true });
@@ -192,6 +192,18 @@ describe('AddCommunityComponent (030 T073)', () => {
       await openPicker('board');
       expect(options()).toEqual(['None — not a sub-association, ✓ Selected', 'Keystone Crossing Master', 'Keystone Ridge, Onboarding']);
       expect(board.getMyCommunities).toHaveBeenCalled();
+      expect(company.getCommunities).not.toHaveBeenCalled();
+    });
+
+    // US1-S8: /me/communities joins a person's roles in one community ('BoardMember/CommunityManager');
+    // that community is one they manage, so it is offered, and a BoardMember-only community is not.
+    it('offers a community whose joined role includes CommunityManager, and not a BoardMember-only one (US1-S8)', async () => {
+      await openPicker('board', [
+        { id: 'c-wv', communityName: 'Willow Vale', role: 'BoardMember/CommunityManager', status: 'Active' },
+        { id: 'c-sh', communityName: 'Sakura Heights', role: 'BoardMember', status: 'Active' },
+      ]);
+      expect(options()).toEqual(['None — not a sub-association, ✓ Selected', 'Willow Vale']);
+      expect(board.getMyCommunities).toHaveBeenCalledWith(100, 0);
       expect(company.getCommunities).not.toHaveBeenCalled();
     });
 

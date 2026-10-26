@@ -88,6 +88,7 @@ public sealed class SenderAuthority(
             invitation.RevokedByUserId = null;
             invitation.RevokeReason = InvitationRevokeReason.SenderLostAuthority;
             CompanyLog.InvitationChange(logger, actorId, invitation.CommunityId, invitation.PropertyId, invitation.Id,
+                await Invitations.InvitationService.InviteeUserIdAsync(db, invitation, ct),
                 invitation.Kind.ToString(), "Revoked", nameof(InvitationRevokeReason.SenderLostAuthority), cause, now);
             revoked++;
         }

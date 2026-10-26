@@ -47,12 +47,17 @@ public static class StartupTasks
     /// the operator path; it applies migrations first. Returns the exit code when the verb was
     /// present, or <c>null</c> to continue normal startup.
     /// </summary>
-    public static async Task<int?> RunGrantCompanyAdminCommandAsync(WebApplication app, string[] args)
+    public static Task<int?> RunGrantCompanyAdminCommandAsync(WebApplication app, string[] args) =>
+        RunGrantCompanyAdminCommandAsync(app.Services, args, Console.Out, Console.Error);
+
+    /// <summary>The same step against any service provider and output streams, so tests run the real entry point.</summary>
+    public static async Task<int?> RunGrantCompanyAdminCommandAsync(IServiceProvider services, string[] args,
+        TextWriter stdout, TextWriter stderr)
     {
         var command = Features.Company.CompanyAdminSetupCommand.TryParse(args, out var error);
         if (error is not null)
         {
-            await Console.Error.WriteLineAsync(error);
+            await stderr.WriteLineAsync(error);
             return 2;
         }
         if (command is null)
@@ -60,16 +65,16 @@ public static class StartupTasks
 
         try
         {
-            await using var scope = app.Services.CreateAsyncScope();
+            await using var scope = services.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
             var result = await scope.ServiceProvider.GetRequiredService<Features.Company.CompanyAdministratorService>()
                 .SetupAsync(command.Email, command.Recover, command.CompanyName, CancellationToken.None);
-            await (result.ExitCode == 0 ? Console.Out : Console.Error).WriteLineAsync(result.Output);
+            await (result.ExitCode == 0 ? stdout : stderr).WriteLineAsync(result.Output);
             return result.ExitCode;
         }
         catch (Exception ex)
         {
-            await Console.Error.WriteLineAsync($"ERROR: the setup step failed: {ex.GetType().Name}: {ex.Message}");
+            await stderr.WriteLineAsync($"ERROR: the setup step failed: {ex.GetType().Name}: {ex.Message}");
             return 1;
         }
     }

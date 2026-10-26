@@ -24,10 +24,13 @@ public class LifecycleActivateTests(TestDatabaseFixture fixture) : CompanyTestBa
         var omar = $"omar-{Guid.NewGuid():N}@example.com";
         var (lenaInvite, _) = await InsertResidencyInvitationAsync(companyId, community, lenaHome, lena, managerId, InvitationState.Scheduled);
         var (omarInvite, _) = await InsertResidencyInvitationAsync(companyId, community, omarHome, omar, managerId, InvitationState.Scheduled);
-        var (residentId, residentEmail) = await CreateResidentAsync(await CreatePropertyAsync(community));
+        var residentHome = await CreatePropertyAsync(community);
+        var (_, residentEmail) = await CreateResidentAsync(residentHome);
         var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
         using var admin = await ClientForAsync(adminEmail);
-        Assert.Empty((await MeAsync(residentEmail)).GetProperty("properties").EnumerateArray());
+        // The resident signs in once, before activation; the same session is reused afterwards.
+        using var resident = await ClientForAsync(residentEmail);
+        Assert.Empty((await JsonAsync(await resident.GetAsync("/api/v1/auth/me"))).GetProperty("properties").EnumerateArray());
         Clock.UtcNow = Clock.UtcNow.AddMinutes(10);
 
         var res = await admin.PostAsync($"/api/v1/communities/{community}/activate", null);
@@ -48,9 +51,11 @@ public class LifecycleActivateTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CommunityLifecycle")
             && e.Properties["CommunityId"].ToString() == community.ToString() && e.Properties["Action"].ToString() == "\"Activated\"");
 
-        // The linked resident's next request lists the home.
-        var me = await MeAsync(residentEmail);
-        Assert.Contains(me.GetProperty("properties").EnumerateArray(), p => p.GetProperty("communityId").GetGuid() == community);
+        // The linked resident's next request on the existing session (no new sign-in) lists the home as Active.
+        var me = await JsonAsync(await resident.GetAsync("/api/v1/auth/me"));
+        var listed = Assert.Single(me.GetProperty("properties").EnumerateArray());
+        Assert.Equal((residentHome, community, "Active"), (listed.GetProperty("id").GetGuid(),
+            listed.GetProperty("communityId").GetGuid(), listed.GetProperty("communityStatus").GetString()));
     }
 
     // US3-S3: a scheduled invitation whose sender lost authority is revoked instead of sent.
@@ -134,10 +139,4 @@ public class LifecycleActivateTests(TestDatabaseFixture fixture) : CompanyTestBa
 
     private Task<CommunityStatus> StatusAsync(Guid community) =>
         WithDbAsync(db => db.Communities.Where(c => c.Id == community).Select(c => c.Status).SingleAsync());
-
-    private async Task<System.Text.Json.JsonElement> MeAsync(string email)
-    {
-        using var client = await ClientForAsync(email);
-        return await JsonAsync(await client.GetAsync("/api/v1/auth/me"));
-    }
 }

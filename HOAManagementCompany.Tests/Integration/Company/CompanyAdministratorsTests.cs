@@ -163,19 +163,27 @@ public partial class CompanyAdministratorsTests(TestDatabaseFixture fixture) : C
         using var admin = await ClientForAsync(adminEmail);
         var opsId = await WithDbAsync(CreateUserAsync);
 
+        // Each action happens at its own time, so each event's time is checked against its own action.
+        Clock.UtcNow = Clock.UtcNow.AddMinutes(1);
+        var invitedAt = Clock.UtcNow;
         var invitationId = (await JsonAsync(await admin.PostAsJsonAsync("/api/v1/company/administrators/invitations",
             new { email = EmailOf(opsId) }))).GetProperty("id").GetGuid();
+        Clock.UtcNow = Clock.UtcNow.AddMinutes(2);
+        var grantedAt = Clock.UtcNow;
         using (var ops = await ClientForAsync(EmailOf(opsId)))
             Assert.Equal(HttpStatusCode.OK,
                 (await ops.PostAsJsonAsync("/api/v1/invitations/accept", new { token = TokensSentTo(EmailOf(opsId)).Single() })).StatusCode);
+        Clock.UtcNow = Clock.UtcNow.AddMinutes(3);
+        var revokedAt = Clock.UtcNow;
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync($"/api/v1/company/administrators/{opsId}/revoke", null)).StatusCode);
 
         var events = LogSink.Events.Where(e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange")
                                                && e.Properties["CompanyId"].ToString() == companyId.ToString()).ToList();
-        Assert.Equal([("Invited", adminId, "null", invitationId.ToString()), ("Granted", opsId, opsId, invitationId.ToString()),
-                ("Revoked", adminId, opsId, "null")],
-            events.Select(e => (Prop(e, "Change"), Prop(e, "ActorId"), Prop(e, "TargetUserId"), Prop(e, "InvitationId"))));
-        Assert.All(events, e => Assert.True(e.Properties.ContainsKey("UtcNow")));
+        Assert.Equal([("Invited", adminId, "null", invitationId.ToString(), invitedAt),
+                ("Granted", opsId, opsId, invitationId.ToString(), grantedAt), ("Revoked", adminId, opsId, "null", revokedAt)],
+            events.Select(e => (Prop(e, "Change"), Prop(e, "ActorId"), Prop(e, "TargetUserId"), Prop(e, "InvitationId"), At(e))));
+        // UTC time: the same instant at a local offset would compare equal above.
+        Assert.All(events, e => Assert.Equal(TimeSpan.Zero, At(e).Offset));
         var rendered = string.Join("\n", events.Select(e => e.RenderMessage() + " " + string.Join(" ", e.Properties.Values)));
         Assert.DoesNotContain("@", rendered);
     }
@@ -379,4 +387,7 @@ public partial class CompanyAdministratorsTests(TestDatabaseFixture fixture) : C
 
     private static string? Prop(Serilog.Events.LogEvent e, string name) =>
         e.Properties.TryGetValue(name, out var v) ? v.ToString().Trim('"') : null;
+
+    private static DateTimeOffset At(Serilog.Events.LogEvent e) =>
+        (DateTimeOffset)((Serilog.Events.ScalarValue)e.Properties["UtcNow"]).Value!;
 }

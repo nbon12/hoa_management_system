@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Features.Company;
+using HOAManagementCompany.Infrastructure.Configuration;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +14,9 @@ namespace HOAManagementCompany.Tests.Integration.Company;
 /// <summary>
 /// 030 T058 — the setup step for the first Company Administrator (FR-038; contracts/company.md §
 /// Setup step). Each test runs on its own freshly migrated database, because the step reads the
-/// deployment's single company.
+/// deployment's single company. The command-line tests run the real entry point Program.cs calls,
+/// <see cref="StartupTasks.RunGrantCompanyAdminCommandAsync(IServiceProvider, string[], TextWriter, TextWriter)"/>,
+/// and read what it prints.
 /// </summary>
 public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixture)
 {
@@ -130,6 +133,84 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
             (grant.Source, grant.GrantedByUserId, grant.InvitationId, grant.RevokedAt));
     }
 
+    // US7-S6, from the command line, the email has an account: exits 0 and prints the grant.
+    [Fact]
+    public async Task FromTheCommandLine_ForAnAccount_ExitsWith0_AndPrintsTheGrant()
+    {
+        var userId = await WithDbAsync(CreateUserAsync);
+
+        var result = await RunCommandLineAsync(["--grant-company-admin", EmailOf(userId)]);
+
+        Assert.Equal(((int?)0, $"Granted Company Administrator to {userId}.{Environment.NewLine}", ""), result);
+        var grant = await WithDbAsync(db => db.CompanyAdministratorGrants.AsNoTracking().SingleAsync());
+        Assert.Equal((userId, CompanyGrantSource.Setup, (DateTimeOffset?)null), (grant.UserId, grant.Source, grant.RevokedAt));
+        Assert.Empty(await WithDbAsync(db => db.Invitations.ToListAsync()));
+    }
+
+    // US7-S6, from the command line, the email has no account: exits 0 and prints the invitation.
+    [Fact]
+    public async Task FromTheCommandLine_ForNoAccount_ExitsWith0_AndPrintsTheInvitation()
+    {
+        var email = $"owner-{Guid.NewGuid():N}@example.com";
+        Clock.UtcNow = new DateTimeOffset(2026, 10, 12, 11, 5, 0, TimeSpan.Zero);
+
+        var result = await RunCommandLineAsync(["--grant-company-admin", email]);
+
+        Assert.Equal(((int?)0, $"Invitation sent; it expires 2026-10-15 11:05 UTC.{Environment.NewLine}", ""), result);
+        var invitation = await WithDbAsync(db => db.Invitations.AsNoTracking().SingleAsync());
+        Assert.Equal((InvitationKind.CompanyAdministrator, InvitationState.Pending, email),
+            (invitation.Kind, invitation.State, invitation.Email));
+        Assert.Equal(email, Assert.Single(Email.Sent).Target);
+        Assert.Empty(await WithDbAsync(db => db.CompanyAdministratorGrants.ToListAsync()));
+    }
+
+    // US7-S7, from the command line: a second run exits 0, prints the no-change line and writes nothing.
+    [Fact]
+    public async Task FromTheCommandLine_ASecondRun_ExitsWith0_PrintsNothingChanged_AndWritesNothing()
+    {
+        var userId = await WithDbAsync(CreateUserAsync);
+        Assert.Equal((int?)0, (await RunCommandLineAsync(["--grant-company-admin", EmailOf(userId)])).ExitCode);
+        var before = await CountsAsync();
+
+        var again = await RunCommandLineAsync(["--grant-company-admin", EmailOf(userId)]);
+        var other = await RunCommandLineAsync(["--grant-company-admin", $"someone-{Guid.NewGuid():N}@example.com"]);
+
+        Assert.Equal(((int?)0, $"A Company Administrator already exists; nothing changed.{Environment.NewLine}", ""), again);
+        Assert.Equal(again, other);
+        Assert.Equal(before, await CountsAsync());
+        Assert.Empty(Email.Sent);
+    }
+
+    // FR-038, from the command line: an unusable email exits 2 with the reason on stderr and writes nothing.
+    [Theory]
+    [InlineData(new[] { "--grant-company-admin", "not-an-email" }, "\"not-an-email\" isn't a valid email address.")]
+    [InlineData(new[] { "--grant-company-admin", "owner@localhost" }, "\"owner@localhost\" isn't a valid email address.")]
+    [InlineData(new[] { "--grant-company-admin" },
+        "--grant-company-admin needs an email address, for example: --grant-company-admin owner@example.com")]
+    public async Task FromTheCommandLine_AnInvalidEmail_ExitsWith2_WithTheReasonOnStderr(string[] args, string reason)
+    {
+        var before = await CountsAsync();
+
+        var result = await RunCommandLineAsync(args);
+
+        Assert.Equal(((int?)2, "", reason + Environment.NewLine), result);
+        Assert.Equal(before, await CountsAsync());
+        Assert.Empty(Email.Sent);
+    }
+
+    // FR-038: without the verb the entry point returns null, so normal startup continues; it prints
+    // and writes nothing.
+    [Fact]
+    public async Task FromTheCommandLine_WithoutTheVerb_ReturnsNull_AndDoesNothing()
+    {
+        var before = await CountsAsync();
+
+        var result = await RunCommandLineAsync([]);
+
+        Assert.Equal(((int?)null, "", ""), result);
+        Assert.Equal(before, await CountsAsync());
+    }
+
     private List<Serilog.Events.LogEvent> SetupEvents() => LogSink.Events
         .Where(e => e.MessageTemplate.Text.StartsWith("CompanyAdminChange") && Prop(e, "ActorId") == "setup").ToList();
 
@@ -144,6 +225,15 @@ public class SetupStepTests(TestDatabaseFixture fixture) : CompanyTestBase(fixtu
         using var scope = NewScope();
         return await scope.ServiceProvider.GetRequiredService<CompanyAdministratorService>()
             .SetupAsync(email, recover, companyName, default);
+    }
+
+    /// <summary>Runs the setup step's command-line entry point on this test's host and captures what it prints.</summary>
+    private async Task<(int? ExitCode, string Stdout, string Stderr)> RunCommandLineAsync(string[] args)
+    {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var exitCode = await StartupTasks.RunGrantCompanyAdminCommandAsync(Services, args, stdout, stderr);
+        return (exitCode, stdout.ToString(), stderr.ToString());
     }
 
     private Task<(int Grants, int Invitations, int Outbox)> CountsAsync() => WithDbAsync(async db => (

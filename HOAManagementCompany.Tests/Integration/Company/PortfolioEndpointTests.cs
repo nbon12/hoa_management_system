@@ -147,7 +147,8 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal([true, false], items.Select(i => i.GetProperty("differsFromDefaults").GetBoolean()));
     }
 
-    // US6-S4, US6-S5
+    // US6-S4, US6-S5: "contains" matches mid-name as well as at the start, in both the community name
+    // and the legal name, and a sub isn't listed just because its parent's name matches.
     [Fact]
     public async Task TheStatusFilterAndSearch_NarrowTheList()
     {
@@ -156,19 +157,26 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         await CreateCommunityInAsync(companyId, CommunityStatus.Archived, name: "Alder Ridge", legalName: "KEYSTONE Holdings, Inc.");
         await CreateCommunityInAsync(companyId, name: "keystone park");
         await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding, name: "Cedar Glen");
+        await CreateCommunityInAsync(companyId, name: "Old Mill at keystone");
+        await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding, name: "Dogwood Run", legalName: "The Keystone Group LLC");
+        var master = await CreateCommunityInAsync(companyId, name: "Keystone Crossing Master");
+        await CreateCommunityInAsync(companyId, name: "Elm Court", parentId: master, legalName: "Elm Court HOA");
 
         Assert.Equal(["Alder Ridge", "Briar Hollow"], Names(await ItemsAsync(companyId, "?status=archived")));
-        Assert.Equal(["Cedar Glen"], Names(await ItemsAsync(companyId, "?status=Onboarding")));
-        Assert.Equal(["keystone park"], Names(await ItemsAsync(companyId, "?status=active")));
-        Assert.Equal(["Alder Ridge", "keystone park"], Names(await ItemsAsync(companyId, "?search=Keystone")));
+        Assert.Equal(["Cedar Glen", "Dogwood Run"], Names(await ItemsAsync(companyId, "?status=Onboarding")));
+        Assert.Equal(["Elm Court", "Keystone Crossing Master", "keystone park", "Old Mill at keystone"],
+            Names(await ItemsAsync(companyId, "?status=active")));
+        Assert.Equal(["Alder Ridge", "Dogwood Run", "Keystone Crossing Master", "keystone park", "Old Mill at keystone"],
+            Names(await ItemsAsync(companyId, "?search=Keystone")));
         Assert.Equal(["Alder Ridge"], Names(await ItemsAsync(companyId, "?status=archived&search=keyStone")));
     }
 
-    // US6-S7
+    // US6-S7: the "No manager" filter and count use FR-020's open-ended manager, not "no membership".
     [Fact]
     public async Task With31Communities_TheListSortsFiltersAndCounts()
     {
         var companyId = await CreateCompanyAsync();
+        var today = DateOnly.FromDateTime(Clock.UtcNow.UtcDateTime);
         await WithDbAsync(async db =>
         {
             for (var i = 1; i <= 31; i++)
@@ -181,12 +189,26 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
                     Status = status,
                 });
                 db.CommunityArcSettings.Add(Domain.Entities.CommunityArcSettings.Defaults(id));
-                // Every community but #7 and #8 has an open-ended manager.
-                if (i is not (7 or 8))
+                // Every community but #7–#12 has an open-ended manager. #7 and #8 have no one. #9–#11 each
+                // have only a membership that isn't an open-ended manager: a manager with an end date, an
+                // open-ended Board Member, an inactive manager. #12 has only a pending manager invitation.
+                if (i == 12)
+                    db.Invitations.Add(new Domain.Entities.Invitation
+                    {
+                        Id = Guid.NewGuid(), Kind = InvitationKind.Membership, CompanyId = companyId, CommunityId = id,
+                        Role = CommunityRole.CommunityManager, Email = $"pat-{id:N}@example.com",
+                        NormalizedEmail = $"pat-{id:N}@example.com", State = InvitationState.Pending,
+                        SenderUserId = await CreateUserAsync(db), CreatedAt = Clock.UtcNow,
+                        TokenHash = Features.Invitations.InvitationTokens.Hash(Features.Invitations.InvitationTokens.New()),
+                        SentAt = Clock.UtcNow, ExpiresAt = Clock.UtcNow.AddHours(72),
+                    });
+                else if (i is not (7 or 8))
                     db.CommunityMemberships.Add(new Domain.Entities.CommunityMembership
                     {
-                        Id = Guid.NewGuid(), CommunityId = id, UserId = await CreateUserAsync(db), Role = CommunityRole.CommunityManager,
-                        Status = MembershipStatus.Active, StartDate = new DateOnly(2025, 1, 1),
+                        Id = Guid.NewGuid(), CommunityId = id, UserId = await CreateUserAsync(db),
+                        Role = i == 10 ? CommunityRole.BoardMember : CommunityRole.CommunityManager,
+                        Status = i == 11 ? MembershipStatus.Inactive : MembershipStatus.Active, StartDate = new DateOnly(2025, 1, 1),
+                        EndDate = i == 9 ? today.AddMonths(3) : null,
                     });
             }
             await db.SaveChangesAsync();
@@ -197,7 +219,7 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         var first = await JsonAsync(await client.GetAsync("/api/v1/company/communities?limit=100"));
         Assert.Equal(Enumerable.Range(1, 31).Select(i => $"Community {i}"), Names(first.GetProperty("items").EnumerateArray().ToList()));
         var counts = first.GetProperty("counts");
-        Assert.Equal((31, 3, 26, 2, 2), (counts.GetProperty("all").GetInt32(), counts.GetProperty("onboarding").GetInt32(),
+        Assert.Equal((31, 3, 26, 2, 6), (counts.GetProperty("all").GetInt32(), counts.GetProperty("onboarding").GetInt32(),
             counts.GetProperty("active").GetInt32(), counts.GetProperty("archived").GetInt32(), counts.GetProperty("noManager").GetInt32()));
 
         var byStatus = Names((await JsonAsync(await client.GetAsync("/api/v1/company/communities?sort=status&limit=6")))
@@ -208,8 +230,9 @@ public class PortfolioEndpointTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.Equal(["Community 31", "Community 30"], desc);
 
         var noManager = await JsonAsync(await client.GetAsync("/api/v1/company/communities?noManager=true&search=community"));
-        Assert.Equal(["Community 7", "Community 8"], Names(noManager.GetProperty("items").EnumerateArray().ToList()));
-        Assert.Equal(2, noManager.GetProperty("total").GetInt32());
+        Assert.Equal(["Community 7", "Community 8", "Community 9", "Community 10", "Community 11", "Community 12"],
+            Names(noManager.GetProperty("items").EnumerateArray().ToList()));
+        Assert.Equal(6, noManager.GetProperty("total").GetInt32());
         // The counts ignore the search, the filters and paging.
         Assert.Equal(31, noManager.GetProperty("counts").GetProperty("all").GetInt32());
     }

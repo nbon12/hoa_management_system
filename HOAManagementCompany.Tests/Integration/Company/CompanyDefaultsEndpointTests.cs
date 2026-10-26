@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
+using HOAManagementCompany.Features.Board.Architectural;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace HOAManagementCompany.Tests.Integration.Company;
@@ -57,7 +60,7 @@ public class CompanyDefaultsEndpointTests(TestDatabaseFixture fixture) : Company
         Assert.Contains("DeemedApproved", logged.Properties["New"].ToString());
     }
 
-    // US4-S2
+    // US4-S2, including a community whose ARC settings were never saved (FR-026)
     [Fact]
     public async Task ChangingEveryDefault_LeavesExistingCommunitiesAndTheirApplicationsUntouched()
     {
@@ -72,16 +75,32 @@ public class CompanyDefaultsEndpointTests(TestDatabaseFixture fixture) : Company
         var bySpec = (await JsonAsync(created)).GetProperty("id").GetGuid();
         // Settings as the migration backfill wrote them.
         var backfilled = await CreateCommunityInAsync(companyId);
+        // Settings never saved: no row, so it reads 027's built-in defaults.
+        var neverSaved = await CreateCommunityInAsync(companyId);
+        await WithDbAsync(db => db.CommunityArcSettings.Where(s => s.CommunityId == neverSaved).ExecuteDeleteAsync());
+        Guid[] communities = [bySpec, backfilled, neverSaved];
         var apps = new List<Guid>();
-        foreach (var community in new[] { bySpec, backfilled })
+        foreach (var community in communities)
             apps.Add(await CreateArcApplicationAsync(community, await CreatePropertyAsync(community), 1001));
-        var before = await SnapshotAsync([bySpec, backfilled], apps);
+        var before = await SnapshotAsync(communities, apps);
+        var neverSavedBefore = await RulesAsync(admin, neverSaved);
 
         var put = await admin.PutAsJsonAsync(Url, Defaults(lapseRule: "DeemedDenied", reviewPeriodDays: 60, reminderDays: 14,
             decisionRule: "MajorityOfVotesCastWithQuorum", timeZoneId: "America/Chicago", statement: "Not approved."));
 
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
-        Assert.Equal(before, await SnapshotAsync([bySpec, backfilled], apps));
+        // Also proves no row was written for the never-saved community: it would show in the snapshot.
+        Assert.Equal(before, await SnapshotAsync(communities, apps));
+        var builtIn = (30, "FlagOverdueOnly", "MajorityOfMembers", 7, "America/New_York",
+            CommunityArcSettings.DefaultFormalDisapprovalStatement, JsonValueKind.Null);
+        Assert.Equal(builtIn, neverSavedBefore);
+        Assert.Equal(builtIn, await RulesAsync(admin, neverSaved));
+        // The row made when it is first needed (its next application) holds 027's defaults, not the changed ones.
+        using var scope = NewScope();
+        var row = await scope.ServiceProvider.GetRequiredService<ArcApplicationFactory>().GetOrCreateSettingsAsync(neverSaved, default);
+        Assert.Equal((30, ArcLapseRule.FlagOverdueOnly, ArcDecisionRule.MajorityOfMembers, 7, "America/New_York",
+                CommunityArcSettings.DefaultFormalDisapprovalStatement),
+            (row.ReviewPeriodDays, row.LapseRule, row.DecisionRule, row.ReminderDays, row.TimeZoneId, row.FormalDisapprovalStatement));
     }
 
     // US4-S3
@@ -178,6 +197,18 @@ public class CompanyDefaultsEndpointTests(TestDatabaseFixture fixture) : Company
              body.GetProperty("updatedAt").ValueKind, body.GetProperty("canEdit").GetBoolean()));
         var row = await WithDbAsync(db => db.CompanyDefaultSettings.AsNoTracking().SingleAsync(d => d.CompanyId == companyId));
         Assert.Equal((30, ArcLapseRule.FlagOverdueOnly, (string?)null), (row.ReviewPeriodDays, row.LapseRule, row.UpdatedByUserId));
+    }
+
+    // The six rules and updatedAt as the community's Architectural review section reads them.
+    private static async Task<(int, string?, string?, int, string?, string?, JsonValueKind)> RulesAsync(HttpClient client, Guid community)
+    {
+        var res = await client.GetAsync($"/api/v1/communities/{community}/architectural-settings");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var body = await JsonAsync(res);
+        return (body.GetProperty("reviewPeriodDays").GetInt32(), body.GetProperty("lapseRule").GetString(),
+            body.GetProperty("decisionRule").GetString(), body.GetProperty("reminderDays").GetInt32(),
+            body.GetProperty("timeZoneId").GetString(), body.GetProperty("formalDisapprovalStatement").GetString(),
+            body.GetProperty("updatedAt").ValueKind);
     }
 
     private Task<ArcLapseRule> LapseRuleAsync(Guid community) =>

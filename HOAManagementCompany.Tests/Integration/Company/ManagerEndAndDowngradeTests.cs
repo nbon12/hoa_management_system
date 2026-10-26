@@ -79,6 +79,9 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
         var boardRow = await WithDbAsync(db => AddMembershipAsync(db, coId, community, CommunityRole.BoardMember));
         var coRow = await RowIdAsync(community, coId, CommunityRole.CommunityManager);
         using var manager = await ClientForAsync(managerEmail);
+        // The co-manager signs in before the downgrade and holds manager powers on that session.
+        using var co = await ClientForAsync(coEmail);
+        Assert.Equal(HttpStatusCode.OK, (await co.GetAsync($"/api/v1/communities/{community}/memberships")).StatusCode);
 
         var res = await manager.PatchAsJsonAsync(MembershipUrl(community, coRow), new { downgradeTo = (int)CommunityRole.BoardMember });
 
@@ -90,8 +93,10 @@ public class ManagerEndAndDowngradeTests(TestDatabaseFixture fixture) : CompanyT
         Assert.Equal((MembershipStatus.Inactive, (DateOnly?)ClockToday()), (ended.Status, ended.EndDate));
         Assert.Equal(MembershipStatus.Active, (await RowAsync(boardRow)).Status);
 
-        using var co = await ClientForAsync(coEmail);
-        Assert.Equal(HttpStatusCode.Forbidden, (await co.GetAsync($"/api/v1/communities/{community}/memberships")).StatusCode);
+        // Their very next manager request, on the same session, is refused; board access stays.
+        var next = await co.GetAsync($"/api/v1/communities/{community}/memberships");
+        Assert.Equal(HttpStatusCode.Forbidden, next.StatusCode);
+        Assert.Equal("FORBIDDEN", (await JsonAsync(next)).GetProperty("code").GetString());
         Assert.Equal(HttpStatusCode.OK,
             (await co.GetAsync($"/api/v1/board/metrics?communityId={community}&surface=CommunityMetrics")).StatusCode);
     }

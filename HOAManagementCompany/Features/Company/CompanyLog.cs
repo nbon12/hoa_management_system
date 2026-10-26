@@ -32,11 +32,12 @@ internal static class CompanyLog
             "BoardMembershipChange: Actor={ActorId} Community={CommunityId} Membership={MembershipId} TargetUser={TargetUserId} Role={Role} Kind={Kind} Cause={Cause} At={UtcNow:o}",
             actorId, communityId, membershipId, targetUserId, role, kind, cause, at));
 
+    // FR-023: the invitee is named by user ID when they have an account, otherwise by the invitation ID alone.
     public static void InvitationChange(ILogger logger, string actorId, Guid? communityId, Guid? propertyId,
-        Guid invitationId, string kind, string change, string? reason, string? cause, DateTimeOffset at) =>
+        Guid invitationId, string? targetUserId, string kind, string change, string? reason, string? cause, DateTimeOffset at) =>
         PendingEvents.Write(() => logger.LogInformation(
-            "InvitationChange: Actor={ActorId} Community={CommunityId} Property={PropertyId} Invitation={InvitationId} Kind={Kind} Change={Change} Reason={Reason} Cause={Cause} At={UtcNow:o}",
-            actorId, communityId, propertyId, invitationId, kind, change, reason, cause, at));
+            "InvitationChange: Actor={ActorId} Community={CommunityId} Property={PropertyId} Invitation={InvitationId} TargetUser={TargetUserId} Kind={Kind} Change={Change} Reason={Reason} Cause={Cause} At={UtcNow:o}",
+            actorId, communityId, propertyId, invitationId, targetUserId, kind, change, reason, cause, at));
 
     public static void InvitationAcceptFailed(ILogger logger, Guid? invitationId, Guid? communityId,
         Guid? propertyId, string? userId, string reason, DateTimeOffset at) =>

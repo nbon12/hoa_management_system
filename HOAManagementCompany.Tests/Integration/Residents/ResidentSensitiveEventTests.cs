@@ -58,10 +58,17 @@ public partial class ResidentSensitiveEventTests(TestDatabaseFixture fixture) : 
         var invitations = Events("InvitationChange", community).Where(e => Prop(e, "InvitationId") == invitationId.ToString()).ToList();
         Assert.Equal(["Created", "Resent", "Accepted"], invitations.Select(e => Prop(e, "Change")));
         Assert.Equal([managerId, managerId, janeId], invitations.Select(e => Prop(e, "ActorId")));
-        Assert.All(invitations, e => Assert.Equal((home.ToString(), "Residency"), (Prop(e, "PropertyId"), Prop(e, "Kind"))));
+        // FR-023: Jane has an account, so she is the target user; Kim has none, so her target is null.
+        Assert.All(invitations, e => Assert.Equal((home.ToString(), "Residency", janeId),
+            (Prop(e, "PropertyId"), Prop(e, "Kind"), Prop(e, "TargetUserId"))));
+        // FR-023: Kim has no account, so her invitation's events name it by the invitation ID alone.
+        Assert.Equal(["Created", "Revoked"], Events("InvitationChange", community)
+            .Where(e => Prop(e, "InvitationId") == revokedId.ToString() && Prop(e, "TargetUserId") == "null")
+            .Select(e => Prop(e, "Change")));
         var revoked = Assert.Single(Events("InvitationChange", community),
             e => Prop(e, "InvitationId") == revokedId.ToString() && Prop(e, "Change") == "Revoked");
-        Assert.Equal(("Manual", managerId, home.ToString()), (Prop(revoked, "Reason"), Prop(revoked, "ActorId"), Prop(revoked, "PropertyId")));
+        Assert.Equal(("Manual", managerId, home.ToString(), "null"),
+            (Prop(revoked, "Reason"), Prop(revoked, "ActorId"), Prop(revoked, "PropertyId"), Prop(revoked, "TargetUserId")));
 
         var failed = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("InvitationAcceptFailed")
                                                         && Prop(e, "InvitationId") == invitationId.ToString());

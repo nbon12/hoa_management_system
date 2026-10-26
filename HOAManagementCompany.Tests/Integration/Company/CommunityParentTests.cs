@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Tests.Fixtures;
 using Microsoft.EntityFrameworkCore;
+using Serilog.Events;
 using Xunit;
 
 namespace HOAManagementCompany.Tests.Integration.Company;
@@ -10,6 +11,7 @@ namespace HOAManagementCompany.Tests.Integration.Company;
 /// <summary>030 T097 — PUT /communities/{id}/parent (FR-016; contracts/company.md § parent).</summary>
 public class CommunityParentTests(TestDatabaseFixture fixture) : CompanyTestBase(fixture)
 {
+    // US5-S4 (the parent setting: each save logs exactly one sensitive event, with the old and new parent)
     [Fact]
     public async Task ACompanyAdministrator_SetsAndClearsTheParent_AndEachChangeIsLogged()
     {
@@ -24,13 +26,16 @@ public class CommunityParentTests(TestDatabaseFixture fixture) : CompanyTestBase
         Assert.Equal(HttpStatusCode.OK, set.StatusCode);
         Assert.Equal(parent, (await JsonAsync(set)).GetProperty("parentCommunityId").GetGuid());
         Assert.Equal(parent, await ParentAsync(community));
-        AssertLogged(adminId, community, from: "", to: parent.ToString());
+        var setLogged = Assert.Single(ChangeEvents(community));
+        Assert.Equal(("CommunityLifecycle", "ParentChanged", adminId, "null", parent.ToString()), Logged(setLogged));
 
         var clear = await admin.PutAsJsonAsync(Url(community), new { parentCommunityId = (Guid?)null });
 
         Assert.Equal(HttpStatusCode.OK, clear.StatusCode);
         Assert.Null(await ParentAsync(community));
-        AssertLogged(adminId, community, from: parent.ToString(), to: "");
+        var logged = ChangeEvents(community);
+        Assert.Equal(2, logged.Count);
+        Assert.Equal(("CommunityLifecycle", "ParentChanged", adminId, parent.ToString(), "null"), Logged(logged[1]));
     }
 
     [Fact]
@@ -106,12 +111,16 @@ public class CommunityParentTests(TestDatabaseFixture fixture) : CompanyTestBase
     private Task<Guid?> ParentAsync(Guid community) =>
         WithDbAsync(db => db.Communities.Where(c => c.Id == community).Select(c => c.ParentCommunityId).SingleAsync());
 
-    private void AssertLogged(string actorId, Guid community, string from, string to) =>
-        Assert.Contains(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CommunityLifecycle")
-            && e.Properties["Action"].ToString() == "\"ParentChanged\""
-            && e.Properties["ActorId"].ToString() == $"\"{actorId}\""
-            && e.Properties["CommunityId"].ToString() == community.ToString()
-            && Unquote(e.Properties["From"].ToString()) == from && Unquote(e.Properties["To"].ToString()) == to);
+    // Every setting-change sensitive event (lifecycle or profile) logged for one community, in order.
+    private List<LogEvent> ChangeEvents(Guid community) => LogSink.Events
+        .Where(e => (e.MessageTemplate.Text.StartsWith("CommunityLifecycle") || e.MessageTemplate.Text.StartsWith("CommunityProfileChanged"))
+            && Prop(e, "CommunityId") == community.ToString())
+        .ToList();
 
-    private static string Unquote(string value) => value == "null" ? "" : value.Trim('"');
+    private static (string Template, string? Action, string? ActorId, string? From, string? To) Logged(LogEvent e) =>
+        (e.MessageTemplate.Text[..e.MessageTemplate.Text.IndexOf(':')], Prop(e, "Action"), Prop(e, "ActorId"), Prop(e, "From"), Prop(e, "To"));
+
+    // A null value renders as "null".
+    private static string? Prop(LogEvent e, string name) =>
+        e.Properties.TryGetValue(name, out var v) ? v.ToString().Trim('"') : null;
 }

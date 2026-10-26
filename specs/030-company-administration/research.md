@@ -373,7 +373,7 @@ The dev seed (`DatabaseSeeder`, dev-like environments only) calls the same `Setu
 | `CommunityProfileChanged` | `Actor= Community= Field= Old= New= At=` |
 | `CompanyDefaultsChanged` / `ArcSettingsChanged` (027, reused for reset) | `Actor= Old= New= At=` |
 | `BoardMembershipChange` (025, extended) | adds `Cause=` and `Kind={grant|edit|end|downgrade|replace-end|replace-grant|reactivate}` |
-| `InvitationChange` | `Actor= Community= Property= Invitation= Kind= Change={Created|Scheduled|Sent|Resent|Revoked|Accepted} Reason= Cause= At=` |
+| `InvitationChange` | `Actor= Community= Property= Invitation= TargetUser={user ID when the invitee has an account, else null} Kind= Change={Created|Scheduled|Sent|Resent|Revoked|Accepted} Reason= Cause= At=` |
 | `InvitationAcceptFailed` | `Invitation={id or "unknown"} Community= Property= User= Reason={code} At=` |
 | `ResidentLinkChange` | `Actor= Community= Property= TargetUser= Change={Linked|Removed} Cause= At=` |
 | `AutopayCancelled` | `Actor= Property= Recurring= Reason= Cause= At=` |

@@ -136,19 +136,24 @@ public class AddCommunityTests(TestDatabaseFixture fixture) : CompanyTestBase(fi
             Assert.Equal((managerId, CommunityRole.CommunityManager, MembershipStatus.Active, (DateOnly?)null),
                 (membership.UserId, membership.Role, membership.Status, membership.EndDate));
 
+            // The notices commit with the community and are delivered once it is saved.
             var notices = await db.OutboxMessages.Where(m => m.Kind == CompanyEmailKinds.CommunityAdded
                                                           && m.DedupKey!.Contains(id.ToString())).ToListAsync();
             Assert.Equal(new[] { adminA, adminB }.Order(), notices.Select(n => n.RecipientUserId!).Order());
             Assert.DoesNotContain(notices, n => n.RecipientUserId == otherCompanyAdmin || n.RecipientUserId == managerId);
-            Assert.All(notices, n => Assert.Contains($"/app/company/communities/{id}/settings/profile", n.PayloadJson));
-            // "Keystone Ridge was added by me, waiting to be marked Active."
-            Assert.All(notices, n =>
-            {
-                var message = JsonSerializer.Deserialize<HOAManagementCompany.Infrastructure.Payments.Alerts.AlertMessage>(n.PayloadJson)!;
-                Assert.Equal($"{communityName} was added and is waiting to be marked Active", message.Subject);
-                Assert.Contains($"Jordan Blake added {communityName}.", message.Body);
-            });
+            Assert.All(notices, n => Assert.Equal(OutboxStatus.Sent, n.Status));
         });
+
+        // Each administrator is emailed at their own address: "Keystone Ridge was added by me, waiting
+        // to be marked Active", with the link to its Community settings page.
+        foreach (var admin in new[] { adminA, adminB })
+        {
+            var sent = Assert.Single(Email.Sent, m => m.Target == EmailOf(admin));
+            Assert.Equal($"{communityName} was added and is waiting to be marked Active", sent.Subject);
+            Assert.Contains($"Jordan Blake added {communityName}.", sent.Body);
+            Assert.Contains($"/app/company/communities/{id}/settings/profile", sent.Body);
+        }
+        Assert.DoesNotContain(Email.Sent, m => m.Target == EmailOf(otherCompanyAdmin) || m.Target == email);
 
         var mine = await JsonAsync(await client.GetAsync("/api/v1/me/communities"));
         Assert.Contains(mine.GetProperty("items").EnumerateArray(), i => i.GetProperty("id").GetGuid() == id);

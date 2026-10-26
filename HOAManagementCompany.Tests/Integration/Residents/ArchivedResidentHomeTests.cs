@@ -122,6 +122,38 @@ public class ArchivedResidentHomeTests(TestDatabaseFixture fixture) : CompanyTes
         Assert.True(await WithDbAsync(db => db.EmailVerifications.AnyAsync(v => v.ProofHash == AuthCrypto.Hash(proof) && v.ConsumedAt == null)));
     }
 
+    // US3-S8 (claim code): claim-code redemption is a resident write, so a code issued before
+    // the archive is refused with COMMUNITY_ARCHIVED (FR-012a).
+    [Fact]
+    public async Task AClaimCode_ForAHomeInAnArchivedCommunity_IsRefusedAsArchived_AndNotUsedUp()
+    {
+        var (companyId, community, home) = await CommunityWithHomeAsync();
+        var email = $"omar-{Guid.NewGuid():N}@example.com";
+        string code;
+        using (var scope = Services.CreateScope())
+            code = await scope.ServiceProvider.GetRequiredService<ClaimCodeService>().IssueAsync(home, email, default);
+        await ArchiveAsync(companyId, community);
+        var proof = await VerifiedEmailProofAsync(email);
+        var client = CreateClient();
+
+        var res = await client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            verificationToken = proof, password = Password, firstName = "Omar", lastName = "Haddad", claimCode = code,
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        var error = await JsonAsync(res);
+        Assert.Equal(
+            ("COMMUNITY_ARCHIVED", "This home's community is no longer managed here, so the claim code can't be used. Your code has not been used up."),
+            (error.GetProperty("code").GetString(), error.GetProperty("message").GetString()));
+        var claim = await WithDbAsync(db => db.PropertyClaimCodes.AsNoTracking().SingleAsync(c => c.PropertyId == home));
+        Assert.Equal((null, null), (claim.RedeemedAt, claim.RedeemedByUserId));
+        Assert.False(await WithDbAsync(db => db.Users.AnyAsync(u => u.Email == email)));
+        Assert.False(await WithDbAsync(db => db.UserProperties.AnyAsync(up => up.PropertyId == home)));
+        // The proof isn't used up either.
+        Assert.True(await WithDbAsync(db => db.EmailVerifications.AnyAsync(v => v.ProofHash == AuthCrypto.Hash(proof) && v.ConsumedAt == null)));
+    }
+
     private async Task<(Guid CompanyId, Guid Community, Guid Home)> CommunityWithHomeAsync()
     {
         var companyId = await CreateCompanyAsync();

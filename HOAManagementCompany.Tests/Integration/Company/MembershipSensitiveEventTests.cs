@@ -30,6 +30,17 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         var (leeId, _) = await CreateStaffAsync(community, CommunityRole.BoardMember);
         var (samId, _) = await CreateStaffAsync(community, CommunityRole.BoardMember);
         var (kimId, _) = await CreateStaffAsync(community, CommunityRole.Accountant);
+        var invitee = await WithDbAsync(CreateUserAsync);
+        var bob = await WithDbAsync(CreateUserAsync);
+        // Names no template, ID or logged value contains, so a first or last name leaked on its own is caught.
+        (string UserId, string First, string Last)[] people =
+        [
+            (adminId, "Aurelio", "Quackenbush"), (managerId, "Perpetua", "Wolstenholme"), (leeId, "Leocadio", "Vandermeer"),
+            (samId, "Samwise", "Fitzwilliam"), (kimId, "Kimberlyn", "Xanthopoulos"), (invitee, "Ignatius", "Zuckerkandl"),
+            (bob, "Bartholomew", "Quillfeather"),
+        ];
+        foreach (var (userId, first, last) in people)
+            await RenameAsync(userId, first, last);
         using var manager = await ClientForAsync(managerEmail);
         using var admin = await ClientForAsync(adminEmail);
 
@@ -46,10 +57,8 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync($"/api/v1/communities/{community}/managers/replace",
             new { currentManagerUserId = managerId, replacementUserId = samId })).StatusCode);
 
-        // Invite, resend, revoke, a failed accept and an accept.
+        // Invite an account holder, resend, a failed accept and an accept; invite an address with no account and revoke.
         using var sam = await ClientForAsync(EmailOf(samId));
-        var invitee = await WithDbAsync(CreateUserAsync);
-        var bob = await WithDbAsync(CreateUserAsync);
         var invitationId = (await JsonAsync(await sam.PostAsJsonAsync(Url(community),
             new { role = (int)CommunityRole.BoardMember, email = EmailOf(invitee) }))).GetProperty("invitationId").GetGuid();
         Clock.UtcNow = Clock.UtcNow.AddMinutes(2);
@@ -60,48 +69,47 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
         Assert.Equal(HttpStatusCode.Forbidden, (await bobClient.PostAsJsonAsync("/api/v1/invitations/accept", new { token })).StatusCode);
         using var inviteeClient = await ClientForAsync(EmailOf(invitee));
         Assert.Equal(HttpStatusCode.OK, (await inviteeClient.PostAsJsonAsync("/api/v1/invitations/accept", new { token })).StatusCode);
+        var revEmail = $"rev-{Guid.NewGuid():N}@example.com";
         var revokedId = (await JsonAsync(await sam.PostAsJsonAsync(Url(community),
-            new { role = (int)CommunityRole.Accountant, email = $"rev-{Guid.NewGuid():N}@example.com" }))).GetProperty("invitationId").GetGuid();
+            new { role = (int)CommunityRole.Accountant, email = revEmail }))).GetProperty("invitationId").GetGuid();
         Assert.Equal(HttpStatusCode.OK, (await sam.PostAsync($"/api/v1/communities/{community}/invitations/{revokedId}/revoke", null)).StatusCode);
 
+        // Exactly one event per change: no change logged twice or under a second kind.
         var memberships = Events("BoardMembershipChange", community);
-        AssertOne(memberships, leeId, "grant", managerId);
-        AssertOne(memberships, kimId, "edit", managerId);
-        AssertOne(memberships, kimId, "end", managerId);
-        AssertOne(memberships, leeId, "downgrade", managerId);
-        AssertOne(memberships, samId, "replace-grant", adminId);
-        AssertOne(memberships, managerId, "replace-end", adminId);
+        Assert.Equal(
+            [(leeId, "grant", managerId), (kimId, "edit", managerId), (kimId, "end", managerId), (leeId, "downgrade", managerId),
+                (samId, "replace-grant", adminId), (managerId, "replace-end", adminId), (invitee, "grant", invitee)],
+            memberships.Select(e => (Prop(e, "TargetUserId"), Prop(e, "Kind"), Prop(e, "ActorId"))));
         // The acceptance's grant is its own event, caused by the invitation.
-        var accepted = Assert.Single(memberships, e => Prop(e, "TargetUserId") == invitee && Prop(e, "Kind") == "grant");
-        Assert.Equal((invitee, $"invitation:{invitationId}", t1), (Prop(accepted, "ActorId"), Prop(accepted, "Cause"), At(accepted)));
-        Assert.All(memberships.Where(e => e != accepted), e => Assert.Equal(t0, At(e)));
+        var accepted = memberships[^1];
+        Assert.Equal(($"invitation:{invitationId}", t1), (Prop(accepted, "Cause"), At(accepted)));
+        Assert.All(memberships.SkipLast(1), e => Assert.Equal(t0, At(e)));
 
-        var invitations = Events("InvitationChange", community).Where(e => Prop(e, "InvitationId") == invitationId.ToString()).ToList();
-        Assert.Equal(["Created", "Resent", "Accepted"], invitations.Select(e => Prop(e, "Change")));
-        Assert.Equal([samId, samId, invitee], invitations.Select(e => Prop(e, "ActorId")));
-        Assert.Equal([t0, t1, t1], invitations.Select(At));
-        var revoked = Assert.Single(Events("InvitationChange", community), e => Prop(e, "InvitationId") == revokedId.ToString() && Prop(e, "Change") == "Revoked");
-        Assert.Equal(("Manual", samId, t1), (Prop(revoked, "Reason"), Prop(revoked, "ActorId"), At(revoked)));
+        // FR-023: the account holder's invitation names them by user ID; the no-account one by invitation ID alone.
+        var invitations = Events("InvitationChange", community);
+        Assert.Equal(
+            [(invitationId.ToString(), "Created", samId, invitee, t0), (invitationId.ToString(), "Resent", samId, invitee, t1),
+                (invitationId.ToString(), "Accepted", invitee, invitee, t1),
+                (revokedId.ToString(), "Created", samId, "null", t1), (revokedId.ToString(), "Revoked", samId, "null", t1)],
+            invitations.Select(e => (Prop(e, "InvitationId"), Prop(e, "Change"), Prop(e, "ActorId"), Prop(e, "TargetUserId"), At(e))));
+        Assert.Equal("Manual", Prop(invitations[^1], "Reason"));
         var failed = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("InvitationAcceptFailed")
                                                         && Prop(e, "InvitationId") == invitationId.ToString());
         Assert.Equal(("INVITATION_EMAIL_MISMATCH", bob, community.ToString(), t1),
             (Prop(failed, "Reason"), Prop(failed, "UserId"), Prop(failed, "CommunityId"), At(failed)));
 
-        var rendered = string.Join("\n", memberships.Concat(Events("InvitationChange", community)).Append(failed)
+        var rendered = string.Join("\n", memberships.Concat(invitations).Append(failed)
             .Select(e => e.RenderMessage() + " " + string.Join(" ", e.Properties.Values)));
-        foreach (var secret in Tokens(EmailOf(invitee)).Concat([EmailOf(invitee), EmailOf(bob), managerEmail, "Board Tester", "@"]))
+        var secrets = Tokens(EmailOf(invitee)).Concat(Tokens(revEmail))
+            .Concat([EmailOf(invitee), EmailOf(bob), managerEmail, revEmail, "@"])
+            .Concat(people.SelectMany(p => new[] { p.First, p.Last }));
+        foreach (var secret in secrets)
             Assert.DoesNotContain(secret, rendered, StringComparison.OrdinalIgnoreCase);
     }
 
     private List<LogEvent> Events(string template, Guid community) => LogSink.Events
         .Where(e => e.MessageTemplate.Text.StartsWith(template) && Prop(e, "CommunityId") == community.ToString())
         .ToList();
-
-    private static void AssertOne(List<LogEvent> events, string target, string kind, string actor)
-    {
-        var e = Assert.Single(events, x => Prop(x, "TargetUserId") == target && Prop(x, "Kind") == kind);
-        Assert.Equal(actor, Prop(e, "ActorId"));
-    }
 
     private static DateTimeOffset At(LogEvent e) => (DateTimeOffset)((ScalarValue)e.Properties["UtcNow"]).Value!;
 
@@ -111,6 +119,10 @@ public partial class MembershipSensitiveEventTests(TestDatabaseFixture fixture) 
     private Task<Guid> RowAsync(Guid community, string userId, CommunityRole role) => WithDbAsync(db =>
         db.CommunityMemberships.Where(m => m.CommunityId == community && m.UserId == userId && m.Role == role)
             .Select(m => m.Id).SingleAsync());
+
+    private Task RenameAsync(string userId, string firstName, string lastName) => WithDbAsync(async db =>
+        Assert.Equal(1, await db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s
+            .SetProperty(u => u.FirstName, firstName).SetProperty(u => u.LastName, lastName))));
 
     private List<string> Tokens(string email) =>
         Email.Sent.Where(m => m.Target == email).Select(m => LinkToken().Match(m.Body).Groups[1].Value).ToList();

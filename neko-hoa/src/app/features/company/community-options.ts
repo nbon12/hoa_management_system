@@ -39,7 +39,8 @@ export async function loadParentOptions(
     } else {
       const res = await board.getMyCommunities(100, offset);
       for (const c of res.items) {
-        if (c.role === 'CommunityManager' && c.status !== 'Archived') {
+        // /me/communities joins a person's roles in a community, e.g. 'BoardMember/CommunityManager'.
+        if (c.role.split('/').includes('CommunityManager') && c.status !== 'Archived') {
           found.set(c.id, { id: c.id, communityName: c.communityName, status: c.status });
         }
       }

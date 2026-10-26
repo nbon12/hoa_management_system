@@ -127,7 +127,7 @@ public sealed class InvitationService(
             {
                 if (!open.IsExpired(now))
                     throw await DuplicateAsync(open, ct);
-                Revoke(open, now, revokedBy: senderUserId, InvitationRevokeReason.Superseded, actor, cause: null);
+                await MarkRevokedAsync(open, now, revokedBy: senderUserId, InvitationRevokeReason.Superseded, actor, cause: null, ct);
                 await db.SaveChangesAsync(ct);
             }
 
@@ -141,7 +141,7 @@ public sealed class InvitationService(
             if (!scheduled)
                 sends.Add(Issue(invitation, now, bypassesCap: false, resent: false));
             await db.SaveChangesAsync(ct);
-            Log(actor, invitation, scheduled ? "Scheduled" : "Created", reason: null, cause: null, now);
+            await LogAsync(actor, invitation, scheduled ? "Scheduled" : "Created", reason: null, cause: null, now, ct);
             return invitation;
         }, ct);
 
@@ -179,7 +179,7 @@ public sealed class InvitationService(
             invitation.ResendCount++;
             sends.Add(Issue(invitation, now, bypassesCap: false, resent: true));
             await db.SaveChangesAsync(ct);
-            Log(actorUserId ?? SetupActor, invitation, "Resent", reason: null, cause: null, now);
+            await LogAsync(actorUserId ?? SetupActor, invitation, "Resent", reason: null, cause: null, now, ct);
             return invitation;
         }, ct);
 
@@ -201,7 +201,7 @@ public sealed class InvitationService(
             if (outcome.RefusalCode is { } code)
                 throw await RefusalAsync(code, invitation, ct);
 
-            Revoke(invitation, now, actorUserId, InvitationRevokeReason.Manual, actorUserId, cause: null);
+            await MarkRevokedAsync(invitation, now, actorUserId, InvitationRevokeReason.Manual, actorUserId, cause: null, ct);
             await db.SaveChangesAsync(ct);
             return invitation;
         }, ct);
@@ -234,13 +234,13 @@ public sealed class InvitationService(
         {
             if (!await senderAuthority.CouldSendAsync(invitation.SenderUserId, invitation, ct))
             {
-                Revoke(invitation, now, revokedBy: null, InvitationRevokeReason.SenderLostAuthority, actorUserId, cause);
+                await MarkRevokedAsync(invitation, now, revokedBy: null, InvitationRevokeReason.SenderLostAuthority, actorUserId, cause, ct);
                 revoked.Add(invitation);
                 continue;
             }
             invitation.State = InvitationState.Pending;
             sends.Add(Issue(invitation, now, bypassesCap: true, resent: false));
-            Log(actorUserId, invitation, "Sent", reason: null, cause, now);
+            await LogAsync(actorUserId, invitation, "Sent", reason: null, cause, now, ct);
         }
         return new ScheduledRelease(sends, revoked);
     }
@@ -261,7 +261,7 @@ public sealed class InvitationService(
             .ToListAsync(ct);
         var now = clock.GetUtcNow();
         foreach (var invitation in open)
-            Revoke(invitation, now, revokedBy: null, InvitationRevokeReason.CommunityArchived, actorUserId, cause: "CommunityArchived");
+            await MarkRevokedAsync(invitation, now, revokedBy: null, InvitationRevokeReason.CommunityArchived, actorUserId, cause: "CommunityArchived", ct);
         return open;
     }
 
@@ -395,8 +395,8 @@ public sealed class InvitationService(
 
             if (!await senderAuthority.CouldSendAsync(invitation.SenderUserId, invitation, ct))
             {
-                Revoke(invitation, now, revokedBy: null, InvitationRevokeReason.SenderLostAuthority,
-                    invitation.SenderUserId ?? SetupActor, cause: "InvitationAccept");
+                await MarkRevokedAsync(invitation, now, revokedBy: null, InvitationRevokeReason.SenderLostAuthority,
+                    invitation.SenderUserId ?? SetupActor, cause: "InvitationAccept", ct);
                 await db.SaveChangesAsync(ct);
                 return new AcceptResult(InvitationTransitions.Invalid, invitation, null, false);
             }
@@ -430,7 +430,7 @@ public sealed class InvitationService(
             invitation.AcceptedAt = now;
             invitation.AcceptedByUserId = user.Id;
             await db.SaveChangesAsync(ct);
-            Log(user.Id, invitation, "Accepted", reason: alreadyHeld ? "AlreadyHeld" : null, cause: null, now);
+            await LogAsync(user.Id, invitation, "Accepted", reason: alreadyHeld ? "AlreadyHeld" : null, cause: null, now, ct);
             return new AcceptResult(null, invitation, user, alreadyHeld);
         }, ct);
 
@@ -572,14 +572,14 @@ public sealed class InvitationService(
         return new PendingSend(invitation, token, delivery, resent);
     }
 
-    private void Revoke(Invitation invitation, DateTimeOffset now, string? revokedBy, InvitationRevokeReason reason,
-        string actor, string? cause)
+    private async Task MarkRevokedAsync(Invitation invitation, DateTimeOffset now, string? revokedBy, InvitationRevokeReason reason,
+        string actor, string? cause, CancellationToken ct)
     {
         invitation.State = InvitationState.Revoked;
         invitation.RevokedAt = now;
         invitation.RevokedByUserId = revokedBy;
         invitation.RevokeReason = reason;
-        Log(actor, invitation, "Revoked", reason.ToString(), cause, now);
+        await LogAsync(actor, invitation, "Revoked", reason.ToString(), cause, now, ct);
     }
 
     // FR-022 steps 1 and 2: unknown, used, revoked or past its term → invalid; then expired.
@@ -639,9 +639,17 @@ public sealed class InvitationService(
         return CompanyErrors.InvitationPending(open.Id, message);
     }
 
-    private void Log(string actor, Invitation invitation, string change, string? reason, string? cause, DateTimeOffset now) =>
+    private async Task LogAsync(string actor, Invitation invitation, string change, string? reason, string? cause,
+        DateTimeOffset now, CancellationToken ct) =>
         CompanyLog.InvitationChange(logger, actor, invitation.CommunityId, invitation.PropertyId, invitation.Id,
-            invitation.Kind.ToString(), change, reason, cause, now);
+            await InviteeUserIdAsync(db, invitation, ct), invitation.Kind.ToString(), change, reason, cause, now);
+
+    /// <summary>FR-023: the invitee's user ID when an account has the invited email, else null.</summary>
+    internal static Task<string?> InviteeUserIdAsync(ApplicationDbContext db, Invitation invitation, CancellationToken ct)
+    {
+        var normalized = invitation.NormalizedEmail.ToUpperInvariant();
+        return db.Users.Where(u => u.NormalizedEmail == normalized).Select(u => u.Id).FirstOrDefaultAsync(ct);
+    }
 }
 
 /// <summary>Told about each link the service emails (030 T054). Only the dev vault listens.</summary>

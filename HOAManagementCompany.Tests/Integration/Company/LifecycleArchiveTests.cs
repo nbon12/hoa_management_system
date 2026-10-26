@@ -23,9 +23,10 @@ public class LifecycleArchiveTests(TestDatabaseFixture fixture) : CompanyTestBas
     public async Task Archiving_HidesItFromMembers_RevokesOpenInvitations_AndKeepsEveryRecordReadable()
     {
         var companyId = await CreateCompanyAsync();
-        var community = await CreateCommunityInAsync(companyId);
+        var name = $"Keystone Park {Guid.NewGuid():N}"[..30];
+        var community = await CreateCommunityInAsync(companyId, name: name, legalName: "Keystone Park HOA, Inc.");
         var (managerId, managerEmail) = await CreateManagerAsync(community);
-        var (_, boardEmail) = await CreateStaffAsync(community, CommunityRole.BoardMember);
+        var (boardId, boardEmail) = await CreateStaffAsync(community, CommunityRole.BoardMember);
         var (_, adminEmail) = await CreateCompanyAdminAsync(companyId);
         using var manager = await ClientForAsync(managerEmail);
         using var board = await ClientForAsync(boardEmail);
@@ -39,6 +40,8 @@ public class LifecycleArchiveTests(TestDatabaseFixture fixture) : CompanyTestBas
             await CreatePropertyAsync(community), $"kim-{Guid.NewGuid():N}@example.com", managerId, InvitationState.Pending);
         Assert.Contains(await MyCommunitiesAsync(manager), id => id == community);
         var before = await CountsAsync(community);
+        var profileBefore = await ReadAsync(admin, community, "profile");
+        var membershipsBefore = MembershipRows(await ReadAsync(admin, community, "memberships"));
 
         var res = await admin.PostAsync($"/api/v1/communities/{community}/archive", null);
 
@@ -63,8 +66,28 @@ public class LifecycleArchiveTests(TestDatabaseFixture fixture) : CompanyTestBas
             Assert.Equal("INVITATION_INVALID", (await JsonAsync(accept)).GetProperty("code").GetString());
         }
 
-        foreach (var path in new[] { "settings", "profile", "memberships", "invitations" })
-            Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/api/v1/communities/{community}/{path}")).StatusCode);
+        // Its profile, settings, and Managers and memberships stay readable to the Company Administrator, unchanged.
+        var profile = await ReadAsync(admin, community, "profile");
+        Assert.Equal((name, "Keystone Park HOA, Inc."),
+            (profile.GetProperty("communityName").GetString(), profile.GetProperty("legalName").GetString()));
+        Assert.Equal(profileBefore.GetRawText(), profile.GetRawText());
+        var settings = await ReadAsync(admin, community, "settings");
+        Assert.Equal((community, name, "Archived"),
+            (settings.GetProperty("id").GetGuid(), settings.GetProperty("communityName").GetString(),
+             settings.GetProperty("status").GetString()));
+        Assert.Equal(["profile", "managers-and-memberships", "architectural-review"],
+            settings.GetProperty("sections").EnumerateArray().Select(s => s.GetString()).ToList());
+        var memberships = MembershipRows(await ReadAsync(admin, community, "memberships"));
+        Assert.Equal([(boardId, "BoardMember", "Active"), (managerId, "CommunityManager", "Active")],
+            memberships.Select(m => (m.UserId, m.Role, m.Status)).ToList());
+        Assert.Equal(membershipsBefore, memberships);
+        foreach (var (kind, revoked) in new[] { ("membership", managerInvite), ("residency", residentInvite) })
+        {
+            var item = Assert.Single((await ReadAsync(admin, community, $"invitations?kind={kind}"))
+                .GetProperty("items").EnumerateArray());
+            Assert.Equal((revoked, "Revoked", "CommunityArchived"),
+                (item.GetProperty("id").GetGuid(), item.GetProperty("state").GetString(), item.GetProperty("revokeReason").GetString()));
+        }
         Assert.Equal(before, await CountsAsync(community));
     }
 
@@ -237,6 +260,21 @@ public class LifecycleArchiveTests(TestDatabaseFixture fixture) : CompanyTestBas
 
     private Task<CommunityStatus> StatusAsync(Guid community) =>
         WithDbAsync(db => db.Communities.Where(c => c.Id == community).Select(c => c.Status).SingleAsync());
+
+    // A Community settings read, which must succeed.
+    private static async Task<JsonElement> ReadAsync(HttpClient client, Guid community, string path)
+    {
+        var res = await client.GetAsync($"/api/v1/communities/{community}/{path}");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        return await JsonAsync(res);
+    }
+
+    // The Managers and memberships rows as read, by role: who, in what role, with what status and dates.
+    private static List<(string? UserId, string? Role, string? Status, string? StartDate, string? EndDate)> MembershipRows(
+        JsonElement list) => list.GetProperty("items").EnumerateArray()
+            .Select(i => (i.GetProperty("userId").GetString(), i.GetProperty("role").GetString(), i.GetProperty("status").GetString(),
+                i.GetProperty("startDate").GetString(), i.GetProperty("endDate").GetString()))
+            .OrderBy(m => m.Item2).ToList();
 
     private static async Task<List<Guid>> MyCommunitiesAsync(HttpClient client) =>
         (await JsonAsync(await client.GetAsync("/api/v1/me/communities"))).GetProperty("items").EnumerateArray()

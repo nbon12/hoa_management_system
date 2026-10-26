@@ -84,7 +84,7 @@ FR-022a: create an account from the link. No claim code.
 | `POST /auth/board-mode` | Eligibility counts memberships in Onboarding and Active communities. Users with no home can switch. |
 | `POST /auth/switch-property` | 409 `COMMUNITY_NOT_ACTIVE` for a home in an Onboarding community. Archived homes are allowed (read-only, FR-012a). |
 | `GET /auth/me` | `CurrentUserDto` gains the fields below. |
-| `POST /auth/register` (claim code) | Unchanged, except that a code for a property in an Onboarding community returns 409 `COMMUNITY_NOT_ACTIVE` *after* the proof and the code have been checked. The code is not used up. Once a property has a resident by any route, its outstanding code is refused with the existing generic `REGISTRATION_FAILED` (FR-024f). |
+| `POST /auth/register` (claim code) | Unchanged, except that a code for a property in an Onboarding community returns 409 `COMMUNITY_NOT_ACTIVE`, and one in an Archived community 409 `COMMUNITY_ARCHIVED`, *after* the proof and the code have been checked. The code is not used up. Once a property has a resident by any route, its outstanding code is refused with the existing generic `REGISTRATION_FAILED` (FR-024f). |
 
 **`CurrentUserDto` (`/auth/me`, and `user` in `AuthResponse`)**:
 

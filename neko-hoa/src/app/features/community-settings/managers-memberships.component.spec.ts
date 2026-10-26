@@ -41,7 +41,10 @@ function invitation(over: Partial<CommunityInvitation> & { id: string; email: st
 }
 
 const NEW = invitation({ id: 'i-new', email: 'new@example.com', termEndDate: '2027-12-31' });
-const ALEX = invitation({ id: 'i-alex', email: 'alex@example.com', role: 'CommunityManager', effectiveState: 'Expired', expiresAt: '2026-10-08T15:00:00Z' });
+const ALEX = invitation({
+  id: 'i-alex', email: 'alex@example.com', role: 'CommunityManager', effectiveState: 'Expired',
+  sentAt: '2026-10-05T15:00:00Z', expiresAt: '2026-10-08T15:00:00Z',
+});
 const BOOKS = invitation({ id: 'i-books', email: 'books@example.com', state: 'Revoked', effectiveState: 'Revoked', revokeReason: 'SenderLostAuthority', canResend: false, canRevoke: false });
 
 function settings(over: Partial<CommunitySettings> = {}, can: Partial<CommunitySettings['can']> = {}): CommunitySettings {
@@ -123,6 +126,11 @@ describe('ManagersMembershipsSectionComponent (030 T083)', () => {
     return within(table(tableName)).getAllByRole('row').find(row => row.textContent!.includes(text))!;
   }
 
+  /** A row's data cells in column order (the row header is not a cell), whitespace collapsed. */
+  function cellTexts(row: HTMLElement): string[] {
+    return within(row).getAllByRole('cell').map(c => c.textContent!.replace(/\s+/g, ' ').trim());
+  }
+
   async function openActions(r: Awaited<ReturnType<typeof setup>>, person: string) {
     fireEvent.click(screen.getByRole('button', { name: `Actions for ${person}` }));
     await settle(r);
@@ -169,20 +177,31 @@ describe('ManagersMembershipsSectionComponent (030 T083)', () => {
       expect(within(rowOf('Board members and accountants of Sakura Heights', 'Dana Fox')).queryByRole('button')).toBeNull();
     });
 
+    // US5-S8: a pending Board Member invitation and an expired Community Manager invitation are both
+    // listed with email, role, sent by, sent at and expires at, each with Resend and Revoke.
     it('lists role invitations with email, role, sender, times in the community zone and status, with Resend and Revoke', async () => {
       await setup();
       const invitations = table('Role invitations for Sakura Heights');
       expect(within(invitations).getAllByRole('columnheader').map(h => h.textContent!.trim()))
         .toEqual(['Email', 'Role', 'Sent by', 'Sent', 'Expires', 'Status', 'Actions']);
-      const row = rowOf('Role invitations for Sakura Heights', 'new@example.com');
-      expect(row.textContent).toContain('Board Member');
-      expect(row.textContent).toContain('Term ends Dec 31, 2027');
-      expect(row.textContent).toContain('Jordan Blake');
-      expect(row.textContent).toContain('Oct 14, 2026, 10:30 AM EDT');
-      expect(row.textContent).toContain('Pending');
-      expect(within(row).getByRole('button', { name: 'Resend invitation to new@example.com' })).toBeTruthy();
-      expect(within(row).getByRole('button', { name: 'Revoke invitation to new@example.com' })).toBeTruthy();
-      expect(rowOf('Role invitations for Sakura Heights', 'alex@example.com').textContent).toContain('Expired');
+      // Cells are read by column (Role, Sent by, Sent, Expires, Status), so Sent and Expires can't be swapped.
+      // The term end is the role cell's second line, after a <br />, so its text runs straight on.
+      const pending = rowOf('Role invitations for Sakura Heights', 'new@example.com');
+      expect(within(pending).getByRole('rowheader').textContent!.trim()).toBe('new@example.com');
+      expect(cellTexts(pending).slice(0, 5)).toEqual([
+        'Board Member' + 'Term ends Dec 31, 2027', 'Jordan Blake', 'Oct 11, 2026, 10:30 AM EDT', 'Oct 14, 2026, 10:30 AM EDT', 'Pending',
+      ]);
+      const expired = rowOf('Role invitations for Sakura Heights', 'alex@example.com');
+      expect(within(expired).getByRole('rowheader').textContent!.trim()).toBe('alex@example.com');
+      expect(cellTexts(expired).slice(0, 5)).toEqual([
+        'Community Manager', 'Jordan Blake', 'Oct 5, 2026, 11:00 AM EDT', 'Oct 8, 2026, 11:00 AM EDT', 'Expired',
+      ]);
+      // Both rows offer a usable Resend (no disabled reason) and Revoke, and nothing else.
+      for (const [row, email] of [[pending, 'new@example.com'], [expired, 'alex@example.com']] as const) {
+        expect(within(row).getAllByRole('button').map(b => b.getAttribute('aria-label')))
+          .toEqual([`Resend invitation to ${email}`, `Revoke invitation to ${email}`]);
+        expect(within(row).getByRole('button', { name: `Resend invitation to ${email}` }).getAttribute('aria-disabled')).toBeNull();
+      }
       const revoked = rowOf('Role invitations for Sakura Heights', 'books@example.com');
       expect(revoked.textContent).toContain('Revoked');
       expect(revoked.textContent).toContain("Sender's role ended");

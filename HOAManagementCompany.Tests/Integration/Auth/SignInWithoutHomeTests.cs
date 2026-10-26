@@ -2,12 +2,14 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using HOAManagementCompany.Domain.Entities;
 using HOAManagementCompany.Domain.Enums;
 using HOAManagementCompany.Infrastructure.Persistence;
 using HOAManagementCompany.Tests.Fixtures;
 using HOAManagementCompany.Tests.Integration.Company;
+using HOAManagementCompany.Tests.Integration.Residents;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,11 +20,19 @@ namespace HOAManagementCompany.Tests.Integration.Auth;
 /// <summary>
 /// 030 T041 — sign-in without a usable home (FR-036a, FR-036b; research R11;
 /// contracts/invitations-and-auth.md § Sign-in changes). A user with no home in an Active or
-/// Archived community signs in with a token that carries no home, and <c>/auth/me</c> says where
-/// the app goes next.
+/// Archived community signs in with a token that carries no home, <c>/auth/me</c> says where the
+/// app goes next, and every resident endpoint refuses that token.
 /// </summary>
 public class SignInWithoutHomeTests(TestDatabaseFixture fixture) : CompanyTestBase(fixture)
 {
+    public enum NoHomeCaller
+    {
+        NeverHadAHome,
+        OnlyHomeRemoved,
+        CommunityManager,
+        CompanyAdministrator
+    }
+
     private readonly FailRefreshMint _failRefreshMint = new();
 
     protected override void ConfigureTestServices(IServiceCollection services)
@@ -115,6 +125,59 @@ public class SignInWithoutHomeTests(TestDatabaseFixture fixture) : CompanyTestBa
         Assert.False(me.GetProperty("isCompanyAdministrator").GetBoolean());
         Assert.Empty(me.GetProperty("properties").EnumerateArray());
         Assert.Empty(me.GetProperty("memberships").EnumerateArray());
+    }
+
+    // US9-S4: whoever has no linked home, every resident endpoint refuses the token sign-in issued
+    // with PROPERTY_ACCESS_DENIED, and nothing is shown or changed.
+    [Theory]
+    [InlineData(NoHomeCaller.NeverHadAHome)]
+    [InlineData(NoHomeCaller.OnlyHomeRemoved)]
+    [InlineData(NoHomeCaller.CommunityManager)]
+    [InlineData(NoHomeCaller.CompanyAdministrator)]
+    public async Task NoLinkedHome_EveryResidentEndpointIsRefused_AndNothingIsShownOrChanged(NoHomeCaller caller)
+    {
+        var companyId = await CreateCompanyAsync();
+        var active = await CreateCommunityInAsync(companyId);
+        var home = await CreatePropertyAsync(active);
+        var (announcementId, pollId, eventId) = await CreateCommunityContentAsync(active);
+        var userId = caller switch
+        {
+            NoHomeCaller.NeverHadAHome => await WithDbAsync(CreateUserAsync),
+            NoHomeCaller.OnlyHomeRemoved => await FormerResidentAsync(home),
+            NoHomeCaller.CommunityManager => (await CreateManagerAsync(active)).UserId,
+            NoHomeCaller.CompanyAdministrator => (await CreateCompanyAdminAsync(companyId)).UserId,
+            _ => throw new ArgumentOutOfRangeException(nameof(caller)),
+        };
+        Assert.Equal(0, await WithDbAsync(db => db.UserProperties.CountAsync(up => up.UserId == userId)));
+
+        var (body, _) = await LoginAsync(EmailOf(userId));
+        var token = body.GetProperty("token").GetString()!;
+        AssertNoHomeClaims(token);
+        using var client = ClientWithToken(token);
+        var before = await ResidentFingerprintAsync(userId, home);
+
+        // Every row ResidentAccessTheoryTests covers, plus the community's real rows a fall-through
+        // would show or write.
+        (string Method, string Path, string? Body)[] calls =
+        [
+            .. ResidentAccessTheoryTests.Endpoints().Select(row => ((string)row[0], (string)row[1], (string?)row[3])),
+            ("GET", $"/api/v1/community/announcements/{announcementId}", null),
+            ("POST", $"/api/v1/community/poll/{pollId}/vote", """{"optionIndex":0}"""),
+            ("POST", $"/api/v1/community/events/{eventId}/rsvp", """{"attending":true}"""),
+        ];
+        foreach (var (method, path, content) in calls)
+        {
+            using var res = await client.SendAsync(ResidentRequest(method, path, content));
+            var text = await res.Content.ReadAsStringAsync();
+            Assert.True(res.StatusCode == HttpStatusCode.Forbidden, $"{method} {path}: expected 403, got {(int)res.StatusCode} {text}");
+            // Nothing is shown: the body is the refusal and no other member.
+            var refusal = JsonDocument.Parse(text).RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ToString());
+            Assert.True(refusal.Keys.Order().SequenceEqual(["code", "message"]) && refusal["code"] == "PROPERTY_ACCESS_DENIED",
+                $"{method} {path}: expected only PROPERTY_ACCESS_DENIED, got {text}");
+        }
+
+        Assert.Equal(before, await ResidentFingerprintAsync(userId, home));
+        Assert.Equal((0, 0, 0), (Stripe.CreatedIntents.Count, Stripe.CreatedSetupIntents.Count, Stripe.OffSessionCharges.Count));
     }
 
     // US9-S5
@@ -281,6 +344,68 @@ public class SignInWithoutHomeTests(TestDatabaseFixture fixture) : CompanyTestBa
         // The AuthResponse's user and /auth/me agree on the landing.
         Assert.Equal(loginBody.GetProperty("user").GetProperty("landing").GetString(), me.GetProperty("landing").GetString());
         return me;
+    }
+
+    /// <summary>A resident whose only home link was removed.</summary>
+    private async Task<string> FormerResidentAsync(Guid home)
+    {
+        var (userId, _) = await CreateResidentAsync(home);
+        await WithDbAsync(db => db.UserProperties.Where(up => up.UserId == userId).ExecuteDeleteAsync());
+        return userId;
+    }
+
+    /// <summary>An announcement, an open poll and an RSVP event, so a refusal that fell through would show or write one.</summary>
+    private Task<(Guid Announcement, Guid Poll, Guid Event)> CreateCommunityContentAsync(Guid communityId) => WithDbAsync(async db =>
+    {
+        var announcement = new Announcement
+        {
+            Id = Guid.NewGuid(), CommunityId = communityId, Title = "Pool reopens", Body = "Saturday at 10am.",
+            PublishedAt = DateTimeOffset.UtcNow, Category = AnnouncementCategory.Events, AuthorName = "Board",
+        };
+        var poll = new Poll
+        {
+            Id = Guid.NewGuid(), CommunityId = communityId, Question = "Extend pool hours?", ClosingLabel = "closes Friday",
+            Options = [new PollOption { Id = Guid.NewGuid(), OptionText = "Yes", OptionIndex = 0 }],
+        };
+        var calendarEvent = new CalendarEvent
+        {
+            Id = Guid.NewGuid(), CommunityId = communityId, Title = "Pool party", EventDate = DateTimeOffset.UtcNow.AddDays(7),
+            Category = EventCategory.Social, RsvpEnabled = true,
+        };
+        db.AddRange(announcement, poll, calendarEvent);
+        await db.SaveChangesAsync();
+        return (announcement.Id, poll.Id, calendarEvent.Id);
+    });
+
+    // Everything a resident endpoint could add or change for the caller and the community's home.
+    private Task<string> ResidentFingerprintAsync(string userId, Guid home) => WithDbAsync(async db => string.Join("|",
+        await db.UserProperties.CountAsync(up => up.UserId == userId || up.PropertyId == home),
+        await db.PollVotes.CountAsync(v => v.UserId == userId),
+        await db.EventRsvps.CountAsync(r => r.UserId == userId),
+        await db.ArchitecturalApplicationDrafts.CountAsync(d => d.CreatedByUserId == userId || d.PropertyId == home),
+        await db.RecurringPayments.CountAsync(r => r.EnrolledByUserId == userId || r.PropertyId == home),
+        await db.PaymentTransactions.CountAsync(t => t.PropertyId == home),
+        await db.DirectoryFields.CountAsync(f => f.PropertyId == home && f.Shared),
+        await db.AlertConsents.CountAsync(c => c.Owner.PropertyId == home),
+        await db.OutboxMessages.CountAsync(m => m.RecipientUserId == userId || db.Owners.Any(o => o.Id == m.OwnerId && o.PropertyId == home)),
+        await db.Owners.Where(o => o.PropertyId == home)
+            .Select(o => new { o.FirstName, o.Email, o.Phone, o.StripeCustomerId, o.AlertSmsOptIn, o.AlertEmailOptIn, o.UpdatedAt })
+            .SingleAsync()));
+
+    private static HttpRequestMessage ResidentRequest(string method, string path, string? body)
+    {
+        var request = new HttpRequestMessage(new HttpMethod(method), path);
+        if (body == "file")
+        {
+            var form = new MultipartFormDataContent();
+            var file = new ByteArrayContent(Encoding.ASCII.GetBytes("%PDF-1.4\n%test\n"));
+            file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            form.Add(file, "file", "plans.pdf");
+            request.Content = form;
+        }
+        else if (body is not null)
+            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        return request;
     }
 
     private static HttpRequestMessage Refresh(string cookie)

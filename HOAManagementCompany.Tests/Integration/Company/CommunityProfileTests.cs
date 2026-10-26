@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using HOAManagementCompany.Infrastructure.Persistence;
@@ -22,9 +23,16 @@ public class CommunityProfileTests(TestDatabaseFixture fixture) : CompanyTestBas
         services.ConfigureDbContext<ApplicationDbContext>(o => o.AddInterceptors(_beforeRename));
     }
 
-    // US3-S17
-    [Fact]
-    public async Task AManager_ChangesTheCounty_AndOnlyTheCountyChanges()
+    // US3-S17: each of the six fields saves alone and logs its old and new value (an empty old value logs as null).
+    [Theory]
+    [InlineData("legalName", "Keystone Ridge Homeowners Association, Inc.", "LegalName", "\"Keystone Ridge HOA, Inc.\"")]
+    [InlineData("communityName", "Keystone Bluff", "CommunityName", "\"Keystone Ridge\"")]
+    [InlineData("county", "Wake", "County", "\"Hamilton\"")]
+    [InlineData("formationDate", "2001-05-06", "FormationDate", "\"2004-03-14\"")]
+    [InlineData("managementStartDate", "2021-02-01", "ManagementStartDate", "\"2020-01-01\"")]
+    [InlineData("description", "A neighborhood of 120 homes.", "Description", "null")]
+    public async Task AManager_ChangesOneProfileField_AndOnlyThatFieldChanges_AndTheChangeIsLogged(
+        string field, string value, string loggedField, string loggedOld)
     {
         var companyId = await CreateCompanyAsync();
         var community = await CreateProfiledCommunityAsync(companyId, "Keystone Ridge");
@@ -32,13 +40,22 @@ public class CommunityProfileTests(TestDatabaseFixture fixture) : CompanyTestBas
         using var manager = await ClientForAsync(managerEmail);
         var before = await ProfileRowAsync(community);
 
-        var res = await manager.PatchAsJsonAsync(Url(community), new { county = "Wake" });
+        var res = await manager.PatchAsJsonAsync(Url(community), new Dictionary<string, string> { [field] = value });
 
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        Assert.Equal("Wake", (await JsonAsync(res)).GetProperty("county").GetString());
-        Assert.Equal(before with { County = "Wake" }, await ProfileRowAsync(community));
+        Assert.Equal(value, (await JsonAsync(res)).GetProperty(field).GetString());
+        Assert.Equal(field switch
+        {
+            "legalName" => before with { LegalName = value },
+            "communityName" => before with { CommunityName = value },
+            "county" => before with { County = value },
+            "formationDate" => before with { FormationDate = DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture) },
+            "managementStartDate" => before with { ManagementStartDate = DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture) },
+            "description" => before with { Description = value },
+            _ => throw new ArgumentOutOfRangeException(nameof(field), field, null),
+        }, await ProfileRowAsync(community));
         var logged = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CommunityProfileChanged"));
-        Assert.Equal(($"\"{managerId}\"", community.ToString(), "\"County\"", "\"Hamilton\"", "\"Wake\""),
+        Assert.Equal(($"\"{managerId}\"", community.ToString(), $"\"{loggedField}\"", loggedOld, $"\"{value}\""),
             (logged.Properties["ActorId"].ToString(), logged.Properties["CommunityId"].ToString(), logged.Properties["Field"].ToString(),
                 logged.Properties["Old"].ToString(), logged.Properties["New"].ToString()));
     }
@@ -173,27 +190,6 @@ public class CommunityProfileTests(TestDatabaseFixture fixture) : CompanyTestBas
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Equal("Keystone Ridge", (await JsonAsync(created)).GetProperty("communityName").GetString());
-    }
-
-    // US3-S17 (a date field)
-    [Fact]
-    public async Task AManager_ChangesTheFormationDate_AndOnlyThatDateChanges()
-    {
-        var companyId = await CreateCompanyAsync();
-        var community = await CreateProfiledCommunityAsync(companyId, "Keystone Ridge");
-        var (managerId, managerEmail) = await CreateManagerAsync(community);
-        using var manager = await ClientForAsync(managerEmail);
-        var before = await ProfileRowAsync(community);
-
-        var res = await manager.PatchAsJsonAsync(Url(community), new { formationDate = "2001-05-06" });
-
-        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        Assert.Equal("2001-05-06", (await JsonAsync(res)).GetProperty("formationDate").GetString());
-        Assert.Equal(before with { FormationDate = new DateOnly(2001, 5, 6) }, await ProfileRowAsync(community));
-        var logged = Assert.Single(LogSink.Events, e => e.MessageTemplate.Text.StartsWith("CommunityProfileChanged"));
-        Assert.Equal(($"\"{managerId}\"", "\"FormationDate\"", "\"2004-03-14\"", "\"2001-05-06\""),
-            (logged.Properties["ActorId"].ToString(), logged.Properties["Field"].ToString(),
-                logged.Properties["Old"].ToString(), logged.Properties["New"].ToString()));
     }
 
     // US3-S17 (invalid values): a value of the wrong JSON type, or a date that isn't a real date.

@@ -49,11 +49,18 @@ public class AuthService(
             || await db.UserProperties.AnyAsync(up => up.PropertyId == claimCode.PropertyId, ct))
             throw new DomainException(RegistrationFailed, "Registration could not be completed.", 422);
 
-        // 030 FR-012a: a home in an Onboarding community isn't live yet. Refused only after the
-        // proof and the code check out, and neither is used up, so the code works once it's live.
-        if (await claimCodes.IsInOnboardingCommunityAsync(claimCode.PropertyId, ct))
-            throw new DomainException("COMMUNITY_NOT_ACTIVE",
-                "This home's community isn't live yet, so the claim code can't be used now. Your code has not been used up.", 409);
+        // 030 FR-012a: a home in an Onboarding community isn't live yet, and one in an Archived
+        // community takes no new residents (claiming is a resident write). Refused only after the
+        // proof and the code check out, and neither is used up.
+        switch (await claimCodes.CommunityStatusOfAsync(claimCode.PropertyId, ct))
+        {
+            case CommunityStatus.Onboarding:
+                throw new DomainException("COMMUNITY_NOT_ACTIVE",
+                    "This home's community isn't live yet, so the claim code can't be used now. Your code has not been used up.", 409);
+            case CommunityStatus.Archived:
+                throw new DomainException("COMMUNITY_ARCHIVED",
+                    "This home's community is no longer managed here, so the claim code can't be used. Your code has not been used up.", 409);
+        }
 
         var user = new ApplicationUser
         {
