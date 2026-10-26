@@ -68,6 +68,32 @@ public class AppLinksTests
         Assert.True(Validator.Validate(options).IsValid);
     }
 
+    [Fact]
+    public void ShippedDevSettings_SupplyAnHttpsOrigin_WithoutAnyEnvironmentVariable()
+    {
+        // The Dev service's ArchitecturalReview__AppBaseUrl comes only from infra-apply, which can lag
+        // the code; a deploy without it crashed at startup. The shipped Dev settings must be enough.
+        var apiDir = Path.Combine(FindRepoRoot(), "HOAManagementCompany");
+        var config = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(apiDir, "appsettings.json"))
+            .AddJsonFile(Path.Combine(apiDir, "appsettings.Dev.json"))
+            .Build();
+        var options = new AppLinksOptions();
+        config.GetSection(AppLinksOptions.SectionName).Bind(options);
+        options.ApplyEnvironment(config, new Env("Dev"));
+
+        Assert.True(Validator.Validate(options).IsValid);
+        Assert.Equal("https://dev.nekohoa.com", options.BaseUrl);
+    }
+
+    private static string FindRepoRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+            if (File.Exists(Path.Combine(dir.FullName, "HOAManagementCompany.sln")))
+                return dir.FullName;
+        throw new InvalidOperationException("Could not locate the repository root (HOAManagementCompany.sln).");
+    }
+
     private sealed class Env(string name) : IWebHostEnvironment
     {
         public string EnvironmentName { get; set; } = name;
