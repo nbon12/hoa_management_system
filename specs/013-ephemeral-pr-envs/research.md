@@ -131,7 +131,9 @@ mechanism, just keyed by PR number instead of SHA.
 **Decision**: New workflow on `pull_request` (`types: [opened, synchronize, reopened, ready_for_review]`),
 `paths: [HOAManagementCompany/**, neko-hoa/**, infra/modules/pr-environment/**, infra/environments/pr/**, .github/workflows/pr-env.yml]`.
 Guard: `if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false`.
-Concurrency: `group: pr-env-${{ github.event.number }}`, `cancel-in-progress: true`.
+Concurrency: `group: pr-env-${{ github.event.number }}`, `cancel-in-progress: false`. (Originally `true`;
+changed for issue #234 after a cancelled `tofu apply` stranded its state lock and left untracked resources.
+GitHub keeps only the newest pending run per group, so the latest push still wins.)
 Jobs (sequential gates, mirrors deploy-dev): build+push image (`pr-<n>-<sha>`) → `tofu apply`
 the PR env (D1/D2) → register Stripe test webhook (D9) → build+deploy Pages branch (D5) →
 poll `/health` → Cypress + Playwright against the PR URLs → post a sticky PR comment with
