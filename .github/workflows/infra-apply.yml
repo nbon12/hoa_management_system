@@ -53,8 +53,9 @@ jobs:
       - name: tofu init
         run: tofu init -input=false
 
+      # Wait for a lock held by a live run (e.g. an operator's local plan) instead of failing at once (#236).
       - name: tofu apply
-        run: tofu apply -input=false -auto-approve
+        run: tofu apply -input=false -auto-approve -lock-timeout=10m
 
   # --- Prod apply (ENABLE WHEN environments/prod EXISTS) -------------------------------------------
   # Prod is gated: the `environment: prod` reference pauses the job for a required reviewer configured

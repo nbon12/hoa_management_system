@@ -61,11 +61,13 @@ jobs:
       - name: tofu validate
         run: tofu validate
 
+      # -lock=false: a read-only plan needs no lock, and a plan cancelled by a newer push
+      # (cancel-in-progress above) would otherwise strand the Dev lock and block infra-apply (#236).
       - name: tofu plan
         id: plan
         run: |
           set -o pipefail
-          tofu plan -input=false -no-color -out tf.plan | tee plan.txt
+          tofu plan -input=false -no-color -lock=false -out tf.plan | tee plan.txt
 
       - name: Post plan summary to PR
         if: always()
