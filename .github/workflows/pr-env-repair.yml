@@ -1,0 +1,303 @@
+# Manual repair of one PR's ephemeral environment (issue #234; docs/handoffs/2026-10-26-agent-cloud-access.md,
+# "Ops workflows to add" §1). Dispatched on `main` by the operator, or by a Claude Code session through the
+# GitHub MCP, so no write credential ever enters a session.
+#
+# Two jobs:
+#   diagnose  always. Read-only: WIF as nekohoa-agent-ro-dev plus read-only provider tokens. No approval.
+#   repair    a real change, or a destroy dry run (reading state needs the deployer). Waits for the `ops`
+#             Environment's required reviewer, then runs as the deployer with CI's write tokens.
+# Actions:
+#   diagnose  PR state, state objects (lock generation + age), and by exact name: Cloud Run, secrets, Neon
+#             branch, R2 bucket, Stripe endpoints, Pages deployments. Never runs tofu: an init would write
+#             an empty state under the prefix, which the sweep would then try to reclaim. For any other
+#             action it also prints what a reap would delete.
+#   unlock    removes state/pr/<n>/default.tflock, only if lock_id is its generation and it is ≥ 45 min old.
+#   destroy   tofu destroy from the existing per-PR state; the state is deleted only if the destroy worked.
+#   reap      deletes by exact name (scripts/pr-env-reap.sh): leftovers that no state tracks.
+#
+# Inputs reach scripts through env, never through `run:` text (FR-E10); secrets are set on the step that
+# uses them (FR-E4); actions are SHA-pinned (FR-E6). Output is names, ids and states only: this public
+# repo's Actions logs are world-readable.
+name: pr-env-repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR whose environment to repair"
+        required: true
+        type: number
+      action:
+        description: "diagnose (read-only), unlock, destroy or reap"
+        required: true
+        type: choice
+        options: [diagnose, unlock, destroy, reap]
+        default: diagnose
+      lock_id:
+        description: "unlock only: the Lock ID from the 412 error (the lock object's generation)"
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Report what would change and change nothing"
+        required: false
+        type: boolean
+        default: true
+      allow_open_pr:
+        description: "Let destroy or reap act on an open PR"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PR_NUMBER: ${{ inputs.pr_number }}
+  ACTION: ${{ inputs.action }}
+  STATE_BUCKET: nekohoa-dev-tfstate
+
+jobs:
+  diagnose:
+    name: Diagnose (pr-${{ inputs.pr_number }})
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # WIF as the read-only agent SA
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check inputs and PR state
+        env:
+          LOCK_ID: ${{ inputs.lock_id }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::pr_number must be a positive integer."; exit 1; }
+          if [ "$ACTION" = unlock ] && ! [[ "$LOCK_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::unlock needs lock_id: the Lock ID (digits) from the 412 error."; exit 1
+          fi
+          state="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.state + (if .merged_at then " (merged)" else "" end)')"
+          echo "PR #${PR_NUMBER}: ${state}"
+          if [ "$ACTION" = unlock ]; then
+            echo "unlock removes the live state/pr/${PR_NUMBER}/default.tflock only if its generation is ${LOCK_ID} and it is at least 45 min old (see the state listing below)."
+          fi
+
+      # Before the agent SA exists (handoff task O4) this still succeeds, and the inventory reports GCP
+      # "not checked" instead of failing.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        continue-on-error: true
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_AGENT_RO_SERVICE_ACCOUNT || 'nekohoa-agent-ro-dev@nekohoa-dev.iam.gserviceaccount.com' }}
+
+      # Read-only tokens only (handoff task O9). A missing one reports its provider "not checked".
+      - name: Inventory by exact name (read-only)
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PR_BASE_BRANCH_ID: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_AGENT_RO_API_KEY }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_AGENT_RO_API_TOKEN }}
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_AGENT_RO_KEY_TEST }}
+          DRY_RUN: "true"
+          ONLY_UNTRACKED: "false"
+        run: scripts/pr-env-reap.sh
+
+  repair:
+    name: ${{ inputs.action }} (pr-${{ inputs.pr_number }}, dry_run=${{ inputs.dry_run }})
+    needs: diagnose
+    if: >
+      github.ref == 'refs/heads/main' && inputs.action != 'diagnose' &&
+      (inputs.dry_run == false || inputs.action == 'destroy')
+    runs-on: ubuntu-latest
+    environment: ops # required reviewer = the operator; a session can dispatch but never approve
+    # The group pr-env.yml and pr-env-teardown.yml use. A run waiting here for approval holds it, so it
+    # blocks pr-env and teardown for this PR until approved or rejected.
+    concurrency:
+      group: pr-env-${{ inputs.pr_number }}
+      cancel-in-progress: false
+    permissions:
+      actions: read # read the ops Environment's protection rules
+      contents: read
+      id-token: write # WIF as the deployer
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # GitHub creates a missing Environment on first use, with no protection rules: refuse to act unless
+      # `ops` exists with a required reviewer, which is what made this run wait for approval.
+      - name: Require the ops approval gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          n="$(gh api "repos/${REPO}/environments/ops" --jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length')"
+          if [ "$n" -lt 1 ]; then
+            echo "::error::The ops Environment has no required reviewer, so this run was not approved. Add one (handoff task O9) and dispatch again."; exit 1
+          fi
+
+      - name: Open-PR guard
+        if: inputs.action == 'destroy' || inputs.action == 'reap'
+        env:
+          ALLOW_OPEN_PR: ${{ inputs.allow_open_pr }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          state="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .state)"
+          if [ "$state" = closed ]; then echo "PR #${PR_NUMBER} is closed."; exit 0; fi
+          if [ "$ALLOW_OPEN_PR" != true ]; then
+            echo "::error::PR #${PR_NUMBER} is ${state}. Refusing to ${ACTION} it without allow_open_pr=true."; exit 1
+          fi
+          # An open PR's next push must queue behind this job, not cancel it mid-destroy (root-cause item 1).
+          if ! grep -A2 '^concurrency:' .github/workflows/pr-env.yml | grep -q 'cancel-in-progress: false'; then
+            echo "::error::pr-env.yml still cancels in-flight runs, so a push could kill this ${ACTION}. Refusing."; exit 1
+          fi
+          echo "::warning::PR #${PR_NUMBER} is open; acting on it because allow_open_pr=true."
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      # ── unlock ────────────────────────────────────────────────────────────────────────────────────────
+      # Needs no `tofu init`: the GCS backend's lock is an object whose generation is the Lock ID, and the
+      # generation precondition makes the delete a no-op if the lock changed since it was checked.
+      - name: Remove the stale state lock
+        if: inputs.action == 'unlock'
+        env:
+          LOCK_ID: ${{ inputs.lock_id }}
+          STALE_AFTER_MIN: "45"
+        run: |
+          set -euo pipefail
+          lock="gs://${STATE_BUCKET}/state/pr/${PR_NUMBER}/default.tflock"
+          gen="$(gcloud storage objects describe "$lock" --format='value(generation)' 2>/dev/null || true)"
+          if [ -z "$gen" ]; then echo "::error::PR #${PR_NUMBER} has no state lock."; exit 1; fi
+          info="$(gcloud storage cat "$lock")"
+          printf '%s' "$info" | jq '{Operation, Who, Version, Created}'
+          if [ "$gen" != "$LOCK_ID" ]; then
+            echo "::error::lock_id ${LOCK_ID} is not the current lock (generation ${gen}). Not removing it."; exit 1
+          fi
+          age_min=$(( ( $(date -u +%s) - $(date -u -d "$(printf '%s' "$info" | jq -r .Created)" +%s) ) / 60 ))
+          if [ "$age_min" -lt "$STALE_AFTER_MIN" ]; then
+            echo "::error::State lock ${gen} is only ${age_min} min old and may belong to a live run. Not removing it."; exit 1
+          fi
+          gcloud storage rm "$lock" --if-generation-match="$LOCK_ID"
+          echo "Removed state lock ${LOCK_ID} (${age_min} min old)."
+
+      # ── destroy ───────────────────────────────────────────────────────────────────────────────────────
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: inputs.action == 'destroy'
+        with:
+          tofu_version: "1.8.0" # the CI version: a newer one could upgrade the state format
+          tofu_wrapper: false
+
+      - name: Require the per-PR state
+        if: inputs.action == 'destroy'
+        run: |
+          if ! gcloud storage ls "gs://${STATE_BUCKET}/state/pr/${PR_NUMBER}/default.tfstate" >/dev/null 2>&1; then
+            echo "::error::PR #${PR_NUMBER} has no state, so tofu has nothing to destroy. Use action=reap."; exit 1
+          fi
+
+      - name: tofu init (state/pr/${{ inputs.pr_number }})
+        if: inputs.action == 'destroy'
+        working-directory: infra/environments/pr
+        run: tofu init -input=false -reconfigure -backend-config="prefix=state/pr/${PR_NUMBER}"
+
+      # Destroy evaluates the whole root, so every variable needs a value. The three placeholders are not
+      # used to delete anything, and keep NEON_PR_ROLE_PASSWORD out of this job (handoff Step 0.8).
+      - name: Plan the destroy (addresses only)
+        if: inputs.action == 'destroy'
+        working-directory: infra/environments/pr
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          TF_VAR_pr_number: ${{ inputs.pr_number }}
+          TF_VAR_head_sha: repair
+          TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_gcp_region: ${{ vars.GCP_REGION }}
+          TF_VAR_neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+          TF_VAR_neon_base_branch_id: unused-by-destroy
+          TF_VAR_neon_role_password: unused-by-destroy
+          TF_VAR_runtime_service_account: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+          TF_VAR_stripe_publishable_key: unused-by-destroy
+          TF_VAR_neon_api_key: ${{ secrets.NEON_API_KEY }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          echo "Tracked by state/pr/${PR_NUMBER}:"
+          tofu state list | sed 's/^/  /'
+          lock_args=(-lock-timeout=5m)
+          [ "$DRY_RUN" = true ] && lock_args=(-lock=false)   # a dry run reads; it never takes the lock
+          # The plan's own diff prints every attribute, so it goes to /dev/null; its addresses are listed instead.
+          tofu plan -destroy -input=false "${lock_args[@]}" -out=destroy.tfplan >/dev/null
+          echo "The destroy would remove:"
+          tofu show -json destroy.tfplan \
+            | jq -r '.resource_changes[]? | select(.change.actions | index("delete")) | "  \(.address)"'
+
+      - name: Deregister the Stripe webhook
+        if: inputs.action == 'destroy' && !inputs.dry_run
+        env:
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+        run: scripts/stripe-webhook-deregister.sh
+
+      # Cloudflare refuses to delete a non-empty bucket (same purge as pr-env-teardown.yml).
+      - name: Empty the R2 bucket
+        if: inputs.action == 'destroy' && !inputs.dry_run
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+        run: |
+          set -euo pipefail
+          ENDPOINT="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-service-url" --project="$PROJECT")"
+          AWS_ACCESS_KEY_ID="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-access-key" --project="$PROJECT")"
+          AWS_SECRET_ACCESS_KEY="$(gcloud secrets versions access latest --secret="${PREFIX}-storage-secret-key" --project="$PROJECT")"
+          echo "::add-mask::${AWS_ACCESS_KEY_ID}"
+          echo "::add-mask::${AWS_SECRET_ACCESS_KEY}"
+          export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=auto
+          aws s3 rm "s3://nekohoa-pr-${PR_NUMBER}-documents" --recursive --only-show-errors --endpoint-url "$ENDPOINT"
+
+      # Applying the saved plan prints resource ids, not the attribute diff.
+      - name: tofu apply the destroy plan
+        id: destroy
+        if: inputs.action == 'destroy' && !inputs.dry_run
+        working-directory: infra/environments/pr
+        run: tofu apply -input=false -lock-timeout=5m destroy.tfplan
+
+      # Only after a successful destroy: deleting state after a failed one turns tracked resources into
+      # invisible orphans (the 2026-10-26 incident).
+      - name: Delete the per-PR state
+        if: inputs.action == 'destroy' && !inputs.dry_run && steps.destroy.outcome == 'success'
+        run: gcloud storage rm --all-versions "gs://${STATE_BUCKET}/state/pr/${PR_NUMBER}/**"
+
+      - name: Remove the plan file
+        if: always() && inputs.action == 'destroy'
+        run: rm -f infra/environments/pr/destroy.tfplan # holds every variable value, including the tokens
+
+      # ── reap ──────────────────────────────────────────────────────────────────────────────────────────
+      - name: Reap by exact name
+        if: inputs.action == 'reap'
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PR_BASE_BRANCH_ID: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          ALLOW_OPEN_PR: ${{ inputs.allow_open_pr }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: "false"
+          ONLY_UNTRACKED: "false"
+        run: scripts/pr-env-reap.sh

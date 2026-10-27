@@ -106,6 +106,16 @@ jobs:
           path: diff-coverage.html
           if-no-files-found: ignore
 
+  ops-scripts:
+    name: Ops scripts (shellcheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: shellcheck
+        run: shellcheck scripts/pr-env-reap.sh scripts/tests/pr-env-reap.test.sh
+      - name: pr-env-reap tests (stubbed providers, no network)
+        run: bash scripts/tests/pr-env-reap.test.sh
+
   frontend:
     name: Frontend (neko-hoa)
     runs-on: ubuntu-latest
