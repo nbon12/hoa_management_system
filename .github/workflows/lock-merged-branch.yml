@@ -1,29 +1,43 @@
+# Lock a PR's head branch once it is merged, so CLAUDE.md's branch lifecycle rule ("a merged branch is
+# immutable and closed") is enforced rather than left to convention.
+#
+# Branch protection needs repository Administration: write, which GITHUB_TOKEN can never have (it is not
+# a GITHUB_TOKEN permission scope, and listing it made GitHub reject this whole file, recording a failed
+# run on every push; #236). The call therefore uses BRANCH_LOCK_TOKEN: a fine-grained personal access
+# token scoped to this repository only, with Administration: Read and write and nothing else.
 name: Lock merged branch
 
 on:
   pull_request:
     types: [closed]
 
+permissions: {} # GITHUB_TOKEN is not used
+
 jobs:
   lock-branch:
-    if: github.event.pull_request.merged == true
+    # Only this repository's own branches: a fork's head branch lives in the fork.
+    if: >
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      administration: write
     steps:
       - name: Lock merged branch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.BRANCH_LOCK_TOKEN }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
           REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret BRANCH_LOCK_TOKEN is not set, so ${BRANCH} was not locked. Add a fine-grained token for this repository with Administration: Read and write."
+            exit 1
+          fi
           gh api \
             --method PUT \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "/repos/${REPO}/branches/${BRANCH}/protection" \
-            --input - <<EOF
+            --input - >/dev/null <<EOF
           {
             "lock_branch": true,
             "required_status_checks": null,
@@ -32,3 +46,4 @@ jobs:
             "restrictions": null
           }
           EOF
+          echo "Locked ${BRANCH}."
