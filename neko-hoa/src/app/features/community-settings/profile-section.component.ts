@@ -288,7 +288,7 @@ export class ProfileSectionComponent {
         void this.load(id);
         if (this.mode() === 'company') void this.loadSubs(id);
       });
-    }, { allowSignalWrites: true });
+    });
   }
 
   isMissing(field: ProfileField): boolean {

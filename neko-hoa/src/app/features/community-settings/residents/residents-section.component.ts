@@ -311,7 +311,7 @@ export class ResidentsSectionComponent implements OnDestroy {
     effect(() => {
       const id = this.ctx.communityId();
       untracked(() => { if (id) void this.reload(); });
-    }, { allowSignalWrites: true });
+    });
   }
 
   ngOnDestroy(): void {

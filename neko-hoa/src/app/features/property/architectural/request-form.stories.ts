@@ -29,4 +29,4 @@ type Story = StoryObj<RequestFormComponent>;
 export const NewRequest: Story = { decorators: [withRoute({}, 'new')] };
 export const EditDraft: Story = { decorators: [withRoute({ draftId: 'd1' }, 'd1')] };
 export const Revision: Story = { decorators: [withRoute({ id: 'a1' }, 'revise')] };
-export const NewRequestOnPhone: Story = { decorators: [withRoute({}, 'new')], parameters: { viewport: { defaultViewport: 'mobile1' } } };
+export const NewRequestOnPhone: Story = { decorators: [withRoute({}, 'new')], globals: { viewport: { value: 'mobile1', isRotated: false } } };

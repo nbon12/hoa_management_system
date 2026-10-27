@@ -5,9 +5,11 @@ import type { StoryObj } from '@storybook/angular';
 // component is seen at the three conventions §2 widths (1360, 834, 390) and in both themes
 // (.storybook/preview.ts).
 
-export const DESKTOP = { viewport: { defaultViewport: 'desktop' }, layout: 'fullscreen' };
-export const TABLET = { viewport: { defaultViewport: 'tablet' }, layout: 'fullscreen' };
-export const PHONE = { viewport: { defaultViewport: 'phone' }, layout: 'fullscreen' };
+// Story globals, not parameters: Storybook 10 picks the viewport from `globals.viewport` and ignores
+// the old `parameters.viewport.defaultViewport`.
+export const DESKTOP = { viewport: { value: 'desktop', isRotated: false } };
+export const TABLET = { viewport: { value: 'tablet', isRotated: false } };
+export const PHONE = { viewport: { value: 'phone', isRotated: false } };
 export const DARK = { theme: 'dark' };
 
 type Size = 'desktop' | 'tablet' | 'phone';
@@ -19,6 +21,10 @@ type Size = 'desktop' | 'tablet' | 'phone';
 export function storyAt<T>() {
   return (size: Size, base: StoryObj<T> = {}, dark = false): StoryObj<T> => {
     const viewport = size === 'desktop' ? DESKTOP : size === 'tablet' ? TABLET : PHONE;
-    return { ...base, parameters: { ...(base.parameters ?? {}), ...viewport }, ...(dark ? { globals: { ...DARK } } : {}) };
+    return {
+      ...base,
+      parameters: { ...(base.parameters ?? {}), layout: 'fullscreen' },
+      globals: { ...(base.globals ?? {}), ...viewport, ...(dark ? DARK : {}) },
+    };
   };
 }
