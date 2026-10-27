@@ -124,7 +124,11 @@ resource "google_cloud_run_v2_service" "api" {
   }
 
   # Image + revision + traffic are pipeline-owned (the workflow image-only deploy); scaling churns on
-  # gcloud deploys. Mirror modules/environment so an infra apply never fights the deploy (FR-016).
+  # gcloud deploys, so an infra apply never fights the deploy (FR-016). Unlike modules/environment
+  # (#236), revision stays ignored: un-ignoring it would make every push's apply create an extra
+  # old-image revision that takes LATEST traffic before the deploy. The cost is the same 409 if a PR
+  # changes this template between pushes; pr-env's failure cleanup then destroys the environment and
+  # the next push provisions it fresh.
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,

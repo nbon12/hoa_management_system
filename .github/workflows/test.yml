@@ -112,9 +112,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: shellcheck
-        run: shellcheck scripts/pr-env-reap.sh scripts/tests/pr-env-reap.test.sh
+        run: >-
+          shellcheck scripts/pr-env-reap.sh scripts/pr-env-clear-stale-lock.sh scripts/pr-env-audit.sh
+          scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh
       - name: pr-env-reap tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-reap.test.sh
+      - name: pr-env lock + audit tests (stubbed providers, no network)
+        run: bash scripts/tests/pr-env-ops.test.sh
 
   frontend:
     name: Frontend (neko-hoa)
