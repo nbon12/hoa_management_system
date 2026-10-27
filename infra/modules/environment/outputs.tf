@@ -14,6 +14,7 @@
 # | cloudflare_api_token       | yes       | secret  CLOUDFLARE_API_TOKEN (echoed input)     |
 # | deploy_alert_webhook_url   | yes       | secret  DEPLOY_ALERT_WEBHOOK_URL (echoed input) |
 # | cloud_run_service_url      | no        | sanity / health-probe target                    |
+# | image_repository           | no        | (internal — the image path test.yml/pr-env.yml push to) |
 # | next_steps                 | no        | human checklist (ends: set DEV_DEPLOY_ENABLED last) |
 # <!-- REPOWISE:END -->
 
@@ -58,6 +59,11 @@ output "deploy_alert_webhook_url" {
 output "cloud_run_service_url" {
   description = "Direct Cloud Run URL (sanity check / health probe before the custom domain is live)."
   value       = google_cloud_run_v2_service.api.uri
+}
+
+output "image_repository" {
+  description = "Artifact Registry path CI pushes the backend image to (<region>-docker.pkg.dev/<project>/<repo>)."
+  value       = "${google_artifact_registry_repository.images.location}-docker.pkg.dev/${google_artifact_registry_repository.images.project}/${google_artifact_registry_repository.images.repository_id}"
 }
 
 output "next_steps" {
