@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Domain.Entities;
+using HOAManagementCompany.Features.Residents;
 using HOAManagementCompany.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,7 +18,7 @@ public sealed record UpdateAlertPreferencesRequest(bool SmsOptIn, bool EmailOptI
 /// GET /payments/alert-preferences — returns the owner's current opt-in flags + alert phone.
 /// Alerts default OFF (TCPA-safe); a brand-new owner reads back all-false.
 /// </summary>
-public class GetAlertPreferencesEndpoint(ApplicationDbContext db) : EndpointWithoutRequest<AlertPreferencesDto>
+public class GetAlertPreferencesEndpoint(ResidentAccess access, ApplicationDbContext db) : EndpointWithoutRequest<AlertPreferencesDto>
 {
     public override void Configure()
     {
@@ -27,7 +28,9 @@ public class GetAlertPreferencesEndpoint(ApplicationDbContext db) : EndpointWith
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Read, ct);
+        var propertyId = home.PropertyId;
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct);
         if (owner is null) { await SendNotFoundAsync(ct); return; }
 
@@ -40,7 +43,7 @@ public class GetAlertPreferencesEndpoint(ApplicationDbContext db) : EndpointWith
 /// appends an immutable <see cref="AlertConsent"/> row (opt_in/opt_out) with the consent text and
 /// source IP — the TCPA paper trail (FR-031). SMS may only be enabled once a phone is on file.
 /// </summary>
-public class UpdateAlertPreferencesEndpoint(ApplicationDbContext db)
+public class UpdateAlertPreferencesEndpoint(ResidentAccess access, ApplicationDbContext db)
     : Endpoint<UpdateAlertPreferencesRequest, AlertPreferencesDto>
 {
     private const string SmsOptInText =
@@ -55,7 +58,9 @@ public class UpdateAlertPreferencesEndpoint(ApplicationDbContext db)
 
     public override async Task HandleAsync(UpdateAlertPreferencesRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         var owner = await db.Owners.FirstOrDefaultAsync(o => o.PropertyId == propertyId, ct);
         if (owner is null) { await SendNotFoundAsync(ct); return; }
 

@@ -1,8 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, Input, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
-import { landingTargetFor } from '../../../core/services/landing';
-import { BoardNavigationService, RESIDENT_ROLE } from '../../../core/services/board-navigation.service';
+import { boardMemberships, isBoardMode, landingTargetFor } from '../../../core/services/landing';
+import { BoardNavigationService } from '../../../core/services/board-navigation.service';
 
 // 025 FR-019/FR-020: the Resident ↔ Board control. Lives in the top-bar account-controls
 // cluster to the LEFT of alerts/avatar; rendered only for a user holding ≥1 active
@@ -13,7 +13,7 @@ import { BoardNavigationService, RESIDENT_ROLE } from '../../../core/services/bo
   standalone: true,
   template: `
     @if (eligible()) {
-      @if (mode() === 'Board') {
+      @if (mode() === 'Board' && !outsideBoard) {
         <div class="mode-seg" role="group" aria-label="Interface mode">
           <button type="button" class="mode-seg__btn"
                   [class.mode-seg__btn--on]="false"
@@ -62,14 +62,24 @@ export class ModeToggleComponent {
   private nav = inject(BoardNavigationService);
   private router = inject(Router);
 
+  /**
+   * 030 brief 01 8.01.e: in the company area the person is outside board mode whatever their last
+   * mode was, so the control offers "Enter board mode", which goes back to the board landing.
+   */
+  @Input() outsideBoard = false;
+
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
 
-  readonly mode = computed(() => this.auth.user()?.lastActiveMode ?? 'Resident');
+  /** 030 FR-036a: a no-home user whose landing is board mode is in board mode (`isBoardMode`). */
+  readonly mode = computed(() => (isBoardMode(this.auth.user()) ? 'Board' : 'Resident'));
 
-  /** FR-020: control renders only for a user holding ≥1 active non-resident membership. */
-  readonly eligible = computed(() =>
-    (this.auth.user()?.memberships ?? []).some(m => m.role !== RESIDENT_ROLE));
+  /**
+   * FR-020: control renders only for a user holding ≥1 active non-resident membership. 030 FR-036,
+   * FR-036b: Onboarding memberships count, Archived ones don't, and the Company Administrator grant
+   * alone shows no control.
+   */
+  readonly eligible = computed(() => boardMemberships(this.auth.user()).length > 0);
 
   async switch(mode: 'Resident' | 'Board'): Promise<void> {
     if (this.busy()) return;

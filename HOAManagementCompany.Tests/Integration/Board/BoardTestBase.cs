@@ -29,16 +29,21 @@ public abstract class BoardTestBase(TestDatabaseFixture fixture) : IntegrationTe
     protected static ApplicationDbContext Db(IServiceScope scope) =>
         scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-    /// <summary>Creates an active (by default) community with a globally-unique name.</summary>
+    /// <summary>
+    /// Creates an active (by default) community with a globally-unique name, in
+    /// <paramref name="companyId"/> or, by default, the deployment's management company (030).
+    /// </summary>
     protected static async Task<Guid> CreateCommunityAsync(
         ApplicationDbContext db,
         CommunityStatus status = CommunityStatus.Active,
-        Guid? parentCommunityId = null)
+        Guid? parentCommunityId = null,
+        Guid? companyId = null)
     {
         var id = Guid.NewGuid();
         db.Communities.Add(new Domain.Entities.Community
         {
             Id = id,
+            ManagementCompanyId = companyId ?? await HOAManagementCompany.Features.Company.DeploymentCompany.IdAsync(db),
             LegalName = $"Test Community {id} LLC",
             CommunityName = $"test-community-{id:N}",
             Status = status,

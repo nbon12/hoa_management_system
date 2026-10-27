@@ -1,10 +1,11 @@
 using FastEndpoints;
 using FluentValidation;
 using HOAManagementCompany.Features.Payments.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Payments;
 
-public class LedgerEndpoint(PaymentService paymentService) : Endpoint<LedgerRequest, LedgerResponse>
+public class LedgerEndpoint(ResidentAccess access, PaymentService paymentService) : Endpoint<LedgerRequest, LedgerResponse>
 {
     public override void Configure()
     {
@@ -14,7 +15,9 @@ public class LedgerEndpoint(PaymentService paymentService) : Endpoint<LedgerRequ
 
     public override async Task HandleAsync(LedgerRequest req, CancellationToken ct)
     {
-        var propertyId = Guid.Parse(User.FindFirst("propertyId")!.Value);
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.ReadHistory, ct);
+        var propertyId = home.PropertyId;
         var result = await paymentService.GetLedgerAsync(propertyId, req, ct);
         await SendOkAsync(result, ct);
     }

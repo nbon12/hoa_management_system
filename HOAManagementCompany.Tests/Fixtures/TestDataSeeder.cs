@@ -30,6 +30,7 @@ public class TestDataSeeder(ApplicationDbContext db)
         db.Communities.Add(new Community
         {
             Id = SakuraCommunityId,
+            ManagementCompanyId = await HOAManagementCompany.Features.Company.DeploymentCompany.IdAsync(db, ct),
             LegalName = "Sakura Heights HOA",
             Status = CommunityStatus.Active,
         });

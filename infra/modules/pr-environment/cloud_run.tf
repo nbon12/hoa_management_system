@@ -66,6 +66,12 @@ resource "google_cloud_run_v2_service" "api" {
         value = "true"
       }
 
+      # 030: emailed links point at this PR's own Pages preview, not Dev (appsettings.Dev.json's default).
+      env {
+        name  = "App__BaseUrl"
+        value = "https://pr-${var.pr_number}.nekohoa-dev.pages.dev"
+      }
+
       # Shared operator secrets (dev-*), latest version.
       dynamic "env" {
         for_each = local.shared_secret_env

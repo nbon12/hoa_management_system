@@ -42,6 +42,44 @@ public static class StartupTasks
     }
 
     /// <summary>
+    /// Handles the 030 setup step, <c>--grant-company-admin &lt;email&gt; [--recover]
+    /// [--company-name "&lt;name&gt;"]</c> (FR-038). Allowed in every environment, because it is
+    /// the operator path; it applies migrations first. Returns the exit code when the verb was
+    /// present, or <c>null</c> to continue normal startup.
+    /// </summary>
+    public static Task<int?> RunGrantCompanyAdminCommandAsync(WebApplication app, string[] args) =>
+        RunGrantCompanyAdminCommandAsync(app.Services, args, Console.Out, Console.Error);
+
+    /// <summary>The same step against any service provider and output streams, so tests run the real entry point.</summary>
+    public static async Task<int?> RunGrantCompanyAdminCommandAsync(IServiceProvider services, string[] args,
+        TextWriter stdout, TextWriter stderr)
+    {
+        var command = Features.Company.CompanyAdminSetupCommand.TryParse(args, out var error);
+        if (error is not null)
+        {
+            await stderr.WriteLineAsync(error);
+            return 2;
+        }
+        if (command is null)
+            return null;
+
+        try
+        {
+            await using var scope = services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
+            var result = await scope.ServiceProvider.GetRequiredService<Features.Company.CompanyAdministratorService>()
+                .SetupAsync(command.Email, command.Recover, command.CompanyName, CancellationToken.None);
+            await (result.ExitCode == 0 ? stdout : stderr).WriteLineAsync(result.Output);
+            return result.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            await stderr.WriteLineAsync($"ERROR: the setup step failed: {ex.GetType().Name}: {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>
     /// Applies migrations and/or seeds at startup per <paramref name="options"/>. <c>SeedAsync</c>
     /// runs <c>MigrateAsync</c> first and is idempotent, so a fresh database (local compose or a
     /// cold Dev deploy) becomes ready-to-use without a manual <c>--seed</c> step. The

@@ -2,10 +2,11 @@ using FastEndpoints;
 using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Community.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Community.Events;
 
-public class EventRsvpEndpoint(CommunityService communityService) : Endpoint<EventRsvpRequest>
+public class EventRsvpEndpoint(ResidentAccess access, CommunityService communityService) : Endpoint<EventRsvpRequest>
 {
     public override void Configure()
     {
@@ -15,7 +16,9 @@ public class EventRsvpEndpoint(CommunityService communityService) : Endpoint<Eve
 
     public override async Task HandleAsync(EventRsvpRequest req, CancellationToken ct)
     {
-        var communityId = User.RequireCommunityId();
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var communityId = home.CommunityId;
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value ?? string.Empty;
         var eventId = Route<Guid>("id");
 

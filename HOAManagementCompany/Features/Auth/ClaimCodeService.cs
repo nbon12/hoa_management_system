@@ -51,6 +51,10 @@ public class ClaimCodeService(
         return row;
     }
 
+    // 030 FR-012a: claim codes can be redeemed only while the home's community is Active.
+    public Task<Domain.Enums.CommunityStatus> CommunityStatusOfAsync(Guid propertyId, CancellationToken ct) =>
+        db.Properties.Where(p => p.Id == propertyId).Select(p => p.Community.Status).FirstAsync(ct);
+
     private static string Mask(string contact) =>
         contact.Length <= 4 ? "***" : $"{contact[..2]}***{contact[^2..]}";
 }

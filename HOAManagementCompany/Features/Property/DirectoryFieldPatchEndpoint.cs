@@ -2,6 +2,7 @@ using FastEndpoints;
 using HOAManagementCompany.Features.Common;
 using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Property.Models;
+using HOAManagementCompany.Features.Residents;
 
 namespace HOAManagementCompany.Features.Property;
 
@@ -11,7 +12,7 @@ public class DirectoryFieldPatchRequest2
     public bool Shared { get; set; }
 }
 
-public class DirectoryFieldPatchEndpoint(PropertyService propertyService) : Endpoint<DirectoryFieldPatchRequest2, DirectoryFieldDto>
+public class DirectoryFieldPatchEndpoint(ResidentAccess access, PropertyService propertyService) : Endpoint<DirectoryFieldPatchRequest2, DirectoryFieldDto>
 {
     public override void Configure()
     {
@@ -21,7 +22,9 @@ public class DirectoryFieldPatchEndpoint(PropertyService propertyService) : Endp
 
     public override async Task HandleAsync(DirectoryFieldPatchRequest2 req, CancellationToken ct)
     {
-        var propertyId = User.RequirePropertyId();
+        // 030 FR-024g: re-check the resident link and the community status on every request.
+        var home = await access.RequireAsync(User, ResidentOperation.Write, ct);
+        var propertyId = home.PropertyId;
         var key = Route<string>("key")!;
         try
         {

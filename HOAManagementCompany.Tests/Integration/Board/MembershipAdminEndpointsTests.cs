@@ -28,10 +28,11 @@ public class MembershipAdminEndpointsTests(TestDatabaseFixture fixture) : BoardT
         return await resolver.CanAccessAsync(Principal(userId), communityId, cap);
     }
 
-    private bool HasSensitiveEvent(string prefix, Guid communityId, string actorId, string targetUserId) =>
+    // 030: the change kind (grant, end, edit, downgrade, ...) is the event's Kind property.
+    private bool HasSensitiveEvent(string kind, Guid communityId, string actorId, string targetUserId) =>
         LogSink.Events.Any(e =>
             e.MessageTemplate.Text.StartsWith("BoardMembershipChange", StringComparison.Ordinal)
-            && e.MessageTemplate.Text.Contains(prefix, StringComparison.Ordinal)
+            && ScalarEquals(e, "Kind", kind)
             && ScalarEquals(e, "CommunityId", communityId)
             && ScalarEquals(e, "ActorId", actorId)
             && ScalarEquals(e, "TargetUserId", targetUserId));
@@ -185,7 +186,7 @@ public class MembershipAdminEndpointsTests(TestDatabaseFixture fixture) : BoardT
         Assert.Equal(HttpStatusCode.Forbidden, post.StatusCode);
 
         var patch = await Client.PatchAsJsonAsync(Url(communityId, membershipId),
-            new { status = (int)MembershipStatus.Inactive });
+            new { end = true });
         Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
     }
 
@@ -243,7 +244,7 @@ public class MembershipAdminEndpointsTests(TestDatabaseFixture fixture) : BoardT
         await LoginAsync(s.managerEmail);
 
         var res = await Client.PatchAsJsonAsync(Url(s.communityId, Guid.NewGuid()),
-            new { status = (int)MembershipStatus.Inactive });
+            new { end = true });
         Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
         Assert.Equal("NOT_FOUND", (await res.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("code").GetString());
     }
@@ -299,8 +300,9 @@ public class MembershipAdminEndpointsTests(TestDatabaseFixture fixture) : BoardT
         Assert.True(await ResolveAsync(m2, communityId, CommunityCapability.ManageMemberships));
 
         await LoginAsync(manager1Email);
+        // 030 FR-019: a downgrade ends the manager row and returns the Board Member row.
         var res = await Client.PatchAsJsonAsync(Url(communityId, manager2MembershipId),
-            new { role = (int)CommunityRole.BoardMember });
+            new { downgradeTo = (int)CommunityRole.BoardMember });
 
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         Assert.Equal("BoardMember", (await res.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("role").GetString());

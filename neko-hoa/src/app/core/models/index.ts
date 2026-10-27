@@ -2,6 +2,15 @@
 export type ISODate = string; // "2026-05-01"
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
+/** 030 data-model.md: a community's lifecycle status. */
+export type CommunityStatus = 'Onboarding' | 'Active' | 'Archived';
+
+/**
+ * 030 R11 (contracts/invitations-and-auth.md): where the app goes after sign-in, computed by the
+ * server's `LandingRule` in FR-036a's order. The client follows it (`landingTargetFor`).
+ */
+export type Landing = 'Board' | 'Company' | 'Resident' | 'NotLive' | 'NoHome';
+
 // 025: an active community membership the user holds. Drives board mode-toggle
 // visibility (FR-020) and the board nav set (FR-024/FR-025), all derived client-side
 // from the login/refresh response (research.md R6).
@@ -9,6 +18,18 @@ export interface CommunityMembershipSummary {
   communityId: string;
   communityName: string;
   role: string; // CommunityRole name: Resident | BoardMember | CommunityManager | Accountant
+  /** 030 FR-036b: Onboarding and Active are listed; the server leaves Archived out. */
+  communityStatus?: CommunityStatus;
+}
+
+/** 030: a home linked to the user. Onboarding homes are left out by the server (FR-012a). */
+export interface UserPropertySummary {
+  id: string;
+  accountNumber: string;
+  address: string;
+  communityId?: string;
+  communityName?: string;
+  communityStatus?: CommunityStatus;
 }
 
 export type UserMode = 'Resident' | 'Board';
@@ -22,6 +43,12 @@ export interface CurrentUser {
   // 025: persisted last-used mode (FR-022) and active memberships.
   lastActiveMode: UserMode;
   memberships: CommunityMembershipSummary[];
+  // 030 R11: always filled by `AuthService.applySession`. Optional so that 025-era fixtures and
+  // backends without spec 030 still type-check; `landing` absent means "use the 025 rule".
+  /** Homes in Active and Archived communities. */
+  properties?: UserPropertySummary[];
+  isCompanyAdministrator?: boolean;
+  landing?: Landing | null;
 }
 
 // ─── Property ────────────────────────────────────────────────────────────────

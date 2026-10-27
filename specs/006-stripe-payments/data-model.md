@@ -215,6 +215,20 @@ Consent changes also append an `AlertConsent` row.
 `DraftDay`, `Status`, `ProcessingFee`, `UpdatedAt`. `ProcessingFee` now derived per-method from
 `HoaPaymentConfig` at draft time (FR-010d), not the hard-coded `1.95`.
 
+**Added by 030** (2026-10-18; [030 data model](../030-company-administration/data-model.md#recurringpayment)):
+
+| Column | Type | Nullable | Notes |
+|--------|------|----------|-------|
+| `EnrolledByUserId` | `string` | Yes | FK → `AspNetUsers`, `SetNull`; the user who enrolled it, set on every enroll or re-enroll |
+| `CancellationReason` | `string(30)` | Yes | `owner_cancelled`, `community_archived` or `resident_removed`; set when `Status` becomes `inactive` |
+
+A schedule is now also cancelled when its community is archived (030 FR-013), and when the
+resident who enrolled it is removed from the property, or, when `EnrolledByUserId` is null, when
+any resident is removed (030 FR-024c). Every cancel sets `Status = "inactive"`, records the
+reason and sets `TerminatedAt` on the current `PaymentAuthorization` (FR-011b); it makes no
+Stripe call. The 030 migration cancels active schedules in communities migrated from `Inactive`
+to `Archived` the same way (`community_archived`, no email).
+
 ### LedgerEntry (modified — append-only, deterministic)
 
 | Column | Type | Nullable | Change |

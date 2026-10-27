@@ -4,28 +4,44 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { TokenService } from './token.service';
-import { CurrentUser, UserMode } from '../models';
+import { CommunityStatus, CurrentUser, Landing, UserMode } from '../models';
 
 // 020-D FR-D1 (contracts/auth-session.md): auth responses carry the access token + user only —
 // the refresh token arrives as an HttpOnly cookie, so /auth calls use withCredentials.
+/** `CurrentUserDto`: `/auth/me`, and `user` in every `AuthResponse` (contracts/invitations-and-auth.md). */
+export interface CurrentUserDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  initials: string;
+  properties: {
+    id: string;
+    accountNumber: string;
+    address: string;
+    // 030 R11: filled by backends that ship spec 030.
+    communityId?: string;
+    communityName?: string;
+    communityStatus?: CommunityStatus;
+  }[];
+  // 025: present on backends that ship the board feature; older tokens omit them.
+  lastActiveMode?: string;
+  memberships?: { communityId: string; communityName: string; role: string; communityStatus?: CommunityStatus }[];
+  // 030 R11 / FR-036a: present on backends that ship spec 030.
+  isCompanyAdministrator?: boolean;
+  landing?: Landing | null;
+}
+
 export interface AuthSessionResponse {
   token: string;
   expiresAt: string;
-  user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    initials: string;
-    properties: { id: string; accountNumber: string; address: string }[];
-    // 025: present on backends that ship the board feature; older tokens omit them.
-    lastActiveMode?: string;
-    memberships?: { communityId: string; communityName: string; role: string }[];
-  };
+  user: CurrentUserDto;
 }
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private static readonly LANDINGS = new Set<Landing>(['Board', 'Company', 'Resident', 'NotLive', 'NoHome']);
+
   private readonly _user = signal<CurrentUser | null>(null);
   readonly user = this._user.asReadonly();
 
@@ -100,17 +116,35 @@ export class AuthService {
 
   /** Adopt a fresh session (login/register/silent refresh). */
   applySession(res: AuthSessionResponse): void {
-    const user: CurrentUser = {
-      id:        res.user.id,
-      firstName: res.user.firstName,
-      lastName:  res.user.lastName,
-      email:     res.user.email,
-      initials:  res.user.initials,
-      lastActiveMode: res.user.lastActiveMode === 'Board' ? 'Board' : 'Resident',
-      memberships: res.user.memberships ?? [],
-    };
-    this._user.set(user);
+    this._user.set(AuthService.toCurrentUser(res.user));
     this.tokens.setAccessToken(res.token);
+  }
+
+  /**
+   * 030 R11: re-read `GET /auth/me` and adopt its user (homes, memberships, the Company
+   * Administrator flag and the server's landing) without touching the access token.
+   */
+  async refreshCurrentUser(): Promise<CurrentUser> {
+    const dto = await firstValueFrom(this.http.get<CurrentUserDto>(`${this.base}/auth/me`));
+    const user = AuthService.toCurrentUser(dto);
+    this._user.set(user);
+    return user;
+  }
+
+  /** Maps the wire DTO to the client model, defaulting fields that pre-030 backends omit. */
+  private static toCurrentUser(dto: CurrentUserDto): CurrentUser {
+    return {
+      id:        dto.id,
+      firstName: dto.firstName,
+      lastName:  dto.lastName,
+      email:     dto.email,
+      initials:  dto.initials,
+      lastActiveMode: dto.lastActiveMode === 'Board' ? 'Board' : 'Resident',
+      memberships: dto.memberships ?? [],
+      properties: dto.properties ?? [],
+      isCompanyAdministrator: dto.isCompanyAdministrator === true,
+      landing: AuthService.LANDINGS.has(dto.landing as Landing) ? dto.landing as Landing : null,
+    };
   }
 
   /**
@@ -121,6 +155,18 @@ export class AuthService {
   async switchMode(mode: UserMode): Promise<void> {
     const res = await firstValueFrom(
       this.http.post<AuthSessionResponse>(`${this.base}/auth/board-mode`, { mode }, { withCredentials: true })
+    );
+    this.applySession(res);
+  }
+
+  /**
+   * 030 FR-012a / brief 11 8.11.c: make another of the person's homes the selected one. The
+   * response is a fresh session for that home. A home in an Onboarding community is refused with
+   * 409 `COMMUNITY_NOT_ACTIVE`; a "No longer managed" home is allowed (read-only).
+   */
+  async switchProperty(propertyId: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<AuthSessionResponse>(`${this.base}/auth/switch-property`, { propertyId }, { withCredentials: true })
     );
     this.applySession(res);
   }

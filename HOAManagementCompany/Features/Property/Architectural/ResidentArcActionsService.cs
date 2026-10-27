@@ -5,6 +5,8 @@ using HOAManagementCompany.Features.Auth;
 using HOAManagementCompany.Features.Board.Architectural;
 using HOAManagementCompany.Infrastructure.Persistence;
 
+using HOAManagementCompany.Features.Residents;
+
 namespace HOAManagementCompany.Features.Property.Architectural;
 
 // <!-- REPOWISE:START domain=resident-arc -->
@@ -25,7 +27,7 @@ public sealed class ResidentArcActionsService(
     /// <summary>Withdraws an undecided request: Closed with outcome Withdrawn (FR-020/FR-021).</summary>
     public async Task<ArchitecturalApplication> WithdrawAsync(ClaimsPrincipal user, Guid applicationId, CancellationToken ct)
     {
-        var app = await scope.ApplicationAsync(user, applicationId, ct);
+        var app = await scope.ApplicationAsync(user, applicationId, ResidentOperation.Write, ct);
         var userId = ResidentArcScope.UserId(user);
         var now = clock.GetUtcNow();
 
@@ -59,7 +61,7 @@ public sealed class ResidentArcActionsService(
         if (message.Length > MaxReplyLength)
             throw ResidentArcDraftService.Validation($"responseMessage must be at most {MaxReplyLength} characters.");
 
-        var app = await scope.ApplicationAsync(user, applicationId, ct);
+        var app = await scope.ApplicationAsync(user, applicationId, ResidentOperation.Write, ct);
         var info = app.InfoRequests.FirstOrDefault(i => i.Id == infoRequestId)
                    ?? throw ResidentArcScope.NotFound("The information request");
         var userId = ResidentArcScope.UserId(user);
@@ -87,7 +89,7 @@ public sealed class ResidentArcActionsService(
     public async Task<ResidentArcAttachmentDto> UploadReplyAttachmentAsync(
         ClaimsPrincipal user, Guid applicationId, Guid infoRequestId, string fileName, long length, Stream content, CancellationToken ct)
     {
-        var app = await scope.ApplicationAsync(user, applicationId, ct);
+        var app = await scope.ApplicationAsync(user, applicationId, ResidentOperation.Write, ct);
         var info = app.InfoRequests.FirstOrDefault(i => i.Id == infoRequestId)
                    ?? throw ResidentArcScope.NotFound("The information request");
         ThrowIfRefused(OpenOnly(app) ?? Unanswered(info));
@@ -114,10 +116,10 @@ public sealed class ResidentArcActionsService(
     }
 
     /// <summary>The storage key of an attachment on the caller's application, or the non-disclosing 403.</summary>
-    public async Task<string> AttachmentKeyAsync(ClaimsPrincipal user, Guid applicationId, Guid attachmentId, CancellationToken ct)
+    public async Task<(string Key, Guid PropertyId)> AttachmentKeyAsync(ClaimsPrincipal user, Guid applicationId, Guid attachmentId, CancellationToken ct)
     {
-        var app = await scope.ApplicationAsync(user, applicationId, ct);
-        return app.Attachments.FirstOrDefault(a => a.Id == attachmentId)?.StorageKey ?? throw ResidentArcScope.Forbidden();
+        var app = await scope.ApplicationAsync(user, applicationId, ResidentOperation.ReadHistory, ct);
+        return (app.Attachments.FirstOrDefault(a => a.Id == attachmentId)?.StorageKey ?? throw ResidentArcScope.Forbidden(), app.PropertyId);
     }
 
     private static ArcRefusal? OpenOnly(ArchitecturalApplication app) => app.Status switch

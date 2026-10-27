@@ -20,9 +20,11 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
 
     // 025: idempotently ensure a board-eligible user (board@nekohoa.dev) exists so the
     // board-mode journey can be exercised in dev/E2E — even on an already-seeded database
-    // (e.g. the pr-env fork, where the full seed no-ops via ShouldSeedAsync). Attaches the
-    // user to an existing property in the seeded community and grants an active BoardMember
-    // membership. Safe to run every startup.
+    // (e.g. the pr-env fork, where the full seed no-ops via ShouldSeedAsync). Grants an active
+    // BoardMember membership in the seeded community. Safe to run every startup.
+    // 030 FR-036a: staff sign in without a home, so the board user is no longer given a
+    // co-residence link on another resident's property (which also gave it that resident's
+    // data). Databases seeded earlier keep the link they already have.
     // The e2e registration flow (E2EClaimCodeEndpoint) claims this seed property, so it MUST
     // stay unclaimed — the board user must never hold a link to it.
     private const string E2eRegistrationAccount = "SAKURA-003";
@@ -36,40 +38,19 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             return;
         }
 
-        var regProperty = await db.Properties
-            .FirstOrDefaultAsync(p => p.AccountNumber == E2eRegistrationAccount, ct);
-
-        // A safe co-residence property: already-claimed, in the community, and NOT the
-        // registration seed property.
-        var safeProperty = await db.Properties.FirstOrDefaultAsync(
-            p => p.CommunityId == community.Id
-                 && p.AccountNumber != E2eRegistrationAccount
-                 && db.UserProperties.Any(up => up.PropertyId == p.Id), ct);
-        if (safeProperty is null)
-        {
-            logger.LogWarning("EnsureBoardUserAsync skipped — no safe claimed property to attach the board user to.");
-            return;
-        }
-
         var boardUser = await db.Users.FirstOrDefaultAsync(u => u.Email == BoardEmail, ct);
         if (boardUser is not null)
         {
             // Self-heal: an earlier build may have linked the board user to the registration
-            // property (SAKURA-003), which blocks the registration e2e. Free it and re-home
-            // the board user on the safe property.
-            if (regProperty is not null)
+            // property (SAKURA-003), which blocks the registration e2e. Free it.
+            var stale = await db.UserProperties
+                .Where(up => up.UserId == boardUser.Id && up.Property.AccountNumber == E2eRegistrationAccount)
+                .ToListAsync(ct);
+            if (stale.Count > 0)
             {
-                var stale = await db.UserProperties
-                    .Where(up => up.UserId == boardUser.Id && up.PropertyId == regProperty.Id)
-                    .ToListAsync(ct);
-                if (stale.Count > 0)
-                {
-                    db.UserProperties.RemoveRange(stale);
-                    if (!await db.UserProperties.AnyAsync(up => up.UserId == boardUser.Id && up.PropertyId == safeProperty.Id, ct))
-                        db.UserProperties.Add(new UserProperty { UserId = boardUser.Id, PropertyId = safeProperty.Id });
-                    await db.SaveChangesAsync(ct);
-                    logger.LogInformation("Repaired board user property link — freed {Account}.", E2eRegistrationAccount);
-                }
+                db.UserProperties.RemoveRange(stale);
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation("Repaired board user property link — freed {Account}.", E2eRegistrationAccount);
             }
             return;
         }
@@ -92,7 +73,6 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
             return;
         }
 
-        db.UserProperties.Add(new UserProperty { UserId = newUser.Id, PropertyId = safeProperty.Id });
         db.CommunityMemberships.Add(new CommunityMembership
         {
             UserId = newUser.Id,
@@ -137,6 +117,7 @@ public class AuthSeeder(ApplicationDbContext db, IServiceProvider services, ILog
         {
             community = new Community
             {
+                ManagementCompanyId = await Features.Company.DeploymentCompany.IdAsync(db, ct),
                 CommunityName = CommunityName,
                 LegalName = CommunityName,
                 Status = CommunityStatus.Active

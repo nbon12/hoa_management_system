@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from './auth.service';
+import { TokenService } from './token.service';
 import { LoginComponent } from '../../features/auth/login.component';
 import { environment } from '../../../environments/environment';
 
@@ -128,6 +129,86 @@ describe('AuthService', () => {
       http.expectOne(`${BASE}/auth/verify-email/confirm`).flush(
         { code: 'VERIFICATION_FAILED' }, { status: 400, statusText: 'Bad Request' });
       expect(await bad).toBeNull();
+    });
+  });
+
+  // 030 T044 / R11: the new CurrentUserDto fields are kept from every session and from /auth/me.
+  describe('030 sign-in state', () => {
+    const COMPANY_ADMIN_USER = {
+      id: 'u9', firstName: 'Robin', lastName: 'Hale', email: 'company@nekohoa.dev', initials: 'RH',
+      properties: [],
+      lastActiveMode: 'Resident',
+      memberships: [],
+      isCompanyAdministrator: true,
+      landing: 'Company',
+    };
+
+    it('keeps properties, isCompanyAdministrator and landing from the auth response', async () => {
+      const promise = svc.login('company@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush({
+        ...MOCK_AUTH_RESPONSE,
+        user: {
+          ...MOCK_AUTH_RESPONSE.user,
+          properties: [{ id: 'p1', accountNumber: 'SAKURA-001', address: '1 Sakura Drive', communityId: 'c1', communityName: 'Sakura Heights', communityStatus: 'Archived' }],
+          memberships: [{ communityId: 'c2', communityName: 'Keystone Ridge', role: 'CommunityManager', communityStatus: 'Onboarding' }],
+          isCompanyAdministrator: true,
+          landing: 'Board',
+        },
+      });
+      await promise;
+      const u = svc.user()!;
+      expect(u.properties).toEqual([{ id: 'p1', accountNumber: 'SAKURA-001', address: '1 Sakura Drive', communityId: 'c1', communityName: 'Sakura Heights', communityStatus: 'Archived' }]);
+      expect(u.memberships[0].communityStatus).toBe('Onboarding');
+      expect(u.isCompanyAdministrator).toBeTrue();
+      expect(u.landing).toBe('Board');
+    });
+
+    it('defaults the 030 fields when an older backend omits them', async () => {
+      const promise = svc.login('resident@nekohoa.dev', 'Password1!');
+      const { properties, ...legacyUser } = MOCK_AUTH_RESPONSE.user;
+      http.expectOne(`${BASE}/auth/login`).flush({ ...MOCK_AUTH_RESPONSE, user: { ...legacyUser, properties: undefined } });
+      await promise;
+      expect(properties.length).toBe(1);
+      expect(svc.user()!.properties).toEqual([]);
+      expect(svc.user()!.isCompanyAdministrator).toBeFalse();
+      expect(svc.user()!.landing).toBeNull();
+    });
+
+    it('ignores a landing value it does not know', async () => {
+      const promise = svc.login('resident@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush({ ...MOCK_AUTH_RESPONSE, user: { ...MOCK_AUTH_RESPONSE.user, landing: 'Elsewhere' } });
+      await promise;
+      expect(svc.user()!.landing).toBeNull();
+    });
+
+    it('refreshCurrentUser() reads /auth/me and keeps the access token', async () => {
+      const login = svc.login('resident@nekohoa.dev', 'Password1!');
+      http.expectOne(`${BASE}/auth/login`).flush(MOCK_AUTH_RESPONSE);
+      await login;
+
+      const me = svc.refreshCurrentUser();
+      const req = http.expectOne(`${BASE}/auth/me`);
+      expect(req.request.method).toBe('GET');
+      req.flush(COMPANY_ADMIN_USER);
+      const user = await me;
+
+      expect(user.isCompanyAdministrator).toBeTrue();
+      expect(user.landing).toBe('Company');
+      expect(svc.user()!.landing).toBe('Company');
+      expect(svc.user()!.properties).toEqual([]);
+      expect(TestBed.inject(TokenService).getAccessToken()).toBe(MOCK_AUTH_RESPONSE.token);
+    });
+
+    it('switchProperty() posts the home and adopts the new session (brief 11 8.11.c)', async () => {
+      const done = svc.switchProperty('p16');
+      const req = http.expectOne(`${BASE}/auth/switch-property`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ propertyId: 'p16' });
+      expect(req.request.withCredentials).toBeTrue();
+      req.flush({ ...MOCK_AUTH_RESPONSE, token: 'header.payload.switched' });
+      await done;
+      expect(TestBed.inject(TokenService).getAccessToken()).toBe('header.payload.switched');
+      expect(svc.user()!.firstName).toBe('Jane');
     });
   });
 

@@ -61,6 +61,10 @@ builder.Host.UseSerilog((ctx, services, cfg) =>
         // Information so "Now listening on: ..." / "Application started" still print locally.
         .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
         .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message}{NewLine}{Exception}")
+        // 030 FR-040: a DomainException is an expected refusal, logged by GlobalExceptionHandler as
+        // its code only. On .NET 9 the exception middleware also logs every exception with its
+        // message before the handler runs, and some refusal messages name an invited email.
+        .Filter.ByExcluding(e => e.Exception is HOAManagementCompany.Features.Auth.DomainException)
         .Enrich.FromLogContext()
         .Enrich.With(new ActivityTraceEnricher()) // trace_id/span_id on every record (FR-003).
         .Enrich.WithProperty("Environment", ctx.HostingEnvironment.EnvironmentName);
@@ -199,6 +203,12 @@ builder.Services.AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsVal
     builder.Configuration, RateLimitingOptions.SectionName);
 builder.Services.AddValidatedOptions<ArcUploadOptions, ArcUploadOptionsValidator>(
     builder.Configuration, ArcUploadOptions.SectionName);
+// Company administration (030): invitation limits (R12) and the one origin for emailed links (R10).
+builder.Services.AddValidatedOptions<InvitationOptions, InvitationOptionsValidator>(
+    builder.Configuration, InvitationOptions.SectionName);
+builder.Services.AddValidatedOptions<AppLinksOptions, AppLinksOptionsValidator>(
+    builder.Configuration, AppLinksOptions.SectionName, o => o.ApplyEnvironment(builder.Configuration, builder.Environment));
+builder.Services.AddSingleton<AppLinks>();
 // DevTools toggles are config-gated (not host-name-gated) so they evaluate correctly in the deployed
 // `Dev` environment; defaults derive from IsDevLike(env) and are forced off in Production (014 US3).
 builder.Services.AddValidatedOptions<DevToolsOptions, DevToolsOptionsValidator>(
@@ -386,6 +396,25 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Auth.IAuthNotifier>(sp 
         : notifier;
 });
 builder.Services.AddScoped<HOAManagementCompany.Features.Dashboard.DashboardService>();
+// Invitations (030 R6): one lifecycle for every kind, with a handler per kind for what it offers.
+// The dev vault keeps each emailed link only where e2e test support is enabled (T054).
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.SenderAuthority>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.InvitationService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyAdministratorService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.CommunityLifecycleService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
+    HOAManagementCompany.Features.Invitations.CompanyAdministratorOfferHandler>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
+    HOAManagementCompany.Features.Invitations.MembershipOfferHandler>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Invitations.IInvitationOfferHandler,
+    HOAManagementCompany.Features.Invitations.ResidencyOfferHandler>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Settings.MembershipService>();
+builder.Services.AddSingleton<HOAManagementCompany.Features.Invitations.IInvitationLinkObserver>(sp =>
+    sp.GetRequiredService<IConfiguration>().GetValue<bool>("DevTools:E2ECleanupEnabled")
+    && !builder.Environment.IsProduction() && !builder.Environment.IsStaging()
+        ? new HOAManagementCompany.Features.DevTools.VaultingInvitationLinkObserver(
+            sp.GetRequiredService<HOAManagementCompany.Features.DevTools.AuthCodeVault>())
+        : new HOAManagementCompany.Features.Invitations.NoInvitationLinkObserver());
 // Board member experience (025-board-overall-design). The single community-scope
 // resolver every board-side endpoint authorizes through (FR-012). The MetricDescriptor
 // registry is intentionally empty here — spec 2 registers concrete descriptors.
@@ -440,6 +469,13 @@ builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcQueries>();
 builder.Services.AddScoped<HOAManagementCompany.Features.Property.Architectural.ResidentArcActionsService>();
 
+// ── Company administration (030-company-administration) ───────────────────
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.ICompanyContext,
+    HOAManagementCompany.Features.Company.CompanyContext>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Company.CompanyEmailRenderer>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Board.Residents.ResidentRemovalService>();
+builder.Services.AddScoped<HOAManagementCompany.Features.Residents.ResidentAccess>();
+
 // ── Seeder (registered for DI so --seed flag can resolve it) ───────────────
 builder.Services.AddScoped<HOAManagementCompany.Seed.DatabaseSeeder>();
 builder.Services.AddScoped<HOAManagementCompany.Seed.DocumentStorageInitializer>();
@@ -463,6 +499,11 @@ var app = builder.Build();
 var seedExitCode = await StartupTasks.RunSeedCommandAsync(app, args);
 if (seedExitCode is not null)
     return seedExitCode.Value;
+
+// ── --grant-company-admin setup step (030 FR-038) — every environment; never an HTTP route ──
+var setupExitCode = await StartupTasks.RunGrantCompanyAdminCommandAsync(app, args);
+if (setupExitCode is not null)
+    return setupExitCode.Value;
 
 // ── Middleware Pipeline ────────────────────────────────────────────────────
 app.UseExceptionHandler();
