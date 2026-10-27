@@ -136,7 +136,7 @@ public sealed class ResidentArcQueries(ApplicationDbContext db, ResidentArcScope
             app.ContractorContact,
             app.AcknowledgedAt,
             app.Attachments.OrderBy(a => a.CreatedAt)
-                .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, a.InfoRequestId)).ToList(),
+                .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, a.InfoRequestId, a.OwnerCommentId)).ToList(),
             infoRequests,
             Timeline(app),
             approved || denied
@@ -149,7 +149,13 @@ public sealed class ResidentArcQueries(ApplicationDbContext db, ResidentArcScope
             CanWithdraw: app.Status == ArcApplicationStatus.Open,
             CanRevise: canRevise,
             revisions.Select(r => new ResidentArcRevisionDto(r.Id, r.Revision,
-                ProjectStatus(r.Status, r.DecisionOutcome, r.Unanswered), r.ReceivedDate)).ToList());
+                ProjectStatus(r.Status, r.DecisionOutcome, r.Unanswered), r.ReceivedDate)).ToList(),
+            app.OwnerComments.OrderBy(c => c.CreatedAt)
+                .Select(c => new ResidentArcCommentDto(c.Id, c.Body, c.CreatedAt,
+                    app.Attachments.Where(a => a.OwnerCommentId == c.Id).OrderBy(a => a.CreatedAt)
+                        .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, null, c.Id)).ToList()))
+                .ToList(),
+            CanComment: app.DecisionOutcome != ArcOutcome.Withdrawn);
     }
 
     /// <summary>Resident-visible events only, oldest first. No vote or vote-comment events.</summary>
@@ -162,6 +168,8 @@ public sealed class ResidentArcQueries(ApplicationDbContext db, ResidentArcScope
             if (info.RespondedAt is { } responded)
                 events.Add(new ResidentArcTimelineEventDto("InfoReplied", responded));
         }
+        foreach (var comment in app.OwnerComments)
+            events.Add(new ResidentArcTimelineEventDto("Commented", comment.CreatedAt));
         if (app.Status == ArcApplicationStatus.Closed && app.ClosedAt is { } closed)
         {
             var closeEvent = app.DecisionOutcome switch

@@ -57,6 +57,10 @@ public class RecordOutcomeEndpoint(
                 return new ArcRefusal(StatusCodes.Status409Conflict, ArcErrorCodes.ApplicationClosed, "This application is already closed.");
             if (app.Status != ArcApplicationStatus.DecisionReached || app.DecisionOutcome is null)
                 return new ArcRefusal(StatusCodes.Status409Conflict, ArcErrorCodes.NoDecision, "No decision has been reached yet.");
+            // 031: board members may still change their votes during the decision's grace period.
+            if (!app.IsDecisionFinal(queries.Now))
+                return new ArcRefusal(StatusCodes.Status409Conflict, ArcErrorCodes.DecisionNotFinal,
+                    $"Board members can change their votes until {app.DecisionFinalAt:yyyy-MM-dd HH:mm} UTC. Record the outcome after that.");
 
             var error = Validate(app, reason, conditions, req.Wording, out var wording);
             if (error is not null)
@@ -71,6 +75,8 @@ public class RecordOutcomeEndpoint(
             {
                 app.ConditionsOfApproval = conditions;
             }
+            // Rows decided before 031 have no board-size snapshot; take it now, at closing.
+            app.EligibleVoterCount ??= await queries.EligibleCountAsync(app.CommunityId, app.PropertyId, ct);
             app.Status = ArcApplicationStatus.Closed;
             app.ClosedAt = queries.Now;
             app.ClosedByUserId = caller;

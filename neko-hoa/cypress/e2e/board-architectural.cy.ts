@@ -2,7 +2,7 @@
 //
 // Stubbed with cy.intercept like board-mode.cy.ts so it runs against `ng serve` with no live API.
 // Covers the US1 and US2 Independent Tests end to end in the browser: the list renders with its tabs
-// and pill, and Approve on an unvoted row shows "you voted approve" and the updated tally.
+// and pill, and Approve + Submit (031) on an unvoted row shows "you voted approve" and the updated tally.
 
 export {};
 
@@ -66,11 +66,13 @@ describe('Board architectural review E2E (027)', () => {
     cy.get('tr[data-app-id="a1042"]').within(() => {
       cy.contains('ARC-1042');
       cy.contains('button', 'Approve').click();
+      // 031 item 5: picking a choice only selects it; Submit casts the vote.
+      cy.contains('button', 'Submit').click();
     });
     cy.wait('@vote').its('request.body').should('deep.equal', { choice: 'Approve', comment: null });
     cy.get('tr[data-app-id="a1042"]').within(() => {
       cy.contains('you voted approve').should('be.visible');
-      cy.get('[role=img]').should('have.attr', 'aria-label', '2 approve · 0 revisions needed · 0 deny · 3 not voted');
+      cy.get('[role=img]').should('have.attr', 'aria-label', '2 approve · 0 request revisions · 0 deny · 3 not voted');
     });
   });
 });

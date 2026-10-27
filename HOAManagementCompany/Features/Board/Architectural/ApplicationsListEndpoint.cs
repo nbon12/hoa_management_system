@@ -52,11 +52,14 @@ public class ApplicationsListEndpoint(ApplicationDbContext db, ICommunityScopeRe
         var closed = req.IncludeWithdrawn == true
             ? all.Where(a => a.Status == ArcApplicationStatus.Closed)
             : all.Where(a => a.Status == ArcApplicationStatus.Closed && a.DecisionOutcome != ArcOutcome.Withdrawn);
-        var isBoard = await queries.ActiveBoard(req.CommunityId).AnyAsync(m => m.UserId == caller, ct);
+        var activeBoard = queries.ActiveBoard(req.CommunityId);
+        var isBoard = await activeBoard.AnyAsync(m => m.UserId == caller, ct);
+        // Recused (linked to the property) only while another board member can still vote (031 waiver).
         var awaiting = all.Where(a =>
             a.Status == ArcApplicationStatus.Open
             && !a.Votes.Any(v => v.VoterUserId == caller)
-            && !db.UserProperties.Any(up => up.PropertyId == a.PropertyId && up.UserId == caller));
+            && !(db.UserProperties.Any(up => up.PropertyId == a.PropertyId && up.UserId == caller)
+                 && activeBoard.Any(m => !db.UserProperties.Any(up => up.PropertyId == a.PropertyId && up.UserId == m.UserId))));
 
         // Counts ignore search and paging so tab labels and the header pill stay stable (FR-003, FR-005).
         var counts = new ArcCountsDto(

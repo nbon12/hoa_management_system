@@ -15,6 +15,16 @@ internal static class ArcLog
             "ArcVoteCast: Actor={ActorId} Community={CommunityId} Application={ApplicationId} Choice={Choice} At={UtcNow:o}",
             actorId, communityId, applicationId, choice, at);
 
+    public static void VoteUndone(ILogger logger, string actorId, Guid communityId, Guid applicationId, DateTimeOffset at) =>
+        logger.LogInformation(
+            "ArcVoteUndone: Actor={ActorId} Community={CommunityId} Application={ApplicationId} At={UtcNow:o}",
+            actorId, communityId, applicationId, at);
+
+    public static void OwnerCommented(ILogger logger, string actorId, Guid communityId, Guid applicationId, int fileCount, DateTimeOffset at) =>
+        logger.LogInformation(
+            "ArcOwnerCommented: Actor={ActorId} Community={CommunityId} Application={ApplicationId} Files={FileCount} At={UtcNow:o}",
+            actorId, communityId, applicationId, fileCount, at);
+
     public static void OutcomeRecorded(ILogger logger, string actorId, Guid communityId, Guid applicationId, string outcome, string? wording, DateTimeOffset at) =>
         logger.LogInformation(
             "ArcOutcomeRecorded: Actor={ActorId} Community={CommunityId} Application={ApplicationId} Outcome={Outcome} Wording={Wording} At={UtcNow:o}",

@@ -50,6 +50,38 @@ internal static class ResidentArcHttp
                ?? throw ResidentArcDraftService.Validation("Send the file in a multipart field named 'file'.");
     }
 
+    /// <summary>
+    /// 031: reads a homeowner comment — the text field <c>message</c> and up to
+    /// <paramref name="maxFiles"/> multipart files named <c>files</c>.
+    /// </summary>
+    public static async Task<(string? Message, IReadOnlyList<IFormFile> Files)> ReadCommentAsync(
+        HttpContext ctx, ArcUploadOptions limits, int maxFiles, CancellationToken ct)
+    {
+        var sizeFeature = ctx.Features.Get<IHttpMaxRequestBodySizeFeature>();
+        if (sizeFeature is { IsReadOnly: false })
+            sizeFeature.MaxRequestBodySize = limits.MaxFileBytes * maxFiles + MultipartOverheadBytes;
+
+        if (!ctx.Request.HasFormContentType)
+            throw ResidentArcDraftService.Validation("Send the comment as multipart/form-data with 'message' and/or 'files'.");
+
+        IFormCollection form;
+        try
+        {
+            form = await ctx.Request.ReadFormAsync(ct);
+        }
+        catch (Exception ex) when (ex is BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge }
+                                       or InvalidDataException)
+        {
+            throw new DomainException(ResidentArcErrorCodes.FileTooLarge,
+                "The files are larger than the upload limit.", StatusCodes.Status422UnprocessableEntity);
+        }
+
+        var files = form.Files.GetFiles("files");
+        if (files.Count > maxFiles)
+            throw ResidentArcDraftService.Validation($"Attach at most {maxFiles} files to one comment.");
+        return (form["message"].ToString(), files);
+    }
+
     /// <summary>Issues one short-lived link after the caller's scope was checked; never a durable URL.</summary>
     public static async Task<ResidentArcAttachmentUrlDto> LinkAsync(
         IDocumentStorage storage, TimeProvider clock, string storageKey, CancellationToken ct)

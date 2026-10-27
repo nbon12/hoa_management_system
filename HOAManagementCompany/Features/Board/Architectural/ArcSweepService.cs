@@ -122,22 +122,25 @@ public sealed class ArcSweepService(
                     app.DecisionRule, eligible, counts.approve, counts.revisionsNeeded, counts.deny, dueDatePassed: true);
                 if (decision is not null)
                 {
-                    SetDecision(app, decision, ArcDecisionSource.Votes, now);
+                    SetDecision(app, decision, ArcDecisionSource.Votes, now, eligible);
                     await db.SaveChangesAsync(ct);
                     result = DueDateResult.DecidedFromVotes;
                     return null;
                 }
             }
 
+            var eligibleAtLapse = app.LapseRule == ArcLapseRule.FlagOverdueOnly
+                ? 0
+                : await queries.EligibleCountAsync(app.CommunityId, app.PropertyId, ct);
             switch (app.LapseRule)
             {
                 case ArcLapseRule.DeemedApproved:
-                    SetDecision(app, new ArcDecision(ArcOutcome.Approved, null), ArcDecisionSource.Lapse, now);
+                    SetDecision(app, new ArcDecision(ArcOutcome.Approved, null), ArcDecisionSource.Lapse, now, eligibleAtLapse);
                     break;
                 case ArcLapseRule.DeemedDenied:
                     // The manager picks the owner wording when recording (FR-025); this default shows until then.
                     SetDecision(app, new ArcDecision(ArcOutcome.Denied, ArcDenialWording.RevisionsRequested),
-                        ArcDecisionSource.Lapse, now);
+                        ArcDecisionSource.Lapse, now, eligibleAtLapse);
                     break;
             }
 
@@ -157,13 +160,20 @@ public sealed class ArcSweepService(
         return result;
     }
 
-    public static void SetDecision(ArchitecturalApplication app, ArcDecision decision, ArcDecisionSource source, DateTimeOffset now)
+    /// <summary>
+    /// Records a reached decision. Final immediately (DecisionFinalAt = now) unless the caller sets a
+    /// grace period afterwards, as a vote-reached decision does (031, <see cref="ArcVoting"/>).
+    /// </summary>
+    public static void SetDecision(
+        ArchitecturalApplication app, ArcDecision decision, ArcDecisionSource source, DateTimeOffset now, int eligibleVoters)
     {
         app.Status = ArcApplicationStatus.DecisionReached;
         app.DecisionOutcome = decision.Outcome;
         app.DecisionWording = decision.Wording;
         app.DecisionSource = source;
         app.DecisionReachedAt = now;
+        app.DecisionFinalAt = now;
+        app.EligibleVoterCount = eligibleVoters;
     }
 
     private async Task<(int approve, int revisionsNeeded, int deny)> VoteCountsAsync(Guid applicationId, CancellationToken ct)

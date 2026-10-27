@@ -49,6 +49,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<ArchitecturalApplication> ArchitecturalApplications => Set<ArchitecturalApplication>();
     public DbSet<ArchitecturalAttachment> ArchitecturalAttachments => Set<ArchitecturalAttachment>();
     public DbSet<ArchitecturalVote> ArchitecturalVotes => Set<ArchitecturalVote>();
+    public DbSet<ArchitecturalOwnerComment> ArchitecturalOwnerComments => Set<ArchitecturalOwnerComment>();
     public DbSet<ArchitecturalInfoRequest> ArchitecturalInfoRequests => Set<ArchitecturalInfoRequest>();
     public DbSet<ArchitecturalApplicationDraft> ArchitecturalApplicationDrafts => Set<ArchitecturalApplicationDraft>();
     public DbSet<ArchitecturalDraftAttachment> ArchitecturalDraftAttachments => Set<ArchitecturalDraftAttachment>();
@@ -545,6 +546,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.Property(x => x.DecisionRule).HasConversion<string>().HasMaxLength(40);
             e.Property(x => x.TimeZoneId).HasMaxLength(64);
             e.Property(x => x.FormalDisapprovalStatement).HasMaxLength(1000);
+            e.Property(x => x.LapseRuleCitation).HasMaxLength(300)
+                .HasDefaultValue(Domain.Entities.CommunityArcSettings.DefaultLapseRuleCitation);
             e.HasOne(x => x.Community).WithOne()
                 .HasForeignKey<CommunityArcSettings>(x => x.CommunityId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<ApplicationUser>().WithMany()
@@ -609,6 +612,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasForeignKey(x => x.InfoRequestId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne<ApplicationUser>().WithMany()
                 .HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<ArchitecturalOwnerComment>().WithMany()
+                .HasForeignKey(x => x.OwnerCommentId).OnDelete(DeleteBehavior.Cascade);
             e.ToTable("ArchitecturalAttachments");
         });
 
@@ -637,6 +642,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasOne<ApplicationUser>().WithMany()
                 .HasForeignKey(x => x.RespondedByUserId).OnDelete(DeleteBehavior.SetNull);
             e.ToTable("ArchitecturalInfoRequests");
+        });
+
+        // 031: homeowner comments on their own application.
+        builder.Entity<ArchitecturalOwnerComment>(e =>
+        {
+            e.HasIndex(x => x.ApplicationId);
+            e.Property(x => x.Body).HasMaxLength(2000);
+            e.HasOne(x => x.Application).WithMany(a => a.OwnerComments)
+                .HasForeignKey(x => x.ApplicationId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Author).WithMany()
+                .HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable("ArchitecturalOwnerComments");
         });
 
         // ── Resident architectural submission (029-resident-arc-requests) ───

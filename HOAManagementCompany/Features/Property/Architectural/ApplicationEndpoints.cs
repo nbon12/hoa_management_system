@@ -102,6 +102,31 @@ public class ReplyInfoRequestEndpoint(ResidentArcActionsService actions, Residen
     }
 }
 
+/// <summary>
+/// POST …/{id}/comments — the homeowner comments on their own request (031), e.g. to answer a revision
+/// request, with text and/or files. Multipart: <c>message</c> plus up to five <c>files</c>.
+/// </summary>
+public class PostCommentEndpoint(ResidentArcActionsService actions, ResidentArcQueries queries, IOptions<ArcUploadOptions> limits)
+    : Endpoint<ResidentArcCommentRoute, ResidentArcDetailDto>
+{
+    public override void Configure()
+    {
+        Post($"{ResidentArcHttp.Base}/{{id:guid}}/comments");
+        AllowFileUploads(dontAutoBindFormData: true);
+        Description(x => x.WithName("CommentOnArchitecturalRequest").WithTags(ResidentArcHttp.Tag)
+            .RequireRateLimiting(ResidentArcHttp.WritePolicy));
+    }
+
+    public override async Task HandleAsync(ResidentArcCommentRoute req, CancellationToken ct)
+    {
+        ResidentArcHttp.NoStore(HttpContext);
+        var (message, files) = await ResidentArcHttp.ReadCommentAsync(
+            HttpContext, limits.Value, ResidentArcActionsService.MaxCommentFiles, ct);
+        var app = await actions.CommentAsync(User, req.Id, message, files, ct);
+        await SendAsync(await queries.BuildDetailAsync(app, ct), StatusCodes.Status201Created, ct);
+    }
+}
+
 /// <summary>POST …/{id}/withdraw — withdraw an undecided request (US4, FR-020/FR-021).</summary>
 public class WithdrawApplicationEndpoint(ResidentArcActionsService actions, ResidentArcQueries queries)
     : EndpointWithoutRequest<ResidentArcDetailDto>

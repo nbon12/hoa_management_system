@@ -75,6 +75,8 @@ h1.page-title {
   &.btn--primary { background: var(--rose); color: var(--paper); }
   &.btn--ghost   { border-style: dashed; color: var(--ink-soft); }
   &.btn--violet  { background: var(--violet); color: var(--paper); }
+  // 031: destructive actions (e.g. "Withdraw request").
+  &.btn--danger  { background: var(--warn-bg); border-color: oklch(0.55 0.16 28); color: oklch(0.42 0.15 28); font-weight: 600; }
   &.btn--block   { width: 100%; justify-content: center; }
 }
 
@@ -102,6 +104,45 @@ h1.page-title {
   &::placeholder { color: var(--ink-mute); }
   &:focus { outline: none; border-color: var(--violet); }
   &.field--dashed { border-style: dashed; }
+  // 031: a hover tint so it's clear the box takes typing.
+  &:hover:not(:disabled):not(:focus) { border-color: var(--violet); background: var(--pink); cursor: text; }
+}
+
+/* ── 031: vote choice toggles (pick one, then Submit/Save) ── */
+.vote-choice {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 999px;
+  border: 1.5px solid var(--line); background: var(--paper); color: var(--ink);
+  font-size: 11.5px; font-weight: 500; font-family: inherit; cursor: pointer;
+  transition: background .12s, border-color .12s;
+  &:hover:not(:disabled) { background: var(--pink); border-color: var(--rose); }
+  &:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+  &:disabled { opacity: .5; cursor: not-allowed; }
+  &[aria-pressed='true'] { background: var(--lav-2); border-color: var(--violet); font-weight: 600; }
+  &[aria-pressed='true']::before { content: '●'; font-size: 8px; color: var(--violet); }
+}
+
+/* ── 031: skeleton screens ── */
+.skeleton {
+  display: block; border-radius: 6px; height: 12px; margin: 8px 0;
+  background: linear-gradient(90deg, var(--line-soft) 25%, var(--lav) 50%, var(--line-soft) 75%);
+  background-size: 200% 100%; animation: skeleton-shimmer 1.2s ease-in-out infinite;
+  &.skeleton--title { height: 18px; width: 55%; margin-bottom: 14px; }
+  &.skeleton--block { height: 64px; }
+  &.skeleton--short { width: 35%; }
+  &.skeleton--mid { width: 70%; }
+}
+@keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* ── 031: final decision marks ── */
+.final-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-weight: 700; border: 1.5px solid var(--ink);
+  &.final-mark--approved { background: var(--ok-bg); border-color: oklch(0.55 0.12 160); color: oklch(0.40 0.10 160); }
+  &.final-mark--denied { background: var(--warn-bg); border-color: oklch(0.55 0.16 28); color: oklch(0.42 0.15 28); }
+  &.final-mark--revisions { background: oklch(0.93 0.09 95); border-color: oklch(0.70 0.14 85); color: oklch(0.45 0.10 75); }
+  &.final-mark--withdrawn { background: var(--line-soft); border-color: var(--line); color: var(--ink-mute); }
 }
 
 /* ── tables ── */

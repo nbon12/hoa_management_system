@@ -78,7 +78,7 @@ As a board member, I vote Approve, Revisions needed or Deny on an open applicati
 
 **Acceptance Scenarios**:
 
-1. **Given** an open application I have not voted on, **When** the row renders, **Then** my vote column shows Approve, Revisions needed, Deny and Info buttons.
+1. **Given** an open application I have not voted on, **When** the row renders, **Then** my vote column shows Approve, Revisions needed, Deny and Info buttons. *(Amended by `031-arc-review-refinements`: the buttons read Approve, Request revisions, Deny and Ask question; a choice is picked, then cast with Submit.)*
 2. **Given** a five-member board and an open application I have not voted on with a tally of 1 approve / 0 deny / 4 not voted, **When** I click Approve on its row, **Then** my vote is saved, my vote column reads "you voted approve", and the tally reads 2 approve / 0 deny / 3 not voted. (A third approval would reach a decision under the default rule; see User Story 6.)
 3. **Given** I have already voted deny on an application, **When** the row renders, **Then** my vote column shows "you voted deny" and no vote buttons.
 4. **Given** an open application I have not voted on, **When** I click Revisions needed with the comment "Fence must be 5ft max per Guideline 4.2", **Then** my vote is saved, my vote column reads "you voted revisions needed", the tally's revisions-needed count goes up by one, and I see the note "Revisions needed counts as a formal denial; the owner is invited to revise and resubmit."
@@ -179,8 +179,8 @@ When enough board members vote the same way, the application has a board decisio
 
 - **Board size changes mid-vote**: The majority and quorum are computed against the active, non-recused board members at the time each vote is counted. A member whose membership ends keeps their already-cast vote; a newly added member can vote on any still-open application.
 - **Even-sized board**: Under majority of members, the majority is more than half of eligible members (3 of 4, 4 of 6). A tie never reaches a decision under either rule.
-- **Board member owns the property**: They are recused. They count neither toward the denominator nor the tally.
-- **Board member votes twice**: The second attempt is refused; a vote can't be changed after it is cast. *(Assumption — see Assumptions.)*
+- **Board member owns the property**: They are recused. They count neither toward the denominator nor the tally. *(Amended by `031-arc-review-refinements`: recusal never leaves the board with nobody eligible — on a one-member board the member votes.)*
+- **Board member votes twice**: The second attempt is refused; a vote can't be changed after it is cast. *(Assumption — see Assumptions.)* *(Amended by `031-arc-review-refinements`: a vote can be undone and recast until the decision is final; a second vote without undo is still refused.)*
 - **Two board members vote at the same moment as the deciding vote**: Exactly one decision is reached, and any vote after the decision is refused.
 - **Application with no attachments**: The row shows "none" and the panel shows an empty-state message.
 - **Info requested close to the deadline**: The due date doesn't move. The reminder (FR-028a) and lapse emails still go out on schedule.
@@ -203,7 +203,7 @@ When enough board members vote the same way, the application has a board decisio
 - **FR-005**: The page header MUST read "Architectural applications" and show a pill counting the open applications the current user may vote on but has not, reading "N awaiting your vote". The pill is hidden when N is 0. *[design: `WFb BoardArchApps` header pill "1 awaiting your vote".]*
 - **FR-006**: The Attachments column MUST show "📎 N file(s)" when attachments exist and "none" otherwise. *[design: `WFb BoardArchApps` attachments cell.]*
 - **FR-007**: The Board votes column MUST show a tally of approve, revisions needed, deny and not-voted counts plus "approved/eligible" text (for example "2/5"), with an accessible label of the form "2 approve · 1 revisions needed · 0 deny · 2 not voted". *[design: `WFb Tally`.]*
-- **FR-008**: The Your vote column MUST show Approve, Revisions needed, Deny and Info actions when the current user may vote and hasn't; "you voted approve", "you voted revisions needed" or "you voted deny" once they have; and a recused indicator when they are recused. *[design: `WFb BoardArchApps` "Your vote" cell; recused state is `[no WFb]`.]*
+- **FR-008**: The Your vote column MUST show Approve, Revisions needed, Deny and Info actions when the current user may vote and hasn't; "you voted approve", "you voted revisions needed" or "you voted deny" once they have; and a recused indicator when they are recused. *[design: `WFb BoardArchApps` "Your vote" cell; recused state is `[no WFb]`.]* *(Amended by `031-arc-review-refinements`: 031 FR-002, FR-007, FR-011, FR-013.)*
 - **FR-009**: Collections MUST be paginated with a default page size of 25 and a maximum of 100. `[no WFb]`
 
 ### Detail panel and attachments
@@ -217,15 +217,15 @@ When enough board members vote the same way, the application has a board decisio
 
 - **FR-014**: Only users with an active Board Member membership in the application's community MAY vote. Community Managers and Accountants MUST NOT vote unless they also hold an active Board Member membership there.
 - **FR-015**: A vote MUST be Approve, Revisions needed or Deny and MAY carry an optional comment of up to 2,000 characters. Revisions needed MUST be presented to the board member as a formal denial that invites the owner to revise and resubmit. *[design: `WFb` "Cast your vote" card — "Comment to the board · Optional".]*
-- **FR-016**: Each eligible board member MAY cast at most one vote per application. A vote can't be changed after it is cast.
+- **FR-016**: Each eligible board member MAY cast at most one vote per application. A vote can't be changed after it is cast. *(Amended by `031-arc-review-refinements`: 031 FR-003–FR-005 — a vote may be undone and recast until the decision is final: one day after the threshold is met, never past the end of the due date.)*
 - **FR-017**: A board member who owns the application's property MUST be recused. They can't vote and don't count toward the eligible total.
-- **FR-018**: Votes MUST be refused on applications that are closed or that have already reached a decision.
+- **FR-018**: Votes MUST be refused on applications that are closed or that have already reached a decision. *(Amended by `031-arc-review-refinements`: refused once the decision is final, 031 FR-004.)*
 - **FR-019**: Vote comments MUST be visible to the community's board members and community managers, each with the voter's name and UTC timestamp. They MUST NOT be visible to residents.
-- **FR-020**: Voting MUST be available from the row (Approve / Revisions needed / Deny), from the detail panel (✓ Approve / ↻ Revisions needed / ✕ Deny with optional comment), and from the Community Home "Needs your vote" card. *[design: `WFb BoardArchApps` row and "Cast your vote" card; `WFb NeedsYourVote`.]*
+- **FR-020**: Voting MUST be available from the row (Approve / Revisions needed / Deny), from the detail panel (✓ Approve / ↻ Revisions needed / ✕ Deny with optional comment), and from the Community Home "Needs your vote" card. *[design: `WFb BoardArchApps` row and "Cast your vote" card; `WFb NeedsYourVote`.]* *(Amended by `031-arc-review-refinements`: picking a choice selects it and Submit / Save casts it, 031 FR-002.)*
 
 ### Information requests
 
-- **FR-021**: A board member MAY send a "Request info" message (required, up to 2,000 characters) on an open application. It MUST NOT count as a vote, MUST NOT change the tally, and MUST NOT pause or move the due date. When composing it, the board member MUST be shown that questions don't pause the review period, with the due date and a pointer that Revisions needed is how to require changes. *[design: `WFb` "Info" row action and "Request info" button.]*
+- **FR-021**: A board member MAY send a "Request info" message (required, up to 2,000 characters) on an open application. It MUST NOT count as a vote, MUST NOT change the tally, and MUST NOT pause or move the due date. When composing it, the board member MUST be shown that questions don't pause the review period, with the due date and a pointer that Revisions needed is how to require changes. *[design: `WFb` "Info" row action and "Request info" button.]* *(Amended by `031-arc-review-refinements`: the action is "Ask question" and the notice text is 031 FR-012.)*
 - **FR-022**: An application with an outstanding information request MUST show an "info requested" marker with the message, sender and time to board members and community managers. `[no WFb]`
 
 ### Decision and closing
@@ -290,7 +290,7 @@ When enough board members vote the same way, the application has a board decisio
 
 ### Measurable Outcomes
 
-- **SC-001**: A board member can go from Community Home to a cast vote on an application in 2 clicks or fewer (Approve on the "Needs your vote" card is 1).
+- **SC-001**: A board member can go from Community Home to a cast vote on an application in 2 clicks or fewer (Approve on the "Needs your vote" card is 1). *(Amended by `031-arc-review-refinements`: a pick and Save on the card, 2 clicks.)*
 - **SC-002**: A board member can open any attachment of an application within 3 seconds of selecting it.
 - **SC-003**: 100% of attachment links issued by the product stop working within 15 minutes, and no page or response contains a durable public object URL.
 - **SC-004**: 0 votes are accepted from non-board members, recused owners, or on closed or decided applications, across the automated suite.
@@ -302,7 +302,7 @@ When enough board members vote the same way, the application has a board decisio
 ## Assumptions
 
 - **Majority rule**: The default rule, "Three of five votes decide", generalizes to a simple majority of active, non-recused board members. The wireframe's five-member board is just the example.
-- **Votes are final**: A board member can't change or withdraw a vote. This keeps the record clean and matches how most boards minute decisions. Easy to relax later if wanted.
+- **Votes are final**: A board member can't change or withdraw a vote. This keeps the record clean and matches how most boards minute decisions. Easy to relax later if wanted. *(Amended by `031-arc-review-refinements`: relaxed — votes are final once the decision is, after a one-day grace period.)*
 - **Due date**: The review period defaults to 30 days, matching the wireframe (received 05/28/26, due 06/27/26), and the lapse rule defaults to "flag overdue only" so nothing is decided automatically until a manager sets the community's rule.
 - **Owner email templates**: Three owner emails (approved, revisions requested, denied) are being designed separately in Claude Design. Until they arrive, plain-text versions with the same fields are used.
 - **No incomplete notice**: A formal "submission incomplete" notice is out of scope. Submissions are kept complete by required fields in the submission spec, and denial with "Revisions requested" covers the rest. It can be added after counsel review.
