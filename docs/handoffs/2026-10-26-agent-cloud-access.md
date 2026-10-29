@@ -30,6 +30,14 @@ Run ids and names are on #234.
 - #235 (A2: `pr-env-repair`, `pr-env-reap.sh`, `cancel-in-progress: false`) and #240 (A5: stale-lock
   clearing, reap before apply, keep state after a failed destroy, sweep fixes and the daily name audit)
   are merged. The #240 double-push test passed, and its teardown left zero residue.
+- A6: the sweep clears a stale lock and removes the prefix (run 40810863292). The test exposed a bug: a
+  lock with no state beside it blocked `tofu init`, which needs the lock to write an empty state. #249
+  fixed it by clearing the lock before init in provision, teardown and sweep.
+- A1: `pr-env-repair action=verify` (#246, made stricter in #250) passed every check that applies. Neon
+  is "not checked". The two Cloud Scheduler checks are inconclusive until the Scheduler API (enabled
+  2026-10-29; it had never been turned on) and the ARC sweep job from #238 exist.
+- O14: the Cloudflare `claude-agent-ro` token was rolled on 2026-10-29. It expires on 2027-01-25; roll it
+  again before then.
 - Tier 1 identities: `nekohoa-agent-ro-dev`, used through WIF on the `main` subject only (not the repo-wide
   principalSet below), the Cloudflare and Stripe `claude-agent-ro` tokens as repo secrets, and the `ops`
   Environment.
@@ -58,12 +66,11 @@ Run ids and names are on #234.
    checked". The daily sweep's name audit, using CI's key, covers Neon orphans fleet-wide.
 
 **Open**
-- A6, last part: show that the sweep clears a lock older than 45 minutes. The test is running on
-  2026-10-29.
-- O14: rehearse one rotation, of the Cloudflare `claude-agent-ro` token (operator, in the dashboard).
 - The cloud half of Verification 8 (decision 4): an operator starts one cloud session.
-- A5a / #238 (`infra-apply` 409) and #242 (images from Artifact Registry; Cloud Run gets 429s from
-  `mirror.gcr.io`) are open. #241 (`lock-merged-branch`) needs the `BRANCH_LOCK_TOKEN` secret.
+- A5a / #238 (`infra-apply` 409). Then re-run `verify` so the scheduler checks mean something. #242
+  (Artifact Registry images) and #241 (`lock-merged-branch`) are merged.
+- Under #236: scope the sweep's live-run check (`CHECK_LIVE_RUNS`) to each PR's own runs. Today a live run
+  for any PR, or a repair run waiting for `ops`, keeps every stale lock.
 
 ---
 
@@ -1403,11 +1410,11 @@ secret is attached.
 - [x] **O13.** (Not applicable: no Tier 2, decision 3.) After any incident that used Tier 2: the break-glass close-out in Step 0.7 (disable
       the repair SA, remove per-orphan bindings, revoke the Tier 2 tokens, remove them from
       `nekohoa-ops`), with ids on the issue.
-- [ ] **O14.** Rehearse one Tier 1 rotation using Security notes → Rotation.
+- [x] **O14.** (Cloudflare token rolled 2026-10-29.) Rehearse one Tier 1 rotation using Security notes → Rotation.
 
 ### Agent session, in order
 
-- [ ] **A1.** (Now `pr-env-repair` `action=verify`; see Status and decisions.) Run the Tier 1 checks (Verification 1-3, 5-7 and 9) and post pass/fail per line on the
+- [x] **A1.** (Now `pr-env-repair` `action=verify`, passed 2026-10-29; scheduler checks pending #238; see Status and decisions.) Run the Tier 1 checks (Verification 1-3, 5-7 and 9) and post pass/fail per line on the
       tracking issue. Run step 4 only while a Tier 2 token is present. Step 8 runs in A3.
 - [x] **A2.** On a new branch off `main`, add `.github/workflows/pr-env-repair.yml` and
       `scripts/pr-env-reap.sh` as specified (SHA-pinned, step-scoped secrets, env-passed inputs,
@@ -1427,7 +1434,7 @@ secret is attached.
 - [ ] **A5a.** On another branch off `main`, fix the `infra-apply` 409 (Root-cause item 9). Confirm
       the `infra-plan` output, then after merge confirm `infra-apply` is green and the plan no longer
       adds `ArchitecturalReview__AppBaseUrl` or `nekohoa-arc-sweep-dev`.
-- [ ] **A6.** Prove the fix with a test PR: push twice in quick succession while `pr-env` is
+- [x] **A6.** (Done 2026-10-29; stale-lock part needed #249.) Prove the fix with a test PR: push twice in quick succession while `pr-env` is
       provisioning. The second run must queue, not cancel the first, and the environment must come
       up. Then close the PR and confirm teardown leaves zero residue. Also show that a lock left
       within 45 minutes of close is cleared by the next sweep and the environment reaches zero
