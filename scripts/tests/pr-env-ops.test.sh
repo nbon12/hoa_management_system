@@ -44,14 +44,20 @@ case "$1 $2" in
   "auth print-access-token") [ -f "$STUB_DIR/gcloud_noauth" ] && exit 1; echo gcp-test-token ;;
 esac
 EOF
-# gh: `run list` prints the live-run count in $STUB_DIR/live (or fails when gh_fail exists); `api
-# repos/.../pulls/<n>` prints $STUB_DIR/pr_<n> (default "closed").
+# gh: `run list --workflow <w> --jq <expr>` applies the real --jq to $STUB_DIR/runs_<w> (default []), so
+# the script's filter is tested too; fails when gh_fail exists. `api repos/.../pulls/<n>` prints
+# $STUB_DIR/pr_<n> (default "closed").
 cat >"$STUB_DIR/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "gh $*" >>"$STUB_DIR/calls"
 [ -f "$STUB_DIR/gh_fail" ] && exit 1
 case "$1 $2" in
-  "run list") cat "$STUB_DIR/live" 2>/dev/null || echo 0 ;;
+  "run list")
+    w="" q="."
+    while [ $# -gt 0 ]; do
+      case "$1" in --workflow) w="$2"; shift 2 ;; --jq) q="$2"; shift 2 ;; *) shift ;; esac
+    done
+    jq -r "$q" "$STUB_DIR/runs_${w}" 2>/dev/null || jq -rn "[] | $q" ;;
   api*) n="${2##*/}"; cat "$STUB_DIR/pr_${n}" 2>/dev/null || echo closed ;;
 esac
 EOF
@@ -60,7 +66,7 @@ chmod +x "$STUB_DIR/bin/"*
 # ── Harness ───────────────────────────────────────────────────────────────────────────────────────────
 route() { printf '%s\t%s\t%s\t%s\n' "$@" >>"$STUB_DIR/routes"; }
 reset() {
-  rm -f "$STUB_DIR"/{routes,calls,argv,live,gh_fail,gcloud_noauth} "$STUB_DIR"/pr_*
+  rm -f "$STUB_DIR"/{routes,calls,argv,gh_fail,gcloud_noauth} "$STUB_DIR"/pr_* "$STUB_DIR"/runs_*
   touch "$STUB_DIR/routes" "$STUB_DIR/calls" "$STUB_DIR/argv"
 }
 run() {
@@ -109,23 +115,47 @@ exit_is 0; called "$DEL"; out_has "removed stale state lock 1761486454120000"
 not_called '^gh '
 dump_on_fail "$f0"
 
-t "sweep mode keeps a stale lock while a pr-env, teardown or repair run is unfinished"; f0=$fail
-lock_at "$OLD"; route DELETE "${LOCK}" 204 ''; echo 1 >"$STUB_DIR/live"
+t "sweep mode keeps a stale lock while this PR's pr-env, teardown or repair run is unfinished"; f0=$fail
+lock_at "$OLD"; route DELETE "${LOCK}" 204 ''
+echo '[{"status":"in_progress","displayTitle":"feat: thing (pr-217)"},
+       {"status":"completed","displayTitle":"feat: thing (pr-217)"}]' >"$STUB_DIR/runs_pr-env.yml"
+echo '[{"status":"waiting","displayTitle":"pr-env-repair reap (pr-217)"}]' >"$STUB_DIR/runs_pr-env-repair.yml"
 clear_lock CHECK_LIVE_RUNS=true
-exit_is 0; out_has "run(s) are unfinished"; not_called '^curl DELETE'
+exit_is 0; out_has "2 pr-env, teardown or repair run(s) that may be this PR's are unfinished"
+not_called '^curl DELETE'
 called '^gh run list --repo nbon12/hoa_management_system --workflow pr-env\.yml '
 called '^gh run list .* --workflow pr-env-teardown\.yml '
 called '^gh run list .* --workflow pr-env-repair\.yml '
 dump_on_fail "$f0"
 
+t "sweep mode ignores other PRs' unfinished runs and finished ones"; f0=$fail
+lock_at "$OLD"; route DELETE "${LOCK}" 204 ''
+echo '[{"status":"in_progress","displayTitle":"fix (pr-217) in the title (pr-247)"},
+       {"status":"completed","displayTitle":"feat: thing (pr-217)"}]' >"$STUB_DIR/runs_pr-env.yml"
+echo '[{"status":"queued","displayTitle":"pr-env-teardown (pr-2170)"}]' >"$STUB_DIR/runs_pr-env-teardown.yml"
+echo '[{"status":"waiting","displayTitle":"pr-env-repair reap (pr-74)"},
+       {"status":"in_progress","displayTitle":"pr-env-repair verify (pr-0)"}]' >"$STUB_DIR/runs_pr-env-repair.yml"
+clear_lock CHECK_LIVE_RUNS=true
+exit_is 0; called "$DEL"; out_lacks "are unfinished"
+dump_on_fail "$f0"
+
+t "sweep mode counts an unfinished run without a PR tag as live"; f0=$fail
+lock_at "$OLD"; route DELETE "${LOCK}" 204 ''
+echo '[{"status":"waiting","displayTitle":"pr-env-repair"}]' >"$STUB_DIR/runs_pr-env-repair.yml"
+clear_lock CHECK_LIVE_RUNS=true
+exit_is 0; out_has "1 pr-env, teardown or repair run(s) that may be this PR's are unfinished"
+not_called '^curl DELETE'
+dump_on_fail "$f0"
+
 t "sweep mode treats an unreadable run list as live"; f0=$fail
 lock_at "$OLD"; route DELETE "${LOCK}" 204 ''; touch "$STUB_DIR/gh_fail"
 clear_lock CHECK_LIVE_RUNS=true
-exit_is 0; out_has "3 pr-env, teardown or repair run(s) are unfinished"; not_called '^curl DELETE'
+exit_is 0; out_has "3 pr-env, teardown or repair run(s) that may be this PR's are unfinished"
+not_called '^curl DELETE'
 dump_on_fail "$f0"
 
 t "sweep mode removes a stale lock when no run is live"; f0=$fail
-lock_at "$OLD"; route DELETE "${LOCK}" 204 ''; echo 0 >"$STUB_DIR/live"
+lock_at "$OLD"; route DELETE "${LOCK}" 204 ''
 clear_lock CHECK_LIVE_RUNS=true
 exit_is 0; called "$DEL"
 dump_on_fail "$f0"

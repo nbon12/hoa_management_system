@@ -9,7 +9,9 @@
 #                                    pr-env-repair run for this PR. The age floor protects a live sweep
 #                                    destroy, which runs outside that group.
 #   pr-env-sweep.yml                 CHECK_LIVE_RUNS=true: outside the group, so it also keeps the lock
-#                                    while any pr-env, teardown or repair run (for any PR) is unfinished.
+#                                    while a pr-env, teardown or repair run for this PR is unfinished.
+#                                    Those workflows end their run-name in "(pr-<n>)"; an unfinished run
+#                                    without that tag counts as live for every PR.
 #
 # A kept lock is not an error: the caller's -lock-timeout waits for it and fails if it never clears. The
 # delete is conditional on the generation that was inspected (the GCS backend's Lock ID), so a lock taken
@@ -67,15 +69,23 @@ if [ "$age" -lt "$STALE_AFTER_MIN" ]; then
 fi
 
 if [ "$CHECK_LIVE_RUNS" = true ]; then
+  # Only runs for this PR can hold its lock, so another PR's run (or a repair waiting days for approval)
+  # does not block this one (#236). A run is matched by the "(pr-<n>)" its workflow's run-name ends in.
   live=0
   for w in pr-env.yml pr-env-teardown.yml pr-env-repair.yml; do
-    c="$(gh run list --repo "$REPO" --workflow "$w" --limit 50 --json status \
-      --jq '[.[] | select(.status != "completed")] | length' 2>/dev/null || true)"
-    [[ "$c" =~ ^[0-9]+$ ]] || c=1 # unknown counts as live
-    live=$(( live + c ))
+    if ! titles="$(gh run list --repo "$REPO" --workflow "$w" --limit 50 --json status,displayTitle \
+      --jq '.[] | select(.status != "completed") | .displayTitle' 2>/dev/null)"; then
+      live=$(( live + 1 )) # unknown counts as live
+      continue
+    fi
+    while IFS= read -r title; do
+      [ -n "$title" ] || continue
+      if [[ "$title" =~ \(pr-([0-9]+)\)$ ]] && [ "${BASH_REMATCH[1]}" != "$PR_NUMBER" ]; then continue; fi
+      live=$(( live + 1 )) # this PR's run, or an untagged one
+    done <<<"$titles"
   done
   if [ "$live" -gt 0 ]; then
-    echo "::warning::PR #${PR_NUMBER}: keeping state lock ${gen} (${age} min old): ${live} pr-env, teardown or repair run(s) are unfinished."
+    echo "::warning::PR #${PR_NUMBER}: keeping state lock ${gen} (${age} min old): ${live} pr-env, teardown or repair run(s) that may be this PR's are unfinished."
     exit 0
   fi
 fi

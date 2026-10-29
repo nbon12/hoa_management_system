@@ -54,8 +54,10 @@ tags are not pruned.
 **Logic** — enumerate `state/pr/*` prefixes (an empty listing is a clean exit); per PR number:
 - PR closed/merged but env present → `tofu destroy` (orphan; SC-005).
 - PR open, last commit > 7 days ago → `tofu destroy` + comment "reclaimed; rebuilds on next push" (FR-007).
-- Before each destroy, clear a stale state lock (`CHECK_LIVE_RUNS=true`: kept while any `pr-env`,
-  teardown or repair run is unfinished, because the sweep is outside the `pr-env-<n>` group). The state is
+- Before each destroy, clear a stale state lock (`CHECK_LIVE_RUNS=true`: kept while a `pr-env`,
+  teardown or repair run for that PR is unfinished, because the sweep is outside the `pr-env-<n>` group;
+  the three workflows end their `run-name` in `(pr-<n>)` so a run can be matched to its PR, and an
+  untagged unfinished run counts for every PR). The state is
   deleted only after a successful destroy; a failed one fails the run and is retried next time.
 - Ensure `pr-base` Neon branch exists; recreate from Dev if missing (self-healing, D3).
 - Audit by name (`scripts/pr-env-audit.sh`, tested by `scripts/tests/pr-env-ops.test.sh`): every

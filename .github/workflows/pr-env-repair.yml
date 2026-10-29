@@ -22,6 +22,8 @@
 # uses them (FR-E4); actions are SHA-pinned (FR-E6). Output is names, ids and states only: this public
 # repo's Actions logs are world-readable.
 name: pr-env-repair
+# Ends in "(pr-<n>)": pr-env-clear-stale-lock.sh matches a live run to its PR by it (sweep, #236).
+run-name: 'pr-env-repair ${{ inputs.action }} (pr-${{ inputs.pr_number }})'
 
 on:
   workflow_dispatch:
