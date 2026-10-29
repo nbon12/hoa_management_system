@@ -173,6 +173,23 @@ out_has "inconclusive  read the value of secret dev-jwt-secret: HTTP 404"
 out_has "inconclusive  describe Cloud Scheduler job nekohoa-arc-sweep-dev: HTTP 404"
 dump_on_fail "$f0"
 
+t "a 403 from a disabled API is inconclusive, and its body is not printed"; f0=$fail
+route GET "${SCHED}\$" 403 '{"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED","metadata":{"consumer":"projects/disabled-body-marker"}}]}}'
+run_verify
+exit_is 0
+out_has "inconclusive  describe Cloud Scheduler job nekohoa-arc-sweep-dev: HTTP 403 SERVICE_DISABLED"
+out_lacks "PASS  describe Cloud Scheduler job"
+out_lacks "disabled-body-marker"
+dump_on_fail "$f0"
+
+t "no scheduler audit-log entries is inconclusive, not a pass"; f0=$fail
+route POST "${LOG}\$" 200 '{"entries":[]}' 'cloudscheduler'
+run_verify
+exit_is 0
+out_has "inconclusive  no Cloud Scheduler audit-log entries in 400 days (no jobs yet)"
+out_lacks "PASS  no request headers"
+dump_on_fail "$f0"
+
 t "an R2 delete that gets to 'bucket does not exist' counts as over-scoped"; f0=$fail
 route DELETE "${CF}/accounts/acct/r2/buckets/agent-ro-probe\$" 404 '{"success":false,"errors":[{"code":10006,"message":"The specified bucket does not exist."}]}'
 run_verify
