@@ -53,31 +53,35 @@ export const RENAMED_TIME_ZONES: Readonly<Record<string, string>> = {
 const OLD_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(RENAMED_TIME_ZONES).map(([old, current]) => [current, old]));
 
-/** "Eastern Time" (`longGeneric`), "GMT-4" (`shortOffset`) or "EDT" (`short`) for this zone at this instant. */
-function zoneName(zone: string, when: Date, style: 'longGeneric' | 'shortOffset' | 'short'): string {
+/**
+ * This zone's "Eastern Time" (`longGeneric`), "GMT-4" (`shortOffset`) or "EDT" (`short`) at an
+ * instant. One formatter serves every instant: building formatters is the slow part.
+ */
+function zoneName(zone: string, style: 'longGeneric' | 'shortOffset' | 'short'): (when: Date) => string {
   try {
-    return new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: style })
-      .formatToParts(when).find(p => p.type === 'timeZoneName')?.value ?? '';
+    const format = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: style });
+    return when => format.formatToParts(when).find(p => p.type === 'timeZoneName')?.value ?? '';
   } catch {
-    return '';
+    return () => '';
   }
 }
 
 /** "GMT-4" → "UTC-4"; "GMT" → "UTC+0". */
-function utcOffset(zone: string, when: Date): string {
-  const raw = zoneName(zone, when, 'shortOffset');
+function utcOffset(raw: string): string {
   return raw === 'GMT' ? 'UTC+0' : raw.replace(/^GMT/, 'UTC');
 }
 
 /** America/New_York → "America/New_York", with "Eastern Time · UTC-4" under it. */
 export function timeZoneOption(zone: string, when: Date = new Date()): PickerOption {
-  const offset = utcOffset(zone, when);
-  const generic = zone === 'UTC' ? 'Coordinated Universal Time' : zoneName(zone, when, 'longGeneric');
+  const offsetAt = zoneName(zone, 'shortOffset');
+  const shortAt = zoneName(zone, 'short');
+  const offset = utcOffset(offsetAt(when));
+  const generic = zone === 'UTC' ? 'Coordinated Universal Time' : zoneName(zone, 'longGeneric')(when);
   // A zone with no generic name gets its offset again ("GMT-03:00"); show the offset once.
   const names = [/^GMT/.test(generic) ? '' : generic, offset].filter(Boolean);
   // Both seasons, whatever today is: "UTC-5" and "EST" find New York in summer too.
   const seasons = [new Date(Date.UTC(when.getUTCFullYear(), 0, 15)), new Date(Date.UTC(when.getUTCFullYear(), 6, 15))];
-  const seasonal = seasons.flatMap(d => [utcOffset(zone, d), zoneName(zone, d, 'short')]).filter(w => w && !/^GMT/.test(w));
+  const seasonal = seasons.flatMap(d => [utcOffset(offsetAt(d)), shortAt(d)]).filter(w => w && !/^GMT/.test(w));
   const words = (id: string) => id.replace(/[_/]/g, ' ');
   return {
     id: zone,
