@@ -15,6 +15,9 @@ Per environment the module provisions:
 - **Google Cloud Run** (`nekohoa-api-${env_name}`, e.g. `nekohoa-api-dev`) — scale-to-zero, port
   8080, `ASPNETCORE_ENVIRONMENT` from input, `/health` probes, the 9 Secret Manager refs, a runtime
   service account, and `allUsers` invoker. The container image is **pipeline-owned** (`ignore_changes`).
+- **Artifact Registry** (`images-${env_name}`) — the Docker repository CI pushes the backend image to
+  (deployer SA as writer, via WIF) and Cloud Run pulls from. Per-PR `pr-*` tags are deleted after 14
+  days. Cloud Run no longer pulls from Docker Hub: its `mirror.gcr.io` path rate-limits uncached tags.
 - **Secret Manager** — the nine `dev-*` secrets the deploy job maps, with `dev-db-connection`
   auto-wired from Neon.
 - **IAM / Workload Identity Federation** — runtime + deployer service accounts and a repo-scoped WIF

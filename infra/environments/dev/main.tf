@@ -53,3 +53,11 @@ module "environment" {
   operator_secrets         = var.operator_secrets
   deploy_alert_webhook_url = var.deploy_alert_webhook_url
 }
+
+# images-dev is created by hand (gcloud) before the PR that introduces it merges, so that PR's own
+# per-PR environment can push its image. Adopt it rather than recreate it. Delete this block once an
+# apply has recorded the repository in state.
+import {
+  to = module.environment.google_artifact_registry_repository.images
+  id = "projects/${var.gcp_project_id}/locations/${var.gcp_region}/repositories/images-dev"
+}
