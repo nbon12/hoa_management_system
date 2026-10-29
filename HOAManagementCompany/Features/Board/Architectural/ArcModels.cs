@@ -8,6 +8,8 @@ public static class ArcErrorCodes
     public const string Forbidden = "FORBIDDEN";
     public const string Recused = "RECUSED";
     public const string AlreadyVoted = "ALREADY_VOTED";
+    public const string NotVoted = "NOT_VOTED";
+    public const string DecisionNotFinal = "DECISION_NOT_FINAL";
     public const string ApplicationDecided = "APPLICATION_DECIDED";
     public const string ApplicationClosed = "APPLICATION_CLOSED";
     public const string NoDecision = "NO_DECISION";
@@ -94,6 +96,8 @@ public sealed record ArcSettingsPutRequest
     public int ReminderDays { get; init; }
     public string? TimeZoneId { get; init; }
     public string? FormalDisapprovalStatement { get; init; }
+    /// <summary>031: the governing-document clause cited when the lapse rule decides an application.</summary>
+    public string? LapseRuleCitation { get; init; }
 }
 
 // ── Responses ────────────────────────────────────────────────────────────────
@@ -119,7 +123,11 @@ public sealed record ArcListItemDto(
     ArcDecisionDto? Decision,
     bool InfoRequested,
     ArcTallyDto Tally,
-    ArcMyVoteDto MyVote);
+    ArcMyVoteDto MyVote,
+    // 031: a reached decision accepts vote changes until VotesLockAt; DecisionFinal once it has passed.
+    bool DecisionFinal = false,
+    DateTimeOffset? VotesLockAt = null,
+    bool CanUndoVote = false);
 
 public sealed record ArcCountsDto(int Open, int Closed, int AwaitingMyVote);
 
@@ -127,7 +135,13 @@ public sealed record ArcListResponse(
     IReadOnlyList<ArcListItemDto> Items, int Total, int Limit, int Offset, ArcCountsDto Counts);
 
 // InfoRequestId is set for a file the owner added with an info-request reply (029).
-public sealed record ArcAttachmentDto(Guid Id, string FileName, long SizeBytes, string ContentType, Guid? InfoRequestId = null);
+// OwnerCommentId is set for a file the owner posted with a comment (031).
+public sealed record ArcAttachmentDto(
+    Guid Id, string FileName, long SizeBytes, string ContentType, Guid? InfoRequestId = null, Guid? OwnerCommentId = null);
+
+// A homeowner comment (031), shown to the board under the application's details.
+public sealed record ArcOwnerCommentDto(
+    Guid Id, string AuthorName, string Body, DateTimeOffset CreatedAt, IReadOnlyList<ArcAttachmentDto> Attachments);
 
 public sealed record ArcVoteDto(string VoterName, string Choice, string? Comment, DateTimeOffset CastAt);
 
@@ -164,7 +178,13 @@ public sealed record ArcDetailDto(
     string? OwnerReason,
     DateTimeOffset? ClosedAt,
     string? OwnerEmailStatus,
-    IReadOnlyList<ArcRevisionSummaryDto> Revisions);
+    IReadOnlyList<ArcRevisionSummaryDto> Revisions,
+    // 031 additions.
+    bool DecisionFinal = false,
+    DateTimeOffset? VotesLockAt = null,
+    bool CanUndoVote = false,
+    IReadOnlyList<ArcOwnerCommentDto>? OwnerComments = null,
+    string? LapseStatement = null);
 
 public sealed record ArcAttachmentUrlDto(string Url, DateTimeOffset ExpiresAt);
 
@@ -180,7 +200,8 @@ public sealed record ArcSettingsDto(
     int ReminderDays,
     string TimeZoneId,
     string FormalDisapprovalStatement,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    string LapseRuleCitation = Domain.Entities.CommunityArcSettings.DefaultLapseRuleCitation);
 
 public sealed record ArcSweepResultDto(
     int RemindersQueued, int LapsesProcessed, int DecisionsAtDueDate, int EmailsDispatched);

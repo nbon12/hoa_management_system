@@ -19,9 +19,9 @@ public class DecisionOnVoteTests(TestDatabaseFixture fixture) : ArcTestBase(fixt
         return (await res.Content.ReadFromJsonAsync<ArcListItemDto>(Json))!;
     }
 
-    // US6-S1: "Given a community using the default majority-of-members rule with 5 active, non-recused board members
-    // and an application with 2 approve votes, When a third board member votes approve, Then the application shows
-    // "decision reached: approve" and refuses further votes."
+    // US6-S1 (as amended by 031 FR-004): "Given a community using the default majority-of-members rule with 5 active,
+    // non-recused board members and an application with 2 approve votes, When a third board member votes approve, Then
+    // the application shows "decision reached: approve" and refuses further votes once the decision is final."
     [Fact]
     public async Task ThirdApproveOfFive_DecidesApproved_AndRefusesFurtherVotes()
     {
@@ -33,6 +33,8 @@ public class DecisionOnVoteTests(TestDatabaseFixture fixture) : ArcTestBase(fixt
 
         Assert.Equal("DecisionReached", row.Status);
         Assert.Equal(new ArcDecisionDto("Approved", null, "Votes"), row.Decision);
+        Assert.False(row.DecisionFinal);
+        Clock.UtcNow = row.VotesLockAt!.Value;
         await LoginAsAsync(s.Board[3]);
         var late = await VoteAsync(s.CommunityId, appId, "Deny");
         Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);

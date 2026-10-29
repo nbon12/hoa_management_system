@@ -213,7 +213,7 @@ export class ArchitecturalReviewSectionComponent {
     effect(() => {
       const id = this.ctx.communityId();
       untracked(() => { if (id) void this.load(id); });
-    }, { allowSignalWrites: true });
+    });
   }
 
   retry(): void {

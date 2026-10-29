@@ -3,7 +3,8 @@
 #   - ORPHANS:  PR is closed/merged but the env still exists (SC-005), and
 #   - INACTIVE: PR is open but has had no new commit for > 7 days (FR-007; clock resets on push,
 #               no absolute-age cap). A reclaimed open PR re-provisions on its next push.
-# Also self-heals the pre-seeded `pr-base` Neon branch if it has gone missing (research D3).
+# Also self-heals the pre-seeded `pr-base` Neon branch if it has gone missing (research D3), and audits
+# per-PR resources by NAME for orphans that have no state prefix at all, which nothing above can see (#236).
 name: pr-env-sweep
 
 on:
@@ -12,6 +13,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
+  actions: read # gh run list: keep a stale lock while a pr-env, teardown or repair run is live
   contents: read
   id-token: write # WIF OIDC
   pull-requests: write # reclaim comment
@@ -80,9 +82,11 @@ jobs:
           set -uo pipefail
           now=$(date -u +%s)
           cutoff=$(( INACTIVITY_DAYS * 86400 ))
+          failed=0
 
-          # Enumerate live PR envs from the state prefixes (state/pr/<n>/...).
-          prs=$(gcloud storage ls "gs://nekohoa-dev-tfstate/state/pr/" 2>/dev/null \
+          # Enumerate live PR envs from the state prefixes (state/pr/<n>/...). An empty listing makes
+          # `gcloud storage ls` exit 1, which -e (the runner's default shell) must not see (#236).
+          prs=$( (gcloud storage ls "gs://nekohoa-dev-tfstate/state/pr/" 2>/dev/null || true) \
             | sed -nE 's#.*/state/pr/([0-9]+)/?$#\1#p' | sort -u)
           [ -z "$prs" ] && { echo "No per-PR environments found."; exit 0; }
 
@@ -115,13 +119,38 @@ jobs:
                 aws s3 rm "s3://nekohoa-pr-${n}-documents" --recursive --endpoint-url "$ENDPOINT" || true
             fi
 
-            ( cd infra/environments/pr \
-              && tofu init -input=false -reconfigure -backend-config="prefix=state/pr/${n}" \
-              && TF_VAR_pr_number="$n" TF_VAR_head_sha="sweep" tofu destroy -input=false -auto-approve ) || true
-            gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${n}" || true
+            # A lock left by a killed run is past the 45-min floor by now; the sweep runs outside the
+            # pr-env-<n> group, so it also keeps the lock while any pr-env, teardown or repair run is live.
+            # The state is deleted only after a successful destroy, so a failed one is retried tomorrow.
+            if ( cd infra/environments/pr \
+                 && tofu init -input=false -reconfigure -backend-config="prefix=state/pr/${n}" \
+                 && PR_NUMBER="$n" CHECK_LIVE_RUNS=true ../../../scripts/pr-env-clear-stale-lock.sh \
+                 && TF_VAR_pr_number="$n" TF_VAR_head_sha="sweep" tofu destroy -input=false -auto-approve -lock-timeout=5m ); then
+              gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${n}" || true
+            else
+              echo "::error::Reclaiming PR #${n} failed; its state is kept so a later sweep can retry."
+              failed=1
+              continue
+            fi
 
             if [[ "$reason" == inactive* ]]; then
               gh pr comment "$n" --repo "$REPO" --body \
                 "🧹 This PR's ephemeral environment was reclaimed after ${INACTIVITY_DAYS} days with no new commits. Push any commit (or re-run the **pr-env** workflow) to rebuild it." || true
             fi
           done
+          exit "$failed"
+
+      # Per-PR resources with no state prefix (a killed apply, or a teardown that deleted the state after
+      # a failed destroy) are invisible to the reclaim above. A closed PR's fail the run; reap them with
+      # pr-env-repair.yml action=reap. Runs even when the reclaim failed.
+      - name: Audit for orphans by name
+        if: always()
+        env:
+          REPO: ${{ github.repository }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: scripts/pr-env-audit.sh

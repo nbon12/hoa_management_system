@@ -56,6 +56,18 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
         await new AuthSeeder(db, scope.ServiceProvider, logger).EnsureBoardUserAsync();
         Assert.True(await db.Users.AnyAsync(u => u.Email == "board@nekohoa.dev"));
 
+        // 031 US4-S1: a database seeded before 030 co-homed the board user on a resident's property, which recused
+        // the whole board on that resident's requests (a 0/0 board). Arrange that link; the seeder must remove it.
+        var boardUserIdForLink = await db.Users.Where(u => u.Email == "board@nekohoa.dev").Select(u => u.Id).SingleAsync();
+        if (!await db.UserProperties.AnyAsync(up => up.UserId == boardUserIdForLink && up.PropertyId == claimed))
+        {
+            db.UserProperties.Add(new HOAManagementCompany.Domain.Entities.UserProperty
+            {
+                Id = Guid.NewGuid(), UserId = boardUserIdForLink, PropertyId = claimed
+            });
+            await db.SaveChangesAsync();
+        }
+
         var seeder = new ArchitecturalSeeder(db, scope.ServiceProvider, logger);
         await seeder.SeedAsync();
         var appsAfterFirst = await db.ArchitecturalApplications.CountAsync(a => a.CommunityId == community.Id);
@@ -96,5 +108,15 @@ public class ArchitecturalSeederTests(TestDatabaseFixture fixture) : Integration
         Assert.Equal(ArcDenialWording.RevisionsRequested, paint[0].DecisionWording);
         Assert.Equal(paint[0].Id, paint[1].PreviousRevisionId);
         Assert.Equal(ArcApplicationStatus.Open, paint[1].Status);
+        // 031 US4-S1: the old co-home link was removed (asserted for every demo user above), and the resident keeps hers.
+        Assert.True(await db.UserProperties.AnyAsync(up => up.UserId == coResident && up.PropertyId == claimed));
+
+        // 031: ARC-1040 was approved by default (lapse rule) and cites the governing documents.
+        var lapsed = await db.ArchitecturalApplications.SingleAsync(a => a.CommunityId == community.Id && a.ApplicationNumber == 1040);
+        Assert.Equal(ArcApplicationStatus.Closed, lapsed.Status);
+        Assert.Equal(ArcOutcome.Approved, lapsed.DecisionOutcome);
+        Assert.Equal(ArcDecisionSource.Lapse, lapsed.DecisionSource);
+        var citation = await db.CommunityArcSettings.Where(x => x.CommunityId == community.Id).Select(x => x.LapseRuleCitation).SingleAsync();
+        Assert.Contains("Declaration of Covenants", citation);
     }
 }

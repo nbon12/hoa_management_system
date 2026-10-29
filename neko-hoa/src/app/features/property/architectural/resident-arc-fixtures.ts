@@ -25,6 +25,7 @@ export const DETAIL: ResidentArcDetail = {
   decision: null, ownerReason: null, formalDisapprovalStatement: null, conditionsOfApproval: null, closedAt: null,
   canWithdraw: true, canRevise: false,
   revisions: [{ id: 'a1', revision: 1, status: 'Submitted', receivedDate: '2026-05-28' }],
+  comments: [], canComment: true,
 };
 
 export const DENIED: ResidentArcDetail = {
@@ -38,6 +39,17 @@ export const DENIED: ResidentArcDetail = {
 export const APPROVED: ResidentArcDetail = {
   ...DETAIL, status: 'Approved', canWithdraw: false, decision: { outcome: 'Approved', wording: null },
   conditionsOfApproval: 'Stain to match the existing color', closedAt: '2026-06-20T12:00:00Z',
+};
+
+/** 031: a denial the owner answered with a comment and a revised plan. */
+export const COMMENTED: ResidentArcDetail = {
+  ...DENIED,
+  attachments: [
+    ...DETAIL.attachments,
+    { id: 'c1f', fileName: 'revised-plan.pdf', sizeBytes: 2048, contentType: 'application/pdf', ownerCommentId: 'c1' },
+  ],
+  comments: [{ id: 'c1', body: 'Lowered the fence to 5ft', createdAt: '2026-06-21T15:00:00Z',
+    attachments: [{ id: 'c1f', fileName: 'revised-plan.pdf', sizeBytes: 2048, contentType: 'application/pdf', ownerCommentId: 'c1' }] }],
 };
 
 export const MORE_INFO: ResidentArcDetail = {

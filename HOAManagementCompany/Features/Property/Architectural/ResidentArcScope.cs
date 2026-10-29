@@ -44,6 +44,7 @@ public sealed class ResidentArcScope(ApplicationDbContext db, ResidentAccess acc
         var app = await db.ArchitecturalApplications
             .Include(a => a.Attachments)
             .Include(a => a.InfoRequests)
+            .Include(a => a.OwnerComments)
             .FirstOrDefaultAsync(a => a.Id == applicationId && a.PropertyId == propertyId, ct);
         return app ?? throw Deny(user, propertyId, $"application:{applicationId}");
     }

@@ -20,6 +20,7 @@ public class ArcSettingsPutEndpoint(
     : Endpoint<ArcSettingsPutRequest, ArcSettingsDto>
 {
     public const int MaxStatementLength = ArcRuleValidator.MaxStatementLength;
+    public const int MaxCitationLength = 300;
 
     public override void Configure()
     {
@@ -42,6 +43,12 @@ public class ArcSettingsPutEndpoint(
             await ArcHttp.ValidationAsync(HttpContext, error.Message, ct);
             return;
         }
+        var citation = req.LapseRuleCitation?.Trim();
+        if (citation is { Length: > MaxCitationLength })
+        {
+            await ArcHttp.ValidationAsync(HttpContext, $"lapseRuleCitation must be at most {MaxCitationLength} characters.", ct);
+            return;
+        }
 
         var settings = await factory.GetOrCreateSettingsAsync(req.CommunityId, ct);
         var before = ArcSettingsSection.Rules(settings);
@@ -52,6 +59,9 @@ public class ArcSettingsPutEndpoint(
         settings.ReminderDays = rules.ReminderDays;
         settings.TimeZoneId = rules.TimeZoneId;
         settings.FormalDisapprovalStatement = rules.FormalDisapprovalStatement;
+        // 031: optional, so clients that don't send it keep the current citation.
+        if (!string.IsNullOrEmpty(citation))
+            settings.LapseRuleCitation = citation;
         settings.UpdatedAt = queries.Now;
         settings.UpdatedByUserId = ArcQueries.CallerId(User);
         await db.SaveChangesAsync(ct);

@@ -10,7 +10,8 @@ namespace HOAManagementCompany.Tests.Integration.Board.Architectural;
 
 /// <summary>
 /// T053 — SC-005: "Every application that meets its community's decision rule shows exactly one decision,
-/// including when the deciding votes arrive simultaneously." FR-018: votes after a decision are refused.
+/// including when the deciding votes arrive simultaneously." FR-018 (031): votes after a final decision are refused;
+/// during the decision's grace period a concurrent vote is accepted and leaves the single decision unchanged.
 /// </summary>
 public class ArcConcurrencyTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
 {
@@ -31,15 +32,20 @@ public class ArcConcurrencyTests(TestDatabaseFixture fixture) : ArcTestBase(fixt
             a.PostAsJsonAsync(url, new { choice = "Approve" }),
             b.PostAsJsonAsync(url, new { choice = "Approve" }));
 
-        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Created);
-        var refused = Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Conflict);
-        Assert.Equal(ArcErrorCodes.ApplicationDecided, await ErrorCodeAsync(refused));
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
 
         var app = await WithDbAsync(db => db.ArchitecturalApplications.AsNoTracking().SingleAsync(x => x.Id == appId));
         Assert.Equal(ArcApplicationStatus.DecisionReached, app.Status);
         Assert.Equal(ArcOutcome.Approved, app.DecisionOutcome);
-        Assert.NotNull(app.DecisionReachedAt);
-        Assert.Equal(3, await WithDbAsync(db => db.ArchitecturalVotes.CountAsync(v => v.ApplicationId == appId)));
+        Assert.Equal(Clock.UtcNow, app.DecisionReachedAt!.Value, TimeSpan.FromMilliseconds(1));
+        Assert.Equal(4, await WithDbAsync(db => db.ArchitecturalVotes.CountAsync(v => v.ApplicationId == appId)));
+
+        // Once the decision is final, a further vote is refused.
+        Clock.UtcNow = app.DecisionFinalAt!.Value;
+        await LoginAsAsync(s.Board[4]);
+        var refused = await VoteAsync(s.CommunityId, appId, "Deny");
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal(ArcErrorCodes.ApplicationDecided, await ErrorCodeAsync(refused));
 
         // Recording the outcome then yields exactly one owner email row.
         var manager = await CreateMemberAsync(s.CommunityId, CommunityRole.CommunityManager);

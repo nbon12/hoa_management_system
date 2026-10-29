@@ -1,6 +1,7 @@
 # Ephemeral per-PR environment — teardown on close/merge (013 contracts/workflows.md, FR-006, SC-004).
 # `closed` fires for both merge and plain close. Each step is best-effort/idempotent so one failure
-# doesn't strand the rest; the daily sweep (pr-env-sweep.yml) backstops anything missed.
+# doesn't strand the rest; the daily sweep (pr-env-sweep.yml) backstops anything missed. The state is
+# deleted only after a successful destroy, so the sweep can still find and retry a failed one (#236).
 name: pr-env-teardown
 
 on:
@@ -69,30 +70,66 @@ jobs:
           export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION=auto
           aws s3 rm "s3://${BUCKET}" --recursive --endpoint-url "$ENDPOINT" || true
 
-      # 3. Authoritative teardown: destroy every per-PR resource from this PR's state (FR-006).
+      # 3. Authoritative teardown: destroy every per-PR resource from this PR's state (FR-006). A lock
+      #    left by a killed pr-env run is removed first once it is 45 min old; a younger one is waited for
+      #    and, if it never clears, the destroy fails and keeps the state for the sweep (#236).
+      - name: Clear a stale state lock left by a killed run
+        if: always()
+        continue-on-error: true # the destroy below waits for any lock this step could not clear
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: scripts/pr-env-clear-stale-lock.sh
+
       - name: tofu destroy
+        id: destroy
         if: always()
         working-directory: infra/environments/pr
-        run: tofu destroy -input=false -auto-approve
+        run: tofu destroy -input=false -auto-approve -lock-timeout=5m
 
-      # 4. Remove the per-PR state objects so the prefix list (used by the sweep) reflects reality.
+      # 4. Remove the per-PR state objects so the prefix list (used by the sweep) reflects reality. Only
+      #    after a successful destroy: deleting state after a failed one turns tracked resources into
+      #    orphans nothing reclaims (PR 217, 2026-10-26). A kept state is retried by the daily sweep.
       - name: Delete per-PR state objects
-        if: always()
-        run: gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${{ github.event.number }}" || true
+        if: always() && steps.destroy.outcome == 'success'
+        run: gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${{ github.event.number }}"
 
-      # 5. Best-effort: delete the Pages branch deploys and the per-PR image tags (both cheap/free if
-      #    left, so failures are non-fatal). The sweep does not need these for correctness.
-      - name: Best-effort prune Pages + image tags
+      # 5. Best-effort: delete the PR's Pages branch deployments (free if left; pruned for tidiness, so
+      #    failures are non-fatal). Every page is read before anything is deleted, and each id is logged.
+      #    Per-PR Docker Hub image tags are not pruned.
+      - name: Best-effort prune Pages deployments
         if: always()
+        continue-on-error: true
         env:
           PRN: ${{ github.event.number }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -uo pipefail
-          # Pages: delete deployments on the pr-<n> branch (free if left; pruned for tidiness).
-          curl -sS -H "Authorization: Bearer ${CF_TOKEN}" \
-            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/pages/projects/nekohoa-dev/deployments?env=preview" \
-            | python3 -c "import sys,json;d=json.load(sys.stdin);print('\n'.join(x['id'] for x in d.get('result',[]) if x.get('deployment_trigger',{}).get('metadata',{}).get('branch')=='pr-'+'${PRN}'))" 2>/dev/null \
-            | while read -r dep; do [ -n "$dep" ] && curl -sS -X DELETE -H "Authorization: Bearer ${CF_TOKEN}" \
-                "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/pages/projects/nekohoa-dev/deployments/${dep}?force=true" >/dev/null || true; done || true
+          api="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/pages/projects/nekohoa-dev/deployments"
+          ids="" page=1
+          while [ "$page" -le 100 ]; do
+            body="$(curl -sS -H "Authorization: Bearer ${CF_TOKEN}" "${api}?env=preview&page=${page}")" || break
+            ids+="$(jq -r --arg b "pr-${PRN}" '.result[]? | select(.deployment_trigger.metadata.branch == $b) | .id' <<<"$body")"$'\n'
+            [ "$page" -lt "$(jq -r '.result_info.total_pages // 1' <<<"$body")" ] || break
+            page=$(( page + 1 ))
+          done
+          [ -n "${ids//$'\n'/}" ] || { echo "No Pages deployments on branch pr-${PRN}."; exit 0; }
+          while read -r dep; do
+            [ -n "$dep" ] || continue
+            if curl -sSf -o /dev/null -X DELETE -H "Authorization: Bearer ${CF_TOKEN}" "${api}/${dep}?force=true"; then
+              echo "Deleted Pages deployment ${dep}"
+            else
+              echo "::warning::Could not delete Pages deployment ${dep}"
+            fi
+          done <<<"$ids"
+
+      # Teardown failure leaves billable resources behind until the next sweep: say so where someone reads.
+      - name: Alert on teardown failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.DEPLOY_ALERT_WEBHOOK_URL }}
+          TEXT: "pr-env teardown FAILED for PR #${{ github.event.number }}. A failed destroy keeps the per-PR state; the daily pr-env-sweep retries it. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          [ -n "$WEBHOOK" ] || { echo "::warning::DEPLOY_ALERT_WEBHOOK_URL is unset; no alert sent."; exit 0; }
+          jq -n --arg text "$TEXT" '{text: $text}' \
+            | curl -sS -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK" || true

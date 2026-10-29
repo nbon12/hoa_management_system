@@ -297,7 +297,7 @@ public sealed class ResidentArcDraftService(
     {
         var carried = await CarriedQuery(draft)
             .OrderBy(a => a.CreatedAt)
-            .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, null))
+            .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, null, null))
             .ToListAsync(ct);
         string? previousDisplayId = null;
         if (draft.PreviousRevisionId is { } previousId)
@@ -317,7 +317,7 @@ public sealed class ResidentArcDraftService(
             draft.PreviousRevisionId,
             previousDisplayId,
             draft.Attachments.OrderBy(a => a.CreatedAt)
-                .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, null)).ToList(),
+                .Select(a => new ResidentArcAttachmentDto(a.Id, a.FileName, a.SizeBytes, a.ContentType, null, null)).ToList(),
             carried,
             draft.RemovedCarriedAttachmentIds,
             draft.UpdatedAt);

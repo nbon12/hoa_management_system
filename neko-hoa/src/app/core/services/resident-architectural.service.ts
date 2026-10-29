@@ -71,6 +71,14 @@ export class ResidentArchitecturalService {
       `${this.base}/${id}/info-requests/${infoRequestId}/reply`, { responseMessage }));
   }
 
+  /** 031: post a comment with text and/or up to five files in one multipart request. */
+  comment(id: string, message: string, files: File[]): Promise<ResidentArcDetail> {
+    const body = new FormData();
+    if (message) body.append('message', message);
+    for (const f of files) body.append('files', f, f.name);
+    return firstValueFrom(this.http.post<ResidentArcDetail>(`${this.base}/${id}/comments`, body));
+  }
+
   withdraw(id: string): Promise<ResidentArcDetail> {
     return firstValueFrom(this.http.post<ResidentArcDetail>(`${this.base}/${id}/withdraw`, null));
   }

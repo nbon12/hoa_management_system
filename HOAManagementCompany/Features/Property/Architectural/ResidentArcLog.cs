@@ -35,6 +35,11 @@ internal static class ResidentArcLog
             "ArcInfoReplied: Actor={ActorId} Application={ApplicationId} InfoRequest={InfoRequestId} At={UtcNow:o}",
             actorId, applicationId, infoRequestId, at);
 
+    public static void Commented(ILogger logger, string actorId, Guid applicationId, Guid commentId, int fileCount, DateTimeOffset at) =>
+        logger.LogInformation(
+            "ArcOwnerCommented: Actor={ActorId} Application={ApplicationId} Comment={CommentId} Files={FileCount} At={UtcNow:o}",
+            actorId, applicationId, commentId, fileCount, at);
+
     public static void RevisionDraftCreated(ILogger logger, string actorId, Guid previousRevisionId, Guid draftId, DateTimeOffset at) =>
         logger.LogInformation(
             "ArcRevisionDraftCreated: Actor={ActorId} PreviousRevision={PreviousRevisionId} Draft={DraftId} At={UtcNow:o}",

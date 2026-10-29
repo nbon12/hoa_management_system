@@ -11,7 +11,8 @@ namespace HOAManagementCompany.Features.Board.Architectural;
 /// POST …/{applicationId}/votes — cast Approve / RevisionsNeeded / Deny with an optional comment
 /// (027 US2; FR-014–FR-018, FR-023). One vote per board member; recused owners and non-board roles are
 /// refused. The vote and the decision check run in one transaction under a row lock so concurrent
-/// deciding votes produce exactly one decision (SC-005, research R4).
+/// deciding votes produce exactly one decision (SC-005, research R4). 031: votes are accepted until the
+/// decision is final (the grace period after the threshold is met), see <see cref="ArcVoting"/>.
 /// </summary>
 public class CastVoteEndpoint(
     ApplicationDbContext db,
@@ -56,7 +57,7 @@ public class CastVoteEndpoint(
         }
 
         var caller = ArcQueries.CallerId(User);
-        if (await queries.IsRecusedAsync(caller, app.PropertyId, ct))
+        if (await queries.IsRecusedAsync(caller, app.CommunityId, app.PropertyId, ct))
         {
             await ArcHttp.ErrorAsync(HttpContext, StatusCodes.Status403Forbidden, ArcErrorCodes.Recused,
                 "You own this property, so you are recused from voting on it.", ct);
@@ -65,7 +66,7 @@ public class CastVoteEndpoint(
 
         var refusal = await ArcLocks.InLockedTransactionAsync(db, app, async () =>
         {
-            var statusRefusal = StatusRefusal(app.Status);
+            var statusRefusal = StatusRefusal(app, queries.Now);
             if (statusRefusal is not null)
                 return new ArcRefusal(StatusCodes.Status409Conflict, statusRefusal.Value.code, statusRefusal.Value.message);
             if (await db.ArchitecturalVotes.AnyAsync(v => v.ApplicationId == app.Id && v.VoterUserId == caller, ct))
@@ -90,19 +91,8 @@ public class CastVoteEndpoint(
                 return AlreadyVoted;
             }
 
-            var choices = await db.ArchitecturalVotes.Where(v => v.ApplicationId == app.Id).Select(v => v.Choice).ToListAsync(ct);
-            var eligible = await queries.EligibleCountAsync(app.CommunityId, app.PropertyId, ct);
-            var decision = ArcDecisionRules.Evaluate(
-                app.DecisionRule, eligible,
-                choices.Count(c => c == ArcVoteChoice.Approve),
-                choices.Count(c => c == ArcVoteChoice.RevisionsNeeded),
-                choices.Count(c => c == ArcVoteChoice.Deny),
-                dueDatePassed: false);
-            if (decision is not null)
-            {
-                ArcSweepService.SetDecision(app, decision, ArcDecisionSource.Votes, queries.Now);
-                await db.SaveChangesAsync(ct);
-            }
+            await ArcVoting.ApplyVotesAsync(db, queries, app, ct);
+            await db.SaveChangesAsync(ct);
             return null;
         }, ct);
         if (refusal is not null)
@@ -118,12 +108,22 @@ public class CastVoteEndpoint(
     private static readonly ArcRefusal AlreadyVoted =
         new(StatusCodes.Status409Conflict, ArcErrorCodes.AlreadyVoted, "You have already voted on this application.");
 
+    /// <summary>Questions are only for undecided applications (027 FR-021).</summary>
     internal static (string code, string message)? StatusRefusal(ArcApplicationStatus status) => status switch
     {
         ArcApplicationStatus.Closed => (ArcErrorCodes.ApplicationClosed, "This application is closed."),
         ArcApplicationStatus.DecisionReached => (ArcErrorCodes.ApplicationDecided, "A decision has already been reached on this application."),
         _ => null
     };
+
+    internal static (string code, string message)? StatusRefusal(ArchitecturalApplication app, DateTimeOffset now) =>
+        app.Status switch
+        {
+            ArcApplicationStatus.Closed => (ArcErrorCodes.ApplicationClosed, "This application is closed."),
+            ArcApplicationStatus.DecisionReached when app.IsDecisionFinal(now) =>
+                (ArcErrorCodes.ApplicationDecided, "The board's decision on this application is final."),
+            _ => null
+        };
 
     private static bool TryParseChoice(string? value, out ArcVoteChoice choice)
     {

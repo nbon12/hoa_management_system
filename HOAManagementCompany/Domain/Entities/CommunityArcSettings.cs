@@ -17,6 +17,7 @@ public class CommunityArcSettings
     public const int FirstApplicationNumber = 1001;
     public const string DefaultFormalDisapprovalStatement =
         "This is a formal disapproval of the plans as submitted under the community's governing documents. You may revise and resubmit.";
+    public const string DefaultLapseRuleCitation = "the community's governing documents";
 
     public Guid CommunityId { get; set; }
     public int ReviewPeriodDays { get; set; } = DefaultReviewPeriodDays;
@@ -25,6 +26,8 @@ public class CommunityArcSettings
     public int ReminderDays { get; set; } = DefaultReminderDays;
     public string TimeZoneId { get; set; } = DefaultTimeZoneId;
     public string FormalDisapprovalStatement { get; set; } = DefaultFormalDisapprovalStatement;
+    /// <summary>031: the governing-document clause behind the lapse rule, cited on deemed decisions.</summary>
+    public string LapseRuleCitation { get; set; } = DefaultLapseRuleCitation;
     public int NextApplicationNumber { get; set; } = FirstApplicationNumber;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     public string? UpdatedByUserId { get; set; }
