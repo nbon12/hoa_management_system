@@ -2,7 +2,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { RequestDetailComponent } from './request-detail.component';
 import { ResidentArchitecturalService } from '../../../core/services/resident-architectural.service';
-import { APPROVED, DENIED, DETAIL, MORE_INFO } from './resident-arc-fixtures';
+import { APPROVED, COMMENTED, DENIED, DETAIL, MORE_INFO } from './resident-arc-fixtures';
 import { ResidentArcDetail } from '../../../core/models';
 import { until } from '../../board/architectural/arc-testing';
 
@@ -10,7 +10,7 @@ describe('RequestDetailComponent (029 US2–US4, US6)', () => {
   let api: jasmine.SpyObj<ResidentArchitecturalService>;
 
   async function setup(detail: ResidentArcDetail) {
-    api = jasmine.createSpyObj<ResidentArchitecturalService>('ResidentArchitecturalService', ['detail', 'attachmentUrl', 'withdraw', 'reply']);
+    api = jasmine.createSpyObj<ResidentArchitecturalService>('ResidentArchitecturalService', ['detail', 'attachmentUrl', 'withdraw', 'reply', 'comment']);
     api.detail.and.resolveTo(detail);
     await render(RequestDetailComponent, {
       providers: [
@@ -86,5 +86,44 @@ describe('RequestDetailComponent (029 US2–US4, US6)', () => {
     expect(api.withdraw).toHaveBeenCalledWith('a1');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Withdraw request' })).toBeNull();
+  });
+
+  // 031 US8-S1 (item 15): "Given my request can be withdrawn, Then 'Withdraw request' is a red button at the top
+  // right of the page header, not at the bottom."
+  it('puts Withdraw request at the top right as a red button (031 item 15)', async () => {
+    await setup(DETAIL);
+    const button = screen.getByRole('button', { name: 'Withdraw request' });
+    expect(button.classList).toContain('btn--danger');
+    expect(button.closest('.page-header__actions')).toBeTruthy();
+  });
+
+  // 031 US7-S1: the owner's comments show in their own section, each comment's files listed with it.
+  it("shows my comments with their files, not among the submitted files (031 item 15)", async () => {
+    await setup(COMMENTED);
+    const section = screen.getByRole('region', { name: 'Comments to the board' });
+    expect(section.textContent).toContain('Lowered the fence to 5ft');
+    expect(section.textContent).toContain('revised-plan.pdf');
+    const files = screen.getByRole('region', { name: 'Files' });
+    expect(files.textContent).not.toContain('revised-plan.pdf');
+  });
+
+  // 031 US7-S1: posting a comment sends text and files, then shows the refreshed thread.
+  it('posts a comment with a file (031 item 15)', async () => {
+    await setup(DENIED);
+    api.comment.and.resolveTo(COMMENTED);
+    fireEvent.input(screen.getByLabelText('Add a comment or revised plans'), { target: { value: 'Lowered the fence to 5ft' } });
+    const file = new File(['%PDF-1.7'], 'revised-plan.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Attach files/), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: /Post comment/ }));
+    await until(() => api.comment.calls.count() === 1);
+    expect(api.comment).toHaveBeenCalledWith('a1', 'Lowered the fence to 5ft', [file]);
+    await until(() => !!screen.queryByText('Lowered the fence to 5ft'));
+  });
+
+  // 031 US7-S4: no comment form on a request that can't take comments (withdrawn).
+  it('hides the comment form when comments are closed', async () => {
+    await setup({ ...DETAIL, status: 'Withdrawn', canWithdraw: false, canComment: false });
+    expect(screen.queryByLabelText('Add a comment or revised plans')).toBeNull();
+    expect(screen.getByText('No comments yet.')).toBeTruthy();
   });
 });

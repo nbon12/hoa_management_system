@@ -2,20 +2,23 @@ import { Component, ElementRef, input, output, signal, viewChild } from '@angula
 import { FormsModule } from '@angular/forms';
 import { ArcVoteChoice } from '../../../core/services/architectural.service';
 import { infoNotice } from './arc-format';
+import { VoteChoiceComponent } from './vote-choice.component';
 
 export interface ArcVoteEvent { choice: ArcVoteChoice; comment: string | null; }
 
 // 027 US2/US4 — wireframe "Cast your vote" card: an optional comment to the board, then
 // ✓ Approve / ↻ Revisions needed / ✕ Deny, or Request info (message required, never pauses the clock).
+// 031: the choice is picked first and cast with "Submit vote" (items 5, 14); "Request info" is "Ask question"
+// (item 11); the comment box shows a hover tint so it reads as typeable (item 6).
 @Component({
   selector: 'app-arc-cast-vote-card',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, VoteChoiceComponent],
   template: `
     <div class="card cvc">
       <div class="section-title" style="margin:0 0 8px;">Cast your vote</div>
       <label class="field-label" for="arc-comment">Comment to the board</label>
-      <textarea #commentBox id="arc-comment" class="input cvc__comment" rows="3" maxlength="2000"
+      <textarea #commentBox id="arc-comment" class="field cvc__comment" rows="3" maxlength="2000"
                 [(ngModel)]="comment" name="comment"
                 placeholder="Optional — visible to the board and the manager"></textarea>
       <div class="cvc__count muted">{{ comment.length }}/2000</div>
@@ -26,10 +29,8 @@ export interface ArcVoteEvent { choice: ArcVoteChoice; comment: string | null; }
       @if (error()) { <p class="cvc__error" role="alert">{{ error() }}</p> }
 
       <div class="cvc__actions">
-        <button type="button" class="btn cvc__approve" [disabled]="busy()" (click)="cast('Approve')">✓ Approve</button>
-        <button type="button" class="btn" [disabled]="busy()" (click)="cast('RevisionsNeeded')">↻ Revisions needed</button>
-        <button type="button" class="btn" [disabled]="busy()" (click)="cast('Deny')">✕ Deny</button>
-        <button type="button" class="btn btn--ghost" [disabled]="busy()" (click)="info()">Request info</button>
+        <app-arc-vote-choice #choice [busy]="busy()" submitLabel="Submit vote" (submitted)="cast($event)" />
+        <button type="button" class="btn btn--ghost cvc__ask" [disabled]="busy()" (click)="info()">Ask question</button>
       </div>
       <p class="muted cvc__rule">{{ ruleText() }}</p>
     </div>
@@ -38,8 +39,7 @@ export interface ArcVoteEvent { choice: ArcVoteChoice; comment: string | null; }
     .cvc { background: var(--lav); }
     .cvc__comment { width: 100%; min-height: 64px; resize: vertical; }
     .cvc__count { font-size: 11px; text-align: right; }
-    .cvc__actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-    .cvc__approve { background: var(--ok-bg); }
+    .cvc__actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
     .cvc__notice { font-size: 12px; background: var(--paper); border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px 10px; }
     .cvc__error { color: var(--warn); font-size: 12px; }
     .cvc__rule { font-size: 11px; margin: 10px 0 0; line-height: 1.55; }
@@ -55,11 +55,12 @@ export class CastVoteCardComponent {
   readonly infoMode = signal(false);
   readonly error = signal<string | null>(null);
   private readonly commentBox = viewChild<ElementRef<HTMLTextAreaElement>>('commentBox');
+  private readonly choice = viewChild<VoteChoiceComponent>('choice');
   comment = '';
 
   notice(): string { return infoNotice(this.dueDate()); }
 
-  /** US4-S1: Info on a row opens the panel with the comment box focused and Request info ready. */
+  /** US4-S1: "Ask question" on a row opens the panel with the comment box focused. */
   focusForInfo(): void {
     this.infoMode.set(true);
     this.commentBox()?.nativeElement.focus();
@@ -74,7 +75,7 @@ export class CastVoteCardComponent {
     this.infoMode.set(true);
     const message = this.comment.trim();
     if (!message) {
-      this.error.set('Say what information is needed.');
+      this.error.set('Type your question for the owner in the box above.');
       this.commentBox()?.nativeElement.focus();
       return;
     }
@@ -85,5 +86,6 @@ export class CastVoteCardComponent {
   reset(): void {
     this.comment = '';
     this.error.set(null);
+    this.choice()?.reset();
   }
 }

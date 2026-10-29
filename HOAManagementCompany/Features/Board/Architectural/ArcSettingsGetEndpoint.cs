@@ -19,7 +19,9 @@ public sealed record ArcRulesDto(
 public sealed record ArcSettingsSectionDto(
     int ReviewPeriodDays, string LapseRule, string DecisionRule, int ReminderDays, string TimeZoneId,
     string FormalDisapprovalStatement, DateTimeOffset? UpdatedAt, ArcRulesDto CompanyDefaults,
-    IReadOnlyList<string> DiffersFromDefaults, bool CanEdit);
+    IReadOnlyList<string> DiffersFromDefaults, bool CanEdit,
+    // 031: the governing-document clause cited on lapse decisions (not part of the company defaults).
+    string LapseRuleCitation = CommunityArcSettings.DefaultLapseRuleCitation);
 
 internal static class ArcSettingsSection
 {
@@ -36,7 +38,7 @@ internal static class ArcSettingsSection
             dto.FormalDisapprovalStatement, dto.UpdatedAt,
             new ArcRulesDto(defaults.ReviewPeriodDays, defaults.LapseRule.ToString(), defaults.DecisionRule.ToString(),
                 defaults.ReminderDays, defaults.TimeZoneId, defaults.FormalDisapprovalStatement),
-            Differences(defaults, settings), canEdit);
+            Differences(defaults, settings), canEdit, settings.LapseRuleCitation);
     }
 
     /// <summary>The community's company defaults; the built-in ones if the company has no row yet.</summary>

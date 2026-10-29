@@ -28,9 +28,12 @@ permissions:
   id-token: write # WIF OIDC
   pull-requests: write # status comment
 
+# Never cancel a run in flight: a cancelled `tofu apply` strands its state lock and leaves resources the
+# state never recorded (the 2026-10-26 incident, issue #234). GitHub keeps only the newest pending run per
+# group, so the latest push still wins once the current run finishes.
 concurrency:
   group: pr-env-${{ github.event.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   pr-env:

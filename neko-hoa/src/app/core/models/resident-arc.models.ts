@@ -13,6 +13,16 @@ export interface ResidentArcAttachment {
   sizeBytes: number;
   contentType: string;
   infoRequestId?: string | null;
+  /** 031: set when the file was posted with one of the owner's comments. */
+  ownerCommentId?: string | null;
+}
+
+/** 031: one of the homeowner's own comments on a request (e.g. a reply to a revision request). */
+export interface ResidentArcComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  attachments: ResidentArcAttachment[];
 }
 
 export interface ResidentArcDraftBody {
@@ -75,7 +85,7 @@ export interface ResidentArcDetail extends ResidentArcListItem {
   acknowledgedAt: string | null;
   attachments: ResidentArcAttachment[];
   infoRequests: ResidentArcInfoRequest[];
-  timeline: { event: 'Submitted' | 'InfoRequested' | 'InfoReplied' | 'Approved' | 'Denied' | 'Withdrawn'; at: string }[];
+  timeline: { event: 'Submitted' | 'InfoRequested' | 'InfoReplied' | 'Commented' | 'Approved' | 'Denied' | 'Withdrawn'; at: string }[];
   decision: { outcome: 'Approved' | 'Denied'; wording: 'RevisionsRequested' | 'Denied' | null } | null;
   ownerReason: string | null;
   formalDisapprovalStatement: string | null;
@@ -84,6 +94,9 @@ export interface ResidentArcDetail extends ResidentArcListItem {
   canWithdraw: boolean;
   canRevise: boolean;
   revisions: { id: string; revision: number; status: ResidentArcStatus; receivedDate: string }[];
+  /** 031 */
+  comments?: ResidentArcComment[] | null;
+  canComment?: boolean;
 }
 
 export interface ResidentArcLink {
