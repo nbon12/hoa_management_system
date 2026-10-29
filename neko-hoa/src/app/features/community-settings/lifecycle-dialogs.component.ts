@@ -267,7 +267,7 @@ export class LifecycleDialogsComponent {
       if (!request || request.seq === this.handledSeq) return;
       this.handledSeq = request.seq;
       untracked(() => this.open(request.action));
-    }, { allowSignalWrites: true });
+    });
   }
 
   // ─── Copy (brief 04 §5.5–§5.7) ─────────────────────────────────────────────

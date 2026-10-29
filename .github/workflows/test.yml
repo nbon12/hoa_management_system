@@ -112,9 +112,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: shellcheck
-        run: shellcheck scripts/pr-env-reap.sh scripts/tests/pr-env-reap.test.sh
+        run: >-
+          shellcheck scripts/pr-env-reap.sh scripts/pr-env-clear-stale-lock.sh scripts/pr-env-audit.sh
+          scripts/pr-env-verify-ro.sh scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh
+          scripts/tests/pr-env-verify-ro.test.sh
       - name: pr-env-reap tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-reap.test.sh
+      - name: pr-env lock + audit tests (stubbed providers, no network)
+        run: bash scripts/tests/pr-env-ops.test.sh
+      - name: pr-env-verify-ro tests (stubbed providers, no network)
+        run: bash scripts/tests/pr-env-verify-ro.test.sh
 
   frontend:
     name: Frontend (neko-hoa)
@@ -207,6 +214,13 @@ jobs:
     # a SKIP (outage/unconfigured) leaves integration-sandbox green, so deploy still proceeds.
     needs: [test, integration-sandbox]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      id-token: write   # WIF → push to Artifact Registry
+    env:
+      # Cloud Run pulls from Artifact Registry (infra/modules/environment/artifact_registry.tf). Docker
+      # Hub keeps getting the same digest for security-scan.yml's nightly re-scan.
+      AR_IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/images-dev/nekohoa-api
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -238,6 +252,23 @@ jobs:
           exit-code: '1'
           trivyignores: .trivyignore
 
+      # No credentials file: it would land in the build context. The access token is all docker needs.
+      - name: Authenticate to Google Cloud
+        id: gcp
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          create_credentials_file: false
+
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.gcp.outputs.access_token }}
+
       - name: Log in to Docker Hub
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -245,13 +276,16 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       # Reuses the Buildx cache from the scanned build, so the pushed image is the one Trivy validated.
-      - name: Push to Docker Hub
+      # One push to both registries, so both carry the same digest.
+      - name: Push to Artifact Registry + Docker Hub
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: HOAManagementCompany/Dockerfile
           push: true
           tags: |
+            ${{ env.AR_IMAGE }}:latest
+            ${{ env.AR_IMAGE }}:${{ github.sha }}
             sakurapatch/nekohoa-api:latest
             sakurapatch/nekohoa-api:${{ github.sha }}
 
@@ -275,7 +309,7 @@ jobs:
     env:
       GCP_REGION: ${{ vars.GCP_REGION }}
       DEV_SERVICE: nekohoa-api-dev
-      IMAGE: sakurapatch/nekohoa-api:${{ github.sha }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/images-dev/nekohoa-api:${{ github.sha }}
       PAGES_PROJECT: nekohoa-dev
 
     steps:

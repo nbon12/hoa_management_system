@@ -10,7 +10,7 @@ import { establishSession, BOARD_EMAIL, BOARD_PASSWORD } from './helpers/auth';
  *  - US1-S8: "Given I hold only a Resident membership, When I navigate directly to the Architectural
  *    Applications route, Then I am refused and redirected to a permitted page."
  *  - US1 Independent Test / FR-002–FR-005: a board member opens the page and sees the tabs, search and table.
- *  - US4-S5: choosing Request info shows that questions don't pause the review period.
+ *  - US4-S5 / 031 US2-S4: choosing Ask question shows that info requests don't delay the due date.
  *  - Accessibility (constitution, T074): tabs, search and row actions are keyboard-reachable and labeled.
  */
 
@@ -51,8 +51,8 @@ test.describe('Board architectural review (027)', () => {
     await expect(page.getByRole('tab', { name: /^Closed · \d+$/ })).toBeVisible();
     await expect(page.getByRole('searchbox', { name: 'Search address or owner' })).toBeVisible();
     await expect(page.getByRole('columnheader')).toHaveText(
-      ['ID', 'Property', 'Project', 'Attachments', 'Due', 'Board votes', 'Your vote']); // textContent; CSS uppercases
-    await expect(page.getByRole('img', { name: /approve · \d+ revisions needed · \d+ deny · \d+ not voted/ }).first()).toBeVisible();
+      ['ID', 'Property', 'Project', 'Attachments', 'Due', 'Board votes', 'Your vote', 'Final decision']); // textContent; CSS uppercases
+    await expect(page.getByRole('img', { name: /approve · \d+ request revisions · \d+ deny · \d+ not voted/ }).first()).toBeVisible();
   });
 
   test('tabs and search are keyboard-operable', async ({ page }) => {
@@ -66,13 +66,24 @@ test.describe('Board architectural review (027)', () => {
     await expect(search).toBeFocused();
   });
 
-  test('Request info explains that questions do not pause the review period (US4-S5)', async ({ page }) => {
+  test('Ask question explains that info requests do not delay the due date (US4-S5, 031 item 13)', async ({ page }) => {
     await openAsBoardMember(page);
     // The seed leaves ARC-1042 unvoted by board@nekohoa.dev, and nothing in this suite votes.
     const row = page.getByRole('row').filter({ hasText: 'ARC-1042' }).first();
-    await row.getByRole('button', { name: 'Info', exact: true }).click();
+    await row.getByRole('button', { name: 'Ask question', exact: true }).click();
     await expect(page.getByLabel('Comment to the board')).toBeFocused();
-    await expect(page.getByRole('note')).toContainText("Questions don't pause the review period (due ");
-    await expect(page.getByRole('note')).toContainText('vote Revisions needed');
+    await expect(page.getByRole('note')).toContainText('Board vote result due ');
+    await expect(page.getByRole('note')).toContainText('Info requests do not delay the due date of the board vote result.');
+  });
+
+  // 031 US6-S1 against the seed: ARC-1040 was approved by default and its panel cites the governing documents.
+  test('the auto-approved demo application cites the governing documents (031 item 12)', async ({ page }) => {
+    await openAsBoardMember(page);
+    await page.getByRole('tab', { name: /^Closed · \d+$/ }).click();
+    const row = page.getByRole('row').filter({ hasText: 'ARC-1040' }).first();
+    await expect(row.getByRole('img', { name: 'Final decision: Application Approved (by default — review period lapsed)' })).toBeVisible();
+    await row.getByText('Backyard pergola', { exact: false }).click();
+    await expect(page.getByText(/deemed approved/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Declaration of Covenants/)).toBeVisible();
   });
 });

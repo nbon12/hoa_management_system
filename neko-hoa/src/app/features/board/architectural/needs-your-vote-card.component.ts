@@ -1,16 +1,19 @@
 import { Component, effect, inject, signal, untracked } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ArcListItem, ArcVoteChoice, ArchitecturalService } from '../../../core/services/architectural.service';
 import { TallyComponent } from './tally.component';
 import { arcContext } from './arc-context';
 import { fmtDate } from './arc-format';
+import { VoteChoiceComponent } from './vote-choice.component';
 
 // 027 US5 — wireframe `NeedsYourVote` on Community Home: open applications the caller can still vote on,
 // with inline Approve / Revisions needed / Deny and a link to all architectural applications (FR-032/FR-033).
+// 031: a row opens that application (item 2); picking a choice no longer votes at once — nothing is
+// pre-selected, and a Save button appears once a choice is picked (items 3, 4).
 @Component({
   selector: 'app-arc-needs-your-vote-card',
   standalone: true,
-  imports: [RouterLink, TallyComponent],
+  imports: [RouterLink, TallyComponent, VoteChoiceComponent],
   template: `
     <section class="card nyv" aria-labelledby="nyv-title">
       <div class="nyv__head">
@@ -24,8 +27,9 @@ import { fmtDate } from './arc-format';
       }
       <ul class="nyv__list">
         @for (a of items(); track a.id) {
-          <li class="nyv__row" [attr.data-app-id]="a.id">
-            <span class="mono nyv__id">{{ a.displayId }}</span>
+          <li class="nyv__row" [attr.data-app-id]="a.id" (click)="rowClick($event, a)">
+            <a class="mono link nyv__id" [routerLink]="['/app/board/architectural']" [queryParams]="{ open: a.id }"
+               [attr.aria-label]="'Open ' + a.displayId">{{ a.displayId }}</a>
             <div class="nyv__main">
               <div class="nyv__project">{{ a.projectTitle }}</div>
               <div class="muted nyv__sub">{{ a.propertyAddress }} · {{ a.ownerName }}</div>
@@ -33,11 +37,8 @@ import { fmtDate } from './arc-format';
             <span class="link nyv__files">📎 {{ a.attachmentCount }}</span>
             <app-arc-tally [tally]="a.tally" />
             <span class="muted nyv__due">due {{ date(a.dueDate) }}</span>
-            <div class="nyv__actions">
-              <button type="button" class="btn nyv__btn nyv__approve" [disabled]="busyId() === a.id" (click)="vote(a, 'Approve')">Approve</button>
-              <button type="button" class="btn nyv__btn" [disabled]="busyId() === a.id" (click)="vote(a, 'RevisionsNeeded')">Revisions needed</button>
-              <button type="button" class="btn nyv__btn" [disabled]="busyId() === a.id" (click)="vote(a, 'Deny')">Deny</button>
-            </div>
+            <app-arc-vote-choice class="nyv__actions" [busy]="busyId() === a.id" submitLabel="Save"
+                                 [groupLabel]="'Your vote on ' + a.displayId" (submitted)="vote(a, $event)" />
           </li>
         }
       </ul>
@@ -50,20 +51,21 @@ import { fmtDate } from './arc-format';
     .nyv__all { margin-left: auto; font-size: 11.5px; }
     .nyv__list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
     .nyv__row { display: flex; align-items: center; gap: 12px; padding: 11px 13px; background: var(--paper);
-                border: 1.5px solid var(--line); border-radius: 11px; flex-wrap: wrap; }
-    .nyv__id { font-size: 11px; color: var(--ink-soft); width: 70px; }
+                border: 1.5px solid var(--line); border-radius: 11px; flex-wrap: wrap; cursor: pointer;
+                transition: border-color .12s, box-shadow .12s; }
+    .nyv__row:hover { border-color: var(--violet); box-shadow: 0 1px 0 var(--lav-2); }
+    .nyv__id { font-size: 11px; width: 70px; }
     .nyv__main { flex: 1; min-width: 160px; }
     .nyv__project { font-weight: 600; font-size: 12.5px; }
     .nyv__sub, .nyv__due { font-size: 11px; }
     .nyv__files { font-size: 11.5px; }
-    .nyv__actions { display: flex; gap: 5px; }
-    .nyv__btn { padding: 4px 10px; font-size: 11px; }
-    .nyv__approve { background: var(--ok-bg); }
+    .nyv__actions { display: flex; }
     .nyv__error { color: var(--warn); font-size: 12px; }
   `]
 })
 export class NeedsYourVoteCardComponent {
   private arc = inject(ArchitecturalService);
+  private router = inject(Router);
   private readonly ctx = arcContext();
 
   readonly items = signal<ArcListItem[]>([]);
@@ -75,7 +77,7 @@ export class NeedsYourVoteCardComponent {
   constructor() {
     effect(() => {
       if (this.ctx.communityId()) untracked(() => void this.load());
-    }, { allowSignalWrites: true });
+    });
   }
 
   private async load(): Promise<void> {
@@ -90,6 +92,13 @@ export class NeedsYourVoteCardComponent {
     } finally {
       this.loaded.set(true);
     }
+  }
+
+  /** 031 item 2: a click on the row's whitespace opens that application; its controls keep their own action. */
+  rowClick(event: MouseEvent, a: ArcListItem): void {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, a, input, label, textarea, select, [role="group"]')) return;
+    void this.router.navigate(['/app/board/architectural'], { queryParams: { open: a.id } });
   }
 
   async vote(a: ArcListItem, choice: ArcVoteChoice): Promise<void> {

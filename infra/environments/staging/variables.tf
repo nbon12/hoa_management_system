@@ -27,7 +27,7 @@ variable "api_dns_proxied" {
 
 variable "container_image" {
   type    = string
-  default = "sakurapatch/nekohoa-api:latest"
+  default = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "stripe_publishable_key" {

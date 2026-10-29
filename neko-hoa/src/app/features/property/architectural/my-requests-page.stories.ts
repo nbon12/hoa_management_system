@@ -22,4 +22,4 @@ type Story = StoryObj<MyRequestsPageComponent>;
 
 export const Mixed: Story = { decorators: [withItems(LIST_ITEMS)] };
 export const Empty: Story = { decorators: [withItems([])] };
-export const Phone: Story = { decorators: [withItems(LIST_ITEMS)], parameters: { viewport: { defaultViewport: 'mobile1' } } };
+export const Phone: Story = { decorators: [withItems(LIST_ITEMS)], globals: { viewport: { value: 'mobile1', isRotated: false } } };

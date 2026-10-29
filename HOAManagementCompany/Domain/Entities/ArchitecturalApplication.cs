@@ -37,6 +37,13 @@ public class ArchitecturalApplication
     public ArcDecisionSource? DecisionSource { get; set; }
     public DateTimeOffset? DecisionReachedAt { get; set; }
 
+    // 031: a decision reached by votes stays open to vote changes until DecisionFinalAt (one day after
+    // the threshold is met, but never past the end of the due date). Null with a decision means final.
+    public DateTimeOffset? DecisionFinalAt { get; set; }
+    // 031: eligible voters when the decision was reached, so a finalized tally keeps the board size it
+    // was decided by even after members join or leave. Null on rows decided before 031.
+    public int? EligibleVoterCount { get; set; }
+
     public string? ConditionsOfApproval { get; set; }
     public string? OwnerReason { get; set; }
     public DateTimeOffset? ClosedAt { get; set; }
@@ -65,6 +72,11 @@ public class ArchitecturalApplication
     public ICollection<ArchitecturalAttachment> Attachments { get; set; } = [];
     public ICollection<ArchitecturalVote> Votes { get; set; } = [];
     public ICollection<ArchitecturalInfoRequest> InfoRequests { get; set; } = [];
+    public ICollection<ArchitecturalOwnerComment> OwnerComments { get; set; } = [];
 
     public string DisplayId => $"ARC-{ApplicationNumber}";
+
+    /// <summary>031: true once a reached decision can no longer change (its grace period has ended).</summary>
+    public bool IsDecisionFinal(DateTimeOffset now) =>
+        DecisionOutcome is not null && (DecisionFinalAt is null || DecisionFinalAt <= now);
 }

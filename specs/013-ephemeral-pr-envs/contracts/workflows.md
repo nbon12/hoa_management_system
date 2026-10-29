@@ -10,11 +10,14 @@ Three new workflows, plus the manual `pr-env-repair.yml` added for issue #234. A
 | Paths | `HOAManagementCompany/**`, `neko-hoa/**`, `infra/modules/pr-environment/**`, `infra/environments/pr/**`, `.github/workflows/pr-env.yml` |
 | Guard | `github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false` |
 | Concurrency | `group: pr-env-${{ github.event.number }}`, `cancel-in-progress: false` (was `true` until issue #234: a cancelled `tofu apply` strands its state lock and leaves untracked resources; GitHub still keeps only the newest pending run) |
-| Auth | WIF (`google-github-actions/auth@v2`) as deployer SA; infra secrets via required-reviewer Environment |
+| Auth | WIF (`google-github-actions/auth@v3`, SHA-pinned in `.github/actions/pr-env-tofu-init`) as deployer SA; infra secrets via required-reviewer Environment |
 
 **Jobs (ordered gates; first failure stops and fails the PR check, FR-009):**
 1. `build-image` → `docker build` + push `sakurapatch/nekohoa-api:pr-<n>-<sha>`
-2. `provision` → `tofu init -backend-config=prefix=state/pr/<n>` → `tofu apply -auto-approve` (D1/D2)
+2. `provision` → `tofu init -backend-config=prefix=state/pr/<n>` → clear a stale state lock
+   (`scripts/pr-env-clear-stale-lock.sh`: only a lock ≥ 45 min old, conditional on its generation) → reap
+   untracked leftovers of a killed apply (`scripts/pr-env-reap.sh` with `ONLY_UNTRACKED=true`) →
+   `tofu apply -auto-approve -lock-timeout=5m` (D1/D2; self-healing added by issue #236)
 3. `stripe-webhook` → create test webhook → write `pr-<n>-stripe-webhook` secret (D9)
 4. `frontend` → Angular build with PR API base URL → `wrangler pages deploy --branch=pr-<n>` (D5)
 5. `health` → poll `<api_url>/health` (≤300s) for migrations+seed
@@ -22,7 +25,8 @@ Three new workflows, plus the manual `pr-env-repair.yml` added for issue #234. A
 7. `report` → upsert a sticky PR comment with `{api, web}` URLs + status
 
 **Postconditions**: on success the PR shows a passing check + env URLs; on any failure the
-check fails clearly and no billable resources are left (provision is rolled back / swept).
+check fails clearly and no billable resources are left (provision is rolled back / swept). The rollback
+deregisters the Stripe test webhook, which no state tracks, before `tofu destroy -lock-timeout=5m`.
 
 ## `pr-env-teardown.yml` — destroy on close/merge
 
@@ -33,8 +37,11 @@ check fails clearly and no billable resources are left (provision is rolled back
 | Concurrency | `group: pr-env-${{ github.event.number }}` (serialize vs provision) |
 
 **Steps (idempotent, best-effort each, FR-006, SC-004 ≤30 min):**
-`tofu destroy` prefix `state/pr/<n>` → delete state object → delete Stripe webhook →
-delete Pages `pr-<n>` branch → delete `pr-<n>-*` image tags.
+delete Stripe webhook → empty the R2 bucket → clear a stale state lock → `tofu destroy -lock-timeout=5m`
+prefix `state/pr/<n>` → delete the state objects **only if the destroy succeeded** → delete every Pages
+`pr-<n>` deployment (all pages). A failure alerts `DEPLOY_ALERT_WEBHOOK_URL`; the kept state is retried by
+the sweep (issue #236: deleting state after a failed destroy orphaned PR 217's resources). Per-PR image
+tags are not pruned.
 
 ## `pr-env-sweep.yml` — reclaim orphans + inactive (FR-007/008)
 
@@ -42,12 +49,20 @@ delete Pages `pr-<n>` branch → delete `pr-<n>-*` image tags.
 |--------|-------|
 | Trigger | `schedule: cron "13 7 * * *"` + `workflow_dispatch` |
 
-**Logic** — enumerate `state/pr/*` prefixes; per PR number:
+**Logic** — enumerate `state/pr/*` prefixes (an empty listing is a clean exit); per PR number:
 - PR closed/merged but env present → `tofu destroy` (orphan; SC-005).
 - PR open, last commit > 7 days ago → `tofu destroy` + comment "reclaimed; rebuilds on next push" (FR-007).
+- Before each destroy, clear a stale state lock (`CHECK_LIVE_RUNS=true`: kept while any `pr-env`,
+  teardown or repair run is unfinished, because the sweep is outside the `pr-env-<n>` group). The state is
+  deleted only after a successful destroy; a failed one fails the run and is retried next time.
 - Ensure `pr-base` Neon branch exists; recreate from Dev if missing (self-healing, D3).
+- Audit by name (`scripts/pr-env-audit.sh`, tested by `scripts/tests/pr-env-ops.test.sh`): every
+  `nekohoa-api-pr-<n>` service, `pr-<n>-*` secret, Neon `pr-<n>` branch and `nekohoa-pr-<n>-documents`
+  bucket whose PR has no `state/pr/<n>` prefix. A closed PR's fail the run (reap with `pr-env-repair`
+  `action=reap`); an open PR's are a warning, since its next `pr-env` run reaps them.
 
-**Guarantee**: after a sweep, zero resources labeled `pr-env=true` belong to a closed PR.
+**Guarantee**: after a sweep, zero resources labeled `pr-env=true` belong to a closed PR, or the run
+fails and names them.
 
 ## `pr-env-repair.yml` — manual repair of one PR's environment (issue #234)
 
