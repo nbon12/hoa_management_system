@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#PR_NUMBER](https://github.com/nbon12/hoa_management_system/pull/PR_NUMBER)
+## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#247](https://github.com/nbon12/hoa_management_system/pull/247)
 
 Frontend only, no API or data change. It touches the architectural review form shared by Community settings › Architectural review and Company defaults (030 briefs 07 and 08).
 
