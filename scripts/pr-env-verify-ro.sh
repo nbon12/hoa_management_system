@@ -4,8 +4,9 @@
 # credentials live, the diagnose job, because no session holds them. Every positive check must succeed
 # and every negative check must be refused.
 #
-# Negative probes use names that do not exist, or reads whose response goes straight to /dev/null, so a
-# wrongly scoped key changes nothing and no value reaches the log. The one exception is `secrets create
+# Negative probes use names that do not exist, or reads whose response is never printed (and deleted at
+# once), so a wrongly scoped key changes nothing and no value reaches the log. A 403 caused by an API
+# that is off in the project (SERVICE_DISABLED) proves nothing, so it is "inconclusive", not a pass. The one exception is `secrets create
 # agent-ro-probe`: if it succeeds, the key is over-scoped and the operator deletes that secret.
 #
 # Env (required): PROJECT REGION PREFIX CF_ACCOUNT; gcloud logged in as the read-only SA (WIF in CI).
@@ -34,11 +35,14 @@ call() {
   code="$(curl -sS -o "$tmp/body" -w '%{http_code}' -X "$method" -H @<(_hdr "$var") "$url" "$@")" || true
   echo "${code:-000}"
 }
-# probe VAR METHOD URL [curl args]: like call, but the body is discarded, so a check that wrongly succeeds
-# never prints what it read.
+# probe VAR METHOD URL [curl args]: like call, but the body is never printed: a check that wrongly succeeds
+# must not show what it read. Only a 403 body is looked at, for Google's SERVICE_DISABLED: a disabled API
+# refuses everyone, so that 403 proves nothing about the credential ("disabled"). The body is deleted at once.
 probe() {
   local var="$1" method="$2" url="$3" code; shift 3
-  code="$(curl -sS -o /dev/null -w '%{http_code}' -X "$method" -H @<(_hdr "$var") "$url" "$@")" || true
+  code="$(curl -sS -o "$tmp/probe" -w '%{http_code}' -X "$method" -H @<(_hdr "$var") "$url" "$@")" || true
+  if [ "${code:-000}" = 403 ] && grep -q SERVICE_DISABLED "$tmp/probe" 2>/dev/null; then code=disabled; fi
+  rm -f "$tmp/probe"
   echo "${code:-000}"
 }
 pass() { echo "  PASS  $*"; passed=$((passed + 1)); }
@@ -52,6 +56,7 @@ expect() { if [ "$2" = "$1" ]; then pass "$3 (HTTP $2)"; else bad "$3: HTTP $2, 
 denied() {
   case "$1" in
     401 | 403) pass "$2 is refused (HTTP $1)" ;;
+    disabled) unsure "$2: HTTP 403 SERVICE_DISABLED (the API is off in this project, so the refusal is unproven)" ;;
     "${3:-404}") unsure "$2: HTTP $1 (the probe target does not exist, so the refusal is unproven)" ;;
     *) bad "$2 was NOT refused (HTTP $1): the credential is over-scoped" ;;
   esac
@@ -104,7 +109,8 @@ if [ -z "$GCP_TOKEN" ]; then skip "GCP: gcloud has no usable credential"; else
   done
   rm -f "$tmp/body"
   if [ "$ok" = true ]; then
-    if [ "$header_paths" -eq 0 ]; then pass "no request headers in ${entries} Cloud Scheduler audit-log entries (400 days)"
+    if [ "$entries" -eq 0 ]; then unsure "no Cloud Scheduler audit-log entries in 400 days (no jobs yet), so there was nothing to inspect"
+    elif [ "$header_paths" -eq 0 ]; then pass "no request headers in ${entries} Cloud Scheduler audit-log entries (400 days)"
     else bad "${header_paths} header field path(s) in Cloud Scheduler audit logs: logging.viewer may read the scheduler secret. Rotate it and drop roles/logging.viewer (handoff Verification 3)."
     fi
   fi
