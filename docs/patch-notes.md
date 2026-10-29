@@ -6,6 +6,38 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#PR_NUMBER](https://github.com/nbon12/hoa_management_system/pull/PR_NUMBER)
+
+Frontend only, no API or data change. It touches the architectural review form shared by Community settings › Architectural review and Company defaults (030 briefs 07 and 08).
+
+**Changes earlier assumptions**
+
+- **Time zone is picked, not typed.** The field is a searchable dropdown of IANA names (`app-combo-picker` in its new `dropdown` mode). Clicking it or its ▾ button lists every zone, with the common US zones first. Typing filters by name, city, generic name ("Eastern") or offset ("UTC-5"). Text that isn't chosen from the list is discarded on blur, so the form can no longer send a mistyped zone.
+  - The list comes from `Intl.supportedValuesOf('timeZone')`, plus `UTC`. Chrome lists 19 renamed zones by their old names (`Asia/Calcutta`, `Europe/Kiev`, `America/Indianapolis`, …). `RENAMED_TIME_ZONES` in `shared/time-zones.ts` maps them to the current names, so every browser saves the same name. A saved zone that isn't in the list still shows, first.
+  - The server is unchanged: `ArcRuleValidator` still accepts any zone `TimeZoneInfo` resolves.
+- **Lapse rule wording.** These are UI labels only. The enum and API values are unchanged.
+  - The field is now "After the review period ends without a decision". It was "When the review period ends without a decision".
+  - The options are now "Auto approve" (`DeemedApproved`), "Auto reject" (`DeemedDenied`) and "No automatic action" (`FlagOverdueOnly`), in that order. Spec 027 calls them "deemed approved", "deemed denied" and "flag overdue only".
+  - A helper under the field explains what each one does.
+  - The behavior is spec 027 FR-027, as before: `ArcSweepService` reaches the decision once the due date passes, and a Community Manager records it.
+
+**Shared frontend pieces you can reuse**
+
+- `ComboPickerComponent` has new opt-in inputs:
+  - `dropdown`: click or ▾ to list every option.
+  - `helperFirst`: the helper goes above the field.
+  - `inputId`: the field's id, for error-summary links.
+  - `settingId`: sets `data-setting-id`, for settings search.
+- `PickerOption.keywords` holds search words that aren't shown.
+- The active option now scrolls into view as you arrow through a long list.
+- `timeZoneOptions(current)` in `shared/time-zones.ts` gives the time zone list.
+
+**Left open**
+
+- `lapseRuleCitation` still has no field in the Architectural review form (031 T024).
+
+---
+
 ## 2026-10-29 · ARC review refinements (031) · [#243](https://github.com/nbon12/hoa_management_system/pull/243)
 
 Spec: [`specs/031-arc-review-refinements/spec.md`](../specs/031-arc-review-refinements/spec.md). Builds on 027 (board ARC review) and 029 (resident ARC requests), and amends both specs.

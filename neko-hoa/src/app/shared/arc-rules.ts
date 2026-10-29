@@ -1,7 +1,10 @@
 import { ArcRuleFields } from '../core/services/company.service';
 
 // 030 briefs 07 and 08: the six architectural review rule fields, shared by a community's
-// Architectural review section and the Company defaults page. Labels keep spec 027's words.
+// Architectural review section and the Company defaults page. Labels keep spec 027's words, except
+// the lapse rule's, which use plain words: "Auto approve" for spec 027's "deemed approved", "Auto
+// reject" for "deemed denied" and "No automatic action" for "flag overdue only". The API values
+// are unchanged.
 
 export type ArcRuleField = keyof ArcRuleFields;
 
@@ -12,7 +15,7 @@ export const ARC_RULE_FIELDS: readonly ArcRuleField[] = [
 export const ARC_RULE_LABELS: Record<ArcRuleField, string> = {
   reviewPeriodDays: 'Review period (days)',
   reminderDays: 'Reminder to the board (days before due, 0 = off)',
-  lapseRule: 'When the review period ends without a decision',
+  lapseRule: 'After the review period ends without a decision',
   decisionRule: 'How a decision is reached',
   timeZoneId: 'Time zone',
   formalDisapprovalStatement: 'Formal disapproval statement (included in every denial email)',
@@ -22,7 +25,7 @@ export const ARC_RULE_LABELS: Record<ArcRuleField, string> = {
 export const ARC_RULE_SHORT_LABELS: Record<ArcRuleField, string> = {
   reviewPeriodDays: 'Review period',
   reminderDays: 'Reminder to the board',
-  lapseRule: 'When the review period ends without a decision',
+  lapseRule: 'After the review period ends without a decision',
   decisionRule: 'How a decision is reached',
   timeZoneId: 'Time zone',
   formalDisapprovalStatement: 'Formal disapproval statement',
@@ -39,9 +42,9 @@ export const ARC_RULE_SETTING_IDS: Record<ArcRuleField, string> = {
 };
 
 export const LAPSE_RULE_OPTIONS: readonly { value: ArcRuleFields['lapseRule']; label: string }[] = [
-  { value: 'FlagOverdueOnly', label: 'Flag as overdue only' },
-  { value: 'DeemedApproved', label: 'Deemed approved' },
-  { value: 'DeemedDenied', label: 'Deemed denied' },
+  { value: 'DeemedApproved', label: 'Auto approve' },
+  { value: 'DeemedDenied', label: 'Auto reject' },
+  { value: 'FlagOverdueOnly', label: 'No automatic action' },
 ];
 
 export const DECISION_RULE_OPTIONS: readonly { value: ArcRuleFields['decisionRule']; label: string }[] = [
@@ -51,7 +54,7 @@ export const DECISION_RULE_OPTIONS: readonly { value: ArcRuleFields['decisionRul
 
 export const STATEMENT_MAX = 1000;
 
-/** A value as people read it: "Flag as overdue only", "45", the time zone name, the statement. */
+/** A value as people read it: "No automatic action", "45", the time zone name, the statement. */
 export function arcRuleValueLabel(field: ArcRuleField, value: ArcRuleFields[ArcRuleField] | null | undefined): string {
   if (value === null || value === undefined) return '';
   if (field === 'lapseRule') return LAPSE_RULE_OPTIONS.find(o => o.value === value)?.label ?? String(value);
@@ -96,7 +99,7 @@ export function validateArcRules(v: ArcRuleFields): Partial<Record<ArcRuleField,
   }
   const zone = (v.timeZoneId ?? '').trim();
   if (!zone) problems.timeZoneId = 'Time zone is required.';
-  else if (!isKnownTimeZone(zone)) problems.timeZoneId = "Time zone isn't recognized. Use a name such as America/New_York.";
+  else if (!isKnownTimeZone(zone)) problems.timeZoneId = "Time zone isn't recognized. Choose one from the list.";
   const statement = (v.formalDisapprovalStatement ?? '').trim();
   if (!statement) problems.formalDisapprovalStatement = 'The formal disapproval statement is required.';
   else if (v.formalDisapprovalStatement.length > STATEMENT_MAX) problems.formalDisapprovalStatement = 'The statement can be at most 1,000 characters.';

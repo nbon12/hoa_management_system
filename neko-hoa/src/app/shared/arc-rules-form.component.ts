@@ -1,5 +1,7 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { ArcRuleFields } from '../core/services/company.service';
+import { ComboPickerComponent, PickerOption } from './combo-picker.component';
+import { timeZoneOptions } from './time-zones';
 import {
   ARC_RULE_FIELDS, ARC_RULE_LABELS, ARC_RULE_SETTING_IDS, ArcRuleField, DECISION_RULE_OPTIONS, LAPSE_RULE_OPTIONS,
   STATEMENT_MAX, arcRuleValueLabel, pickArcRules, validateArcRules,
@@ -13,10 +15,12 @@ type Errors = Partial<Record<ArcRuleField, string>>;
  * default). Client checks run first: on failure an error summary takes focus, each link moves focus
  * to its field, and each message also shows under its field. `showErrors` does the same for a
  * server's `VALIDATION_ERROR`. The statement area accepts more than 1,000 characters (D5).
+ * The time zone is a searchable dropdown of IANA names, so it can't be mistyped.
  */
 @Component({
   selector: 'app-arc-rules-form',
   standalone: true,
+  imports: [ComboPickerComponent],
   template: `
     <form class="arf" (submit)="submit($event)" novalidate>
       @if (summary().length) {
@@ -33,6 +37,12 @@ type Errors = Partial<Record<ArcRuleField, string>>;
       <div class="arf__grid">
         @for (f of fields; track f) {
           <div class="arf__field" [class.arf__field--wide]="f === 'formalDisapprovalStatement'">
+            @if (f === 'timeZoneId') {
+              <app-combo-picker [label]="labels[f]" [inputId]="fieldId(f)" [settingId]="settingIds[f]" [helper]="helper(f) ?? ''"
+                                [helperFirst]="true" [dropdown]="true" placeholder="Search or choose a time zone" [noun]="timeZoneNoun"
+                                [options]="timeZones" [value]="draft().timeZoneId || null" (valueChange)="set(f, $event ?? '')"
+                                [error]="errors()[f] ?? null" [disabled]="busy" [noMatchMessage]="noTimeZoneMatch" />
+            } @else {
             <label class="field-label" [for]="fieldId(f)">{{ labels[f] }}</label>
             @if (helper(f); as h) { <p class="field-help" [id]="fieldId(f) + '-help'">{{ h }}</p> }
             @switch (f) {
@@ -55,11 +65,6 @@ type Errors = Partial<Record<ArcRuleField, string>>;
                 <p class="field-help" [id]="fieldId(f) + '-count'"><span aria-hidden="true">{{ countText() }} / 1,000</span><span class="sr-only">{{ countText() }} of 1,000 characters used</span></p>
                 <p class="sr-only" role="status" aria-live="polite">{{ overLimit() ? 'The statement is over 1,000 characters.' : '' }}</p>
               }
-              @case ('timeZoneId') {
-                <input class="field" type="text" autocomplete="off" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]"
-                       [attr.aria-describedby]="describedBy(f)" [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy"
-                       [value]="draft().timeZoneId" (input)="set(f, $any($event.target).value)" />
-              }
               @default {
                 <input class="field" type="number" inputmode="numeric" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]"
                        [attr.aria-describedby]="describedBy(f)" [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy"
@@ -67,6 +72,7 @@ type Errors = Partial<Record<ArcRuleField, string>>;
               }
             }
             @if (errors()[f]) { <p class="field-error" [id]="fieldId(f) + '-error'">{{ errors()[f] }}</p> }
+            }
           </div>
         }
       </div>
@@ -106,6 +112,10 @@ export class ArcRulesFormComponent implements OnInit, AfterViewInit {
   readonly settingIds = ARC_RULE_SETTING_IDS;
   readonly lapseOptions = LAPSE_RULE_OPTIONS;
   readonly decisionOptions = DECISION_RULE_OPTIONS;
+  readonly timeZoneNoun: [string, string] = ['time zone', 'time zones'];
+  readonly noTimeZoneMatch = (q: string): string => `No time zone matches “${q}”. Try a city, such as Chicago, or a name, such as Eastern.`;
+  /** Set once the saved value is known, so a zone the browser doesn't list still shows. */
+  timeZones: PickerOption[] = [];
 
   readonly draft = signal<ArcRuleFields>({
     reviewPeriodDays: 0, lapseRule: 'FlagOverdueOnly', decisionRule: 'MajorityOfMembers', reminderDays: 0, timeZoneId: '', formalDisapprovalStatement: '',
@@ -118,6 +128,7 @@ export class ArcRulesFormComponent implements OnInit, AfterViewInit {
 
   ngOnInit(): void {
     this.draft.set(pickArcRules(this.value));
+    this.timeZones = timeZoneOptions(this.value.timeZoneId);
   }
 
   ngAfterViewInit(): void {
@@ -135,12 +146,14 @@ export class ArcRulesFormComponent implements OnInit, AfterViewInit {
     switch (f) {
       case 'reviewPeriodDays': return `1 to 365. An application is due this many days after it's received.${suffix}`;
       case 'reminderDays': return `0 to 30. 0 turns reminders off.${suffix}`;
-      case 'lapseRule': return d ? suffix.trim() : null;
+      case 'lapseRule':
+        return 'No automatic action keeps the application open and marks it overdue. Auto approve and Auto reject reach that '
+          + `decision once the due date passes; a Community Manager then records it, which emails the owner.${suffix}`;
       case 'decisionRule': return `With a quorum, more than half of the eligible board members must vote.${suffix}`;
       case 'timeZoneId':
         return this.variant === 'defaults'
-          ? 'A time zone name, such as America/New_York. New communities start with it. Company Administrator invitations show their expiry time in it.'
-          : `A time zone name, such as America/New_York. Used for due dates and for the expiry times on this community's invitations.${suffix}`;
+          ? 'Search by city or name, such as Chicago or Eastern. New communities start with it. Company Administrator invitations show their expiry time in it.'
+          : `Search by city or name, such as Chicago or Eastern. Used for due dates and for the expiry times on this community's invitations.${suffix}`;
       case 'formalDisapprovalStatement':
         return this.variant === 'defaults'
           ? 'Up to 1,000 characters.'
