@@ -33,9 +33,10 @@ Run ids and names are on #234.
 - A6: the sweep clears a stale lock and removes the prefix (run 40810863292). The test exposed a bug: a
   lock with no state beside it blocked `tofu init`, which needs the lock to write an empty state. #249
   fixed it by clearing the lock before init in provision, teardown and sweep.
-- A1: `pr-env-repair action=verify` (#246, made stricter in #250) passed every check that applies. Neon
-  is "not checked". The two Cloud Scheduler checks are inconclusive until the Scheduler API (enabled
-  2026-10-29; it had never been turned on) and the ARC sweep job from #238 exist.
+- A1: `pr-env-repair action=verify` (#246, made stricter in #250): 17 passed, Neon "not checked", none
+  failed (run 40811942211). It ran after #238 created the ARC sweep job; the Cloud Scheduler API had never
+  been turned on, and was enabled on 2026-10-29.
+- A5a: #238 merged. `infra-apply` succeeded and created `nekohoa-arc-sweep-dev`.
 - O14: the Cloudflare `claude-agent-ro` token was rolled on 2026-10-29. It expires on 2027-01-25; roll it
   again before then.
 - Tier 1 identities: `nekohoa-agent-ro-dev`, used through WIF on the `main` subject only (not the repo-wide
@@ -67,8 +68,6 @@ Run ids and names are on #234.
 
 **Open**
 - The cloud half of Verification 8 (decision 4): an operator starts one cloud session.
-- A5a / #238 (`infra-apply` 409). Then re-run `verify` so the scheduler checks mean something. #242
-  (Artifact Registry images) and #241 (`lock-merged-branch`) are merged.
 - Under #236: scope the sweep's live-run check (`CHECK_LIVE_RUNS`) to each PR's own runs. Today a live run
   for any PR, or a repair run waiting for `ops`, keeps every stale lock.
 
@@ -1414,7 +1413,7 @@ secret is attached.
 
 ### Agent session, in order
 
-- [x] **A1.** (Now `pr-env-repair` `action=verify`, passed 2026-10-29; scheduler checks pending #238; see Status and decisions.) Run the Tier 1 checks (Verification 1-3, 5-7 and 9) and post pass/fail per line on the
+- [x] **A1.** (Now `pr-env-repair` `action=verify`, 17 passed 2026-10-29; see Status and decisions.) Run the Tier 1 checks (Verification 1-3, 5-7 and 9) and post pass/fail per line on the
       tracking issue. Run step 4 only while a Tier 2 token is present. Step 8 runs in A3.
 - [x] **A2.** On a new branch off `main`, add `.github/workflows/pr-env-repair.yml` and
       `scripts/pr-env-reap.sh` as specified (SHA-pinned, step-scoped secrets, env-passed inputs,
@@ -1431,7 +1430,7 @@ secret is attached.
 - [x] **A5.** On another branch off `main`, implement Root-cause fixes 2-7 and the sweep and
       `infra-apply` changes from Ops workflows. Update `contracts/workflows.md:12` and
       `research.md:134` in 013.
-- [ ] **A5a.** On another branch off `main`, fix the `infra-apply` 409 (Root-cause item 9). Confirm
+- [x] **A5a.** (#238, merged 2026-10-29.) On another branch off `main`, fix the `infra-apply` 409 (Root-cause item 9). Confirm
       the `infra-plan` output, then after merge confirm `infra-apply` is green and the plan no longer
       adds `ArchitecturalReview__AppBaseUrl` or `nekohoa-arc-sweep-dev`.
 - [x] **A6.** (Done 2026-10-29; stale-lock part needed #249.) Prove the fix with a test PR: push twice in quick succession while `pr-env` is
