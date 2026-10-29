@@ -139,8 +139,9 @@ public class VoteChangeTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
         Assert.Equal(Local(due.AddDays(1), 0), decided.VotesLockAt);
     }
 
-    // 031 FR-003: a decision made the evening before the due date still gets its full day, which ends before the
-    // due date does.
+    // 031 FR-003: a decision made the evening before the due date still gets its full day (24 hours), which ends before
+    // the due date does. The day is 24 real hours, not the same wall-clock time tomorrow: they differ when a
+    // daylight-saving change falls in between (ArcVotingGraceEndTests pins that case to fixed dates).
     [Fact]
     public async Task DecisionOnDayBeforeDue_GetsFullDay()
     {
@@ -152,7 +153,8 @@ public class VoteChangeTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
 
         var decided = await CastAsync(s.Board[1], s, appId, "Approve");
 
-        Assert.Equal(Local(due, 20), decided.VotesLockAt);
+        Assert.Equal(Clock.UtcNow + ArcVoting.GracePeriod, decided.VotesLockAt);
+        Assert.True(decided.VotesLockAt < Local(due.AddDays(1), 0));
     }
 
     // 031 FR-003: an overdue application (flag-only lapse rule) decided after its due date is changeable to the end of that day.

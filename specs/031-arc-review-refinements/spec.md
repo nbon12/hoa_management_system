@@ -219,7 +219,7 @@ As a board member, I open an application by clicking anywhere on its row, here o
 | US3-S6 | `VoteChangeTests.Undo_OnClosedApplication_IsRefused` |
 | US3-S7 | `VoteChangeTests.RecordOutcome_DuringGrace_IsRefused` |
 | US3-S8 | `VoteChangeTests.Undo_ByManager_IsRefused` |
-| FR-003 | `VoteChangeTests.DecisionOnLastDay_LocksAtEndOfDueDate`, `DecisionOnDayBeforeDue_GetsFullDay`, `DecisionAfterDueDate_LocksAtEndOfThatDay` |
+| FR-003 | `VoteChangeTests.DecisionOnLastDay_LocksAtEndOfDueDate`, `DecisionOnDayBeforeDue_GetsFullDay`, `DecisionAfterDueDate_LocksAtEndOfThatDay`; `ArcVotingGraceEndTests` (fixed dates, both DST changes) |
 | US4-S1, US4-S2 | `ArchitecturalSeederTests.Seeder_CreatesDemoData_AndIsIdempotent`; `e2e/board-architectural.spec.ts` › "the auto-approved demo application cites the governing documents" |
 | US5-S1 | `BoardSizeAndLapseTests.SingleMemberBoard_OwnerIsNotRecused_AndCanVote` |
 | US5-S2 | `BoardSizeAndLapseTests.TwoMemberBoard_OwnerIsStillRecused` |

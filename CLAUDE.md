@@ -1,6 +1,6 @@
 # HOAManagementCompany Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-10-17
+Auto-generated from all feature plans. Last updated: 2026-10-29
 
 ## Active Technologies
 - C# / .NET 9.0 (backend); TypeScript / Angular 17+ (frontend) (006-stripe-payments)
@@ -34,6 +34,8 @@ Auto-generated from all feature plans. Last updated: 2026-10-17
 - PostgreSQL (Neon prod; Testcontainers CI/local). No new tables — one additive forward-only migration `<ts>_AddResidentArcSubmission` that extends 027's tables: (029-resident-arc-requests)
 - C# / .NET 9.0 (backend `HOAManagementCompany`, tests `HOAManagementCompany.Tests`); TypeScript / Angular 17.3 (frontend `neko-hoa`) + All existing: FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity/JWT, `ICommunityScopeResolver` (extended: `DecideAsync`, company capabilities), `IAlertProvider`/`SesEmailProvider` (direct invitation sends), `OutboxMessage` + `OutboxDispatcher`, `Microsoft.AspNetCore.RateLimiting`, FluentValidation `AddValidatedOptions`, Serilog, `TimeProvider`. Angular standalone components and signals. **No new packages.** (030-company-administration)
 - PostgreSQL (Neon prod, Testcontainers CI/local). New tables: `ManagementCompanies`, `CompanyAdministratorGrants`, `CompanyDefaultSettings`, `Invitations`, `InvitationDeliveries`. Modified: `Communities` (company FK, `NormalizedName`, Onboarding/Active/Archived + lifecycle stamps), `RecurringPayments` (`EnrolledByUserId`, `CancellationReason`). ICU collation `natural_sort`. (030-company-administration)
+- C# / .NET 9.0 (backend `HOAManagementCompany`, tests `HOAManagementCompany.Tests`); TypeScript / Angular 17.3 (frontend `neko-hoa`) + All existing (027/029 ARC stack). **No new packages.** (031-arc-review-refinements)
+- PostgreSQL (Neon prod, Testcontainers CI/local). New table `ArchitecturalOwnerComments`. Modified: `ArchitecturalApplications` (+ `DecisionFinalAt`, `EligibleVoterCount`), `ArchitecturalAttachments` (+ `OwnerCommentId`), `CommunityArcSettings` (+ `LapseRuleCitation`). (031-arc-review-refinements)
 
 - C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend) (005-otel-aspire-observability)
 
@@ -71,6 +73,7 @@ There is no `lint` npm script; do not run `npm run lint`.
 C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard conventions
 
 ## Recent Changes
+- 031-arc-review-refinements: ARC votes can be undone and recast until the decision is final (one-day grace period capped at the due date); two-step voting UI; final-decision column; homeowner comment threads; recusal waiver and board-size snapshot; lapse-rule citation. See `docs/patch-notes.md`. **No new packages.**
 - 030-company-administration: Company Administrator role and company record; community lifecycle (Onboarding/Active/Archived); invitations (membership, residency, company admin) with link sign-up; sign-in without a home; per-request resident access check; autopay attribution. All existing packages; **no new packages.**
 - 029-resident-arc-requests: Added C# / .NET 9.0 (backend `HOAManagementCompany`, tests `HOAManagementCompany.Tests`); TypeScript / Angular 17.3 (frontend `neko-hoa`) + All existing — FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity/JWT, `IDocumentStorage` (R2/MinIO), `OutboxMessage` + `OutboxDispatcher` + `SesEmailProvider`, `Microsoft.AspNetCore.RateLimiting`, Serilog, FluentValidation via `AddValidatedOptions`; Angular standalone components + signals, existing `AuthService` active-property claim. From 027 (shared, lands first): `ArchitecturalApplication` et al., `ArcApplicationFactory`, `Arc*` enums. **No new packages.**
 - 027-board-arc-review: Added C# / .NET 9.0 (backend `HOAManagementCompany`, tests `HOAManagementCompany.Tests`); TypeScript / Angular 17.3 (frontend `neko-hoa`); HCL / OpenTofu ≥ 1.8 (one Cloud Scheduler job) + All existing: FastEndpoints, EF Core 9 (Npgsql), ASP.NET Core Identity/JWT, `ICommunityScopeResolver`, `IDocumentStorage` (R2/MinIO), `OutboxMessage` + `OutboxDispatcher` + `SesEmailProvider`, `Microsoft.AspNetCore.RateLimiting`, Serilog, `TimeProvider` (BCL). Angular standalone components and signals. OpenTofu `hashicorp/google` (already pinned). **No new packages.**
@@ -78,6 +81,13 @@ C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard con
 
 
 <!-- MANUAL ADDITIONS START -->
+
+## Patch notes: read them, and add to them when you merge
+
+`docs/patch-notes.md` is the running log of what changed on `main`, newest first. Each entry covers behavior and contract changes, assumptions that no longer hold, shared pieces to reuse, and open follow-ups. Other agents rely on it to catch up.
+
+- **Before starting work**, skim the entries newer than the last merge you know about, especially any that touch the area you're changing.
+- **When a PR merges a feature or a behavior-changing fix**, add an entry at the top of `docs/patch-notes.md` **in that same PR**. Follow the existing entry's shape: date, title, spec link, PR link, then the sections that apply. Keep it to what someone working nearby needs to know. Dependency bumps and doc-only changes don't need an entry.
 
 ## Spec Kit workflow: PR watching
 
