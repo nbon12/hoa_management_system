@@ -6,6 +6,26 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-10-29 · Fix: ARC settings Save stuck on "Saving…" · [#248](https://github.com/nbon12/hoa_management_system/pull/248)
+
+Spec: [`specs/030-company-administration/contracts/community-settings.md`](../specs/030-company-administration/contracts/community-settings.md) § Architectural review section.
+
+**Changes earlier assumptions**
+
+- `PUT /api/v1/communities/{cid}/architectural-settings` now answers with the **GET body** (`ArcSettingsSectionDto`: the rules plus `companyDefaults`, `differsFromDefaults`, `canEdit` and `lapseRuleCitation`), the same as `POST …/reset`. It used to answer with 027's narrower `ArcSettingsDto`. Every 027 field is still there, so clients that read only those are unaffected.
+- `ArcSettingsDto` is no longer sent by any endpoint. `ArcSettingsSection` still builds it in memory, and the `ArcSettingsChanged` log uses it.
+
+**Why**
+
+- Community settings › Architectural review stores the PUT result as its state. With the narrow body, its `summary()`/`matches()` computeds threw on every change-detection pass. Save then stayed on "Saving…" although the write had succeeded.
+- Component specs that mock the service can't catch this kind of drift. When a write's result replaces UI state, answer with the GET body, and pin that in a backend integration test.
+
+**Tests**
+
+- `ArcSettingsSectionTests.SavingTheRules_AnswersWithTheGetBody`, run as Company Administrator and as Community Manager. It checks that the PUT body carries the section fields and equals the next GET.
+
+---
+
 ## 2026-10-29 · ARC review refinements (031) · [#243](https://github.com/nbon12/hoa_management_system/pull/243)
 
 Spec: [`specs/031-arc-review-refinements/spec.md`](../specs/031-arc-review-refinements/spec.md). Builds on 027 (board ARC review) and 029 (resident ARC requests), and amends both specs.
