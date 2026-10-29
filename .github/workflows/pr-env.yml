@@ -84,10 +84,35 @@ jobs:
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3
 
+      # 2b. Self-heal what a killed run left behind (#236): its state lock, then any per-PR resource the
+      #     state never recorded (a killed apply creates resources it never writes down; the next apply then
+      #     fails on "already exists"). The reap deletes only what `tofu state list` does not track.
+      - name: Clear a stale state lock left by a killed run
+        continue-on-error: true # tofu apply below waits for any lock this step could not clear
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: scripts/pr-env-clear-stale-lock.sh
+
+      - name: Reap untracked per-PR leftovers (from a killed apply)
+        working-directory: infra/environments/pr
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PR_BASE_BRANCH_ID: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ONLY_UNTRACKED: "true"
+          DRY_RUN: "false"
+        run: ../../../scripts/pr-env-reap.sh
+
       # 3. Provision: Neon branch fork + R2 bucket + secrets + Cloud Run (placeholder image).
       - name: tofu apply
         working-directory: infra/environments/pr
-        run: tofu apply -input=false -auto-approve
+        run: tofu apply -input=false -auto-approve -lock-timeout=5m
 
       - name: Capture environment outputs
         id: tf
@@ -252,7 +277,14 @@ jobs:
             }
 
       # FR-009 clean failure: destroy partial resources so nothing billable is stranded (sweep backstops).
+      # The Stripe endpoint is never in state, so a failure after `Register Stripe webhook` deregisters it
+      # here (#236).
       - name: Clean up on failure
         if: failure()
         working-directory: infra/environments/pr
-        run: tofu destroy -input=false -auto-approve || true
+        env:
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          ../../../scripts/stripe-webhook-deregister.sh || true
+          tofu destroy -input=false -auto-approve -lock-timeout=5m || true
