@@ -114,11 +114,14 @@ jobs:
       - name: shellcheck
         run: >-
           shellcheck scripts/pr-env-reap.sh scripts/pr-env-clear-stale-lock.sh scripts/pr-env-audit.sh
-          scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh
+          scripts/pr-env-verify-ro.sh scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh
+          scripts/tests/pr-env-verify-ro.test.sh
       - name: pr-env-reap tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-reap.test.sh
       - name: pr-env lock + audit tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-ops.test.sh
+      - name: pr-env-verify-ro tests (stubbed providers, no network)
+        run: bash scripts/tests/pr-env-verify-ro.test.sh
 
   frontend:
     name: Frontend (neko-hoa)
