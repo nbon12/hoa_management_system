@@ -111,13 +111,18 @@ resource "google_cloud_run_v2_service" "api" {
   # tofu is the single declarative owner of all OTHER config (env vars, secrets, probes, scaling, SA),
   # so the pipeline deploys image-only and shifts traffic (canary tags) without drift here. image is
   # the live :sha pushed by 009; client/client_version churn on every gcloud deploy; traffic is the
-  # canary split (candidate tag → 100%) the deploy job manages. template[0].revision is also
-  # pipeline-owned: every gcloud deploy stamps a new revision name, which tofu would otherwise null
-  # on each apply (perpetual churn / an extra revision per apply).
+  # canary split (candidate tag → 100%) the deploy job manages.
+  #
+  # template[0].revision is deliberately NOT ignored (#236). gcloud deploy names each revision
+  # client-side and refresh stores that name in state; ignoring it made every template change re-send
+  # the existing name with new config, which Cloud Run refuses (409 "Revision named ... with different
+  # configuration already exists"). Unset here, tofu sends no name and Cloud Run generates one. Cost:
+  # a harmless in-place revision → null diff on infra-plan after each gcloud deploy. The revision an
+  # apply creates gets no traffic (traffic stays on the candidate tag), and the next deploy-dev
+  # carries its config forward.
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
-      template[0].revision,
       # gcloud image-only deploys re-emit the scaling block without the explicit min_instance_count=0
       # (0 is the API default), so tofu perpetually wants to re-add it. min=0 (scale-to-zero) is the
       # default regardless, so ignore the pipeline's scaling representation to stay drift-free.
