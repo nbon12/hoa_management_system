@@ -63,7 +63,7 @@ describe('SettingsSideNavComponent (030 T067)', () => {
     expect(labels).toEqual([
       'Architectural review',
       'Architectural review › Review period',
-      'Architectural review › When the review period ends without a decision',
+      'Architectural review › After the review period ends without a decision',
     ]);
     expect(screen.getByRole('status').textContent!.trim()).toBe('3 settings match');
     // Matching ignores case and matches part of a word.

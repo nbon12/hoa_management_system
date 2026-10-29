@@ -7,6 +7,8 @@ export interface PickerOption {
   detail?: string | null;
   /** A text chip after the label, for example "Onboarding". */
   chip?: string | null;
+  /** More words that match when typing but aren't shown, for example "New York Eastern Time". */
+  keywords?: string | null;
 }
 
 interface PickerRow extends PickerOption {
@@ -21,7 +23,10 @@ let nextId = 1;
  * (case-insensitive, part of a word) and emits `queryChange` for server-side search; Up/Down move,
  * Enter chooses, Esc closes without changing the value; the match count is announced politely;
  * the chosen option reads "✓ Selected". With `noneLabel` a "none" row comes first.
- * Used for the parent association (brief 03, 04) and the people pickers (brief 05).
+ * With `dropdown`, clicking the field or its ▾ button lists every option over the content below
+ * it, and typing highlights the first match so Enter chooses it: a searchable dropdown. Matches on
+ * the label come before matches on `keywords` only.
+ * Used for the parent association (brief 03, 04), the people pickers (brief 05) and the time zone.
  */
 @Component({
   selector: 'app-combo-picker',
@@ -29,29 +34,56 @@ let nextId = 1;
   template: `
     <div class="cbp">
       <label class="field-label" [for]="inputId">{{ label }}</label>
-      <input class="field" [id]="inputId" role="combobox" aria-autocomplete="list" autocomplete="off" [placeholder]="placeholder"
-             [attr.aria-expanded]="open()" [attr.aria-controls]="listId" [attr.aria-activedescendant]="activeOptionId()"
-             [attr.aria-describedby]="describedBy()" [attr.aria-invalid]="error ? 'true' : null" [disabled]="disabled"
-             [value]="text()" (input)="onInput($any($event.target).value)" (keydown)="onKey($event)" (blur)="close()" />
+      @if (helper && helperFirst) { <p class="field-help" [id]="helpId">{{ helper }}</p> }
+      <div class="cbp__control" [class.cbp__control--dropdown]="dropdown">
+        <input #input class="field" [id]="inputId" role="combobox" aria-autocomplete="list" autocomplete="off" [placeholder]="placeholder"
+               [attr.data-setting-id]="settingId" [attr.aria-expanded]="open()" [attr.aria-controls]="listId"
+               [attr.aria-activedescendant]="activeOptionId()" [attr.aria-describedby]="describedBy()"
+               [attr.aria-invalid]="error ? 'true' : null" [disabled]="disabled" [value]="text()"
+               (input)="onInput($any($event.target).value)" (keydown)="onKey($event)" (click)="onClick(input)" (blur)="close()" />
+        @if (dropdown) {
+          <button type="button" class="cbp__toggle" tabindex="-1" [attr.aria-label]="'Show all ' + noun[1]"
+                  [attr.aria-expanded]="open()" [attr.aria-controls]="listId" [disabled]="disabled"
+                  (mousedown)="$event.preventDefault()" (click)="toggle(input)"><span aria-hidden="true">▾</span></button>
+        }
+        @if (open()) {
+          <!-- A press anywhere in the list (its padding, its scrollbar) keeps focus in the field. -->
+          <div class="cbp__popup" (mousedown)="$event.preventDefault()">
+            <ul class="cbp__list" role="listbox" [id]="listId" [attr.aria-label]="label">
+              @for (row of rows(); track row.key; let i = $index) {
+                <li role="option" class="cbp__option" [id]="optionId(i)" [class.cbp__option--active]="i === active()"
+                    [attr.aria-selected]="isSelected(row)" (click)="choose(row)">
+                  <span class="cbp__label">{{ row.label }}@if (row.detail) {<span class="cbp__detail">{{ row.detail }}</span>}</span>
+                  @if (row.chip) { <span class="sr-only">, </span><span class="pill">{{ row.chip }}</span> }
+                  @if (isSelected(row)) { <span class="sr-only">, </span><span class="cbp__selected">✓ Selected</span> }
+                </li>
+              }
+            </ul>
+            @if (query().trim() && matchCount() === 0) { <p class="muted cbp__empty">{{ noMatch() }}</p> }
+          </div>
+        }
+      </div>
       <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
-      @if (open()) {
-        <ul class="cbp__list" role="listbox" [id]="listId" [attr.aria-label]="label">
-          @for (row of rows(); track row.key; let i = $index) {
-            <li role="option" class="cbp__option" [id]="optionId(i)" [class.cbp__option--active]="i === active()"
-                [attr.aria-selected]="isSelected(row)" (mousedown)="$event.preventDefault()" (click)="choose(row)">
-              <span class="cbp__label">{{ row.label }}@if (row.detail) {<span class="cbp__detail">{{ row.detail }}</span>}</span>
-              @if (row.chip) { <span class="sr-only">, </span><span class="pill">{{ row.chip }}</span> }
-              @if (isSelected(row)) { <span class="sr-only">, </span><span class="cbp__selected">✓ Selected</span> }
-            </li>
-          }
-        </ul>
-        @if (query().trim() && matchCount() === 0) { <p class="muted cbp__empty">{{ noMatch() }}</p> }
-      }
-      @if (helper) { <p class="field-help" [id]="helpId">{{ helper }}</p> }
+      @if (helper && !helperFirst) { <p class="field-help" [id]="helpId">{{ helper }}</p> }
       @if (error) { <p class="field-error" [id]="errorId">{{ error }}</p> }
     </div>
   `,
   styles: [`
+    .cbp__control { position: relative; }
+    .cbp__control--dropdown .field { padding-right: 36px; }
+    .cbp__toggle {
+      position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 30px; height: 30px;
+      border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); cursor: pointer;
+    }
+    .cbp__toggle:hover:not(:disabled) { background: var(--lav); color: var(--ink); }
+    .cbp__toggle:disabled { cursor: default; opacity: 0.5; }
+    /* A dropdown's list opens over the content below it, so closing it never moves a button the
+       pointer is on (a click on Save while the list is open would otherwise be lost). */
+    .cbp__control--dropdown .cbp__popup { position: absolute; top: 100%; left: 0; right: 0; z-index: 40; }
+    .cbp__control--dropdown .cbp__list { box-shadow: 0 6px 18px rgb(0 0 0 / 12%); }
+    .cbp__control--dropdown .cbp__empty {
+      margin-top: 4px; padding: 8px 10px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px;
+    }
     .cbp__list {
       list-style: none; margin-top: 4px; max-height: 240px; overflow-y: auto;
       border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper); padding: 4px;
@@ -75,6 +107,12 @@ export class ComboPickerComponent {
   /** Words for the count: [singular, plural]. */
   @Input() noun: [string, string] = ['option', 'options'];
   @Input() noMatchMessage: (query: string) => string = q => `Nothing matches “${q}”.`;
+  /** A searchable dropdown: clicking the field, or the ▾ button after it, lists every option. */
+  @Input() dropdown = false;
+  /** The helper goes between the label and the field, as in the architectural review form. */
+  @Input() helperFirst = false;
+  /** The settings registry id, for settings search (`data-setting-id` on the field). */
+  @Input() settingId: string | null = null;
   @Input() set options(v: PickerOption[]) {
     this.all.set([...(v ?? [])]);
     this.text.set(this.labelOf(this.selected()));
@@ -89,7 +127,8 @@ export class ComboPickerComponent {
   @Output() readonly queryChange = new EventEmitter<string>();
 
   private readonly uid = nextId++;
-  readonly inputId = `cbp-input-${this.uid}`;
+  /** The field's id. Set it when something else links to the field, such as an error summary. */
+  @Input() inputId = `cbp-input-${this.uid}`;
   readonly listId = `cbp-list-${this.uid}`;
   readonly helpId = `cbp-help-${this.uid}`;
   readonly errorId = `cbp-error-${this.uid}`;
@@ -103,8 +142,10 @@ export class ComboPickerComponent {
 
   readonly rows = computed<PickerRow[]>(() => {
     const q = this.query().trim().toLowerCase();
-    const options = this.all()
-      .filter(o => !q || o.label.toLowerCase().includes(q))
+    const onLabel = (o: PickerOption) => o.label.toLowerCase().includes(q);
+    const matches = q ? this.all().filter(o => onLabel(o) || !!o.keywords?.toLowerCase().includes(q)) : this.all();
+    // Label matches first ("UTC" before every zone whose offset reads "UTC-5"), each group in order.
+    const options = (q ? [...matches.filter(onLabel), ...matches.filter(o => !onLabel(o))] : matches)
       .map(o => ({ ...o, key: o.id, none: false }));
     return this.noneLabel ? [{ key: '', id: '', label: this.noneLabel, none: true }, ...options] : options;
   });
@@ -141,7 +182,10 @@ export class ComboPickerComponent {
     this.text.set(value);
     this.query.set(value);
     this.open.set(true);
-    this.active.set(-1);
+    // `dropdown`: the first match is highlighted, so Enter chooses it.
+    const first = this.dropdown && value.trim() ? this.rows().findIndex(r => !r.none) : -1;
+    if (first >= 0) this.setActive(first);
+    else this.active.set(-1);
     this.queryChange.emit(value.trim());
   }
 
@@ -151,11 +195,11 @@ export class ComboPickerComponent {
       case 'ArrowDown':
         event.preventDefault();
         if (!this.open()) return this.openList();
-        this.active.set(Math.min(count - 1, this.active() + 1));
+        this.setActive(Math.min(count - 1, this.active() + 1));
         return;
       case 'ArrowUp':
         event.preventDefault();
-        if (this.open()) this.active.set(Math.max(0, this.active() - 1));
+        if (this.open()) this.setActive(Math.max(0, this.active() - 1));
         return;
       case 'Enter':
         if (this.open()) {
@@ -189,10 +233,32 @@ export class ComboPickerComponent {
     this.text.set(this.labelOf(this.selected()));
   }
 
+  /** `dropdown`: a click lists every option and selects the text, so typing starts a new search. */
+  onClick(input: HTMLInputElement): void {
+    if (!this.dropdown || this.disabled || this.open()) return;
+    this.openList();
+    input.select();
+  }
+
+  /** The ▾ button: opens or closes the list, keeping focus in the field. */
+  toggle(input: HTMLInputElement): void {
+    if (this.disabled) return;
+    if (this.open()) return this.close();
+    input.focus();
+    this.openList();
+    input.select();
+  }
+
   private openList(): void {
     this.query.set('');
     this.open.set(true);
-    this.active.set(Math.max(0, this.rows().findIndex(r => this.isSelected(r))));
+    this.setActive(Math.max(0, this.rows().findIndex(r => this.isSelected(r))));
+  }
+
+  /** Moves the active option, scrolling it into view once the list has rendered. */
+  private setActive(index: number): void {
+    this.active.set(index);
+    setTimeout(() => document.getElementById(this.optionId(index))?.scrollIntoView?.({ block: 'nearest' }));
   }
 
   private labelOf(id: string | null): string {

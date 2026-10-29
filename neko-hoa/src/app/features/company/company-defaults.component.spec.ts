@@ -78,6 +78,19 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
     return screen.getByLabelText(label) as HTMLInputElement;
   }
 
+  /** Opens the time zone dropdown, searches for `search` and chooses `zone`. */
+  async function chooseTimeZone(r: Awaited<ReturnType<typeof setup>>, search: string, zone: string) {
+    const tz = screen.getByRole('combobox', { name: 'Time zone' });
+    fireEvent.click(tz);
+    fireEvent.input(tz, { target: { value: search } });
+    await settle(r);
+    const option = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option')
+      .find(o => o.textContent!.trim().startsWith(zone));
+    expect(option).withContext(`${zone} is listed for “${search}”`).toBeDefined();
+    fireEvent.click(option!);
+    await settle(r);
+  }
+
   function errorUnder(el: HTMLElement): string {
     return (el.getAttribute('aria-describedby') ?? '').split(/\s+/).map(id => document.getElementById(id))
       .filter(n => n?.classList.contains('field-error')).map(n => n!.textContent!.trim()).join(' ');
@@ -103,7 +116,7 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
       const view = within(rules());
       expect(view.getByText('30')).toBeTruthy();
       expect(view.getByText('7')).toBeTruthy();
-      expect(view.getByText('Flag as overdue only')).toBeTruthy();
+      expect(view.getByText('No automatic action')).toBeTruthy();
       expect(view.getByText('Majority of board members')).toBeTruthy();
       expect(view.getByText('America/New_York')).toBeTruthy();
       expect(view.getByText(`“${STATEMENT}”`)).toBeTruthy();
@@ -120,7 +133,7 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
       await until(() => document.activeElement === field('Review period (days)'));
       expect(screen.getByText('126 / 1,000')).toBeTruthy();
 
-      const lapse = screen.getByLabelText('When the review period ends without a decision') as HTMLSelectElement;
+      const lapse = screen.getByLabelText('After the review period ends without a decision') as HTMLSelectElement;
       lapse.value = 'DeemedApproved';
       fireEvent.change(lapse);
       fireEvent.click(screen.getByRole('button', { name: 'Save company defaults' }));
@@ -129,7 +142,7 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
       const dlg = screen.getByRole('dialog', { name: 'Save the company defaults?' });
       const changes = within(dlg).getByRole('list', { name: 'These settings change:' });
       expect(within(changes).getAllByRole('listitem').map(li => li.textContent!.replace(/\s+/g, ' ').trim()))
-        .toEqual(['When the review period ends without a decision: Flag as overdue only → Deemed approved from Flag as overdue only to Deemed approved']);
+        .toEqual(['After the review period ends without a decision: No automatic action → Auto approve from No automatic action to Auto approve']);
       const text = dlg.textContent!.replace(/\s+/g, ' ');
       expect(text).toContain('Communities added from now on start with these settings.');
       expect(text).toContain('Existing communities whose settings now differ will show “Differs from defaults” in the portfolio.');
@@ -149,7 +162,7 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
       });
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(toasts()).toEqual(['Company defaults saved.']);
-      expect(within(rules()).getByText('Deemed approved')).toBeTruthy();
+      expect(within(rules()).getByText('Auto approve')).toBeTruthy();
       await until(() => document.activeElement === screen.getByRole('button', { name: 'Edit company defaults' }));
     });
 
@@ -180,20 +193,37 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
       expect(document.activeElement).toBe(field('Reminder to the board (days before due, 0 = off)'));
     });
 
-    it('checks the time zone and the statement', async () => {
-      const r = await setup();
+    it('checks the time zone and the statement: a saved zone the browser does not recognize must be changed', async () => {
+      const r = await setup({ result: defaults({ timeZoneId: 'Mars/Olympus_Mons' }) });
       await edit(r);
-      fireEvent.input(field('Time zone'), { target: { value: 'Mars/Olympus_Mons' } });
+      expect(field('Time zone').value).toBe('Mars/Olympus_Mons');
       fireEvent.input(field('Formal disapproval statement (included in every denial email)'), { target: { value: '  ' } });
       fireEvent.click(screen.getByRole('button', { name: 'Save company defaults' }));
       await settle(r);
-      expect(errorUnder(field('Time zone'))).toBe("Time zone isn't recognized. Use a name such as America/New_York.");
+      expect(errorUnder(field('Time zone'))).toBe("Time zone isn't recognized. Choose one from the list.");
       expect(errorUnder(field('Formal disapproval statement (included in every denial email)'))).toBe('The formal disapproval statement is required.');
+      expect(company.putDefaults).not.toHaveBeenCalled();
 
-      fireEvent.input(field('Time zone'), { target: { value: '' } });
+      await chooseTimeZone(r, 'denver', 'America/Denver');
+      expect(errorUnder(field('Time zone'))).toBe('');
+    });
+
+    it('requires a time zone when none is saved, and typing alone never sets one', async () => {
+      const r = await setup({ result: defaults({ timeZoneId: '' }) });
+      await edit(r);
+      const tz = field('Time zone');
+      fireEvent.click(tz);
+      fireEvent.input(tz, { target: { value: 'America/Chicago' } });
+      fireEvent.blur(tz);
+      await settle(r);
+      expect(tz.value).toBe('');
       fireEvent.click(screen.getByRole('button', { name: 'Save company defaults' }));
       await settle(r);
       expect(errorUnder(field('Time zone'))).toBe('Time zone is required.');
+      expect(field('Time zone').getAttribute('aria-invalid')).toBe('true');
+      const summary = screen.getByRole('alert');
+      fireEvent.click(within(summary).getByRole('link', { name: 'Time zone is required.' }));
+      expect(document.activeElement).toBe(field('Time zone'));
     });
 
     it('sends nothing when no value changed, and Cancel returns to the read view', async () => {
@@ -216,7 +246,7 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
     it('a server validation refusal returns to the form with the message under its field', async () => {
       const r = await setup();
       await edit(r);
-      fireEvent.input(field('Time zone'), { target: { value: 'America/Chicago' } });
+      await chooseTimeZone(r, 'chicago', 'America/Chicago');
       fireEvent.click(screen.getByRole('button', { name: 'Save company defaults' }));
       await settle(r);
       const dlg = screen.getByRole('dialog', { name: 'Save the company defaults?' });
@@ -311,7 +341,7 @@ describe('CompanyDefaultsComponent (030 T125)', () => {
       expect(screen.queryByRole('textbox')).toBeNull();
       expect(screen.queryByRole('spinbutton')).toBeNull();
       expect(screen.queryByRole('combobox')).toBeNull();
-      expect(within(card).getByText('Flag as overdue only')).toBeTruthy();
+      expect(within(card).getByText('No automatic action')).toBeTruthy();
       const note = screen.getByRole('region', { name: 'Changes apply only to new communities' });
       expect(note.textContent).toContain('A change here applies only to communities added afterwards. Existing communities, including yours, keep their own settings');
     });

@@ -91,6 +91,22 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
     return screen.getByLabelText(label) as HTMLInputElement;
   }
 
+  function timeZoneField(): HTMLInputElement {
+    return screen.getByRole('combobox', { name: 'Time zone' }) as HTMLInputElement;
+  }
+
+  /** Opens the time zone dropdown, searches for `search` and chooses `zone`. */
+  async function chooseTimeZone(r: Awaited<ReturnType<typeof setup>>, search: string, zone: string) {
+    fireEvent.click(timeZoneField());
+    fireEvent.input(timeZoneField(), { target: { value: search } });
+    await settle(r);
+    const listbox = screen.getByRole('listbox', { name: 'Time zone' });
+    const option = within(listbox).getAllByRole('option').find(o => o.textContent!.trim().startsWith(zone));
+    expect(option).withContext(`${zone} is listed for “${search}”`).toBeDefined();
+    fireEvent.click(option!);
+    await settle(r);
+  }
+
   function toasts(): string[] {
     return TestBed.inject(ToastService).toasts().map(t => t.message);
   }
@@ -114,7 +130,7 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       for (const id of ['lapse-rule', 'decision-rule', 'time-zone', 'formal-disapproval-statement']) {
         expect(within(valueOf(id)).queryByText('Differs from defaults')).withContext(id).toBeNull();
       }
-      expect(within(valueOf('lapse-rule')).getByText('Flag as overdue only')).toBeTruthy();
+      expect(within(valueOf('lapse-rule')).getByText('No automatic action')).toBeTruthy();
       expect(within(valueOf('formal-disapproval-statement')).getByText(`“${STATEMENT}”`)).toBeTruthy();
       expect(within(rules()).getByRole('button', { name: 'Edit architectural review' })).toBeTruthy();
     });
@@ -183,8 +199,10 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       expect(field('Review period (days)').value).toBe('45');
       expect(screen.getByText("1 to 365. An application is due this many days after it's received. Company default: 30.")).toBeTruthy();
       expect(screen.getByText('0 to 30. 0 turns reminders off. Company default: 7.')).toBeTruthy();
-      expect(screen.getByText('Company default: Flag as overdue only.')).toBeTruthy();
-      expect(screen.getByText("A time zone name, such as America/New_York. Used for due dates and for the expiry times on this community's invitations. Company default: America/New_York.")).toBeTruthy();
+      expect(screen.getByText("If the board hasn't decided by the due date, Auto approve approves the application, Auto reject denies it, and No "
+        + 'automatic action keeps it open and marks it overdue. Under “Majority of votes cast (with a quorum)”, a side that leads with a quorum '
+        + 'at the due date decides instead. A Community Manager then records the decision, which emails the owner. Company default: No automatic action.')).toBeTruthy();
+      expect(screen.getByText("Search by city or name, such as Dallas, Eastern or EST. Used for due dates and for the expiry times on this community's invitations. Company default: America/New_York.")).toBeTruthy();
       expect(screen.queryByRole('button', { name: /Reset/ })).toBeNull();
       await until(() => document.activeElement === field('Review period (days)'));
     });
@@ -210,6 +228,142 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       await until(() => document.activeElement === screen.getByRole('button', { name: 'Edit architectural review' }));
     });
 
+    it('offers Auto approve, Auto reject or No automatic action for after the review period ends, and saves the API value', async () => {
+      const r = await setup();
+      await edit(r);
+      const lapse = screen.getByLabelText('After the review period ends without a decision') as HTMLSelectElement;
+      expect(Array.from(lapse.options).map(o => [o.textContent!.trim(), o.value])).toEqual([
+        ['Auto approve', 'DeemedApproved'],
+        ['Auto reject', 'DeemedDenied'],
+        ['No automatic action', 'FlagOverdueOnly'],
+      ]);
+      expect(lapse.selectedOptions[0].textContent!.trim()).toBe('No automatic action');
+      lapse.value = 'DeemedDenied';
+      fireEvent.change(lapse);
+      svc.putArcSettings.and.resolveTo(arc({ lapseRule: 'DeemedDenied', differsFromDefaults: ['reviewPeriodDays', 'reminderDays', 'lapseRule'] }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
+      await settle(r);
+      expect(svc.putArcSettings.calls.mostRecent().args[1].lapseRule).toBe('DeemedDenied');
+      expect(within(valueOf('lapse-rule')).getByText('Auto reject')).toBeTruthy();
+      expect(within(valueOf('lapse-rule')).getByText('Company default: No automatic action')).toBeTruthy();
+    });
+
+    it('picks the time zone from a searchable dropdown, never free text', async () => {
+      const r = await setup();
+      await edit(r);
+      const tz = timeZoneField();
+      expect(tz.value).toBe('America/New_York');
+      expect(tz.getAttribute('data-setting-id')).toBe('time-zone');
+      expect(screen.queryByRole('listbox')).toBeNull();
+
+      // A click lists every zone, the common US zones first, with the saved one selected.
+      fireEvent.click(tz);
+      await settle(r);
+      let options = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option');
+      expect(options.length).toBeGreaterThan(100);
+      ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu']
+        .forEach((zone, i) => expect(options[i].textContent!.trim().startsWith(zone)).withContext(zone).toBeTrue());
+      expect(options[0].textContent).toMatch(/Eastern Time · UTC-[45]/);
+      expect(options[0].getAttribute('aria-selected')).toBe('true');
+      expect(tz.getAttribute('aria-expanded')).toBe('true');
+
+      // Typing searches the name, the city and the zone's generic name.
+      for (const [search, zone] of [['tokyo', 'Asia/Tokyo'], ['los angeles', 'America/Los_Angeles'], ['central time', 'America/Chicago']]) {
+        fireEvent.input(tz, { target: { value: search } });
+        await settle(r);
+        options = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option');
+        expect(options.some(o => o.textContent!.trim().startsWith(zone))).withContext(search).toBeTrue();
+        expect(options.length).withContext(search).toBeLessThan(100);
+      }
+      fireEvent.input(tz, { target: { value: 'Mars/Olympus_Mons' } });
+      await settle(r);
+      // Shown under the field and announced.
+      expect(screen.getAllByText('No time zone matches “Mars/Olympus_Mons”. Try a city, such as Chicago, or a name, such as Eastern or EST.').length).toBe(2);
+      expect(within(screen.getByRole('listbox', { name: 'Time zone' })).queryAllByRole('option').length).toBe(0);
+
+      // Leaving without choosing puts the saved zone back; a save with another change sends it unchanged.
+      fireEvent.blur(tz);
+      await settle(r);
+      expect(tz.value).toBe('America/New_York');
+      expect(screen.queryByRole('listbox')).toBeNull();
+      fireEvent.input(field('Review period (days)'), { target: { value: '50' } });
+      svc.putArcSettings.and.resolveTo(arc({ reviewPeriodDays: 50 }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
+      await settle(r);
+      expect(svc.putArcSettings).toHaveBeenCalledTimes(1);
+      expect(svc.putArcSettings.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({ reviewPeriodDays: 50, timeZoneId: 'America/New_York' }));
+
+      // Choosing one saves it.
+      await edit(r);
+      await chooseTimeZone(r, 'chicago', 'America/Chicago');
+      expect(timeZoneField().value).toBe('America/Chicago');
+      svc.putArcSettings.and.resolveTo(arc({ timeZoneId: 'America/Chicago', differsFromDefaults: ['reviewPeriodDays', 'reminderDays', 'timeZoneId'] }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
+      await settle(r);
+      expect(svc.putArcSettings.calls.mostRecent().args[1].timeZoneId).toBe('America/Chicago');
+    });
+
+    it('highlights the first match as you type, so Enter chooses it, and lists name matches first', async () => {
+      const r = await setup();
+      await edit(r);
+      const tz = timeZoneField();
+      fireEvent.click(tz);
+      fireEvent.input(tz, { target: { value: 'dallas' } });
+      await settle(r);
+      const first = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option')[0];
+      expect(first.textContent!.trim().startsWith('America/Chicago')).toBeTrue();
+      expect(tz.getAttribute('aria-activedescendant')).toBe(first.id);
+      fireEvent.keyDown(tz, { key: 'Enter' });
+      await settle(r);
+      expect(tz.value).toBe('America/Chicago');
+      expect(screen.queryByRole('listbox')).toBeNull();
+
+      // "UTC" is in every zone's offset; the zone named UTC still comes first.
+      fireEvent.click(tz);
+      fireEvent.input(tz, { target: { value: 'UTC' } });
+      await settle(r);
+      expect(within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option')[0].textContent!.trim().startsWith('UTC')).toBeTrue();
+      // US abbreviations work, whatever the season.
+      fireEvent.input(tz, { target: { value: 'EST' } });
+      await settle(r);
+      const est = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option').slice(0, 5);
+      expect(est.some(o => o.textContent!.trim().startsWith('America/New_York'))).withContext('EST lists New York near the top').toBeTrue();
+    });
+
+    it('opens the list over the form, so Save stays put, and a press in the list keeps focus in the field', async () => {
+      const r = await setup();
+      await edit(r);
+      const save = screen.getByRole('button', { name: 'Save architectural review' });
+      // Measured against the form: opening the list focuses the field, which may scroll the page.
+      const offset = () => save.getBoundingClientRect().top - save.closest('form')!.getBoundingClientRect().top;
+      const before = offset();
+      fireEvent.click(timeZoneField());
+      await settle(r);
+      const listbox = screen.getByRole('listbox', { name: 'Time zone' });
+      expect(getComputedStyle(listbox.parentElement!).position).toBe('absolute');
+      expect(offset()).toBe(before);
+      const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+      listbox.dispatchEvent(press);
+      expect(press.defaultPrevented).withContext('a press on the list or its scrollbar does not blur the field').toBeTrue();
+    });
+
+    it('opens and closes the time zone list with its ▾ button, and keeps an unlisted saved zone', async () => {
+      const r = await setup({ result: arc({ timeZoneId: 'US/Eastern' }) });
+      await edit(r);
+      expect(timeZoneField().value).toBe('US/Eastern');
+      const toggle = screen.getByRole('button', { name: 'Show all time zones' });
+      expect(toggle.getAttribute('tabindex')).toBe('-1');
+      fireEvent.click(toggle);
+      await settle(r);
+      const listbox = screen.getByRole('listbox', { name: 'Time zone' });
+      expect(within(listbox).getAllByRole('option')[0].getAttribute('aria-selected')).toBe('true');
+      expect(document.activeElement).toBe(timeZoneField());
+      fireEvent.click(toggle);
+      await settle(r);
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    });
+
     it('validates ranges and required text before saving (US5-S4 form, 8.07.e)', async () => {
       const r = await setup();
       await edit(r);
@@ -227,19 +381,21 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
     it("shows the server's field message, and the save failure, on the form", async () => {
       const r = await setup();
       await edit(r);
-      fireEvent.input(field('Time zone'), { target: { value: 'America/Chicago' } });
-      svc.putArcSettings.and.rejectWith(httpError(422, { code: 'VALIDATION_ERROR', message: 'Invalid.', errors: [{ field: 'TimeZoneId', message: "Time zone isn't recognized. Use a name such as America/New_York." }] }));
+      await chooseTimeZone(r, 'chicago', 'America/Chicago');
+      svc.putArcSettings.and.rejectWith(httpError(422, { code: 'VALIDATION_ERROR', message: 'Invalid.', errors: [{ field: 'TimeZoneId', message: 'timeZoneId must be a valid IANA time zone, e.g. America/New_York.' }] }));
       fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
       await settle(r);
       await until(() => !!screen.queryByRole('heading', { name: "The architectural review settings weren't saved" }));
-      expect(field('Time zone').getAttribute('aria-invalid')).toBe('true');
+      expect(timeZoneField().getAttribute('aria-invalid')).toBe('true');
+      expect(document.getElementById(timeZoneField().getAttribute('aria-describedby')!.split(' ').pop()!)!.textContent!.trim())
+        .toBe('timeZoneId must be a valid IANA time zone, e.g. America/New_York.');
 
       svc.putArcSettings.and.rejectWith(httpError(0));
-      fireEvent.input(field('Time zone'), { target: { value: 'America/Denver' } });
+      await chooseTimeZone(r, 'denver', 'America/Denver');
       fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
       await settle(r);
       expect(screen.getByText("Couldn't save. Check your connection and try again.")).toBeTruthy();
-      expect(field('Time zone').value).toBe('America/Denver');
+      expect(timeZoneField().value).toBe('America/Denver');
     });
 
     it('a save in a community archived in another tab shows the banner and re-reads the page', async () => {
@@ -287,7 +443,7 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
         'Reminder to the board (days before due, 0 = off): 10 → 7 from 10 to 7',
       ]);
       const text = dlg.textContent!.replace(/\s+/g, ' ');
-      expect(text).toContain("These already match and don't change: When the review period ends without a decision, How a decision is reached, Time zone and Formal disapproval statement.");
+      expect(text).toContain("These already match and don't change: After the review period ends without a decision, How a decision is reached, Time zone and Formal disapproval statement.");
       expect(text).toContain('The new settings apply to applications received from now on.');
       expect(text).toContain("Applications already received keep their rules. Their due dates, lapse rule and decision rule don't change.");
       expect(text).toContain("Application numbering doesn't change. The next application gets the number it would have had.");

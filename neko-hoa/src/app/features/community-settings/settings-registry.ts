@@ -51,7 +51,7 @@ export const SETTINGS_REGISTRY: readonly SectionDef[] = [
       // Labels from today's ARC settings page (conventions §5.3).
       { id: 'review-period', label: 'Review period' },
       { id: 'reminder-days', label: 'Reminder to the board' },
-      { id: 'lapse-rule', label: 'When the review period ends without a decision' },
+      { id: 'lapse-rule', label: 'After the review period ends without a decision' },
       { id: 'decision-rule', label: 'How a decision is reached' },
       { id: 'time-zone', label: 'Time zone' },
       { id: 'formal-disapproval-statement', label: 'Formal disapproval statement' },
