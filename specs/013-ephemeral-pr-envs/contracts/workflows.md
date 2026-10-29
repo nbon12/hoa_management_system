@@ -14,8 +14,9 @@ Three new workflows, plus the manual `pr-env-repair.yml` added for issue #234. A
 
 **Jobs (ordered gates; first failure stops and fails the PR check, FR-009):**
 1. `build-image` → `docker build` + push `sakurapatch/nekohoa-api:pr-<n>-<sha>`
-2. `provision` → `tofu init -backend-config=prefix=state/pr/<n>` → clear a stale state lock
-   (`scripts/pr-env-clear-stale-lock.sh`: only a lock ≥ 45 min old, conditional on its generation) → reap
+2. `provision` → clear a stale state lock (`scripts/pr-env-clear-stale-lock.sh`: only a lock ≥ 45 min old,
+   conditional on its generation; before init, which needs the lock when no state exists yet) →
+   `tofu init -lock-timeout=5m -backend-config=prefix=state/pr/<n>` → reap
    untracked leftovers of a killed apply (`scripts/pr-env-reap.sh` with `ONLY_UNTRACKED=true`) →
    `tofu apply -auto-approve -lock-timeout=5m` (D1/D2; self-healing added by issue #236)
 3. `stripe-webhook` → create test webhook → write `pr-<n>-stripe-webhook` secret (D9)
@@ -37,7 +38,8 @@ deregisters the Stripe test webhook, which no state tracks, before `tofu destroy
 | Concurrency | `group: pr-env-${{ github.event.number }}` (serialize vs provision) |
 
 **Steps (idempotent, best-effort each, FR-006, SC-004 ≤30 min):**
-delete Stripe webhook → empty the R2 bucket → clear a stale state lock → `tofu destroy -lock-timeout=5m`
+clear a stale state lock (before `tofu init`) → delete Stripe webhook → empty the R2 bucket →
+`tofu destroy -lock-timeout=5m`
 prefix `state/pr/<n>` → delete the state objects **only if the destroy succeeded** → delete every Pages
 `pr-<n>` deployment (all pages). A failure alerts `DEPLOY_ALERT_WEBHOOK_URL`; the kept state is retried by
 the sweep (issue #236: deleting state after a failed destroy orphaned PR 217's resources). Per-PR image

@@ -29,6 +29,16 @@ runs:
         workload_identity_provider: ${{ inputs.wif_provider }}
         service_account: ${{ inputs.service_account }}
 
+    # Before init, not after: when state/pr/<n>/ holds a lock but no default.tfstate (a run killed inside
+    # its first `tofu init`), init itself takes the lock to write the empty state, and fails with a 412 on
+    # a stale one. The clear needs only the token above (the runner's preinstalled gcloud), not tofu.
+    # A failed lookup is not fatal: init and apply/destroy wait for any lock (-lock-timeout).
+    - name: Clear a stale state lock left by a killed run
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr_number }}
+      run: scripts/pr-env-clear-stale-lock.sh || echo "::warning::Could not check the state lock; tofu waits for it (-lock-timeout)."
+
     # No wrapper: tofu receives the runner's cancel signal directly, so it can release its state lock.
     # Defence in depth only; pr-env.yml no longer cancels in-flight runs (#234).
     - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
@@ -40,4 +50,4 @@ runs:
     - name: tofu init (state/pr/${{ inputs.pr_number }})
       shell: bash
       working-directory: infra/environments/pr
-      run: tofu init -input=false -backend-config="prefix=state/pr/${{ inputs.pr_number }}"
+      run: tofu init -input=false -lock-timeout=5m -backend-config="prefix=state/pr/${{ inputs.pr_number }}"

@@ -71,15 +71,9 @@ jobs:
           aws s3 rm "s3://${BUCKET}" --recursive --endpoint-url "$ENDPOINT" || true
 
       # 3. Authoritative teardown: destroy every per-PR resource from this PR's state (FR-006). A lock
-      #    left by a killed pr-env run is removed first once it is 45 min old; a younger one is waited for
-      #    and, if it never clears, the destroy fails and keeps the state for the sweep (#236).
-      - name: Clear a stale state lock left by a killed run
-        if: always()
-        continue-on-error: true # the destroy below waits for any lock this step could not clear
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: scripts/pr-env-clear-stale-lock.sh
-
+      #    left by a killed pr-env run was removed in pr-env-tofu-init (before init) once 45 min old; a
+      #    younger one is waited for and, if it never clears, the destroy fails and keeps the state for
+      #    the sweep (#236).
       - name: tofu destroy
         id: destroy
         if: always()

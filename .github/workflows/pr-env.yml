@@ -93,15 +93,10 @@ jobs:
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3
 
-      # 2b. Self-heal what a killed run left behind (#236): its state lock, then any per-PR resource the
-      #     state never recorded (a killed apply creates resources it never writes down; the next apply then
-      #     fails on "already exists"). The reap deletes only what `tofu state list` does not track.
-      - name: Clear a stale state lock left by a killed run
-        continue-on-error: true # tofu apply below waits for any lock this step could not clear
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-        run: scripts/pr-env-clear-stale-lock.sh
-
+      # 2b. Self-heal what a killed run left behind (#236). Its stale state lock was already cleared in
+      #     pr-env-tofu-init, before `tofu init`. Here: any per-PR resource the state never recorded (a
+      #     killed apply creates resources it never writes down; the next apply then fails on "already
+      #     exists"). The reap deletes only what `tofu state list` does not track.
       - name: Reap untracked per-PR leftovers (from a killed apply)
         working-directory: infra/environments/pr
         env:
