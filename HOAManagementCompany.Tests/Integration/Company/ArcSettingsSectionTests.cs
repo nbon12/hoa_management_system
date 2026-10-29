@@ -82,6 +82,30 @@ public class ArcSettingsSectionTests(TestDatabaseFixture fixture) : CompanyTestB
         Assert.Equal("FORBIDDEN", (await JsonAsync(save)).GetProperty("code").GetString());
     }
 
+    // US5-S1, US5-S2: the section shows a save without a reload, so the PUT answers with the GET body
+    // (companyDefaults, differsFromDefaults, canEdit), as the reset does.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SavingTheRules_AnswersWithTheGetBody(bool asCompanyAdministrator)
+    {
+        var companyId = await CreateCompanyAsync();
+        var community = await CreateCommunityInAsync(companyId);
+        var (_, email) = asCompanyAdministrator ? await CreateCompanyAdminAsync(companyId) : await CreateManagerAsync(community);
+        using var client = await ClientForAsync(email);
+
+        var put = await client.PutAsJsonAsync(Url(community), Body(reviewPeriodDays: 45));
+
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+        var saved = await JsonAsync(put);
+        Assert.Equal(45, saved.GetProperty("reviewPeriodDays").GetInt32());
+        Assert.Equal(30, saved.GetProperty("companyDefaults").GetProperty("reviewPeriodDays").GetInt32());
+        Assert.Equal(["reviewPeriodDays"], saved.GetProperty("differsFromDefaults").EnumerateArray().Select(f => f.GetString()));
+        Assert.True(saved.GetProperty("canEdit").GetBoolean());
+        var read = await JsonAsync(await client.GetAsync(Url(community)));
+        Assert.True(JsonElement.DeepEquals(read, saved), $"PUT {saved}\nGET {read}");
+    }
+
     // US5-S5, and the GET's companyDefaults and differsFromDefaults
     [Fact]
     public async Task ResettingToTheDefaults_CopiesTheSixRulesOnly()

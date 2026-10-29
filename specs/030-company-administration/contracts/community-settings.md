@@ -285,7 +285,8 @@ The property drawer.
 ### PUT /communities/{communityId}/architectural-settings *(027, auth changed)*
 
 - **Auth**: `ManageArcSettings`, write.
-- The request and response shapes are otherwise unchanged. One Save for the section (Clarifications 2026-10-14).
+- The request shape is otherwise unchanged. One Save for the section (Clarifications 2026-10-14).
+- **200**: the GET body, as for the reset, so the section shows the save (and which fields now differ from the company defaults) without a reload. 027's fields are all still there.
 
 ### POST /communities/{communityId}/architectural-settings/reset
 

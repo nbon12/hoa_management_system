@@ -9,7 +9,8 @@ namespace HOAManagementCompany.Features.Board.Architectural;
 /// <summary>
 /// PUT /communities/{communityId}/architectural-settings — community manager edits the review period,
 /// lapse rule, decision rule, reminder days, time zone and formal disapproval statement (027 FR-029/
-/// FR-030). Applies to applications received afterwards; logged with old and new values.
+/// FR-030). Applies to applications received afterwards; logged with old and new values. Answers with
+/// the GET body, as the reset does, so the Architectural review section shows the save without a reload.
 /// </summary>
 public class ArcSettingsPutEndpoint(
     ApplicationDbContext db,
@@ -17,7 +18,7 @@ public class ArcSettingsPutEndpoint(
     ArcApplicationFactory factory,
     ArcQueries queries,
     ILogger<ArcSettingsPutEndpoint> logger)
-    : Endpoint<ArcSettingsPutRequest, ArcSettingsDto>
+    : Endpoint<ArcSettingsPutRequest, ArcSettingsSectionDto>
 {
     public const int MaxStatementLength = ArcRuleValidator.MaxStatementLength;
     public const int MaxCitationLength = 300;
@@ -66,9 +67,8 @@ public class ArcSettingsPutEndpoint(
         settings.UpdatedByUserId = ArcQueries.CallerId(User);
         await db.SaveChangesAsync(ct);
 
-        var dto = ArcSettingsMapping.ToDto(settings, true);
         ArcLog.SettingsChanged(logger, settings.UpdatedByUserId, req.CommunityId, before, ArcSettingsSection.Rules(settings),
             queries.Now);
-        await SendOkAsync(dto, ct);
+        await SendOkAsync(await ArcSettingsSection.BuildAsync(db, scope, User, req.CommunityId, ct), ct);
     }
 }
