@@ -83,10 +83,12 @@ variable "api_dns_proxied" {
 variable "container_image" {
   description = <<-EOT
     Placeholder image for the FIRST-EVER service create only. After the 009 pipeline pushes a real
-    :sha, lifecycle.ignore_changes keeps infra from reverting it (FR-007).
+    :sha, lifecycle.ignore_changes keeps infra from reverting it (FR-007). Google's public sample, not
+    our own image: the registry this module creates is still empty on that first apply. It answers
+    200 on every path, so the /health probes pass.
   EOT
   type        = string
-  default     = "sakurapatch/nekohoa-api:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "stripe_publishable_key" {

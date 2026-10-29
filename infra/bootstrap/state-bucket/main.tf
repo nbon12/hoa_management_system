@@ -38,6 +38,8 @@ resource "google_project_service" "required" {
     "billingbudgets.googleapis.com",
     # 027: the hourly architectural review sweep job (modules/environment/scheduler.tf).
     "cloudscheduler.googleapis.com",
+    # The backend image repository (modules/environment/artifact_registry.tf).
+    "artifactregistry.googleapis.com",
   ])
 
   project            = var.gcp_project_id

@@ -8,7 +8,7 @@ variable "pr_number" {
 }
 
 variable "head_sha" {
-  description = "PR head commit SHA. Selects the image tag sakurapatch/nekohoa-api:pr-<n>-<sha> (pipeline-owned thereafter)."
+  description = "PR head commit SHA. Selects the image tag pr-<n>-<sha> in the Dev Artifact Registry repo images-dev (pipeline-owned thereafter)."
   type        = string
 }
 
@@ -70,9 +70,9 @@ variable "stripe_publishable_key" {
 }
 
 variable "container_image" {
-  description = "Placeholder image for the FIRST create only. The pr-env.yml workflow deploys the real sakurapatch/nekohoa-api:pr-<n>-<sha> image-only via gcloud AFTER the Stripe webhook secret is written; ignore_changes keeps tofu from reverting it (mirrors modules/environment)."
+  description = "Placeholder image for the FIRST create only. The pr-env.yml workflow deploys the real images-dev/nekohoa-api:pr-<n>-<sha> image-only via gcloud AFTER the Stripe webhook secret is written; ignore_changes keeps tofu from reverting it (mirrors modules/environment). Google's public sample answers 200 on every path, so the /health probes pass without depending on anything we pushed."
   type        = string
-  default     = "sakurapatch/nekohoa-api:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "cloudflare_account_id" {

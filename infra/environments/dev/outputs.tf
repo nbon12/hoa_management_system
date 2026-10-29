@@ -36,6 +36,10 @@ output "cloud_run_service_url" {
   value = module.environment.cloud_run_service_url
 }
 
+output "image_repository" {
+  value = module.environment.image_repository
+}
+
 output "next_steps" {
   value = module.environment.next_steps
 }

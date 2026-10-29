@@ -28,9 +28,9 @@ variable "api_dns_proxied" {
 }
 
 variable "container_image" {
-  description = "Placeholder image for the first create only; ignored thereafter (FR-007)."
+  description = "Placeholder image for the first create only; ignored thereafter (FR-007). See the module variable."
   type        = string
-  default     = "sakurapatch/nekohoa-api:latest"
+  default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
 
 variable "stripe_publishable_key" {
