@@ -43,7 +43,7 @@ Auto-generated from all feature plans. Last updated: 2026-10-17
 HOAManagementCompany/            # C# / .NET 9.0 backend (REST API, domain, EF Core persistence)
 HOAManagementCompany.Tests/      # xUnit integration + performance tests (Testcontainers.PostgreSQL)
 HOAManagementCompany.sln         # Solution file
-neko-hoa/                        # Angular 17.3 frontend (single-page app, Storybook, Cypress/Playwright e2e)
+neko-hoa/                        # Angular 21 frontend (single-page app, Storybook, Cypress/Playwright e2e)
 specs/                           # Spec Kit feature specs (001-… through 009-…)
 scripts/                         # Build/CI helper scripts
 repowise/                        # Repowise index/config
@@ -68,7 +68,7 @@ There is no `lint` npm script; do not run `npm run lint`.
 
 ## Code Style
 
-C# / .NET 9.0 (backend); TypeScript / Angular 17.3 (frontend): Follow standard conventions
+C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard conventions
 
 ## Recent Changes
 - 030-company-administration: Company Administrator role and company record; community lifecycle (Onboarding/Active/Archived); invitations (membership, residency, company admin) with link sign-up; sign-in without a home; per-request resident access check; autopay attribution. All existing packages; **no new packages.**

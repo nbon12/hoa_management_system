@@ -31,4 +31,4 @@ export const UnderReview: Story = { decorators: [withDetail(DETAIL)] };
 export const MoreInfoRequested: Story = { decorators: [withDetail(MORE_INFO)] };
 export const Approved: Story = { decorators: [withDetail(APPROVED)] };
 export const DeniedRevisionsRequested: Story = { decorators: [withDetail(DENIED)] };
-export const DeniedOnPhone: Story = { decorators: [withDetail(DENIED)], parameters: { viewport: { defaultViewport: 'mobile1' } } };
+export const DeniedOnPhone: Story = { decorators: [withDetail(DENIED)], globals: { viewport: { value: 'mobile1', isRotated: false } } };

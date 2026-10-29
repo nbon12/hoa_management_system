@@ -219,7 +219,7 @@ export class CommunitySettingsPageComponent implements AfterViewChecked {
         // Board mode with several managed communities and none chosen: choose one first.
         else if (this.mode === 'board') void this.router.navigate(['/app/board/communities']);
       });
-    }, { allowSignalWrites: true });
+    });
 
     // An unknown or hidden section opens the first one the server lists.
     effect(() => {

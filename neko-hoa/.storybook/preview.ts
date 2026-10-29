@@ -1,5 +1,5 @@
 import type { Preview } from '@storybook/angular';
-import { MINIMAL_VIEWPORTS } from '@storybook/addon-viewport';
+import { MINIMAL_VIEWPORTS } from 'storybook/viewport';
 
 // 030 T149: every story can be seen at the phone, tablet and desktop widths of conventions §2
 // (390, 834 and 1360 px) and in both themes. The app ships one theme; "Dark" redefines the design
@@ -11,7 +11,7 @@ const preview: Preview = {
       matchers: { color: /(background|color)$/i, date: /Date$/i },
     },
     viewport: {
-      viewports: {
+      options: {
         ...MINIMAL_VIEWPORTS,
         phone: { name: 'Phone (390)', styles: { width: '390px', height: '844px' }, type: 'mobile' },
         tablet: { name: 'Tablet (834)', styles: { width: '834px', height: '1112px' }, type: 'tablet' },
