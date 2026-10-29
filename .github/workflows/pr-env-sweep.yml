@@ -120,7 +120,8 @@ jobs:
             fi
 
             # A lock left by a killed run is past the 45-min floor by now; the sweep runs outside the
-            # pr-env-<n> group, so it also keeps the lock while any pr-env, teardown or repair run is live.
+            # pr-env-<n> group, so it also keeps the lock while a pr-env, teardown or repair run for that PR
+            # (matched by its "(pr-<n>)" run-name; untagged runs count) is live.
             # The lock is cleared BEFORE init: with no default.tfstate beside it, init takes the lock to
             # write an empty state and fails with a 412 on a stale one (the #234 A6 test).
             # The state is deleted only after a successful destroy, so a failed one is retried tomorrow.

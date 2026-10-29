@@ -11,6 +11,8 @@
 # contributors" setting blocks untrusted runs until a maintainer approves; infra secrets live in the
 # required-reviewer `pr-preview` Environment.
 name: pr-env
+# Ends in "(pr-<n>)": pr-env-clear-stale-lock.sh matches a live run to its PR by it (sweep, #236).
+run-name: '${{ github.event.pull_request.title }} (pr-${{ github.event.number }})'
 
 on:
   pull_request:

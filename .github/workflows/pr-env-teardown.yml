@@ -3,6 +3,8 @@
 # doesn't strand the rest; the daily sweep (pr-env-sweep.yml) backstops anything missed. The state is
 # deleted only after a successful destroy, so the sweep can still find and retry a failed one (#236).
 name: pr-env-teardown
+# Ends in "(pr-<n>)": pr-env-clear-stale-lock.sh matches a live run to its PR by it (sweep, #236).
+run-name: 'pr-env-teardown (pr-${{ github.event.number }})'
 
 on:
   pull_request:
