@@ -19,10 +19,13 @@ public sealed class ResidentArcActionsService(
     ApplicationDbContext db,
     ResidentArcScope scope,
     ResidentArcDraftService drafts,
+    ArcQueries arcQueries,
     TimeProvider clock,
     ILogger<ResidentArcActionsService> logger)
 {
     public const int MaxReplyLength = 2000;
+    public const int MaxCommentLength = 2000;
+    public const int MaxCommentFiles = 5;
 
     /// <summary>Withdraws an undecided request: Closed with outcome Withdrawn (FR-020/FR-021).</summary>
     public async Task<ArchitecturalApplication> WithdrawAsync(ClaimsPrincipal user, Guid applicationId, CancellationToken ct)
@@ -36,6 +39,8 @@ public sealed class ResidentArcActionsService(
             var blocked = OpenOnly(app);
             if (blocked is not null)
                 return blocked;
+            // 031: keep the board size at withdrawal so the closed tally doesn't drift.
+            app.EligibleVoterCount = await arcQueries.EligibleCountAsync(app.CommunityId, app.PropertyId, ct);
             app.Status = ArcApplicationStatus.Closed;
             app.DecisionOutcome = ArcOutcome.Withdrawn;
             app.WithdrawnAt = now;
@@ -113,6 +118,66 @@ public sealed class ResidentArcActionsService(
         db.ArchitecturalAttachments.Add(attachment);
         await db.SaveChangesAsync(ct);
         return new ResidentArcAttachmentDto(attachment.Id, attachment.FileName, attachment.SizeBytes, attachment.ContentType, info.Id);
+    }
+
+    /// <summary>
+    /// 031: posts a homeowner comment with text and/or files on any of the caller's requests that wasn't
+    /// withdrawn — open, decided or closed (e.g. to answer "revisions requested"). Files get the same
+    /// type, size and per-application limits as every other upload.
+    /// </summary>
+    public async Task<ArchitecturalApplication> CommentAsync(
+        ClaimsPrincipal user, Guid applicationId, string? message, IReadOnlyList<IFormFile> files, CancellationToken ct)
+    {
+        var body = message?.Trim() ?? string.Empty;
+        if (body.Length == 0 && files.Count == 0)
+            throw ResidentArcDraftService.Validation("Write a comment or attach a file.");
+        if (body.Length > MaxCommentLength)
+            throw ResidentArcDraftService.Validation($"message must be at most {MaxCommentLength} characters.");
+
+        var app = await scope.ApplicationAsync(user, applicationId, ResidentOperation.Write, ct);
+        if (app.DecisionOutcome == ArcOutcome.Withdrawn)
+            throw new DomainException(ArcErrorCodes.ApplicationClosed, "This request was withdrawn.", StatusCodes.Status409Conflict);
+
+        // Check every file before uploading any, so a rejected file leaves nothing behind.
+        var count = app.Attachments.Count;
+        var total = app.Attachments.Sum(a => a.SizeBytes);
+        var checkedFiles = new List<(string Name, ResidentArcDraftService.CheckedFile File)>();
+        foreach (var f in files)
+        {
+            await using var stream = f.OpenReadStream();
+            var file = await drafts.ReadCheckedAsync(user, app.PropertyId, f.Length, stream, count, total, ct);
+            checkedFiles.Add((f.FileName, file));
+            count++;
+            total += file.Bytes.LongLength;
+        }
+
+        var userId = ResidentArcScope.UserId(user);
+        var now = clock.GetUtcNow();
+        var comment = new ArchitecturalOwnerComment
+        {
+            Id = Guid.NewGuid(), ApplicationId = app.Id, AuthorUserId = userId, Body = body, CreatedAt = now
+        };
+        db.ArchitecturalOwnerComments.Add(comment);
+        foreach (var (name, file) in checkedFiles)
+        {
+            var key = $"arc/{app.CommunityId}/{app.ApplicationNumber}/{Guid.NewGuid()}";
+            await drafts.UploadOrFailAsync(key, file.Bytes, file.ContentType, ct);
+            db.ArchitecturalAttachments.Add(new ArchitecturalAttachment
+            {
+                ApplicationId = app.Id,
+                OwnerCommentId = comment.Id,
+                FileName = ResidentArcDraftService.CleanFileName(name),
+                SizeBytes = file.Bytes.LongLength,
+                ContentType = file.ContentType,
+                StorageKey = key,
+                UploadedByUserId = userId,
+                CreatedAt = now
+            });
+        }
+        await db.SaveChangesAsync(ct);
+
+        ResidentArcLog.Commented(logger, userId, app.Id, comment.Id, checkedFiles.Count, now);
+        return app;
     }
 
     /// <summary>The storage key of an attachment on the caller's application, or the non-disclosing 403.</summary>

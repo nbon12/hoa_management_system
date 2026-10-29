@@ -34,7 +34,7 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
 
   async function setup(items: ArcListItem[] = [row(), row({ id: 'a2', displayId: 'ARC-1041', attachmentCount: 0 })], query: Record<string, string> = {},
                        counts = { open: 4, closed: 27, awaitingMyVote: 1 }) {
-    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['list', 'vote', 'detail', 'attachmentUrl', 'requestInfo']);
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['list', 'vote', 'undoVote', 'detail', 'attachmentUrl', 'requestInfo']);
     arc.list.and.returnValue(Promise.resolve(page(items, counts)));
     arc.detail.and.returnValue(new Promise(() => {}));
     active.set('c1');
@@ -56,7 +56,7 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     await setup();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toContain('Architectural');
     expect(screen.getAllByRole('columnheader').map(h => h.textContent!.trim()))
-      .toEqual(['ID', 'Property', 'Project', 'Attachments', 'Due', 'Board votes', 'Your vote']);
+      .toEqual(['ID', 'Property', 'Project', 'Attachments', 'Due', 'Board votes', 'Your vote', 'Final decision']);
   });
 
   // US1-S1: tabs read "Open · 4" and "Closed · 27", Open selected, the open rows listed.
@@ -90,7 +90,7 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     expect(within(first).getByText('Praneeth Pattyam')).toBeTruthy();
     expect(first.textContent).toContain('📎 3 files');
     expect(first.textContent).toContain('06/27/26');
-    expect(within(first).getByRole('img', { name: '2 approve · 0 revisions needed · 0 deny · 3 not voted' })).toBeTruthy();
+    expect(within(first).getByRole('img', { name: '2 approve · 0 request revisions · 0 deny · 3 not voted' })).toBeTruthy();
     expect(screen.getAllByRole('row')[2].textContent).toContain('none');
   });
 
@@ -118,12 +118,78 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     await until(() => arc.list.calls.mostRecent().args[0] === 'c2');
   });
 
-  // US2-S1: Approve, Revisions needed, Deny and Info render for CanVote.
-  it('offers Approve, Revisions needed, Deny and Info when I can vote (US2-S1)', async () => {
+  // US2-S1 (031 wording): Approve, Request revisions, Deny and Ask question render for CanVote; nothing is selected.
+  it('offers Approve, Request revisions, Deny and Ask question when I can vote (US2-S1)', async () => {
     await setup([row()]);
     const r = screen.getAllByRole('row')[1];
-    for (const name of ['Approve', 'Revisions needed', 'Deny', 'Info'])
+    for (const name of ['Approve', 'Request revisions', 'Deny', 'Ask question'])
       expect(within(r).getByRole('button', { name })).toBeTruthy();
+    expect(within(r).getByRole('button', { name: 'Approve' }).getAttribute('aria-pressed')).toBe('false');
+    expect(within(r).queryByRole('button', { name: 'Submit' })).toBeNull();
+  });
+
+  // 031 US1-S1: "Given the applications table, When I click the whitespace of a row, Then that application opens."
+  it('opens an application when its row is clicked (031 item 1)', async () => {
+    const r = await setup([row(), row({ id: 'a2', displayId: 'ARC-1041' })]);
+    fireEvent.click(within(screen.getAllByRole('row')[2]).getByText('711 Keystone Park Dr #29'));
+    expect(r.fixture.componentInstance.selectedId()).toBe('a2');
+    // A click on a control inside the row keeps the control's own action.
+    r.fixture.componentInstance.selectedId.set(null);
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Approve' }));
+    expect(r.fixture.componentInstance.selectedId()).toBeNull();
+  });
+
+  // 031 US1-S2: "When I pick Deny on a row, Then nothing is cast until I click Submit."
+  it('casts a row vote only after Submit (031 item 5)', async () => {
+    await setup([row()]);
+    const r = screen.getAllByRole('row')[1];
+    fireEvent.click(within(r).getByRole('button', { name: 'Deny' }));
+    expect(arc.vote).not.toHaveBeenCalled();
+    arc.vote.and.returnValue(Promise.resolve(row({ myVote: { state: 'Voted', choice: 'Deny' }, canUndoVote: true })));
+    fireEvent.click(within(r).getByRole('button', { name: 'Submit' }));
+    await waitFor(() => expect(screen.getByText('you voted deny')).toBeTruthy());
+    expect(arc.vote).toHaveBeenCalledWith('c1', 'a1', 'Deny');
+  });
+
+  // 031 US3-S1: "Given I voted and the vote can still change, When the row renders, Then an undo link follows my vote;
+  // clicking it removes my vote and offers the choices again."
+  it('offers undo while my vote can change and recasts after it (031 item 5)', async () => {
+    await setup([row({ myVote: { state: 'Voted', choice: 'Approve' }, canUndoVote: true,
+      status: 'DecisionReached', decision: { outcome: 'Approved', wording: null, source: 'Votes' },
+      votesLockAt: '2026-06-20T16:00:00Z' })]);
+    const r = screen.getAllByRole('row')[1];
+    expect(within(r).getByText('you voted approve')).toBeTruthy();
+    expect(r.textContent).toContain('until 06/20/26');
+    arc.undoVote.and.returnValue(Promise.resolve(row()));
+    fireEvent.click(within(r).getByRole('button', { name: 'Undo your vote on ARC-1042' }));
+    await waitFor(() => expect(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Approve' })).toBeTruthy());
+    expect(arc.undoVote).toHaveBeenCalledWith('c1', 'a1');
+  });
+
+  // 031 US1-S6: "Given finalized decisions, Then the Final decision column shows ✓ / ✕ / yellow ↻ and no undo link."
+  it('shows the final-decision mark instead of undo once final (031 item 8)', async () => {
+    await setup([
+      row({ id: 'f1', status: 'Closed', decisionFinal: true, myVote: { state: 'Voted', choice: 'Approve' },
+        decision: { outcome: 'Approved', wording: null, source: 'Votes' } }),
+      row({ id: 'f2', status: 'Closed', decisionFinal: true, decision: { outcome: 'Denied', wording: 'Denied', source: 'Votes' } }),
+      row({ id: 'f3', status: 'DecisionReached', decisionFinal: true,
+        decision: { outcome: 'Denied', wording: 'RevisionsRequested', source: 'Votes' } }),
+    ]);
+    expect(screen.getByRole('img', { name: 'Final decision: Application Approved' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Final decision: Denied' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Final decision: Revisions Requested/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Undo your vote/ })).toBeNull();
+  });
+
+  // 031 US1-S7 (item 7): "Given 1 application awaits my vote, When I vote on it from the detail panel, Then the header
+  // pill disappears" — counts are re-read from the server after every change.
+  it('refreshes "awaiting your vote" after a change from the panel (031 item 7)', async () => {
+    const r = await setup([row()], {}, { open: 4, closed: 27, awaitingMyVote: 1 });
+    expect(screen.getByText('1 awaiting your vote')).toBeTruthy();
+    arc.list.and.returnValue(Promise.resolve(page([], { open: 4, closed: 27, awaitingMyVote: 0 })));
+    r.fixture.componentInstance.changed(row({ myVote: { state: 'Voted', choice: 'Approve' } }));
+    await until(() => screen.queryByText(/awaiting your vote/) === null);
+    expect(arc.list).toHaveBeenCalledWith('c1', jasmine.objectContaining({ awaitingMyVote: true }));
   });
 
   // US2-S2: from 1 approve / 0 deny / 4 not voted, Approve → "you voted approve" and 2 / 0 / 3.
@@ -135,11 +201,13 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     arc.vote.and.returnValue(Promise.resolve(row({
       myVote: { state: 'Voted', choice: 'Approve' }, tally: { approve: 2, revisionsNeeded: 0, deny: 0, notVoted: 3, eligible: 5 },
     })));
+    arc.list.and.returnValue(Promise.resolve(page([], { open: 4, closed: 27, awaitingMyVote: 1 })));
     fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Approve' }));
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Submit' }));
     await waitFor(() => expect(screen.getByText('you voted approve')).toBeTruthy());
     expect(arc.vote).toHaveBeenCalledWith('c1', 'a1', 'Approve');
-    expect(screen.getByRole('img', { name: '2 approve · 0 revisions needed · 0 deny · 3 not voted' })).toBeTruthy();
-    expect(screen.getByText('1 awaiting your vote')).toBeTruthy();
+    expect(screen.getByRole('img', { name: '2 approve · 0 request revisions · 0 deny · 3 not voted' })).toBeTruthy();
+    await until(() => !!screen.queryByText('1 awaiting your vote'));
   });
 
   it('shows "you voted deny" with no buttons (US2-S3)', async () => {
@@ -149,12 +217,13 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     expect(within(r).queryByRole('button', { name: 'Approve' })).toBeNull();
   });
 
-  it('shows "you voted revisions needed" and the formal-denial note after voting (US2-S4)', async () => {
+  it('shows "you voted to request revisions" and the formal-denial note after voting (US2-S4)', async () => {
     await setup([row()]);
     arc.vote.and.returnValue(Promise.resolve(row({ myVote: { state: 'Voted', choice: 'RevisionsNeeded' } })));
-    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Revisions needed' }));
-    await waitFor(() => expect(screen.getByText('you voted revisions needed')).toBeTruthy());
-    expect(screen.getByText('Revisions needed counts as a formal denial; the owner is invited to revise and resubmit.')).toBeTruthy();
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Request revisions' }));
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Submit' }));
+    await waitFor(() => expect(screen.getByText('you voted to request revisions')).toBeTruthy());
+    expect(screen.getByText('Request revisions counts as a formal denial; the owner is invited to revise and resubmit.')).toBeTruthy();
   });
 
   it('shows recused instead of vote buttons (US2-S8)', async () => {
@@ -196,6 +265,7 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     arc.vote.and.returnValue(Promise.reject({ error: { message: 'You have already voted on this application.' } }));
     const before = arc.list.calls.count();
     fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Deny' }));
+    fireEvent.click(within(screen.getAllByRole('row')[1]).getByRole('button', { name: 'Submit' }));
     await until(() => !!screen.queryByRole('alert')?.textContent?.includes('already voted'));
     expect(arc.list.calls.count()).toBeGreaterThan(before);
   });
@@ -214,12 +284,12 @@ describe('ApplicationsPageComponent (027 US1/US2)', () => {
     await until(() => !!screen.queryByRole('alert')?.textContent?.includes('could not be loaded'));
   });
 
-  it('opens the detail panel from the ID and from Info', async () => {
+  it('opens the detail panel from the ID and from Ask question (031 item 11)', async () => {
     const r = await setup([row()]);
     fireEvent.click(screen.getByRole('button', { name: 'ARC-1042' }));
     expect(r.fixture.componentInstance.selectedId()).toBe('a1');
     r.fixture.componentInstance.selectedId.set(null);
-    fireEvent.click(screen.getByRole('button', { name: 'Info' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask question' }));
     expect(r.fixture.componentInstance.selectedId()).toBe('a1');
     expect(r.fixture.componentInstance.infoFor()).toBe('a1');
     fireEvent.click(screen.getByRole('button', { name: '📎 3 files' }));

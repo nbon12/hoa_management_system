@@ -26,7 +26,7 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
 
   async function setup(d: ArcDetail = detail(), manager = false) {
     arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService',
-      ['detail', 'attachmentUrl', 'vote', 'requestInfo', 'recordOutcome', 'resendOutcomeEmail']);
+      ['detail', 'attachmentUrl', 'vote', 'undoVote', 'requestInfo', 'recordOutcome', 'resendOutcomeEmail']);
     arc.detail.and.returnValue(Promise.resolve(d));
     const r = await render(ApplicationDetailPanelComponent, {
       componentInputs: { communityId: 'c1', applicationId: 'a1', manager },
@@ -98,12 +98,12 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
     expect(screen.getByText('Please attach a plat survey')).toBeTruthy();
     expect(screen.getByText(/Bianca Board/)).toBeTruthy();
     // the vote buttons stay available
-    expect(screen.getByRole('button', { name: '✓ Approve' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy();
   });
 
-  // US4-S5: "…When I choose Request info, Then I see the notice "Questions don't pause the review period
-  // (due <date>)…" and the info-requested marker shows the unchanged due date."
-  it('shows the review-period notice on Request info and the unchanged due date on the marker (US4-S5)', async () => {
+  // US4-S5 as amended by 031 US2-S4 (item 13): "…When I choose Ask question, Then I see the due date and 'Info requests
+  // do not delay the due date of the board vote result…'", and the info-requested marker carries the same notice.
+  it('shows the due-date notice on Ask question and on the info-requested marker (US4-S5, 031 item 13)', async () => {
     const r = await setup(detail({
       infoRequested: true,
       infoRequests: [{ id: 'i1', requestedBy: 'Bianca Board', message: 'Please attach a plat survey', requestedAt: '2026-06-02T10:00:00Z', respondedAt: null }],
@@ -112,16 +112,20 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
     await until(() => !!r.fixture.nativeElement.querySelector('[role="note"]'));
     r.fixture.detectChanges();
     expect(screen.getByRole('note').textContent!.trim()).toBe(
-      "Questions don't pause the review period (due 06/27/26). To require changes before approval, vote Revisions needed — it counts as a formal denial and invites the owner to resubmit.");
+      'Board vote result due 06/27/26. Info requests do not delay the due date of the board vote result. Failure to ' +
+      'approve or deny by the due date may result in auto-approval. To request revisions, please select "Request revisions".');
     const marker = r.fixture.nativeElement.querySelector('.adp__info') as HTMLElement;
     expect(marker.textContent).toContain('info requested');
-    expect(marker.textContent).toContain('review still due 06/27/26');
+    expect(marker.textContent).toContain('Info requests do not delay the due date of the board vote result.');
+    expect(marker.textContent).not.toContain('review still due');
   });
 
   it('submits a vote and refreshes', async () => {
     const r = await setup();
     arc.vote.and.returnValue(Promise.resolve({} as any));
-    fireEvent.click(screen.getByRole('button', { name: '✓ Approve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(arc.vote).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit vote' }));
     await until(() => arc.vote.calls.count() > 0 && arc.detail.calls.count() > 1);
     expect(arc.vote).toHaveBeenCalledWith('c1', 'a1', 'Approve', null);
     expect(r).toBeTruthy();
@@ -158,7 +162,7 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
         { id: 'a1', revision: 2, receivedDate: '2026-05-28', decision: null },
       ],
     }));
-    expect(screen.getByText('Denied · revisions requested')).toBeTruthy();
+    expect(screen.getByText('Revisions Requested (effectively denied; the resident is asked to revise and resubmit)')).toBeTruthy();
     expect(screen.getByText('Lower the fence to 5ft per Guideline 4.2')).toBeTruthy();
     expect(screen.getByText('Fence must be 5ft max per Guideline 4.2')).toBeTruthy();
     expect(screen.getByText('Bianca Board')).toBeTruthy();
@@ -170,7 +174,8 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
       decision: { outcome: 'Approved', wording: null, source: 'Votes' },
       conditionsOfApproval: 'Fence must be stained to match the existing color',
     }));
-    expect(screen.getByText('Approved')).toBeTruthy();
+    expect(screen.getByText('Application Approved')).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Final decision: Application Approved' })).toBeTruthy();
     expect(screen.getByText('Fence must be stained to match the existing color')).toBeTruthy();
   });
 
@@ -184,7 +189,7 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
     await setup();
     arc.requestInfo.and.returnValue(Promise.resolve({} as any));
     fireEvent.input(screen.getByLabelText('Comment to the board'), { target: { value: 'Please attach a plat survey' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Request info' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask question' }));
     await until(() => arc.requestInfo.calls.count() > 0 && arc.detail.calls.count() > 1);
     expect(arc.requestInfo).toHaveBeenCalledWith('c1', 'a1', 'Please attach a plat survey');
   });
@@ -192,7 +197,8 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
   it('shows the server message when an action fails', async () => {
     await setup();
     arc.vote.and.returnValue(Promise.reject({ error: { message: 'A decision has already been reached on this application.' } }));
-    fireEvent.click(screen.getByRole('button', { name: '✕ Deny' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit vote' }));
     await until(() => !!screen.queryByRole('alert')?.textContent?.includes('A decision has already been reached'));
   });
 
@@ -212,8 +218,108 @@ describe('ApplicationDetailPanelComponent (027 US3)', () => {
 
   it('shows my recorded vote, the formal-denial note, and recusal', async () => {
     await setup(detail({ myVote: { state: 'Voted', choice: 'RevisionsNeeded' } }));
-    expect(screen.getByText('you voted revisions needed')).toBeTruthy();
-    expect(screen.getByText('Revisions needed counts as a formal denial; the owner is invited to revise and resubmit.')).toBeTruthy();
+    expect(screen.getByText('you voted to request revisions')).toBeTruthy();
+    expect(screen.getByText('Request revisions counts as a formal denial; the owner is invited to revise and resubmit.')).toBeTruthy();
+  });
+
+  // 031 US2-S1 (item 10): "Given three board votes, When the Details section renders, Then it lists
+  // 'Aaliyah Brooks — voted approve', 'Marcus Chen — voted approve', 'Bianca Board — voted to request revisions'."
+  it('lists every vote as "— voted …", never "you voted" (031 item 10)', async () => {
+    const r = await setup(detail({ votes: [
+      { voterName: 'Aaliyah Brooks', choice: 'Approve', comment: null, castAt: '2026-06-01T14:03:00Z' },
+      { voterName: 'Marcus Chen', choice: 'Approve', comment: null, castAt: '2026-06-02T09:10:00Z' },
+      { voterName: 'Bianca Board', choice: 'RevisionsNeeded', comment: null, castAt: '2026-06-03T09:10:00Z' },
+    ] }));
+    const items = Array.from(r.fixture.nativeElement.querySelectorAll('.adp__votes li') as NodeListOf<HTMLElement>)
+      .map(li => li.textContent!.replace(/\s+/g, ' ').trim());
+    expect(items).toEqual(['Aaliyah Brooks — voted approve', 'Marcus Chen — voted approve', 'Bianca Board — voted to request revisions']);
+    expect(r.fixture.nativeElement.querySelector('.adp__votes').textContent).not.toContain('you voted');
+  });
+
+  // 031 US2-S2 (item 10): "Board final result: Not yet decided" until final; then the outcome.
+  it('shows the board final result (031 item 10)', async () => {
+    await setup();
+    expect(screen.getByText('Not yet decided')).toBeTruthy();
+  });
+
+  it('shows "Not yet decided" with a pending note while votes can still change (031 item 5)', async () => {
+    await setup(detail({ status: 'DecisionReached', decision: { outcome: 'Approved', wording: null, source: 'Votes' },
+      decisionFinal: false, votesLockAt: '2026-06-20T16:00:00Z', myVote: { state: 'Voted', choice: 'Approve' }, canUndoVote: true }));
+    expect(screen.getByText('Not yet decided')).toBeTruthy();
+    expect(screen.getByText(/board members can change their votes until 06\/20\/26/)).toBeTruthy();
+  });
+
+  // 031 US3-S1 from the panel: undo then refresh.
+  it('undoes my vote from the panel (031 item 5)', async () => {
+    await setup(detail({ myVote: { state: 'Voted', choice: 'Approve' }, canUndoVote: true, votesLockAt: null }));
+    arc.undoVote.and.returnValue(Promise.resolve({} as any));
+    fireEvent.click(screen.getByRole('button', { name: 'undo' }));
+    await until(() => arc.undoVote.calls.count() > 0 && arc.detail.calls.count() > 1);
+    expect(arc.undoVote).toHaveBeenCalledWith('c1', 'a1');
+  });
+
+  // 031 US6-S1 (item 12): "Given an application approved by default, When I open it, Then where the vote card would
+  // be I see a statement citing the governing documents and the final result shows the green ✓."
+  it('explains a lapse approval with the governing-document citation (031 item 12)', async () => {
+    const statement = 'Approved by default: the board did not approve or deny this application by its due date (06/27/26). ' +
+      'Under Article IX, Section 9.4 of the Declaration, an application the board does not act on within the 30-day review ' +
+      'period is deemed approved.';
+    await setup(detail({ status: 'Closed', decisionFinal: true, myVote: { state: 'NotEligible' },
+      decision: { outcome: 'Approved', wording: null, source: 'Lapse' }, lapseStatement: statement }));
+    expect(screen.getByText(statement)).toBeTruthy();
+    expect(screen.getByText('Approved by default')).toBeTruthy();
+    expect(screen.queryByText('Cast your vote')).toBeNull();
+    expect(screen.getAllByRole('img', { name: /Final decision: Application Approved/ }).length).toBe(2);
+  });
+
+  // 031 US7-S2 (item 15): the homeowner's comments get their own section under the details.
+  it("shows the homeowner's comments in their own section (031 item 15)", async () => {
+    const r = await setup(detail({
+      attachments: [
+        { id: 'f1', fileName: 'fence-plan.pdf', sizeBytes: 1000, contentType: 'application/pdf' },
+        { id: 'c1f', fileName: 'revised-plan.pdf', sizeBytes: 2048, contentType: 'application/pdf', ownerCommentId: 'c1' },
+      ],
+      ownerComments: [{ id: 'c1', authorName: 'Praneeth Pattyam', body: 'Lowered the fence to 5ft', createdAt: '2026-06-05T15:00:00Z',
+        attachments: [{ id: 'c1f', fileName: 'revised-plan.pdf', sizeBytes: 2048, contentType: 'application/pdf', ownerCommentId: 'c1' }] }],
+    }));
+    const section = screen.getByRole('region', { name: 'Homeowner comments' });
+    expect(section.textContent).toContain('Praneeth Pattyam');
+    expect(section.textContent).toContain('Lowered the fence to 5ft');
+    expect(section.textContent).toContain('revised-plan.pdf');
+    // The comment's file is listed with the comment, not with the submitted attachments.
+    expect(r.fixture.nativeElement.querySelectorAll('.adp__files li').length).toBe(1);
+    arc.attachmentUrl.and.returnValue(Promise.resolve({ url: 'https://signed.example/x', expiresAt: '' }));
+    const open = spyOn(window, 'open');
+    fireEvent.click(screen.getByRole('button', { name: 'Open revised-plan.pdf in a new tab' }));
+    await until(() => open.calls.count() > 0);
+  });
+
+  it('says when the homeowner has not commented', async () => {
+    await setup();
+    expect(screen.getByText("The homeowner hasn't commented on this application.")).toBeTruthy();
+  });
+
+  // 031 US1-S9 (item 9): "When I click an application, Then skeletons show in place of the details and the vote card
+  // until it loads."
+  it('shows two skeletons while the application loads (031 item 9)', async () => {
+    arc = jasmine.createSpyObj<ArchitecturalService>('ArchitecturalService', ['detail']);
+    let resolve!: (d: ArcDetail) => void;
+    arc.detail.and.returnValue(new Promise<ArcDetail>(res => (resolve = res)));
+    const r = await render(ApplicationDetailPanelComponent, {
+      componentInputs: { communityId: 'c1', applicationId: 'a1' },
+      providers: [{ provide: ArchitecturalService, useValue: arc }],
+    });
+    expect(screen.getByTestId('detail-skeleton')).toBeTruthy();
+    expect(screen.getByTestId('vote-skeleton')).toBeTruthy();
+    resolve(detail());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toBeTruthy());
+    expect(screen.queryByTestId('detail-skeleton')).toBeNull();
+
+    // Switching to another application shows the skeletons again at once.
+    arc.detail.and.returnValue(new Promise<ArcDetail>(() => {}));
+    r.fixture.componentRef.setInput('applicationId', 'a2');
+    r.fixture.detectChanges();
+    await until(() => !!screen.queryByTestId('detail-skeleton'));
   });
 
   it('explains recusal', async () => {

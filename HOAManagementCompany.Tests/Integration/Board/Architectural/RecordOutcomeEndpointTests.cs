@@ -134,6 +134,8 @@ public class RecordOutcomeEndpointTests(TestDatabaseFixture fixture) : ArcTestBa
         Assert.Equal(new ArcTallyDto(0, 1, 3, 1, 5), decided.Tally);
         Assert.Equal(new ArcDecisionDto("Denied", "Denied", "Votes"), decided.Decision);
 
+        // 031: board members may change their votes until the grace period ends; the outcome is recorded after it.
+        Clock.UtcNow = decided.VotesLockAt!.Value.AddMinutes(1);
         await LoginAsAsync(manager);
         var res = await RecordAsync(s.CommunityId, appId, new { ownerReason = "Exceeds the height limit." });
 

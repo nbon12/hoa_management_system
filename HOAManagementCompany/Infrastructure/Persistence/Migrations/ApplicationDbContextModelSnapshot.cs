@@ -18,7 +18,7 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.21")
+                .HasAnnotation("ProductVersion", "9.0.20")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -250,6 +250,9 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DecisionFinalAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DecisionOutcome")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -277,6 +280,9 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
 
                     b.Property<DateOnly>("DueDate")
                         .HasColumnType("date");
+
+                    b.Property<int?>("EligibleVoterCount")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("LapseProcessedAt")
                         .HasColumnType("timestamp with time zone");
@@ -475,6 +481,9 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("InfoRequestId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OwnerCommentId")
+                        .HasColumnType("uuid");
+
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
 
@@ -491,6 +500,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.HasIndex("ApplicationId");
 
                     b.HasIndex("InfoRequestId");
+
+                    b.HasIndex("OwnerCommentId");
 
                     b.HasIndex("UploadedByUserId");
 
@@ -579,6 +590,36 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.HasIndex("RespondedByUserId");
 
                     b.ToTable("ArchitecturalInfoRequests", (string)null);
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ArchitecturalOwnerComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AuthorUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId");
+
+                    b.HasIndex("AuthorUserId");
+
+                    b.ToTable("ArchitecturalOwnerComments", (string)null);
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ArchitecturalVote", b =>
@@ -761,6 +802,13 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("LapseRuleCitation")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasDefaultValue("the community's governing documents");
 
                     b.Property<int>("NextApplicationNumber")
                         .HasColumnType("integer");
@@ -2445,6 +2493,11 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                         .HasForeignKey("InfoRequestId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ArchitecturalOwnerComment", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerCommentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
@@ -2491,6 +2544,25 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Navigation("Application");
 
                     b.Navigation("RequestedBy");
+                });
+
+            modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ArchitecturalOwnerComment", b =>
+                {
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ArchitecturalApplication", "Application")
+                        .WithMany("OwnerComments")
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HOAManagementCompany.Domain.Entities.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+
+                    b.Navigation("Author");
                 });
 
             modelBuilder.Entity("HOAManagementCompany.Domain.Entities.ArchitecturalVote", b =>
@@ -3044,6 +3116,8 @@ namespace HOAManagementCompany.Infrastructure.Persistence.Migrations
                     b.Navigation("Attachments");
 
                     b.Navigation("InfoRequests");
+
+                    b.Navigation("OwnerComments");
 
                     b.Navigation("Votes");
                 });

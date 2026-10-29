@@ -47,6 +47,12 @@ export interface ArcListItem {
   infoRequested: boolean;
   tally: ArcTally;
   myVote: ArcMyVote;
+  /** 031: the reached decision can no longer change. */
+  decisionFinal?: boolean;
+  /** 031: a reached decision accepts vote changes until this instant (UTC). */
+  votesLockAt?: string | null;
+  /** 031: the caller may undo (and then recast) their vote. */
+  canUndoVote?: boolean;
 }
 
 export interface ArcCounts {
@@ -70,6 +76,17 @@ export interface ArcAttachment {
   contentType: string;
   /** 029: set when the owner added the file with an info-request reply. */
   infoRequestId?: string | null;
+  /** 031: set when the owner posted the file with a comment. */
+  ownerCommentId?: string | null;
+}
+
+/** 031: a homeowner comment, shown to the board in its own section under the details. */
+export interface ArcOwnerComment {
+  id: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  attachments: ArcAttachment[];
 }
 
 export interface ArcVote {
@@ -108,6 +125,10 @@ export interface ArcDetail extends ArcListItem {
   closedAt: string | null;
   ownerEmailStatus: 'Pending' | 'Sent' | 'Failed' | 'NoOwnerEmail' | null;
   revisions: ArcRevisionSummary[];
+  /** 031 */
+  ownerComments?: ArcOwnerComment[] | null;
+  /** 031: for a decision made by the lapse rule, the explanation citing the governing documents. */
+  lapseStatement?: string | null;
 }
 
 export interface ArcSettings {
@@ -117,6 +138,8 @@ export interface ArcSettings {
   reminderDays: number;
   timeZoneId: string;
   formalDisapprovalStatement: string;
+  /** 031: the governing-document clause cited when the lapse rule decides an application. */
+  lapseRuleCitation?: string;
   updatedAt?: string | null;
 }
 
@@ -168,6 +191,11 @@ export class ArchitecturalService {
   vote(communityId: string, applicationId: string, choice: ArcVoteChoice, comment?: string | null): Promise<ArcListItem> {
     return firstValueFrom(this.http.post<ArcListItem>(
       `${this.apps(communityId)}/${applicationId}/votes`, { choice, comment: comment || null }));
+  }
+
+  /** 031: undo the caller's vote while the decision isn't final, so it can be recast. */
+  undoVote(communityId: string, applicationId: string): Promise<ArcListItem> {
+    return firstValueFrom(this.http.delete<ArcListItem>(`${this.apps(communityId)}/${applicationId}/votes/mine`));
   }
 
   requestInfo(communityId: string, applicationId: string, message: string): Promise<ArcInfoRequest & { dueDate: string }> {

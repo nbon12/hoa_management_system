@@ -5,11 +5,12 @@ import { ResidentArchitecturalService } from '../../../core/services/resident-ar
 import { ResidentArcAttachment, ResidentArcDetail } from '../../../core/models';
 import { InfoReplyComponent } from './info-reply.component';
 import { WithdrawDialogComponent } from './withdraw-dialog.component';
+import { CommentThreadComponent } from './comment-thread.component';
 import { errorMessage, fileSize, projectTypeLabel, statusLabel, statusTone } from './resident-arc-format';
 
 const TIMELINE_LABELS: Record<string, string> = {
   Submitted: 'Submitted', InfoRequested: 'Board asked for more information', InfoReplied: 'You replied',
-  Approved: 'Approved', Denied: 'Denied', Withdrawn: 'Withdrawn',
+  Commented: 'You commented', Approved: 'Approved', Denied: 'Denied', Withdrawn: 'Withdrawn',
 };
 
 /**
@@ -20,7 +21,7 @@ const TIMELINE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-arc-request-detail',
   standalone: true,
-  imports: [DatePipe, RouterLink, InfoReplyComponent, WithdrawDialogComponent],
+  imports: [DatePipe, RouterLink, InfoReplyComponent, WithdrawDialogComponent, CommentThreadComponent],
   styles: [`
     :host { display: block; max-width: 860px; }
     .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 20px; }
@@ -48,6 +49,10 @@ const TIMELINE_LABELS: Record<string, string> = {
         <h1 class="page-title">{{ d.displayId }}@if (d.revision > 1) { <span class="pill" style="margin-left:6px;">v{{ d.revision }}</span> } · {{ d.projectTitle }}</h1>
         <div class="page-header__actions">
           <a class="btn btn--ghost" routerLink="/app/property/architectural">Back to my requests</a>
+          <!-- 031 item 15: withdrawing is at the top right, in red. -->
+          @if (d.canWithdraw) {
+            <button class="btn btn--danger" (click)="withdrawing.set(true)">Withdraw request</button>
+          }
         </div>
       </div>
       <p><span class="pill {{ tone(d) }}">{{ label(d) }}</span>
@@ -97,11 +102,11 @@ const TIMELINE_LABELS: Record<string, string> = {
 
         <section class="card" aria-labelledby="files-title">
           <h2 class="section-title" id="files-title">Files</h2>
-          @if (d.attachments.length === 0) {
+          @if (submittedFiles(d).length === 0) {
             <p class="muted">No files attached.</p>
           } @else {
             <ul class="files">
-              @for (f of d.attachments; track f.id) {
+              @for (f of submittedFiles(d); track f.id) {
                 <li>
                   <span>📎 {{ f.fileName }} <span class="muted">· {{ size(f.sizeBytes) }}@if (f.infoRequestId) { · added with a reply }</span></span>
                   <button class="btn btn--ghost" (click)="open(d.id, f)" [attr.aria-label]="'Open ' + f.fileName">Open</button>
@@ -110,6 +115,8 @@ const TIMELINE_LABELS: Record<string, string> = {
             </ul>
           }
         </section>
+
+        <app-arc-comment-thread [detail]="d" (posted)="detail.set($event)" (openFile)="open(d.id, $event)" />
 
         @if (answered(d).length) {
           <section class="card" aria-labelledby="questions-title">
@@ -149,11 +156,6 @@ const TIMELINE_LABELS: Record<string, string> = {
           </section>
         }
 
-        @if (d.canWithdraw) {
-          <div class="actions">
-            <button class="btn btn--ghost" (click)="withdrawing.set(true)">Withdraw request</button>
-          </div>
-        }
       </div>
 
       @if (withdrawing()) {
@@ -185,6 +187,8 @@ export class RequestDetailComponent implements OnInit {
   }
 
   unanswered(d: ResidentArcDetail) { return d.status === 'MoreInfoRequested' ? d.infoRequests.filter(q => !q.respondedAt) : []; }
+  /** Files posted with a comment are listed with that comment instead. */
+  submittedFiles(d: ResidentArcDetail) { return d.attachments.filter(f => !f.ownerCommentId); }
   answered(d: ResidentArcDetail) { return d.infoRequests.filter(q => !!q.respondedAt); }
   label(d: ResidentArcDetail): string { return statusLabel(d.status); }
   statusText = statusLabel;

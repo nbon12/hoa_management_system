@@ -16,6 +16,8 @@ public class ArchitecturalAttachment
     /// <summary>Set when the file was added with a resident's info-request reply (029).</summary>
     public Guid? InfoRequestId { get; set; }
     public string? UploadedByUserId { get; set; }
+    /// <summary>Set when the file was posted with a homeowner comment (031).</summary>
+    public Guid? OwnerCommentId { get; set; }
 
     public ArchitecturalApplication Application { get; set; } = null!;
 }

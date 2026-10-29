@@ -95,6 +95,11 @@ public sealed class ResidentArcReplyUploadRequest
     public IFormFile? File { get; set; }
 }
 
+public sealed class ResidentArcCommentRoute
+{
+    public Guid Id { get; set; }
+}
+
 public sealed class ResidentArcReplyRequest
 {
     public Guid Id { get; set; }
@@ -104,7 +109,12 @@ public sealed class ResidentArcReplyRequest
 
 // ── Responses (resident-safe: no vote, voter, tally or vote-comment field exists) ──
 
-public sealed record ResidentArcAttachmentDto(Guid Id, string FileName, long SizeBytes, string ContentType, Guid? InfoRequestId);
+public sealed record ResidentArcAttachmentDto(
+    Guid Id, string FileName, long SizeBytes, string ContentType, Guid? InfoRequestId, Guid? OwnerCommentId = null);
+
+/// <summary>031: one of the homeowner's own comments on a request, with the files posted with it.</summary>
+public sealed record ResidentArcCommentDto(
+    Guid Id, string Body, DateTimeOffset CreatedAt, IReadOnlyList<ResidentArcAttachmentDto> Attachments);
 
 public sealed record ResidentArcDraftDto(
     Guid Id,
@@ -175,6 +185,9 @@ public sealed record ResidentArcDetailDto(
     DateTimeOffset? ClosedAt,
     bool CanWithdraw,
     bool CanRevise,
-    IReadOnlyList<ResidentArcRevisionDto> Revisions);
+    IReadOnlyList<ResidentArcRevisionDto> Revisions,
+    // 031: the homeowner's comment thread.
+    IReadOnlyList<ResidentArcCommentDto>? Comments = null,
+    bool CanComment = false);
 
 public sealed record ResidentArcAttachmentUrlDto(string Url, DateTimeOffset ExpiresAt);

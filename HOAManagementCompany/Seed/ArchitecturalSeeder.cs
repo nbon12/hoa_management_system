@@ -43,7 +43,11 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
         }
 
         // 030 FR-036a: staff sign in without a home, so the demo users get a membership only — no
-        // co-home on another user's property. Databases seeded earlier keep the links they have.
+        // co-home on another user's property.
+        // 031: databases seeded before that still co-home the demo staff on the demo resident's property,
+        // which recuses every board member on that resident's requests (a 0/0 board). Remove those links.
+        await UnhomeDemoStaffAsync(ct);
+
         var boardIds = new List<string> { boardUser.Id };
         foreach (var (email, first, last) in ExtraBoard)
             boardIds.Add(await EnsureUserWithRoleAsync(community.Id, email, first, last, CommunityRole.BoardMember, ct));
@@ -52,8 +56,12 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
         // Independent of the board demo below, so it also lands on dev databases seeded before 029.
         await EnsureResidentDemoAsync(boardUser.Id, ct);
 
+        // 031: an application approved by default (lapse rule), added on dev databases seeded earlier too.
+        await EnsureAutoApprovedDemoAsync(community.Id, boardUser.Id, ct);
+
         if (await db.ArchitecturalApplications.AnyAsync(a => a.CommunityId == community.Id
-                                                             && a.SubmittedByUserId == null, ct))
+                                                             && a.SubmittedByUserId == null
+                                                             && a.ApplicationNumber != AutoApprovedNumber, ct))
             return;
 
         // Properties the board user isn't linked to (so they aren't recused) and that aren't the
@@ -117,6 +125,80 @@ public class ArchitecturalSeeder(ApplicationDbContext db, IServiceProvider servi
         settings.NextApplicationNumber = Math.Max(settings.NextApplicationNumber, 1043);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded architectural applications for {Community}.", CommunityName);
+    }
+
+    private const int AutoApprovedNumber = 1040;
+    private const string DemoLapseCitation =
+        "Article IX, Section 9.4 of the Declaration of Covenants, Conditions and Restrictions";
+
+    private static readonly string[] DemoUserEmails =
+        [BoardEmail, ..ExtraBoard.Select(b => b.Email), ManagerEmail];
+
+    /// <summary>
+    /// 031: removes the demo board's and manager's links to any property a non-demo user lives on. Staff
+    /// sign in without a home (031 FR-036a); the old co-home recused the whole board on that resident's
+    /// requests. Idempotent.
+    /// </summary>
+    private async Task UnhomeDemoStaffAsync(CancellationToken ct)
+    {
+        var demoUserIds = await db.Users.Where(u => DemoUserEmails.Contains(u.Email!)).Select(u => u.Id).ToListAsync(ct);
+        var shared = await db.UserProperties
+            .Where(up => demoUserIds.Contains(up.UserId)
+                         && db.UserProperties.Any(o => o.PropertyId == up.PropertyId && !demoUserIds.Contains(o.UserId)))
+            .ToListAsync(ct);
+        if (shared.Count == 0)
+            return;
+        db.UserProperties.RemoveRange(shared);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Removed {Count} demo staff links to residents' properties.", shared.Count);
+    }
+
+    /// <summary>
+    /// 031: ARC-1040, closed as approved by default because the board did not act by its due date, so
+    /// the lapse-rule view (citation of the governing documents) can be tried. Idempotent.
+    /// </summary>
+    private async Task EnsureAutoApprovedDemoAsync(Guid communityId, string boardUserId, CancellationToken ct)
+    {
+        if (await db.ArchitecturalApplications.AnyAsync(a => a.CommunityId == communityId && a.ApplicationNumber == AutoApprovedNumber, ct))
+            return;
+
+        var factory = services.GetRequiredService<ArcApplicationFactory>();
+        var settings = await factory.GetOrCreateSettingsAsync(communityId, ct);
+        if (settings.LapseRuleCitation == CommunityArcSettings.DefaultLapseRuleCitation)
+            settings.LapseRuleCitation = DemoLapseCitation;
+
+        // A property nobody lives on and no other application uses, so no resident sees it as theirs.
+        var propertyId = await db.Properties
+            .Where(p => p.CommunityId == communityId && p.AccountNumber != RegistrationAccount
+                        && !db.UserProperties.Any(up => up.PropertyId == p.Id)
+                        && !db.ArchitecturalApplications.Any(a => a.PropertyId == p.Id))
+            .OrderBy(p => p.AccountNumber)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(ct);
+        if (propertyId is null)
+        {
+            logger.LogWarning("ArchitecturalSeeder skipped the auto-approved demo — no spare property.");
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var app = await CreateAsync(factory, AutoApprovedNumber, propertyId.Value, "Gabriela Ortiz", ArcProjectType.Landscaping,
+            "Backyard pergola — cedar, 12x14", "Freestanding cedar pergola over the existing rear patio, stained natural.",
+            today.AddDays(-settings.ReviewPeriodDays - 12), [("pergola-plan.pdf", "application/pdf")], ct);
+        Votes(app, [boardUserId], ArcVoteChoice.Approve);
+
+        var lapsedAt = new DateTimeOffset(app.DueDate.AddDays(1).ToDateTime(new TimeOnly(1, 0)), TimeSpan.Zero);
+        var manager = await db.Users.FirstAsync(u => u.Email == ManagerEmail, ct);
+        app.LapseRule = ArcLapseRule.DeemedApproved;
+        Close(app, ArcOutcome.Approved, null, null, manager.Id, app.DueDate.AddDays(2));
+        app.DecisionSource = ArcDecisionSource.Lapse;
+        app.DecisionReachedAt = lapsedAt;
+        app.DecisionFinalAt = lapsedAt;
+        app.LapseProcessedAt = lapsedAt;
+        app.EligibleVoterCount = 1 + ExtraBoard.Length;
+        settings.NextApplicationNumber = Math.Max(settings.NextApplicationNumber, AutoApprovedNumber + 1);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Seeded the auto-approved architectural demo application.");
     }
 
     /// <summary>

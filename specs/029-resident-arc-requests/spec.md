@@ -89,7 +89,7 @@ While a request is under review, a board member asks a question via "Request inf
 
 ### User Story 4 - Withdraw a request (Priority: P3)
 
-A homeowner changes their mind before a decision is made and withdraws the request. It moves to Closed with outcome "withdrawn" and disappears from the board's open list.
+A homeowner changes their mind before a decision is made and withdraws the request. It moves to Closed with outcome "withdrawn" and disappears from the board's open list. *(Amended by `031-arc-review-refinements` FR-023: "Withdraw request" is a red button at the top right of the request page. 031 FR-020 also adds a homeowner comment section to every request that wasn't withdrawn.)*
 
 **Why this priority**: A useful control for residents, but affects a minority of requests and is not needed for the core submit/track loop.
 
