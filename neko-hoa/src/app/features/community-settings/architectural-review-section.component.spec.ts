@@ -280,14 +280,17 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       expect(screen.getAllByText('No time zone matches “Mars/Olympus_Mons”. Try a city, such as Chicago, or a name, such as Eastern.').length).toBe(2);
       expect(within(screen.getByRole('listbox', { name: 'Time zone' })).queryAllByRole('option').length).toBe(0);
 
-      // Leaving without choosing puts the saved zone back; Save sends it unchanged.
+      // Leaving without choosing puts the saved zone back; a save with another change sends it unchanged.
       fireEvent.blur(tz);
       await settle(r);
       expect(tz.value).toBe('America/New_York');
-      svc.putArcSettings.and.resolveTo(arc());
+      expect(screen.queryByRole('listbox')).toBeNull();
+      fireEvent.input(field('Review period (days)'), { target: { value: '50' } });
+      svc.putArcSettings.and.resolveTo(arc({ reviewPeriodDays: 50 }));
       fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
       await settle(r);
-      expect(svc.putArcSettings.calls.mostRecent().args[1].timeZoneId).toBe('America/New_York');
+      expect(svc.putArcSettings).toHaveBeenCalledTimes(1);
+      expect(svc.putArcSettings.calls.mostRecent().args[1]).toEqual(jasmine.objectContaining({ reviewPeriodDays: 50, timeZoneId: 'America/New_York' }));
 
       // Choosing one saves it.
       await edit(r);
