@@ -12,24 +12,24 @@ Frontend only, no API or data change. It touches the architectural review form s
 
 **Changes earlier assumptions**
 
-- **Time zone is picked, not typed.** The field is a searchable dropdown of IANA names (`app-combo-picker` in its new `dropdown` mode). Clicking it or its ▾ button lists every zone, with the common US zones first. Typing filters by name, city, generic name ("Eastern") or offset ("UTC-5"). Text that isn't chosen from the list is discarded on blur, so the form can no longer send a mistyped zone.
-  - The list comes from `Intl.supportedValuesOf('timeZone')`, plus `UTC`. Chrome lists 19 renamed zones by their old names (`Asia/Calcutta`, `Europe/Kiev`, `America/Indianapolis`, …). `RENAMED_TIME_ZONES` in `shared/time-zones.ts` maps them to the current names, so every browser saves the same name. A saved zone that isn't in the list still shows, first.
+- **Time zone is picked, not typed.** The field is a searchable dropdown of IANA names (`app-combo-picker` in its new `dropdown` mode). Clicking it or its ▾ button lists every zone, with the common US zones first. Typing filters by name, city, generic name ("Eastern"), abbreviation ("EST", either season) or offset ("UTC-5", either season). The common US zones also match big US cities that aren't IANA names ("Dallas") and "Arizona", "Alaska" and "Hawaii". Name matches are listed first, and the first match is highlighted, so Enter chooses it. The list opens over the content below it. Text that isn't chosen from the list is discarded on blur, so the form can no longer send a mistyped zone.
+  - The list comes from `Intl.supportedValuesOf('timeZone')`, plus `UTC`. Chrome lists 19 renamed zones by their old names (`Asia/Calcutta`, `Europe/Kiev`, `America/Indianapolis`, …). `RENAMED_TIME_ZONES` in `shared/time-zones.ts` maps them to the current names (when the browser resolves the current name), so every browser saves the same name. A saved zone that isn't in the list still shows, first.
   - The server is unchanged: `ArcRuleValidator` still accepts any zone `TimeZoneInfo` resolves.
 - **Lapse rule wording.** These are UI labels only. The enum and API values are unchanged.
   - The field is now "After the review period ends without a decision". It was "When the review period ends without a decision".
   - The options are now "Auto approve" (`DeemedApproved`), "Auto reject" (`DeemedDenied`) and "No automatic action" (`FlagOverdueOnly`), in that order. Spec 027 calls them "deemed approved", "deemed denied" and "flag overdue only".
-  - A helper under the field explains what each one does.
+  - A helper under the field explains what each one does, including the exception: under "Majority of votes cast (with a quorum)", a side that leads with a quorum at the due date decides instead.
   - The behavior is spec 027 FR-027, as before: `ArcSweepService` reaches the decision once the due date passes, and a Community Manager records it.
 
 **Shared frontend pieces you can reuse**
 
 - `ComboPickerComponent` has new opt-in inputs:
-  - `dropdown`: click or ▾ to list every option.
+  - `dropdown`: click or ▾ to list every option. The list is an overlay, and typing highlights the first match.
   - `helperFirst`: the helper goes above the field.
   - `inputId`: the field's id, for error-summary links.
   - `settingId`: sets `data-setting-id`, for settings search.
-- `PickerOption.keywords` holds search words that aren't shown.
-- The active option now scrolls into view as you arrow through a long list.
+- `PickerOption.keywords` holds search words that aren't shown. Label matches are listed before keyword-only matches.
+- In every mode, the active option now scrolls into view as you arrow through a long list, and a press anywhere in the open list (its padding or scrollbar) keeps focus in the field.
 - `timeZoneOptions(current)` in `shared/time-zones.ts` gives the time zone list.
 
 **Left open**

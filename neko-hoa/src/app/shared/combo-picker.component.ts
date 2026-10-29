@@ -23,8 +23,9 @@ let nextId = 1;
  * (case-insensitive, part of a word) and emits `queryChange` for server-side search; Up/Down move,
  * Enter chooses, Esc closes without changing the value; the match count is announced politely;
  * the chosen option reads "✓ Selected". With `noneLabel` a "none" row comes first.
- * With `dropdown`, clicking the field or its ▾ button lists every option, so it works as a
- * searchable dropdown.
+ * With `dropdown`, clicking the field or its ▾ button lists every option over the content below
+ * it, and typing highlights the first match so Enter chooses it: a searchable dropdown. Matches on
+ * the label come before matches on `keywords` only.
  * Used for the parent association (brief 03, 04), the people pickers (brief 05) and the time zone.
  */
 @Component({
@@ -45,21 +46,24 @@ let nextId = 1;
                   [attr.aria-expanded]="open()" [attr.aria-controls]="listId" [disabled]="disabled"
                   (mousedown)="$event.preventDefault()" (click)="toggle(input)"><span aria-hidden="true">▾</span></button>
         }
+        @if (open()) {
+          <!-- A press anywhere in the list (its padding, its scrollbar) keeps focus in the field. -->
+          <div class="cbp__popup" (mousedown)="$event.preventDefault()">
+            <ul class="cbp__list" role="listbox" [id]="listId" [attr.aria-label]="label">
+              @for (row of rows(); track row.key; let i = $index) {
+                <li role="option" class="cbp__option" [id]="optionId(i)" [class.cbp__option--active]="i === active()"
+                    [attr.aria-selected]="isSelected(row)" (click)="choose(row)">
+                  <span class="cbp__label">{{ row.label }}@if (row.detail) {<span class="cbp__detail">{{ row.detail }}</span>}</span>
+                  @if (row.chip) { <span class="sr-only">, </span><span class="pill">{{ row.chip }}</span> }
+                  @if (isSelected(row)) { <span class="sr-only">, </span><span class="cbp__selected">✓ Selected</span> }
+                </li>
+              }
+            </ul>
+            @if (query().trim() && matchCount() === 0) { <p class="muted cbp__empty">{{ noMatch() }}</p> }
+          </div>
+        }
       </div>
       <p class="sr-only" role="status" aria-live="polite">{{ announcement() }}</p>
-      @if (open()) {
-        <ul class="cbp__list" role="listbox" [id]="listId" [attr.aria-label]="label">
-          @for (row of rows(); track row.key; let i = $index) {
-            <li role="option" class="cbp__option" [id]="optionId(i)" [class.cbp__option--active]="i === active()"
-                [attr.aria-selected]="isSelected(row)" (mousedown)="$event.preventDefault()" (click)="choose(row)">
-              <span class="cbp__label">{{ row.label }}@if (row.detail) {<span class="cbp__detail">{{ row.detail }}</span>}</span>
-              @if (row.chip) { <span class="sr-only">, </span><span class="pill">{{ row.chip }}</span> }
-              @if (isSelected(row)) { <span class="sr-only">, </span><span class="cbp__selected">✓ Selected</span> }
-            </li>
-          }
-        </ul>
-        @if (query().trim() && matchCount() === 0) { <p class="muted cbp__empty">{{ noMatch() }}</p> }
-      }
       @if (helper && !helperFirst) { <p class="field-help" [id]="helpId">{{ helper }}</p> }
       @if (error) { <p class="field-error" [id]="errorId">{{ error }}</p> }
     </div>
@@ -73,6 +77,13 @@ let nextId = 1;
     }
     .cbp__toggle:hover:not(:disabled) { background: var(--lav); color: var(--ink); }
     .cbp__toggle:disabled { cursor: default; opacity: 0.5; }
+    /* A dropdown's list opens over the content below it, so closing it never moves a button the
+       pointer is on (a click on Save while the list is open would otherwise be lost). */
+    .cbp__control--dropdown .cbp__popup { position: absolute; top: 100%; left: 0; right: 0; z-index: 40; }
+    .cbp__control--dropdown .cbp__list { box-shadow: 0 6px 18px rgb(0 0 0 / 12%); }
+    .cbp__control--dropdown .cbp__empty {
+      margin-top: 4px; padding: 8px 10px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px;
+    }
     .cbp__list {
       list-style: none; margin-top: 4px; max-height: 240px; overflow-y: auto;
       border: 1.5px solid var(--ink); border-radius: 10px; background: var(--paper); padding: 4px;
@@ -131,8 +142,10 @@ export class ComboPickerComponent {
 
   readonly rows = computed<PickerRow[]>(() => {
     const q = this.query().trim().toLowerCase();
-    const options = this.all()
-      .filter(o => !q || o.label.toLowerCase().includes(q) || !!o.keywords?.toLowerCase().includes(q))
+    const onLabel = (o: PickerOption) => o.label.toLowerCase().includes(q);
+    const matches = q ? this.all().filter(o => onLabel(o) || !!o.keywords?.toLowerCase().includes(q)) : this.all();
+    // Label matches first ("UTC" before every zone whose offset reads "UTC-5"), each group in order.
+    const options = (q ? [...matches.filter(onLabel), ...matches.filter(o => !onLabel(o))] : matches)
       .map(o => ({ ...o, key: o.id, none: false }));
     return this.noneLabel ? [{ key: '', id: '', label: this.noneLabel, none: true }, ...options] : options;
   });
@@ -169,7 +182,10 @@ export class ComboPickerComponent {
     this.text.set(value);
     this.query.set(value);
     this.open.set(true);
-    this.active.set(-1);
+    // `dropdown`: the first match is highlighted, so Enter chooses it.
+    const first = this.dropdown && value.trim() ? this.rows().findIndex(r => !r.none) : -1;
+    if (first >= 0) this.setActive(first);
+    else this.active.set(-1);
     this.queryChange.emit(value.trim());
   }
 

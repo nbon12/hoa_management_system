@@ -199,9 +199,10 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       expect(field('Review period (days)').value).toBe('45');
       expect(screen.getByText("1 to 365. An application is due this many days after it's received. Company default: 30.")).toBeTruthy();
       expect(screen.getByText('0 to 30. 0 turns reminders off. Company default: 7.')).toBeTruthy();
-      expect(screen.getByText('No automatic action keeps the application open and marks it overdue. Auto approve and Auto reject reach that '
-        + 'decision once the due date passes; a Community Manager then records it, which emails the owner. Company default: No automatic action.')).toBeTruthy();
-      expect(screen.getByText("Search by city or name, such as Chicago or Eastern. Used for due dates and for the expiry times on this community's invitations. Company default: America/New_York.")).toBeTruthy();
+      expect(screen.getByText("If the board hasn't decided by the due date, Auto approve approves the application, Auto reject denies it, and No "
+        + 'automatic action keeps it open and marks it overdue. Under “Majority of votes cast (with a quorum)”, a side that leads with a quorum '
+        + 'at the due date decides instead. A Community Manager then records the decision, which emails the owner. Company default: No automatic action.')).toBeTruthy();
+      expect(screen.getByText("Search by city or name, such as Dallas, Eastern or EST. Used for due dates and for the expiry times on this community's invitations. Company default: America/New_York.")).toBeTruthy();
       expect(screen.queryByRole('button', { name: /Reset/ })).toBeNull();
       await until(() => document.activeElement === field('Review period (days)'));
     });
@@ -277,7 +278,7 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       fireEvent.input(tz, { target: { value: 'Mars/Olympus_Mons' } });
       await settle(r);
       // Shown under the field and announced.
-      expect(screen.getAllByText('No time zone matches “Mars/Olympus_Mons”. Try a city, such as Chicago, or a name, such as Eastern.').length).toBe(2);
+      expect(screen.getAllByText('No time zone matches “Mars/Olympus_Mons”. Try a city, such as Chicago, or a name, such as Eastern or EST.').length).toBe(2);
       expect(within(screen.getByRole('listbox', { name: 'Time zone' })).queryAllByRole('option').length).toBe(0);
 
       // Leaving without choosing puts the saved zone back; a save with another change sends it unchanged.
@@ -300,6 +301,50 @@ describe('ArchitecturalReviewSectionComponent (030 T130)', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save architectural review' }));
       await settle(r);
       expect(svc.putArcSettings.calls.mostRecent().args[1].timeZoneId).toBe('America/Chicago');
+    });
+
+    it('highlights the first match as you type, so Enter chooses it, and lists name matches first', async () => {
+      const r = await setup();
+      await edit(r);
+      const tz = timeZoneField();
+      fireEvent.click(tz);
+      fireEvent.input(tz, { target: { value: 'dallas' } });
+      await settle(r);
+      const first = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option')[0];
+      expect(first.textContent!.trim().startsWith('America/Chicago')).toBeTrue();
+      expect(tz.getAttribute('aria-activedescendant')).toBe(first.id);
+      fireEvent.keyDown(tz, { key: 'Enter' });
+      await settle(r);
+      expect(tz.value).toBe('America/Chicago');
+      expect(screen.queryByRole('listbox')).toBeNull();
+
+      // "UTC" is in every zone's offset; the zone named UTC still comes first.
+      fireEvent.click(tz);
+      fireEvent.input(tz, { target: { value: 'UTC' } });
+      await settle(r);
+      expect(within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option')[0].textContent!.trim().startsWith('UTC')).toBeTrue();
+      // US abbreviations work, whatever the season.
+      fireEvent.input(tz, { target: { value: 'EST' } });
+      await settle(r);
+      const est = within(screen.getByRole('listbox', { name: 'Time zone' })).getAllByRole('option').slice(0, 5);
+      expect(est.some(o => o.textContent!.trim().startsWith('America/New_York'))).withContext('EST lists New York near the top').toBeTrue();
+    });
+
+    it('opens the list over the form, so Save stays put, and a press in the list keeps focus in the field', async () => {
+      const r = await setup();
+      await edit(r);
+      const save = screen.getByRole('button', { name: 'Save architectural review' });
+      // Measured against the form: opening the list focuses the field, which may scroll the page.
+      const offset = () => save.getBoundingClientRect().top - save.closest('form')!.getBoundingClientRect().top;
+      const before = offset();
+      fireEvent.click(timeZoneField());
+      await settle(r);
+      const listbox = screen.getByRole('listbox', { name: 'Time zone' });
+      expect(getComputedStyle(listbox.parentElement!).position).toBe('absolute');
+      expect(offset()).toBe(before);
+      const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+      listbox.dispatchEvent(press);
+      expect(press.defaultPrevented).withContext('a press on the list or its scrollbar does not blur the field').toBeTrue();
     });
 
     it('opens and closes the time zone list with its ▾ button, and keeps an unlisted saved zone', async () => {

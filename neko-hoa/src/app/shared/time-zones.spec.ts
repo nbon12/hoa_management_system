@@ -17,12 +17,8 @@ describe('time zone options', () => {
 
   it('shows the IANA name, with the generic name and the offset under it', () => {
     const winter = new Date('2026-01-15T12:00:00Z');
-    expect(timeZoneOption('America/New_York', winter)).toEqual({
-      id: 'America/New_York',
-      label: 'America/New_York',
-      detail: 'Eastern Time · UTC-5',
-      keywords: 'America New York Eastern Time UTC-5',
-    });
+    const ny = timeZoneOption('America/New_York', winter);
+    expect([ny.id, ny.label, ny.detail]).toEqual(['America/New_York', 'America/New_York', 'Eastern Time · UTC-5']);
     expect(timeZoneOption('America/New_York', new Date('2026-07-15T12:00:00Z')).detail).toBe('Eastern Time · UTC-4');
     expect(timeZoneOption('Asia/Kolkata', winter).detail).toBe('India Standard Time · UTC+5:30');
     expect(timeZoneOption('UTC', winter).detail).toBe('Coordinated Universal Time · UTC+0');
@@ -39,6 +35,22 @@ describe('time zone options', () => {
     expect(india.keywords).toContain('India Standard Time');
   });
 
+  it('matches both seasons\' offsets and abbreviations, whatever the date, and big US cities', () => {
+    for (const when of [new Date('2026-01-15T12:00:00Z'), new Date('2026-07-15T12:00:00Z')]) {
+      const ny = timeZoneOption('America/New_York', when).keywords!;
+      for (const word of ['America New York', 'Eastern Time', 'UTC-5', 'UTC-4', 'EST', 'EDT', 'Boston', 'Atlanta']) {
+        expect(ny).withContext(`${when.toISOString()} ${word}`).toContain(word);
+      }
+    }
+    expect(timeZoneOption('America/Chicago').keywords).toContain('Dallas');
+    expect(timeZoneOption('America/Chicago').keywords).toContain('CST');
+    expect(timeZoneOption('America/Los_Angeles').keywords).toContain('PST');
+    expect(timeZoneOption('America/Phoenix').keywords).toContain('Arizona');
+    expect(timeZoneOption('Pacific/Honolulu').keywords).toContain('Hawaii');
+    // Abbreviations that are only an offset ("GMT+1") aren't repeated.
+    expect(timeZoneOption('Europe/Berlin').keywords).not.toContain('GMT');
+  });
+
   it('keeps a saved zone the browser does not list, first, so the field still shows it', () => {
     const options = timeZoneOptions('US/Eastern');
     expect(options[0].id).toBe('US/Eastern');
@@ -51,5 +63,11 @@ describe('time zone options', () => {
     expect(timeZoneOption('Mars/Olympus_Mons')).toEqual({
       id: 'Mars/Olympus_Mons', label: 'Mars/Olympus_Mons', detail: null, keywords: 'Mars Olympus Mons',
     });
+  });
+
+  it('offers only zones this browser resolves', () => {
+    for (const o of timeZoneOptions()) {
+      expect(() => new Intl.DateTimeFormat('en-US', { timeZone: o.id })).withContext(o.id).not.toThrow();
+    }
   });
 });

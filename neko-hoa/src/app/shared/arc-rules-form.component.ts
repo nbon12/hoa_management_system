@@ -43,35 +43,35 @@ type Errors = Partial<Record<ArcRuleField, string>>;
                                 [options]="timeZones" [value]="draft().timeZoneId || null" (valueChange)="set(f, $event ?? '')"
                                 [error]="errors()[f] ?? null" [disabled]="busy" [noMatchMessage]="noTimeZoneMatch" />
             } @else {
-            <label class="field-label" [for]="fieldId(f)">{{ labels[f] }}</label>
-            @if (helper(f); as h) { <p class="field-help" [id]="fieldId(f) + '-help'">{{ h }}</p> }
-            @switch (f) {
-              @case ('lapseRule') {
-                <select class="field" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]" [attr.aria-describedby]="describedBy(f)"
-                        [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy" (change)="set(f, $any($event.target).value)">
-                  @for (o of lapseOptions; track o.value) { <option [value]="o.value" [selected]="draft().lapseRule === o.value">{{ o.label }}</option> }
-                </select>
+              <label class="field-label" [for]="fieldId(f)">{{ labels[f] }}</label>
+              @if (helper(f); as h) { <p class="field-help" [id]="fieldId(f) + '-help'">{{ h }}</p> }
+              @switch (f) {
+                @case ('lapseRule') {
+                  <select class="field" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]" [attr.aria-describedby]="describedBy(f)"
+                          [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy" (change)="set(f, $any($event.target).value)">
+                    @for (o of lapseOptions; track o.value) { <option [value]="o.value" [selected]="draft().lapseRule === o.value">{{ o.label }}</option> }
+                  </select>
+                }
+                @case ('decisionRule') {
+                  <select class="field" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]" [attr.aria-describedby]="describedBy(f)"
+                          [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy" (change)="set(f, $any($event.target).value)">
+                    @for (o of decisionOptions; track o.value) { <option [value]="o.value" [selected]="draft().decisionRule === o.value">{{ o.label }}</option> }
+                  </select>
+                }
+                @case ('formalDisapprovalStatement') {
+                  <textarea class="field" rows="4" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]" [attr.aria-describedby]="describedBy(f)"
+                            [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy" [value]="draft().formalDisapprovalStatement"
+                            (input)="set(f, $any($event.target).value)"></textarea>
+                  <p class="field-help" [id]="fieldId(f) + '-count'"><span aria-hidden="true">{{ countText() }} / 1,000</span><span class="sr-only">{{ countText() }} of 1,000 characters used</span></p>
+                  <p class="sr-only" role="status" aria-live="polite">{{ overLimit() ? 'The statement is over 1,000 characters.' : '' }}</p>
+                }
+                @default {
+                  <input class="field" type="number" inputmode="numeric" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]"
+                         [attr.aria-describedby]="describedBy(f)" [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy"
+                         [value]="draft()[f]" (input)="set(f, $any($event.target).value)" />
+                }
               }
-              @case ('decisionRule') {
-                <select class="field" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]" [attr.aria-describedby]="describedBy(f)"
-                        [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy" (change)="set(f, $any($event.target).value)">
-                  @for (o of decisionOptions; track o.value) { <option [value]="o.value" [selected]="draft().decisionRule === o.value">{{ o.label }}</option> }
-                </select>
-              }
-              @case ('formalDisapprovalStatement') {
-                <textarea class="field" rows="4" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]" [attr.aria-describedby]="describedBy(f)"
-                          [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy" [value]="draft().formalDisapprovalStatement"
-                          (input)="set(f, $any($event.target).value)"></textarea>
-                <p class="field-help" [id]="fieldId(f) + '-count'"><span aria-hidden="true">{{ countText() }} / 1,000</span><span class="sr-only">{{ countText() }} of 1,000 characters used</span></p>
-                <p class="sr-only" role="status" aria-live="polite">{{ overLimit() ? 'The statement is over 1,000 characters.' : '' }}</p>
-              }
-              @default {
-                <input class="field" type="number" inputmode="numeric" [id]="fieldId(f)" [attr.data-setting-id]="settingIds[f]"
-                       [attr.aria-describedby]="describedBy(f)" [attr.aria-invalid]="errors()[f] ? 'true' : null" [disabled]="busy"
-                       [value]="draft()[f]" (input)="set(f, $any($event.target).value)" />
-              }
-            }
-            @if (errors()[f]) { <p class="field-error" [id]="fieldId(f) + '-error'">{{ errors()[f] }}</p> }
+              @if (errors()[f]) { <p class="field-error" [id]="fieldId(f) + '-error'">{{ errors()[f] }}</p> }
             }
           </div>
         }
@@ -113,7 +113,7 @@ export class ArcRulesFormComponent implements OnInit, AfterViewInit {
   readonly lapseOptions = LAPSE_RULE_OPTIONS;
   readonly decisionOptions = DECISION_RULE_OPTIONS;
   readonly timeZoneNoun: [string, string] = ['time zone', 'time zones'];
-  readonly noTimeZoneMatch = (q: string): string => `No time zone matches “${q}”. Try a city, such as Chicago, or a name, such as Eastern.`;
+  readonly noTimeZoneMatch = (q: string): string => `No time zone matches “${q}”. Try a city, such as Chicago, or a name, such as Eastern or EST.`;
   /** Set once the saved value is known, so a zone the browser doesn't list still shows. */
   timeZones: PickerOption[] = [];
 
@@ -147,13 +147,14 @@ export class ArcRulesFormComponent implements OnInit, AfterViewInit {
       case 'reviewPeriodDays': return `1 to 365. An application is due this many days after it's received.${suffix}`;
       case 'reminderDays': return `0 to 30. 0 turns reminders off.${suffix}`;
       case 'lapseRule':
-        return 'No automatic action keeps the application open and marks it overdue. Auto approve and Auto reject reach that '
-          + `decision once the due date passes; a Community Manager then records it, which emails the owner.${suffix}`;
+        return "If the board hasn't decided by the due date, Auto approve approves the application, Auto reject denies it, and No "
+          + 'automatic action keeps it open and marks it overdue. Under “Majority of votes cast (with a quorum)”, a side that leads '
+          + `with a quorum at the due date decides instead. A Community Manager then records the decision, which emails the owner.${suffix}`;
       case 'decisionRule': return `With a quorum, more than half of the eligible board members must vote.${suffix}`;
       case 'timeZoneId':
         return this.variant === 'defaults'
-          ? 'Search by city or name, such as Chicago or Eastern. New communities start with it. Company Administrator invitations show their expiry time in it.'
-          : `Search by city or name, such as Chicago or Eastern. Used for due dates and for the expiry times on this community's invitations.${suffix}`;
+          ? 'Search by city or name, such as Dallas, Eastern or EST. New communities start with it. Company Administrator invitations show their expiry time in it.'
+          : `Search by city or name, such as Dallas, Eastern or EST. Used for due dates and for the expiry times on this community's invitations.${suffix}`;
       case 'formalDisapprovalStatement':
         return this.variant === 'defaults'
           ? 'Up to 1,000 characters.'
