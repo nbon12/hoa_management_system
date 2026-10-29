@@ -3,10 +3,11 @@
 # A killed `tofu apply` never releases gs://<bucket>/state/pr/<n>/default.tflock, and every later apply or
 # destroy for that PR then fails on it until someone removes it by hand.
 #
-# Callers, each right before its `tofu apply` / `tofu destroy`:
-#   pr-env.yml, pr-env-teardown.yml  The pr-env-<n> concurrency group already excludes a live pr-env,
-#                                    teardown or pr-env-repair run for this PR. The age floor protects a
-#                                    live sweep destroy, which runs outside that group.
+# Callers, each right before `tofu init` (with no default.tfstate, init itself needs the lock):
+#   pr-env-tofu-init action          Used by pr-env.yml and pr-env-teardown.yml. The pr-env-<n>
+#                                    concurrency group already excludes a live pr-env, teardown or
+#                                    pr-env-repair run for this PR. The age floor protects a live sweep
+#                                    destroy, which runs outside that group.
 #   pr-env-sweep.yml                 CHECK_LIVE_RUNS=true: outside the group, so it also keeps the lock
 #                                    while any pr-env, teardown or repair run (for any PR) is unfinished.
 #

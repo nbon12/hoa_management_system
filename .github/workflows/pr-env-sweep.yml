@@ -121,10 +121,12 @@ jobs:
 
             # A lock left by a killed run is past the 45-min floor by now; the sweep runs outside the
             # pr-env-<n> group, so it also keeps the lock while any pr-env, teardown or repair run is live.
+            # The lock is cleared BEFORE init: with no default.tfstate beside it, init takes the lock to
+            # write an empty state and fails with a 412 on a stale one (the #234 A6 test).
             # The state is deleted only after a successful destroy, so a failed one is retried tomorrow.
             if ( cd infra/environments/pr \
-                 && tofu init -input=false -reconfigure -backend-config="prefix=state/pr/${n}" \
                  && PR_NUMBER="$n" CHECK_LIVE_RUNS=true ../../../scripts/pr-env-clear-stale-lock.sh \
+                 && tofu init -input=false -reconfigure -lock-timeout=5m -backend-config="prefix=state/pr/${n}" \
                  && TF_VAR_pr_number="$n" TF_VAR_head_sha="sweep" tofu destroy -input=false -auto-approve -lock-timeout=5m ); then
               gcloud storage rm --recursive "gs://nekohoa-dev-tfstate/state/pr/${n}" || true
             else
