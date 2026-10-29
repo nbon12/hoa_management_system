@@ -19,6 +19,54 @@ not confirmed against the live service or the provider's documentation.
 
 ---
 
+## Status and decisions (2026-10-29)
+
+Read this first. The plan below is the original 2026-10-26 design. Where they differ, this section wins.
+Run ids and names are on #234.
+
+**Done**
+- PR #217's orphans (and PR #74's, found by the name audit) were reaped through `pr-env-repair`, approved
+  in `ops`. GCP, Cloudflare and Stripe show zero residue; Neon is unverified (no read-only key).
+- #235 (A2: `pr-env-repair`, `pr-env-reap.sh`, `cancel-in-progress: false`) and #240 (A5: stale-lock
+  clearing, reap before apply, keep state after a failed destroy, sweep fixes and the daily name audit)
+  are merged. The #240 double-push test passed, and its teardown left zero residue.
+- Tier 1 identities: `nekohoa-agent-ro-dev`, used through WIF on the `main` subject only (not the repo-wide
+  principalSet below), the Cloudflare and Stripe `claude-agent-ro` tokens as repo secrets, and the `ops`
+  Environment.
+
+**Decisions**
+1. **No Tier 1 GCP key (O3 declined; O8 not needed).** A static SA key breaks 016 FR-004, and nothing
+   needs one. `diagnose` and `verify` already run as the read-only SA through WIF. Local sessions read
+   logs with the operator's own `gcloud`, with consent. The cost is that a cloud session cannot read Cloud
+   Logging. Do not route logs through Actions instead: this repo's Actions logs are public. Revisit only
+   if cloud sessions need log access.
+2. **No credentials in any session (A1 moved into the workflow).** Tier 1 credentials live only in repo
+   secrets, used by `pr-env-repair`'s unapproved diagnose job. `action=verify` (`scripts/pr-env-verify-ro.sh`)
+   runs Verification 1-3 and 5-7 there. Verification 4 (Tier 2) and 9 (OpenTofu in the cloud VM) do not
+   apply. Because no secret enters a VM, O6a no longer gates this work.
+3. **No Tier 2 break-glass identities.** `nekohoa-agent-repair-dev`, its delete roles, and the Cloudflare and
+   Stripe repair tokens are not created. Repair is the approved `repair` job, running as CI's deployer. O13
+   applies only if Tier 2 is ever created.
+4. **The `nekohoa-ops` cloud environment (O7, O10) is optional.** It holds no credentials. A cloud session
+   only needs to be able to dispatch `pr-env-repair`. What is still open is the cloud half of
+   Verification 8: a cloud session must be refused when it tries to approve its own `ops` run.
+5. **The self-approval gap is accepted for local sessions.** A local session uses the operator's `gh`
+   login, so GitHub would accept its approval (`current_user_can_approve: true`). The gate relies on the
+   session never sending one, which is the same trust as any tool run under the operator's login. If a
+   cloud session can approve, give sessions their own GitHub identity and turn on "Prevent self-review".
+6. **No Tier 1 Neon key for now (O6, operator, 2026-10-27).** `diagnose` and `verify` report Neon as "not
+   checked". The daily sweep's name audit, using CI's key, covers Neon orphans fleet-wide.
+
+**Open**
+- A6, last part: show that the sweep clears a lock older than 45 minutes. The test is running on
+  2026-10-29.
+- O14: rehearse one rotation, of the Cloudflare `claude-agent-ro` token (operator, in the dashboard).
+- The cloud half of Verification 8 (decision 4): an operator starts one cloud session.
+- A5a / #238 (`infra-apply` 409) and #242 (images from Artifact Registry; Cloud Run gets 429s from
+  `mirror.gcr.io`) are open. #241 (`lock-merged-branch`) needs the `BRANCH_LOCK_TOKEN` secret.
+
+---
+
 ## TL;DR
 
 - **What broke.** `pr-env` run [40333522843] was cancelled by a new push while `tofu apply` was
@@ -1323,57 +1371,57 @@ secret is attached.
 
 ### Operator (human), in order
 
-- [ ] **O1.** Review and merge the PR that adds this file.
-- [ ] **O2.** Do Step 0 for PR #217 from a workstation now, or wait for O9 + A2 and let `pr-env-repair`
+- [x] **O1.** Review and merge the PR that adds this file.
+- [x] **O2.** Do Step 0 for PR #217 from a workstation now, or wait for O9 + A2 and let `pr-env-repair`
       do it. Either way, record the result on the tracking issue (ids only).
-- [ ] **O3.** Decide on the Tier 1 GCP key. If yes, record it as accepted risk under 016 FR-004 with
+- [x] **O3.** (Declined 2026-10-29; see Status and decisions.) Decide on the Tier 1 GCP key. If yes, record it as accepted risk under 016 FR-004 with
       the controls listed above. Precondition: O6a.
-- [ ] **O4.** Create the four GCP custom roles, `nekohoa-agent-ro-dev` (with its WIF binding for
+- [x] **O4.** (Read-only half done; Tier 2 dropped, decision 3.) Create the four GCP custom roles, `nekohoa-agent-ro-dev` (with its WIF binding for
       `diagnose`) and `nekohoa-agent-repair-dev` (commands above). Leave the repair SA disabled.
-- [ ] **O5.** Create the Cloudflare `claude-agent-ro` token (R2 Read, Pages Read, 90-day TTL) and the
+- [x] **O5.** Create the Cloudflare `claude-agent-ro` token (R2 Read, Pages Read, 90-day TTL) and the
       Stripe test `claude-agent-ro` restricted key (Webhook Endpoints Read).
-- [ ] **O6.** Neon: try the Collaborator + project Viewer member route. If it works, create its
+- [x] **O6.** (No Tier 1 Neon for now, 2026-10-27.) Neon: try the Collaborator + project Viewer member route. If it works, create its
       personal key. If not, note "no Tier 1 Neon" on the issue.
-- [ ] **O6a.** Gate for every credential stored as an environment variable (including
+- [x] **O6a.** (No longer gates this work: no credential enters a session, decision 2.) Gate for every credential stored as an environment variable (including
       `GCP_AGENT_RO_SA_KEY_JSON` and every Tier 2 token): 016-F T026/T027 (issue #99, draft PR #105)
       and the `.claude/**` write-deny rule (FR-F5/F6) are merged. Before the gate, O7 may add only
       Network secrets (never in the VM) and the non-secret `CLOUDFLARE_ACCOUNT_ID`.
-- [ ] **O7.** Create the cloud environment `nekohoa-ops` with New environment: Tier 1 credentials
+- [ ] **O7.** (Optional, and with no credentials: decision 4.) Create the cloud environment `nekohoa-ops` with New environment: Tier 1 credentials
       (subject to O6a), the four allowed domains, and the setup script. Confirm the dependency
       routine does not use it.
-- [ ] **O8.** If O3 is yes and O6a holds, create the Tier 1 GCP key and add it as
+- [x] **O8.** (Not needed: O3 declined.) If O3 is yes and O6a holds, create the Tier 1 GCP key and add it as
       `GCP_AGENT_RO_SA_KEY_JSON`.
-- [ ] **O9.** Create the GitHub Environment `ops`: the operator as required reviewer, deployment
+- [x] **O9.** Create the GitHub Environment `ops`: the operator as required reviewer, deployment
       branches `main` only. Add the read-only tokens from O5 and O6 as repo Actions secrets
       `CLOUDFLARE_AGENT_RO_API_TOKEN`, `STRIPE_AGENT_RO_KEY_TEST` and `NEON_AGENT_RO_API_KEY` for
       `diagnose` (or separate tokens of the same scope).
-- [ ] **O9a.** Review and merge the A2 PR (`pr-env-repair.yml`, `pr-env-reap.sh`, Root-cause item 1).
-- [ ] **O10.** Start a new session in `nekohoa-ops` pointed at this file.
-- [ ] **O11.** Approve the `pr-env-repair` runs the session asks for, after reading their dry-run
+- [x] **O9a.** Review and merge the A2 PR (`pr-env-repair.yml`, `pr-env-reap.sh`, Root-cause item 1).
+- [ ] **O10.** (Any cloud session will do: it runs the cloud half of Verification 8.) Start a new session in `nekohoa-ops` pointed at this file.
+- [x] **O11.** Approve the `pr-env-repair` runs the session asks for, after reading their dry-run
       output, and approve or reject waiting runs promptly (they block `pr-env` for that PR).
-- [ ] **O12.** Review and merge the A5 PR (Root-cause fixes 2-7).
-- [ ] **O13.** After any incident that used Tier 2: the break-glass close-out in Step 0.7 (disable
+- [x] **O12.** Review and merge the A5 PR (Root-cause fixes 2-7).
+- [x] **O13.** (Not applicable: no Tier 2, decision 3.) After any incident that used Tier 2: the break-glass close-out in Step 0.7 (disable
       the repair SA, remove per-orphan bindings, revoke the Tier 2 tokens, remove them from
       `nekohoa-ops`), with ids on the issue.
 - [ ] **O14.** Rehearse one Tier 1 rotation using Security notes → Rotation.
 
 ### Agent session, in order
 
-- [ ] **A1.** Run the Tier 1 checks (Verification 1-3, 5-7 and 9) and post pass/fail per line on the
+- [ ] **A1.** (Now `pr-env-repair` `action=verify`; see Status and decisions.) Run the Tier 1 checks (Verification 1-3, 5-7 and 9) and post pass/fail per line on the
       tracking issue. Run step 4 only while a Tier 2 token is present. Step 8 runs in A3.
-- [ ] **A2.** On a new branch off `main`, add `.github/workflows/pr-env-repair.yml` and
+- [x] **A2.** On a new branch off `main`, add `.github/workflows/pr-env-repair.yml` and
       `scripts/pr-env-reap.sh` as specified (SHA-pinned, step-scoped secrets, env-passed inputs,
       names-only output), together with Root-cause item 1, its prerequisite. Open a PR and watch its
       CI; this is code, not docs.
-- [ ] **A3.** After O9a and O9: run Verification 8 and post the result. Then follow "How a session
+- [x] **A3.** After O9a and O9: run Verification 8 and post the result. Then follow "How a session
       uses it" step 0, dispatch `pr-env-repair` `diagnose` for 217, then `reap` with
       `dry_run=true` (its `diagnose` job prints the planned deletions; nothing waits for approval).
       Post the planned deletions on the issue. Then dispatch `dry_run=false` and ask the operator to
       approve it.
-- [ ] **A4.** Run Step 0.6 (zero residue for 217) and the fleet-wide audit with Tier 1
+- [x] **A4.** Run Step 0.6 (zero residue for 217) and the fleet-wide audit with Tier 1
       (`use_tier1`); with no Tier 1 Neon credential, take the Neon rows from `diagnose`. Report any
       other orphan PR numbers. Reap them only on the operator's explicit request.
-- [ ] **A5.** On another branch off `main`, implement Root-cause fixes 2-7 and the sweep and
+- [x] **A5.** On another branch off `main`, implement Root-cause fixes 2-7 and the sweep and
       `infra-apply` changes from Ops workflows. Update `contracts/workflows.md:12` and
       `research.md:134` in 013.
 - [ ] **A5a.** On another branch off `main`, fix the `infra-apply` 409 (Root-cause item 9). Confirm
@@ -1436,7 +1484,9 @@ Revocation:
 | Cloud environment | delete the Network secret or variable from `nekohoa-ops`. A Network secret stops at deletion; a running session keeps an old variable until its VM is next restored or rebuilt. Revoking at the provider first is what makes revocation immediate. |
 
 Rotation (create the new credential first, verify it, then remove the old one; a Network secret is
-changed by deleting it and adding it again):
+changed by deleting it and adding it again). Under decision 2 of "Status and decisions", the only place a
+Tier 1 credential lives is its repo secret. "Verification N" then means dispatching `pr-env-repair` with
+`action=verify` from `main`.
 
 | Credential | Rotate |
 |------------|--------|

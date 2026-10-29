@@ -179,7 +179,7 @@ describe('CommunitySettingsService (030 contracts/community-settings.md)', () =>
     expect((await d).removed).toBeTrue();
   });
 
-  it('getArcSettings(), putArcSettings() (six fields only) and resetArc() use /architectural-settings', async () => {
+  it('getArcSettings(), putArcSettings() (six fields only, answered with the GET body) and resetArc() use /architectural-settings', async () => {
     const g = svc.getArcSettings(C);
     http.expectOne(`${URL}/architectural-settings`).flush({ ...RULES, companyDefaults: RULES, differsFromDefaults: [], canEdit: true });
     expect((await g).canEdit).toBeTrue();
@@ -188,8 +188,8 @@ describe('CommunitySettingsService (030 contracts/community-settings.md)', () =>
     const req = http.expectOne(`${URL}/architectural-settings`);
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual(RULES);
-    req.flush({ ...RULES });
-    await p;
+    req.flush({ ...RULES, reviewPeriodDays: 45, companyDefaults: RULES, differsFromDefaults: ['reviewPeriodDays'], canEdit: true });
+    expect((await p).differsFromDefaults).toEqual(['reviewPeriodDays']);
 
     const r = svc.resetArc(C);
     const rr = http.expectOne(`${URL}/architectural-settings/reset`);
