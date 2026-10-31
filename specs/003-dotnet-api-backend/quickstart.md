@@ -10,8 +10,8 @@
 ## First-Time Setup
 
 ```bash
-# 1. Clone and enter the repo
-cd HOAManagementCompany
+# 1. Clone and enter the repo (docker-compose.yaml and the solution are at the repo root)
+cd hoa_management_system
 
 # 2. Start infrastructure (PostgreSQL + MinIO)
 docker compose up -d

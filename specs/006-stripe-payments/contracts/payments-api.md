@@ -3,10 +3,10 @@
 **Feature**: 006-stripe-payments | **Date**: 2026-06-06
 **Base path**: Paths below are shown relative to `/payments/`; the deployed prefix is
 `/api/v1` (FastEndpoints `RoutePrefix`), so the real path is e.g. `/api/v1/payments/intent`.
-**Auth**: All endpoints require a valid JWT (`Authorization: Bearer <token>`) and a `propertyId` claim — **except** the webhook endpoint (Stripe signature) and the `/payments/jobs/*` endpoints (Cloud Scheduler OIDC / shared secret).
-**Error shape**: `{ "code": "string", "message": "string" }` (existing convention)
+**Auth**: All endpoints require a valid JWT (`Authorization: Bearer <token>`) and a `propertyId` claim — **except** the webhook endpoint (Stripe signature) and the `/payments/jobs/*` endpoints (`X-Scheduler-Secret` header). *Superseded in part by specs/030-company-administration (FR-024g, FR-012a):* the `propertyId` claim only selects the home. Every resident endpoint re-checks the caller's resident link and the community's status on each request: no link → `403 PROPERTY_ACCESS_DENIED`; Onboarding community → `409 COMMUNITY_NOT_ACTIVE`; Archived community → `409 COMMUNITY_ARCHIVED`, except reads of the ledger, statements, receipts and transactions.
+**Error shape**: `{ "code": "string", "message": "string" }` (existing convention). Request-validation failures return `422` with `{ "code": "VALIDATION_ERROR", "message": "…", "errors": [{ "field", "message" }] }`. An unhandled Stripe API error returns `500` (global exception handler).
 **Timestamps**: UTC, ISO 8601
-**Idempotency**: `POST /payments/intent`, `/payments/one-time/confirm`, and `/payments/setup-intent` accept an `Idempotency-Key` header (FR-007a). A repeated key returns the original result and is forwarded to Stripe; keys are persisted durably (survive restarts, FR-035).
+**Idempotency**: `POST /payments/intent` and `/payments/one-time/confirm` accept an `Idempotency-Key` header (FR-007a); `POST /payments/recurring/setup-intent` does not. A repeated key returns the original result and is forwarded to Stripe; keys are persisted durably (survive restarts, FR-035).
 **Fee fields**: money responses split `baseAmount`/`gross` and `fee` as distinct fields (FR-004b); never a single combined total only.
 
 ---
@@ -25,7 +25,11 @@ Returns the data needed to populate the one-time payment amount presets.
   "nextAssessment": 35.00,
   "nextAssessmentDueDate": "2026-07-01",
   "creditBalance": 0.00,
-  "fee": { "cardFeeType": "Percentage", "cardFeeValue": 0.03, "cardScope": "CreditOnly", "achFee": 0.00 }
+  "cardFeeType": "Percentage",
+  "cardFeeValue": 0.03,
+  "cardScope": "CreditOnly",
+  "surchargingEnabled": true,
+  "achFeeValue": 0.00
 }
 ```
 
@@ -33,9 +37,9 @@ Returns the data needed to populate the one-time payment amount presets.
 |-------|------|-------|
 | `currentBalance` | decimal | Recomputed from append-only ledger (ordered by `Sequence`) |
 | `nextAssessment` | decimal | `Property.MonthlyAssessment` |
-| `nextAssessmentDueDate` | string (date) | First day of next month |
+| `nextAssessmentDueDate` | string (date) or null | Next occurrence of `Property.AssessmentDueDay` (null when unset) |
 | `creditBalance` | decimal | On-account credit from any overpayment (FR-007c), 0 if none |
-| `fee` | object | Per-HOA fee model from `HoaPaymentConfig` (FR-004b): `cardFeeType` (Flat\|Percentage), `cardFeeValue`, `cardScope` (AllCards\|CreditOnly), `achFee`. Final fee still computed server-side at intent time (depends on card funding). |
+| `cardFeeType`, `cardFeeValue`, `cardScope`, `surchargingEnabled`, `achFeeValue` | flat fields | Per-HOA fee model from `HoaPaymentConfig` (FR-004b): `cardFeeType` (Flat\|Percentage), `cardScope` (AllCards\|CreditOnly). Final fee still computed server-side at intent time (depends on card funding). |
 
 ---
 
@@ -49,35 +53,34 @@ Creates a Stripe `PaymentIntent` for a one-time payment. Returns the `clientSecr
 **Request**:
 ```json
 {
-  "amountCents": 12895,
-  "paymentMethodType": "card"
+  "amount": 128.95,
+  "method": "card"
 }
 ```
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `amountCents` | int | Yes | Base amount in cents (before surcharge); must be > 0 |
-| `paymentMethodType` | string | Yes | `"card"` or `"ach"` |
+| `amount` | decimal | Yes | Base amount in dollars (before fee); must be > 0 |
+| `method` | string | Yes | `"card"` or `"ach"` (lower-case) |
 
 **Validation**:
-- `amountCents` > 0
-- `paymentMethodType` in `["card", "ach"]`
+- `amount` > 0
+- `method` in `["card", "ach"]`
 
 **Response 200**:
 ```json
 {
-  "clientSecret": "pi_abc_secret_xyz",
   "paymentIntentId": "pi_abc",
-  "baseAmount": 128.95,
+  "clientSecret": "pi_abc_secret_xyz",
+  "amount": 128.95,
   "fee": 3.87,
-  "total": 132.82,
-  "currency": "usd"
+  "total": 132.82
 }
 ```
 
 **Errors**:
-- `400` — validation failure
-- `502` — Stripe API unreachable
+- `422` — validation failure
+- `500` — Stripe API error
 
 ---
 
@@ -99,12 +102,12 @@ Called by the frontend after `stripe.confirmPayment()` resolves (redirect or ret
 {
   "transactionId": "uuid",
   "status": "Succeeded",
-  "maskedMethod": "Visa •• 4242",
-  "baseAmount": 128.95,
-  "fee": 3.87,
+  "grossAmount": 128.95,
+  "feeAmount": 3.87,
   "total": 132.82,
-  "confirmation": "CONF-A1B2C3D4",
-  "processedAt": "2026-06-06T14:23:00Z"
+  "maskedMethod": "Visa •• 4242",
+  "confirmationNumber": "CONF-A1B2C3D4E5",
+  "receiptId": "uuid"
 }
 ```
 
@@ -113,23 +116,24 @@ Called by the frontend after `stripe.confirmPayment()` resolves (redirect or ret
 {
   "transactionId": "uuid",
   "status": "Pending",
-  "maskedMethod": "Chase •• 6789",
-  "baseAmount": 35.00,
-  "fee": 0.00,
+  "grossAmount": 35.00,
+  "feeAmount": 0.00,
   "total": 35.00,
-  "confirmation": "CONF-E5F6G7H8",
-  "processedAt": "2026-06-06T14:25:00Z"
+  "maskedMethod": "Chase •• 6789",
+  "confirmationNumber": null,
+  "receiptId": null
 }
 ```
 
 **Errors**:
-- `400` — `paymentIntentId` missing or does not belong to this property
+- `422` — `paymentIntentId` missing (validation)
+- `403` — the PaymentIntent's `propertyId` metadata is not the caller's property
 - `422` — PaymentIntent in Failed status (returns failure details)
-- `502` — Stripe API unreachable
+- `500` — Stripe API error
 
 ---
 
-## POST /payments/setup-intent
+## POST /payments/recurring/setup-intent
 
 Creates a Stripe `SetupIntent` to vault a payment method for recurring auto-pay. Creates (or reuses) a Stripe Customer for the resident.
 
@@ -140,14 +144,17 @@ Creates a Stripe `SetupIntent` to vault a payment method for recurring auto-pay.
 **Response 200**:
 ```json
 {
-  "clientSecret": "seti_abc_secret_xyz",
   "setupIntentId": "seti_abc",
-  "stripeCustomerId": "cus_xyz"
+  "clientSecret": "seti_abc_secret_xyz",
+  "publishableKey": "pk_test_..."
 }
 ```
 
+**Rate limit**: `payments` policy
+
 **Errors**:
-- `502` — Stripe API unreachable
+- `404` — no owner record for the property
+- `500` — Stripe API error
 
 ---
 
@@ -161,30 +168,26 @@ Returns the current auto-pay configuration for the resident's property.
 ```json
 {
   "id": "uuid",
-  "isEnabled": true,
   "amountType": "Assessment",
   "fixedAmount": null,
-  "paymentMethodType": "Ach",
+  "method": "Ach",
   "draftDay": 15,
-  "maskedMethod": "Chase •• 6789 · ACH · no fee",
+  "status": "active",
+  "maskedMethod": "Bank ····6789",
   "nextDraftDate": "2026-07-15",
   "nextDraftAmount": 35.00,
   "mandateAcceptedAt": "2026-06-06T14:30:00Z",
-  "processingFee": 0.00,
-  "updatedAt": "2026-06-06T14:30:00Z"
+  "processingFee": 0.00
 }
 ```
 
-**Response 200** (no auto-pay):
-```json
-null
-```
+**Response 204** (no active auto-pay): no body.
 
 ---
 
 ## PUT /payments/recurring
 
-Creates or updates auto-pay configuration. Stores vaulted payment method reference. Never stores raw or masked card/bank data.
+Creates or updates auto-pay configuration. Stores the vaulted payment method reference plus Stripe-provided display detail (card brand, last 4, card funding). Never stores raw or self-masked card/bank numbers (amended 2026-10-31 to match PR #19).
 
 **Auth**: Required  
 **Rate limit**: `payments` policy
@@ -192,33 +195,37 @@ Creates or updates auto-pay configuration. Stores vaulted payment method referen
 **Request**:
 ```json
 {
-  "paymentMethodId": "pm_stripe_id",
-  "draftDay": 15,
-  "amountType": "Assessment",
+  "amountType": "assessment",
   "fixedAmount": null,
-  "mandateAccepted": true
+  "draftDay": 15,
+  "setupIntentId": "seti_abc",
+  "mandateAccepted": true,
+  "mandateText": "I authorize recurring payments of …",
+  "mandateVersion": "1.0"
 }
 ```
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `paymentMethodId` | string | Yes | Stripe `pm_...` returned from SetupIntent confirmation |
+| `setupIntentId` | string | Yes | Stripe `seti_...` the browser confirmed; the backend reads the vaulted `pm_...` from it |
 | `draftDay` | int | Yes | 1–28 |
-| `amountType` | string | Yes | `Assessment`, `Balance`, `Fixed` (UI labels differ; enum values stay these) |
+| `amountType` | string | Yes | `assessment`, `balance` or `fixed` (lower-case; stored and returned as `Assessment`/`Balance`/`Fixed`) |
 | `fixedAmount` | decimal | Conditional | Required when `amountType = Fixed`; > 0 |
-| `mandateAccepted` | bool | Yes | Must be `true`; 400 if false |
+| `mandateAccepted` | bool | Yes | Must be `true`; 422 if false |
+| `mandateText` | string | No | Exact mandate text shown; a server default is used when absent |
+| `mandateVersion` | string | No | Defaults to `1.0` |
 
 **Response 200**: Same shape as `GET /payments/recurring`
 
 **Errors**:
-- `400` — validation failure or mandate not accepted
-- `502` — Stripe API unreachable (customer creation/PM attachment)
+- `422` — validation failure or mandate not accepted
+- `500` — Stripe API error (customer creation / SetupIntent retrieval)
 
 ---
 
 ## DELETE /payments/recurring
 
-Disables auto-pay. Sets `RecurringPayment.Status = "inactive"`. No further drafts occur.
+Disables auto-pay. Sets `RecurringPayment.Status = "inactive"` and `TerminatedAt` on the current `PaymentAuthorization` (FR-011b). Makes no Stripe call. No further drafts occur. Since specs/030-company-administration (R9) it also records `CancellationReason = "owner_cancelled"`.
 
 **Auth**: Required
 
@@ -231,16 +238,14 @@ Disables auto-pay. Sets `RecurringPayment.Status = "inactive"`. No further draft
 Returns the paginated transaction audit trail for the resident's property.
 
 **Auth**: Required  
-**Pagination**: `limit` (default 20, max 100) and `offset` (default 0)
+**Pagination**: `limit` (default 50, clamped to 1–200) and `offset` (default 0); newest first
 
 **Query parameters**:
 
 | Param | Type | Notes |
 |-------|------|-------|
-| `limit` | int | Default 20, max 100 |
+| `limit` | int | Default 50, clamped to 1–200 |
 | `offset` | int | Default 0 |
-| `status` | string | Optional filter: `Pending`, `Succeeded`, `Failed`, `PartiallyRefunded`, `Refunded`, `Disputed`, `DisputeLost`, `Returned` |
-| `isRecurring` | bool | Optional filter |
 
 **Response 200**:
 ```json
@@ -248,31 +253,24 @@ Returns the paginated transaction audit trail for the resident's property.
   "items": [
     {
       "id": "uuid",
-      "paymentIntentId": "pi_abc",
-      "grossAmount": 128.95,
-      "fee": 3.87,
-      "total": 132.82,
-      "cumulativeRefunded": 0.00,
-      "currency": "usd",
-      "status": "Succeeded",
-      "paymentMethodType": "Card",
-      "cardFunding": "credit",
-      "maskedMethod": "Visa •• 4242",
-      "isRecurring": false,
-      "failureCode": null,
-      "failureMessage": null,
-      "returnCode": null,
       "createdAt": "2026-06-06T14:23:00Z",
-      "updatedAt": "2026-06-06T14:23:00Z"
+      "grossAmount": 128.95,
+      "feeAmount": 3.87,
+      "total": 132.82,
+      "cumulativeRefundedAmount": 0.00,
+      "status": "Succeeded",
+      "paymentMethod": "Card",
+      "maskedMethod": "Visa •• 4242",
+      "isRecurring": false
     }
   ],
-  "total": 1,
-  "limit": 20,
+  "totalCount": 1,
+  "limit": 50,
   "offset": 0
 }
 ```
 
-**Note**: `maskedMethod` is derived from Stripe `PaymentIntent` metadata set at intent creation time (brand + last4 for card; bank name + last4 for ACH). Raw payment method details are never stored.
+**Note**: `maskedMethod` comes from the transaction's receipt (e.g. `Visa •• 4242`); before a receipt exists it is the generic `Card` or `ACH`. Raw payment method details are never stored.
 
 ---
 
@@ -287,8 +285,7 @@ Returns the resident's payment alert opt-in preferences.
 {
   "smsOptIn": false,
   "emailOptIn": false,
-  "alertPhone": null,
-  "alertEmail": "resident@example.com"
+  "alertPhone": null
 }
 ```
 
@@ -305,8 +302,7 @@ Updates alert opt-in preferences.
 {
   "smsOptIn": true,
   "emailOptIn": true,
-  "alertPhone": "+15105551234",
-  "alertEmail": "resident@example.com"
+  "alertPhone": "+15105551234"
 }
 ```
 
@@ -314,12 +310,13 @@ Updates alert opt-in preferences.
 |-------|------|----------|-------|
 | `smsOptIn` | bool | Yes | |
 | `emailOptIn` | bool | Yes | |
-| `alertPhone` | string | Conditional | Required when `smsOptIn = true`; E.164 format |
-| `alertEmail` | string | Conditional | Required when `emailOptIn = true` |
+| `alertPhone` | string | Conditional | E.164; required when `smsOptIn = true` unless a phone is already on file |
 
 **Validation**:
-- `alertPhone` is required when `smsOptIn = true`
-- `alertEmail` is required when `emailOptIn = true`; must be valid email
+- `smsOptIn = true` with no phone in the request or on file → `422`
+- `alertPhone`, when given, must be E.164 → `422`
+- Email alerts go to the owner's email on file (`Owner.Email`, editable via `PATCH /property/owner`); there is no separate alert email.
+- Each channel whose state changes appends an `AlertConsent` row (FR-031).
 
 **Response 200**: Same shape as `GET /payments/alert-preferences`
 
@@ -329,19 +326,21 @@ Updates alert opt-in preferences.
 
 Stripe webhook endpoint. Unauthenticated by JWT — authenticated by Stripe signature verification.
 
-**Auth**: Stripe `Stripe-Signature` header (HMAC-SHA256 with `Payments:WebhookSigningSecret`)  
+**Auth**: Stripe `Stripe-Signature` header (HMAC-SHA256 with `Stripe:WebhookSigningSecret`; timestamp tolerance `Stripe:WebhookToleranceSeconds`, default 300)  
 **Content-Type**: `application/json` (raw body required for signature verification)  
 **Rate limit**: None (Stripe IPs only — consider Cloudflare WAF allowlist)
 
 **Processing**:
 1. Read raw body bytes.
 2. Verify `Stripe-Signature` via `EventUtility.ConstructEvent` with timestamp tolerance (FR-030); return `400` on failure **without mutating data**.
-3. Durably capture into `WebhookEventInbox` by `StripeEventId` (unique); if it already exists, return `200` immediately (duplicate). Ack `200` after capture, before heavy processing (FR-032).
+3. Durably capture into `WebhookEventInbox` by `StripeEventId` (unique); if it already exists and is `Processed`, return `200` immediately (duplicate); a `Received` row is processed again. Processing runs in the same request after the capture is saved, and `200` is returned whether processing succeeds or fails (a failure leaves the row `Received` for the reconcile retry) (FR-032).
 4. Route by `event.Type`:
    - `payment_intent.succeeded` → transition `PaymentTransaction` to Succeeded; write `LedgerEntry` if was Pending (ACH settlement)
    - `payment_intent.payment_failed` → transition to Failed; store `FailureCode` + `FailureMessage`; trigger alert if recurring + opted in
-   - `charge.refunded` → transition to Refunded
-   - `charge.dispute.created` → transition to Disputed
+   - `charge.refunded` → `PartiallyRefunded`/`Refunded` from the cumulative `amount_refunded`; compensating `Refund` ledger entry
+   - `charge.dispute.created` → `Disputed`; compensating `Chargeback` entry
+   - `charge.dispute.closed` → won: `Succeeded` plus a restoring entry; lost: `DisputeLost` (plus the NSF fee when enabled)
+   - `payment_intent.payment_failed` on an already-`Succeeded` ACH transaction → `Returned` (see webhook-events.md)
    - *(all others)* → log at `Information`; do not mutate
 5. Mark the `WebhookEventInbox` row `Processed`; on processing failure, leave it for retry / dead-letter (FR-032).
 6. Alerts/receipts are enqueued to `OutboxMessage` in the same transaction and dispatched promptly (FR-034).
@@ -357,21 +356,23 @@ Stripe webhook endpoint. Unauthenticated by JWT — authenticated by Stripe sign
 Per-owner account statement (charges, payments, running balance, credits) for the resident's
 property — supports NC owner record-inspection rights (FR-039, § 47F-3-118).
 
-**Auth**: Required · **Pagination**: `limit`/`offset` · **Caching**: no-store
+**Auth**: Required (still readable when the community is Archived, 030 FR-012a) · not paginated
 
-**Query**: `startDate`, `endDate` (optional, ISO date).
+**Query**: `startDate`, `endDate` (optional, ISO `yyyy-MM-dd`); the window defaults to the trailing 12 months.
 
 **Response 200**:
 ```json
 {
+  "startDate": "2025-06-06",
+  "endDate": "2026-06-06",
   "openingBalance": 90.00,
+  "totalCharges": 35.00,
+  "totalPayments": 90.00,
   "closingBalance": 35.00,
-  "creditBalance": 0.00,
   "lines": [
-    { "sequence": 1012, "date": "2026-06-01", "type": "RegularAssessment", "charge": 35.00, "payment": 0.00, "balance": 125.00, "transactionId": null },
-    { "sequence": 1013, "date": "2026-06-06", "type": "Payment", "charge": 0.00, "payment": 90.00, "balance": 35.00, "transactionId": "uuid" }
-  ],
-  "total": 2, "limit": 50, "offset": 0
+    { "entryDate": "2026-06-01", "documentNumber": null, "description": "June assessment", "chargeAmount": 35.00, "paymentAmount": 0.00, "runningBalance": 125.00, "entryType": "RegularAssessment" },
+    { "entryDate": "2026-06-06", "documentNumber": null, "description": "Online Payment – Card – ch_…", "chargeAmount": 0.00, "paymentAmount": 90.00, "runningBalance": 35.00, "entryType": "Payment" }
+  ]
 }
 ```
 
@@ -387,34 +388,35 @@ by category in allocation order.
 **Response 200**:
 ```json
 {
+  "asOf": "2026-06-06",
   "totalDue": 35.00,
-  "asOf": "2026-06-06T14:23:00Z",
-  "buckets": [
-    { "category": "RegularAssessment", "amount": 35.00 },
-    { "category": "LateFee", "amount": 0.00 }
+  "creditBalance": 0.00,
+  "breakdown": [
+    { "category": "RegularAssessment", "amount": 35.00 }
   ]
 }
 ```
 
 ---
 
-## GET /payments/receipts/{transactionId}
+## GET /payments/receipts/{id}
 
 Retrieve a durable payment receipt (FR-007f). Issued at card success / ACH settlement.
 
-**Auth**: Required (must own the transaction's property)
+**Auth**: Required (the receipt must belong to the caller's property). `{id}` is the receipt id (`receiptId` from the confirm response), not the transaction id.
 
 **Response 200**:
 ```json
 {
+  "id": "uuid",
   "transactionId": "uuid",
-  "confirmation": "CONF-A1B2C3D4",
+  "confirmationNumber": "CONF-A1B2C3D4E5",
   "maskedMethod": "Visa •• 4242",
-  "grossAmount": 128.95, "fee": 3.87, "total": 132.82,
+  "grossAmount": 128.95, "feeAmount": 3.87, "total": 132.82,
   "issuedAt": "2026-06-06T14:23:05Z"
 }
 ```
-**Errors**: `404` — no receipt yet (e.g. ACH not settled).
+**Errors**: `404` — no such receipt for the caller's property.
 
 ---
 
@@ -424,11 +426,11 @@ Processes auto-pay drafts due today (FR-010). Charges vaulted methods off-sessio
 recurring `PaymentTransaction`s + `DraftEntry`s, sends variable-amount notices (FR-011c), and
 enqueues outbox messages.
 
-**Auth**: Cloud Scheduler OIDC token (or shared-secret header); **not** session-auth. Source-
+**Auth**: `X-Scheduler-Secret` header, compared in constant time with `Jobs:SchedulerSharedSecret` (`401` otherwise); **not** session-auth; no OIDC path. Optional `?date=YYYY-MM-DD` overrides today (UTC). Source-
 restricted via Cloudflare. **Idempotency**: per draft `draft:{recurringId}:{period}` (FR-011d)
 — safe to re-run.
 
-**Response 200**: `{ "processed": 12, "succeeded": 11, "failed": 1, "skippedDuplicate": 0 }`
+**Response 200**: `{ "dueCount": 12, "charged": 11, "failed": 1, "skipped": 0, "noticesSent": 2 }`
 
 ---
 
@@ -440,12 +442,12 @@ Stripe for charge/event status and resolves any transaction left non-terminal pa
 
 **Auth**: same as `run-drafts`.
 
-**Response 200**: `{ "reconciled": 3, "outboxSent": 5, "inboxRetried": 1, "deadLettered": 0 }`
+**Response 200**: `{ "resolvedAchTransactions": 3, "retriedWebhooks": 1, "dispatchedAlerts": 5 }`
 
 ---
 
 ## Breaking Change Notes
 
 - `POST /payments/one-time` (old endpoint) is replaced by the two-step `POST /payments/intent` + `POST /payments/one-time/confirm`. Old frontend code must be updated.
-- `PUT /payments/recurring` request body changes: removes raw card/bank fields, adds `paymentMethodId` and `mandateAccepted`. Existing frontend code for recurring setup must be replaced with the SetupIntent flow.
+- `PUT /payments/recurring` request body changes: removes raw card/bank fields, adds `setupIntentId` and `mandateAccepted`. Existing frontend code for recurring setup must be replaced with the SetupIntent flow.
 - `GET /payments/recurring` response changes: removes masked card/bank fields, adds `maskedMethod`, `mandateAcceptedAt`, `nextDraftDate`, `nextDraftAmount`.

@@ -6,6 +6,48 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-10-31 · Repo hygiene sweep: dead code, duplicate tests, spec/doc reconciliation, small spec fixes · [#PR_NUMBER](https://github.com/nbon12/hoa_management_system/pull/PR_NUMBER)
+
+One-time first pass of the planned nightly hygiene routine. No API, data or UI change for residents or staff.
+
+**Changes earlier assumptions**
+
+- **Removed shared pieces. Don't call them; use the replacements.**
+  - `ClaimsPrincipalExtensions` (`RequirePropertyId`/`RequireCommunityId`): resident endpoints use `ResidentAccess.RequireAsync` (030).
+  - `AllocationService.ApplyPaymentAsync`: use `LedgerService.AddPaymentAsync`.
+  - `LedgerService.RecomputeBalancesAsync`: running balances are computed per append, and 006 FR-007d forbids mutating ledger entries.
+  - Frontend `BoardService.getMemberships/createMembership/updateMembership` and `ArchitecturalService.getSettings/putSettings`: use `CommunitySettingsService`.
+  - `CommunityService.searchDocuments` and `PaymentsService.getBalance`.
+  - `scripts/setup-test-db.sh` and `HOAManagementCompany.Tests/run-playwright-tests.sh`: tests always use Testcontainers, and the .NET Playwright tests were deleted in June.
+- **Backend OTLP traces and metrics now go to `<OTEL_EXPORTER_OTLP_ENDPOINT>/v1/traces` and `/v1/metrics`.** Before, they went to the bare base URL, which HTTP/protobuf uses verbatim (005 FR-022). Logs and the browser proxy already appended their paths. Set the endpoint to the OTLP *base* URL.
+- **Sign-in lockout settings are validated at startup.**
+  - `Identity:Lockout:MaxFailedAttempts` (1–100) and `LockoutMinutes` (1–1440) are now `IdentityLockoutOptions`.
+  - A bad value fails startup instead of silently weakening lockout. Defaults are unchanged (10 / 30).
+- **The Sandbox test tier skips, rather than errors, without provider secrets.**
+  - The harness now blanks every Twilio key unless both Twilio test credentials are set.
+  - A plain local `dotnet test` with no secrets goes from 10 failures to 8 skipped. This resolves failure 2 of #216.
+- **API fixes from spec 003/006:**
+  - A missing or invalid token now gets `401 { code: "UNAUTHORIZED", message }`; the body used to be empty.
+  - The dashboard `currentBalance` follows ledger `Sequence`, not `EntryDate`, so a backdated payment no longer leaves a stale balance. Same-date ledger rows list by `Sequence`.
+  - `GET /community/documents?pinned=` filters, and `GET /community/events?category=A&category=B` returns the union.
+- **Payment webhook fixes (006):**
+  - A refund that includes the card fee restores only the principal on the owner's ledger (FR-004d).
+  - `charge.refund.updated` is no longer cast to `Charge`, so it no longer fails every time.
+  - A one-time ACH return no longer sends a failure alert (FR-014c: recurring only).
+  - `PUT /payments/recurring` is rate-limited with the `payments` policy.
+- **Manual `security-scan` runs** (`workflow_dispatch`) scan the published `sakurapatch/nekohoa-api:latest`, as the 011 quickstart says. PR and push runs are unchanged.
+- **Per-PR Stripe webhooks** also subscribe to `charge.dispute.created` and `charge.dispute.closed`. They still skip `charge.refund.updated`: its payload is a Refund object, which `WebhookProcessor` can't read.
+- **Spec text now matches what shipped**, with "Amended by PR #…" / "Superseded by specs/NNN" notes. Older specs (005–030) were updated for later specs and for deliberate changes such as Artifact Registry (#242), ARC refinements (031) and SES (026). Stale READMEs were refreshed; the tests README describes Testcontainers.
+
+**Left open**
+
+- Spec gaps too large or too risky for an unattended pass are tracked as `spec-gap` issues: #263–#271 and #273–#279.
+  - The most urgent is #275: nothing schedules `run-drafts`/`reconcile` in deployed environments.
+- The constitution's Docker Hub mandate versus Artifact Registry is #272.
+- Pre-existing: the skipped Cypress test in `alert-preferences.cy.ts` stays parked under #215. Test factories in `HOAManagementCompany.Tests/Factories` are unused but kept, as the constitution's prescribed pattern.
+
+---
+
 ## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#247](https://github.com/nbon12/hoa_management_system/pull/247)
 
 Frontend only, no API or data change. It touches the architectural review form shared by Community settings › Architectural review and Company defaults (030 briefs 07 and 08).

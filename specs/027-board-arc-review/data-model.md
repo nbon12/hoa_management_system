@@ -10,7 +10,7 @@ All new tables are added in one forward-only EF Core migration (`<timestamp>_Add
 |---|---|---|
 | `ArcApplicationStatus` | `Open`, `DecisionReached`, `Closed` | Lifecycle below |
 | `ArcVoteChoice` | `Approve`, `RevisionsNeeded`, `Deny` | RevisionsNeeded + Deny = denial side (spec FR-023) |
-| `ArcOutcome` | `Approved`, `Denied` | The legal record (FR-025) |
+| `ArcOutcome` | `Approved`, `Denied`, `Withdrawn` | The legal record (FR-025). `Withdrawn` was added by 029 (the resident withdrew; not a board decision). |
 | `ArcDenialWording` | `RevisionsRequested`, `Denied` | Owner-facing only; null when approved |
 | `ArcDecisionSource` | `Votes`, `Lapse` | Lapse = "by default (review period lapsed)" |
 | `ArcDecisionRule` | `MajorityOfMembers`, `MajorityOfVotesCastWithQuorum` | FR-029 |
@@ -23,13 +23,14 @@ All new tables are added in one forward-only EF Core migration (`<timestamp>_Add
 
 | Field | Type | Rules |
 |---|---|---|
-| `CommunityId` | Guid, PK + FK → `Communities` | One row per community, created on first read with defaults |
+| `CommunityId` | Guid, PK + FK → `Communities` | One row per community. *Changed by 030:* created with the community from the company defaults and backfilled for older communities; `ArcApplicationFactory` still creates a missing row with the 027 defaults |
 | `ReviewPeriodDays` | int | 1–365, default 30 |
 | `LapseRule` | `ArcLapseRule` | Default `FlagOverdueOnly` |
 | `DecisionRule` | `ArcDecisionRule` | Default `MajorityOfMembers` |
 | `ReminderDays` | int | 0–30, default 7, 0 = off |
 | `TimeZoneId` | string(64) | IANA, default `America/New_York`, must resolve (R7) |
 | `FormalDisapprovalStatement` | string(1000) | Required; default text from spec FR-029 |
+| `LapseRuleCitation` | string(300) | Added by 031 (FR-016). Default "the community's governing documents". Not a company default |
 | `NextApplicationNumber` | int | Starts at 1001; incremented atomically (R3) |
 | `UpdatedAt` | timestamptz | |
 | `UpdatedByUserId` | string? | FK → `AspNetUsers`, set null on delete |
@@ -59,6 +60,8 @@ All new tables are added in one forward-only EF Core migration (`<timestamp>_Add
 | `DecisionWording` | `ArcDenialWording?` | Set when the outcome is `Denied` |
 | `DecisionSource` | `ArcDecisionSource?` | |
 | `DecisionReachedAt` | timestamptz? | |
+| `DecisionFinalAt` | timestamptz? | Added by 031 (FR-003): when the decision stops accepting vote changes. A votes decision gets the threshold time + 24 h, capped at the end of the later of the due date and the threshold day; lapse and due-date decisions get the decision time (final at once). Null with a decision (rows decided before 031) also counts as final |
+| `EligibleVoterCount` | int? | Added by 031 (FR-015): eligible voters, snapshotted when the decision is reached, at withdrawal, and at close if still missing |
 | `ConditionsOfApproval` | string(2000)? | Only when `Approved` (FR-025) |
 | `OwnerReason` | string(2000)? | Required when `Denied` (FR-025) |
 | `ClosedAt` | timestamptz? | Set when the manager records the outcome |
@@ -103,7 +106,7 @@ Index: `(ApplicationId)`.
 | `Comment` | string(2000)? | Board and manager only (FR-019) |
 | `CastAt` | timestamptz | |
 
-Unique `(ApplicationId, VoterUserId)` enforces one vote per member (FR-016). Votes are immutable: there is no update or delete endpoint.
+Unique `(ApplicationId, VoterUserId)` enforces one vote per member (FR-016). *Superseded by specs/031-arc-review-refinements (FR-005):* a member may undo their own vote (`DELETE …/votes/mine`) until the decision is final. There is no update endpoint.
 
 ### `ArchitecturalInfoRequest`
 
@@ -143,9 +146,9 @@ Add `ViewArchitecturalApplications` (BoardMember, CommunityManager), `VoteArchit
 ```
 
 **Transition rules**
-- `Open → DecisionReached`: only through `ArcDecisionRules.Evaluate` (on a vote or in the sweep), under a row lock (R4). The decision is set exactly once.
-- `DecisionReached → Closed`: Community Manager only, with a reason when denied and optional conditions when approved. Writes the outcome outbox row in the same transaction.
-- Votes and info requests are refused unless the status is `Open`. Votes are also refused from recused or ineligible users.
+- `Open → DecisionReached`: only through `ArcDecisionRules.Evaluate` (on a vote or in the sweep), under a row lock (R4). *Changed by 031 (FR-003, FR-004):* a votes decision gets a grace period (`DecisionFinalAt`). Until then every vote or undo re-runs the rule: losing the threshold returns the application to `Open`, and a different winning side records a new decision and a new grace period. Lapse and due-date decisions are final at once.
+- `DecisionReached → Closed`: Community Manager only, once the decision is final (031 FR-006), with a reason when denied and optional conditions when approved. Writes the outcome outbox row in the same transaction.
+- Info requests are refused unless the status is `Open`. Votes and undos are refused unless the status is `Open`, or `DecisionReached` with the decision not yet final (031 FR-004). Votes are also refused from recused or ineligible users.
 - `Closed` is terminal. Revisions are new rows, and earlier rows never change.
 - An application is shown as overdue when `Status = Open` and now is past the end of `DueDate` in `TimeZoneId`. This is computed at read time, not stored.
 
@@ -153,8 +156,8 @@ Add `ViewArchitecturalApplications` (BoardMember, CommunityManager), `VoteArchit
 
 | Value | Definition |
 |---|---|
-| Eligible voters | Active BoardMember memberships in the community, minus users linked to the property through `UserProperty` |
-| Tally | Counts per `ArcVoteChoice` + not voted (eligible minus votes from current eligible members) |
+| Eligible voters | Active BoardMember memberships in the community, minus users linked to the property through `UserProperty`. *Changed by 031 (FR-014):* linked members are removed only while another active board member can vote |
+| Tally | Counts per `ArcVoteChoice` + not voted (eligible minus votes from current eligible members). *Changed by 031 (FR-015):* a final or closed decision uses `EligibleVoterCount` as eligible |
 | Awaiting my vote | Open, caller eligible, caller not recused, no vote by caller |
 | Info requested | Any `ArchitecturalInfoRequest` with `RespondedAt` null |
 | Owner email status | From the latest outbox row with DedupKey `arc:{id}:outcome*`: its `Status` (`Pending`/`Sent`/`Failed`); `NoOwnerEmail` when the outcome was recorded but the property has no owner email; null before an outcome |
@@ -166,7 +169,9 @@ Add `ViewArchitecturalApplications` (BoardMember, CommunityManager), `VoteArchit
 |---|---|---|
 | Vote `choice` | One of the three | 422 `VALIDATION_ERROR` |
 | Vote / info `comment`, `message` | ≤ 2,000 chars; info message required, non-blank | 422 `VALIDATION_ERROR` |
-| Vote on non-Open | | 409 `APPLICATION_DECIDED` or `APPLICATION_CLOSED` |
+| Vote or undo once the decision is final, or on a closed application (031 FR-004) | | 409 `APPLICATION_DECIDED` or `APPLICATION_CLOSED` |
+| Undo with no vote (031 FR-005) | | 404 `NOT_VOTED` |
+| Outcome while the decision is in its grace period (031 FR-006) | | 409 `DECISION_NOT_FINAL` |
 | Duplicate vote | | 409 `ALREADY_VOTED` |
 | Recused voter | | 403 `RECUSED` |
 | Outcome on non-`DecisionReached` | | 409 `NO_DECISION` |
