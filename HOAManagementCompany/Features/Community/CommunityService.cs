@@ -72,8 +72,14 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
         if (!string.IsNullOrWhiteSpace(req.EndDate) && DateTimeOffset.TryParse(req.EndDate, out var end))
             query = query.Where(e => e.EventDate <= end);
 
-        if (!string.IsNullOrWhiteSpace(req.Category) && Enum.TryParse<EventCategory>(req.Category, true, out var cat))
-            query = query.Where(e => e.Category == cat);
+        // 003 FR-034: `category` is repeatable (?category=Board&category=Social returns the union).
+        var categories = (req.Category ?? [])
+            .Select(c => Enum.TryParse<EventCategory>(c, true, out var v) ? v : (EventCategory?)null)
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .ToList();
+        if (categories.Count > 0)
+            query = query.Where(e => categories.Contains(e.Category));
 
         var total = await query.CountAsync(ct);
         var items = await query
@@ -118,6 +124,10 @@ public class CommunityService(ApplicationDbContext db, IDocumentStorage storage)
 
         if (!string.IsNullOrWhiteSpace(req.Search))
             query = query.Where(d => d.Name.Contains(req.Search));
+
+        // 003 FR-036: optional pinned filter.
+        if (req.Pinned.HasValue)
+            query = query.Where(d => d.Pinned == req.Pinned.Value);
 
         var total = await query.CountAsync(ct);
         var items = await query

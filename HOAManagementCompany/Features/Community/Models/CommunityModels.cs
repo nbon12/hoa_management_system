@@ -18,7 +18,7 @@ public record ViolationListResponse(IEnumerable<ViolationDto> Items, int TotalCo
 
 public record ViolationDto(Guid Id, string Title, string? Description, string Category, string Status, DateOnly IssuedDate, DateOnly? ResolvedDate, DateOnly? DueDate, decimal? FineAmount, string? ImageUrl);
 
-public record EventListRequest(int Page = 1, int PageSize = 50, string? StartDate = null, string? EndDate = null, string? Category = null);
+public record EventListRequest(int Page = 1, int PageSize = 50, string? StartDate = null, string? EndDate = null, string[]? Category = null);
 
 public record EventListResponse(IEnumerable<EventDto> Items, int TotalCount, int Page, int PageSize);
 
@@ -26,7 +26,7 @@ public record EventDto(Guid Id, string Title, string? Description, DateTimeOffse
 
 public record EventRsvpRequest(bool Attending);
 
-public record DocumentListRequest(int Page = 1, int PageSize = 50, string? Category = null, string? Search = null);
+public record DocumentListRequest(int Page = 1, int PageSize = 50, string? Category = null, string? Search = null, bool? Pinned = null);
 
 public record DocumentListResponse(IEnumerable<DocumentDto> Items, int TotalCount, int Page, int PageSize);
 

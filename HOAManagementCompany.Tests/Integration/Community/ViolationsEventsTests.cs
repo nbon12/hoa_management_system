@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HOAManagementCompany.Tests.Fixtures;
 using Xunit;
 
@@ -30,6 +31,22 @@ public class ViolationsEventsTests(TestDatabaseFixture fixture) : IntegrationTes
         await SetAuthHeaderAsync();
         var response = await Client.GetAsync("/api/v1/community/events");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    // 003 FR-034: `category` is repeatable; repeated values return the union, a single value still filters.
+    [Theory]
+    [InlineData("category=Board&category=Amenity", new[] { "Board", "Amenity" })]
+    [InlineData("category=Board", new[] { "Board" })]
+    public async Task GetEvents_CategoryFilter_ReturnsTheUnionOfTheGivenCategories(string query, string[] expected)
+    {
+        await SetAuthHeaderAsync();
+        var response = await Client.GetAsync($"/api/v1/community/events?{query}&pageSize=100");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var categories = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray()
+            .Select(e => e.GetProperty("category").GetString()!).ToList();
+        Assert.All(categories, c => Assert.Contains(c, expected));
+        Assert.All(expected, c => Assert.Contains(c, categories));
     }
 
     [Fact]
