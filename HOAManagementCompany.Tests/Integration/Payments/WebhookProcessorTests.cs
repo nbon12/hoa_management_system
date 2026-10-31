@@ -169,6 +169,46 @@ public class WebhookProcessorTests(TestDatabaseFixture fixture) : PaymentTestBas
         Assert.Equal(2, await db.LedgerEntries.CountAsync(e => e.TransactionId == txn.Id && e.EntryType == LedgerEntryType.Refund));
     }
 
+    // FR-004d: the card fee was never credited to the owner's ledger, so a full refund that also
+    // returns the fee restores only the principal.
+    [Fact]
+    public async Task ChargeRefunded_FullRefundIncludingCardFee_RestoresOnlyThePrincipal()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<WebhookProcessor>();
+        var txn = await SeedTransactionAsync(db, TransactionStatus.Succeeded, PaymentMethod.Card, gross: 100m);
+        txn.FeeAmount = 3m;
+        txn.Total = 103m;
+        await db.SaveChangesAsync();
+
+        await processor.ProcessAsync(RefundEvent(txn.StripeChargeId!, 10300));   // $103 cumulative = full total
+
+        await db.Entry(txn).ReloadAsync();
+        Assert.Equal(TransactionStatus.Refunded, txn.Status);
+        Assert.Equal(103m, txn.CumulativeRefundedAmount);
+        var restored = await db.LedgerEntries
+            .Where(e => e.TransactionId == txn.Id && e.EntryType == LedgerEntryType.Refund)
+            .SumAsync(e => e.ChargeAmount);
+        Assert.Equal(100m, restored);
+    }
+
+    // FR-016: charge.refund.updated carries a Refund object, not a Charge; it is logged, never failed.
+    [Fact]
+    public async Task ChargeRefundUpdated_IsIgnoredWithoutError()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<WebhookProcessor>();
+        var txn = await SeedTransactionAsync(db, TransactionStatus.Succeeded, PaymentMethod.Card, gross: 100m);
+
+        var ex = await Record.ExceptionAsync(() => processor.ProcessAsync(Evt("charge.refund.updated",
+            new { id = $"re_{Guid.NewGuid():N}", @object = "refund", charge = txn.StripeChargeId, amount = 1000, status = "succeeded" })));
+
+        Assert.Null(ex);
+        Assert.False(await db.LedgerEntries.AnyAsync(e => e.TransactionId == txn.Id && e.EntryType == LedgerEntryType.Refund));
+    }
+
     [Fact]
     public async Task Dispute_CreatedThenWon_RestoresFunds()
     {
