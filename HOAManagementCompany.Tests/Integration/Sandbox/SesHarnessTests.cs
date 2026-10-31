@@ -112,3 +112,31 @@ public class SesHarnessRequireSesTests
     public void Full_configuration_with_the_guard_on_runs() =>
         Assert.Null(Record.Exception(() => SandboxIntegrationTestBase.RequireSes(Config())));
 }
+
+/// <summary>
+/// 007 FR-004 / 026 FR-012: with no Twilio secrets (the PR job, where CI still exports
+/// <c>Twilio__FromNumber</c>), the harness blanks every Twilio key so the host starts and the
+/// Twilio tests Skip instead of every Stage-2 test erroring. Not in the Sandbox category; no
+/// provider is contacted.
+/// </summary>
+public class TwilioHarnessUnconfiguredTests(TestDatabaseFixture fixture) : SandboxIntegrationTestBase(fixture)
+{
+    private static string? CiShapedEnv(string name) => name == "Twilio__FromNumber" ? "+15005550006" : null;
+
+    protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
+        BuildSandboxConfiguration(CiShapedEnv);
+
+    [Fact]
+    public void Without_twilio_credentials_every_twilio_key_is_blank()
+    {
+        var config = BuildSandboxConfiguration(CiShapedEnv).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        Assert.Equal("", config["Twilio:AccountSid"]);
+        Assert.Equal("", config["Twilio:AuthToken"]);
+        Assert.Equal("", config["Twilio:FromNumber"]);
+    }
+
+    [Fact]
+    public void Missing_twilio_secrets_skip_instead_of_failing() =>
+        Assert.Throws<SkipException>(() => RequireTwilio());
+}
