@@ -6,6 +6,27 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-10-31 · Architecture Police: nightly duplicate-pattern consolidation · [#259](https://github.com/nbon12/hoa_management_system/pull/259)
+
+Tooling only. No application behavior, API or data change.
+
+**What changes for people working nearby**
+
+- The **Architecture Police** scheduled task runs nightly at 4:41 AM America/New_York. It follows `.claude/skills/architecture-police/SKILL.md`.
+- Each run consolidates **one** duplicated pattern into a single shared implementation, with no behavior change. It squash-merges a `refactor(architecture-police): …` PR from an `architecture-police/<date>` branch, but only once every check is green.
+- Each of those PRs adds its own entry here, naming the canonical piece and the removed variants. Read those entries before re-adding a helper.
+- It skips candidates that touch files in other open PRs. A branch opened later may still need a rebase after a night's merge.
+- It never changes `infra/**`, `.github/**`, migrations, `specs/` or `.specify/`. Duplicates found there go into the PR description as findings.
+
+**Shared pieces you can reuse**
+
+- `.claude/skills/architecture-police/find_clones.py` is a standard-library clone finder:
+  - `python3 -I find_clones.py [--fuzzy] [--min-lines N] PATH…`;
+  - `--fuzzy` also matches copies with renamed identifiers;
+  - it is useful before adding a helper, to check whether one already exists.
+
+---
+
 ## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#247](https://github.com/nbon12/hoa_management_system/pull/247)
 
 Frontend only, no API or data change. It touches the architectural review form shared by Community settings › Architectural review and Company defaults (030 briefs 07 and 08).
