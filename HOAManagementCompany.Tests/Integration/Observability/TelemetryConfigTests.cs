@@ -51,4 +51,21 @@ public class TelemetryConfigTests
         // SQL capture defaults ON in Development (FR-010).
         Assert.True(options.CaptureSqlText);
     }
+
+    // FR-022: an OTLP Endpoint set in code is used verbatim for HTTP/protobuf, so the trace and
+    // metric exporters must target <base>/v1/traces and <base>/v1/metrics, not the bare base URL.
+    [Theory]
+    [InlineData("http://aspire-dashboard:18890", "traces", "http://aspire-dashboard:18890/v1/traces")]
+    [InlineData("https://vendor.example.com/otlp/", "metrics", "https://vendor.example.com/otlp/v1/metrics")]
+    public void ConfigureOtlp_AppendsTheSignalPath(string endpoint, string signal, string expected)
+    {
+        var options = ObservabilityOptions.FromConfiguration(
+            Config(new() { ["OTEL_EXPORTER_OTLP_ENDPOINT"] = endpoint }), new FakeEnv());
+        var exporter = new OpenTelemetry.Exporter.OtlpExporterOptions();
+
+        ObservabilityServiceCollectionExtensions.ConfigureOtlp(exporter, options, signal);
+
+        Assert.Equal(new Uri(expected), exporter.Endpoint);
+        Assert.Equal(OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf, exporter.Protocol);
+    }
 }

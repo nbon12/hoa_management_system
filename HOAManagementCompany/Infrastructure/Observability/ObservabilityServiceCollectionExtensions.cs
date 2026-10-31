@@ -60,23 +60,26 @@ public static class ObservabilityServiceCollectionExtensions
                 AddTracingInstrumentation(tracing, startup);
 
                 if (exportToOtlp)
-                    tracing.AddOtlpExporter(o => ConfigureOtlp(o, startup));
+                    tracing.AddOtlpExporter(o => ConfigureOtlp(o, startup, "traces"));
             })
             .WithMetrics(metrics =>
             {
                 AddMetricsInstrumentation(metrics);
 
                 if (exportToOtlp)
-                    metrics.AddOtlpExporter(o => ConfigureOtlp(o, startup));
+                    metrics.AddOtlpExporter(o => ConfigureOtlp(o, startup, "metrics"));
             });
 
         return builder;
     }
 
     // Applies the env-configured OTLP destination uniformly to every signal (FR-007).
-    private static void ConfigureOtlp(OtlpExporterOptions o, ObservabilityOptions options)
+    // OtlpEndpoint is the OTLP base URL (OTEL_EXPORTER_OTLP_ENDPOINT). An Endpoint set in code is
+    // used verbatim for HTTP/protobuf, so the signal path is appended here (FR-022), as the logs
+    // exporter (Program.cs) and the browser telemetry proxy already do.
+    public static void ConfigureOtlp(OtlpExporterOptions o, ObservabilityOptions options, string signal)
     {
-        o.Endpoint = new Uri(options.OtlpEndpoint);
+        o.Endpoint = new Uri($"{options.OtlpEndpoint.TrimEnd('/')}/v1/{signal}");
         o.Protocol = OtlpExportProtocol.HttpProtobuf; // FR-022: HTTP/protobuf only.
         if (!string.IsNullOrWhiteSpace(options.OtlpHeaders))
             o.Headers = options.OtlpHeaders;
