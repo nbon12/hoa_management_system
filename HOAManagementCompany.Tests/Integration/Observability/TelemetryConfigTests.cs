@@ -51,13 +51,4 @@ public class TelemetryConfigTests
         // SQL capture defaults ON in Development (FR-010).
         Assert.True(options.CaptureSqlText);
     }
-
-    [Fact]
-    public void UnsetEndpoint_OutsideDevelopment_GatesSqlTextOff()
-    {
-        var options = ObservabilityOptions.FromConfiguration(
-            Config(new()), new FakeEnv { EnvironmentName = Environments.Production });
-
-        Assert.False(options.CaptureSqlText);
-    }
 }

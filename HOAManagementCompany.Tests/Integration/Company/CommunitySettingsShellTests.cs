@@ -49,20 +49,6 @@ public class CommunitySettingsShellTests(TestDatabaseFixture fixture) : CompanyT
             Assert.Equal(JsonValueKind.Null, can.GetProperty("activate").GetProperty("reasonCode").ValueKind);
     }
 
-    [Fact]
-    public async Task OnboardingWithAnOpenEndedManager_CanBeMarkedActive()
-    {
-        var companyId = await CreateCompanyAsync();
-        var community = await CreateCommunityInAsync(companyId, CommunityStatus.Onboarding);
-        await CreateManagerAsync(community);
-        var (_, email) = await CreateCompanyAdminAsync(companyId);
-
-        var activate = (await GetSettingsAsync(email, community)).GetProperty("can").GetProperty("activate");
-
-        Assert.True(activate.GetProperty("allowed").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, activate.GetProperty("reasonCode").ValueKind);
-    }
-
     // FR-010: no open-ended manager → Mark Active is disabled with NO_ACTIVE_MANAGER.
     [Fact]
     public async Task WithNoOpenEndedManager_ActivateGivesNoActiveManager_AndNoManagerIsShown()

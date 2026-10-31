@@ -44,8 +44,8 @@ public class ManagerRuleTheoryTests
         ["first manager · end-dated", Array.Empty<ManagerRule.Row>(), ManagerRule.Change.Appoint(Today.AddMonths(6)), false],
         ["only end-dated left · appoint end-dated", new[] { EndDated(A, 10) }, ManagerRule.Change.Appoint(Today.AddMonths(6)), false],
         ["only ended rows · appoint open-ended", new[] { Ended(A) }, ManagerRule.Change.Appoint(null), true],
-        // Accepting an invitation is an appointment at acceptance time (FR-022 Terms).
-        ["accept open-ended", Array.Empty<ManagerRule.Row>(), ManagerRule.Change.Appoint(null), true],
+        // Accepting an invitation is an appointment at acceptance time (FR-022 Terms); the
+        // open-ended case is the same input as "first manager · open-ended" above.
         ["accept end-dated with no open-ended manager", new[] { EndDated(A, 10) }, ManagerRule.Change.Appoint(Today.AddDays(40)), false],
         // Replace: the replacement is open-ended, then the current one ends (FR-020).
         ["replace the only manager", new[] { OpenEnded(A) }, ManagerRule.Change.Replace(A), true],
