@@ -31,8 +31,8 @@ How to verify each slice is correctly implemented. Each slice ships as its own P
 
 ## D — Frontend Session & Content Security
 1. **Cookie session**: after login, the refresh token is not readable by page script; `document.cookie` does not expose it; access token is in memory only. Reload → silent refresh restores session.
-2. **CSP**: served `_headers` includes an enforcing CSP limiting script/frame to self + `js.stripe.com` and connect to self + API; payments and API calls still work (Cypress).
-3. **No committed creds**: `git ls-files | grep e2e/.auth/state.json` → absent; `.gitignore` covers `e2e/.auth/`; e2e still runs (global-setup regenerates state).
+2. **CSP**: served `_headers` (source `neko-hoa/src/_headers`) includes an enforcing CSP limiting script to self + `js.stripe.com`, frames to `js.stripe.com` + `hooks.stripe.com`, and connect to self + the per-deployment stamped API origin + `api.stripe.com`. It is asserted by `npm run test:headers` (`scripts/stamp-headers.test.mjs`) and the deployed Playwright smoke `e2e/smoke.spec.ts`; payments and API calls still work under it.
+3. **No committed creds**: `git ls-files | grep e2e/.auth/state.json` → absent; `.gitignore` covers `e2e/.auth/`; e2e still runs (there is no shared auth state: each Playwright test logs in through `e2e/helpers/auth.ts` `establishSession` — PR #103).
 4. **Interceptor**: bearer attached only to API-origin requests; concurrent 401s → one refresh call.
 
 ## E — CI/CD & Infra Least Privilege

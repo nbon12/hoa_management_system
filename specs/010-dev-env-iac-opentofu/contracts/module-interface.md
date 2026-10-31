@@ -17,7 +17,7 @@ See `data-model.md` → Module interface. Contract rules:
   verbatim from `env_name`: it maps `dev → Dev`, `staging → Staging`, `prod → Production`. The
   module MUST NOT assume `title(env_name)` (that would wrongly yield `Prod`). Dev passes `"Dev"`.
 - Secret IDs are an exception: they are **literal** per the 009 contract (`dev-*`). For Staging/Prod
-  the module takes a `secret_prefix` input (default derives from `env_name`) so the literal-vs-derived
+  the module takes a required `secret_prefix` input (no default; each environment passes it, e.g. Staging passes `"staging"`) so the literal-vs-derived
   boundary is explicit; Dev passes `secret_prefix = "dev"` to match rows 8–16 of matrix-conformance.
 - All secret-bearing inputs are typed `sensitive = true`.
 - `github_repository` is required and used verbatim in the WIF attribute condition.

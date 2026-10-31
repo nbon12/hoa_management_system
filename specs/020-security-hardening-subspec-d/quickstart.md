@@ -42,7 +42,7 @@ WHERE "UserId" = (SELECT "Id" FROM "AspNetUsers" WHERE "Email" = 'resident@nekoh
   AND "RevokedAt" IS NULL;
 ```
 
-CI is unaffected: `e2e/global-setup.ts` regenerates auth state at runtime.
+CI is unaffected: no auth state is stored. Each Playwright test logs in for itself through `e2e/helpers/auth.ts` `establishSession`, and `e2e/global-setup.ts` only resets seed state (`DELETE /api/v1/e2e/cleanup`). *(Amended 2026-10-31 by PR #103, commit "test(020-D): per-context API login replaces shared storageState snapshot": strict one-time-use refresh rotation makes a shared cookie snapshot unusable.)*
 
 ## CI wiring
 

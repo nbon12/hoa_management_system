@@ -2,7 +2,7 @@
 
 **Feature Branch**: `009-dev-auto-deploy`  
 **Created**: 2026-06-13  
-**Status**: Partially delivered (PR #35) — see Delivery Status below  
+**Status**: Delivered. The pipeline shipped in PR #35; Dev was provisioned by specs/010-dev-env-iac-opentofu (live 2026-06-14) and `DEV_DEPLOY_ENABLED` is on. The Delivery Status below records the original PR #35 scope  
 **Input**: User description: "I want to create a dev environment that automatically gets pushed to upon merges to main. review the constitution for what it should be setup like."
 
 ## Delivery Status & Deferred Scope *(PR #35)*
@@ -22,13 +22,13 @@ PR is safe to merge before any cloud resources exist):
 - **Environment provisioning** (the isolated Neon DB, Cloud Run service, Cloudflare Pages/DNS/R2,
   Secret Manager, WIF — FR-010/FR-011/FR-015/FR-016 *infrastructure*) is delivered declaratively by
   a follow-up **Infrastructure-as-Code feature** (OpenTofu) rather than by hand — see
-  [`HANDOFF-infra-as-code.md`](./HANDOFF-infra-as-code.md).
+  [`specs/010-dev-env-iac-opentofu`](../010-dev-env-iac-opentofu/spec.md) (implemented; Dev applied 2026-06-14). The original `HANDOFF-infra-as-code.md` was removed in PR #70.
 - **Live verification** of the isolation and success criteria (SC-002, SC-005, SC-006, SC-009, and
   the US3/US4 acceptance runs) happens after the first real deploy once provisioning and
   `DEV_DEPLOY_ENABLED=true` are in place.
 - **Known limitation:** the E2E gate runs the Cypress suite, which currently stubs the backend
   in-spec — so it validates the Dev frontend but not yet the Dev backend end-to-end. Promoting it to
-  a true integration gate is a follow-up.
+  a true integration gate is a follow-up. *(Done by specs/012-playwright-dev-smoke, PR #62: `deploy-dev` also runs a Playwright gate against the live Dev preview and the candidate backend before promotion. Since specs/014-post-deploy-hardening FR-005 (PR #71), that gate runs only the curated read-only `@smoke` subset, `npm run e2e:playwright-smoke`.)*
 
 ## User Scenarios & Testing *(mandatory)*
 

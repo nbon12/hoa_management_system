@@ -170,8 +170,7 @@ jobs:
           image-ref: ${{ steps.target.outputs.ref }}
           format: sarif
           output: trivy-image.sarif
-          ignore-unfixed: true
-          exit-code: '0'
+          exit-code: '0'   # no ignore-unfixed: unfixed findings stay visible in SARIF (FR-015)
 
       - name: Upload image SARIF to Code Scanning
         continue-on-error: true
@@ -203,7 +202,7 @@ jobs:
 ## Reference change — `test.yml` `docker-push` (build → scan → push)
 
 The single `Build and push` step (currently `push: true`) is split so the scan sits between build
-and push. Only the relevant steps are shown; SHAs are pinned the same way.
+and push. Only the relevant steps are shown; SHAs are pinned the same way. *(Amended 2026-10-28 by PR #242: after the scan, `docker-push` also authenticates to Google via WIF and pushes the scanned build to Artifact Registry `${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/images-dev/nekohoa-api:{latest,sha}` together with Docker Hub, in one push step. See `.github/workflows/test.yml` `docker-push`.)*
 
 ```yaml
       - name: Set up Buildx

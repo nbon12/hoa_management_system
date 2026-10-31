@@ -13,14 +13,17 @@ SC-005 (isolation) and SC-006 (no leaked secrets).
 | `Startup__ApplyMigrations` | env / `appsettings.Dev.json` | `true` | — |
 | `Startup__SeedData` | env / `appsettings.Dev.json` | `true` | — |
 | `Startup__EnableSwagger` | env / `appsettings.Dev.json` | `true` | MUST be `false` in Prod |
-| `Cors__AllowedOrigins__0` | env | Cloudflare Pages Dev origin | Dev-only origin |
+| `Cors:AllowedOrigins` / `Cors:AllowedOriginSuffixes` | `appsettings.Dev.json` (non-secret) | `https://dev.nekohoa.com` / `.nekohoa-dev.pages.dev` (preview origins for the smoke gate) | Dev-only origins; suffixes are not set in Production |
 | `ConnectionStrings__DefaultConnection` | **secret ref** | Neon Dev DB | not shared w/ Staging/Prod |
 | `Jwt__Secret` | **secret ref** | Dev-only signing key | distinct per env |
 | `Sentry__Dsn` | **secret ref** | Dev Sentry project | distinct per env |
 | `Stripe__SecretKey` / `Stripe__WebhookSigningSecret` | **secret ref** | `sk_test_…` / `whsec_…` (test) | test mode only |
 | `Storage__ServiceUrl` + `Storage__AccessKey` + `Storage__SecretKey` + `Storage__BucketName` | env + **secret refs** | Cloudflare R2 Dev bucket | not shared w/ Staging/Prod |
 | `Jobs__SchedulerSharedSecret` | **secret ref** | Dev-only | distinct per env |
-| `Twilio__*` / `SendGrid__*` | **secret ref** (optional) | test creds or unset | alerts disabled if unset |
+| `Stripe__PublishableKey` | env (OpenTofu) | `pk_test_…` | non-secret; required by `StripeOptionsValidator` (added by specs/010 FR-006) |
+| `Storage__ForcePathStyle` | env (OpenTofu) | `true` | R2 requires path-style addressing (specs/010 FR-006) |
+| `App__BaseUrl` | `appsettings.Dev.json` (`App:BaseUrl`); OpenTofu also sets the legacy fallback `ArchitecturalReview__AppBaseUrl` | `https://dev.nekohoa.com` | required by `AppLinksOptionsValidator` in deployed environments (PR #233) |
+| `Twilio__*` / `Ses__*` | **secret ref** (optional) | test creds or unset | alerts/email disabled if unset *(SendGrid was replaced by Amazon SES in specs/026-ses-email-provider, which leaves wiring SES into Dev as a follow-up)* |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` / `_HEADERS` / `OTEL_SERVICE_NAME` | env + secret | Dev telemetry target | header credential server-side only |
 
 **Rule**: every value above is supplied at deploy/run time. None appears in the repository or in any
