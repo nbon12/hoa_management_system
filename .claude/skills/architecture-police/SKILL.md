@@ -222,7 +222,9 @@ Do this on unmodified `main`, before editing.
 4. Once local checks pass, mark the PR ready for review. Then wait for every GitHub check to
    finish. Subscribe to the PR's activity and end your turn: check events wake the session. Do
    not poll with `sleep`. If a check fails, fix it within the theme, push, and wait again.
-5. **Merge with a squash merge, and delete the branch, only if all of the following hold:**
+5. **Merge with a squash merge only if all of the following hold.** After merging, try to
+   delete the branch. The session's git proxy may refuse the delete, and that is fine: leave
+   the branch.
    - every check has completed and none failed or is pending (skipped or neutral is fine);
    - the branch is up to date with `main`. If `main` moved, update the branch and wait for the
      checks again;
