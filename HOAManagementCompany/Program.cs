@@ -145,10 +145,9 @@ builder.Services.AddIdentityCore<ApplicationUser>(o =>
     o.Password.RequireNonAlphanumeric = true;
     o.Password.RequiredLength = 8;
     o.User.RequireUniqueEmail = true;
-    // 016-A FR-A4: per-account lockout (10 failed attempts → 30-minute lock, config-driven).
+    // 016-A FR-A4: per-account lockout. The thresholds come from the validated
+    // IdentityLockoutOptions (Identity:Lockout, default 10 attempts → 30 minutes) below.
     o.Lockout.AllowedForNewUsers = true;
-    o.Lockout.MaxFailedAccessAttempts = builder.Configuration.GetValue("Identity:Lockout:MaxFailedAttempts", 10);
-    o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(builder.Configuration.GetValue("Identity:Lockout:LockoutMinutes", 30));
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
@@ -203,6 +202,15 @@ builder.Services.AddValidatedOptions<RateLimitingOptions, RateLimitingOptionsVal
     builder.Configuration, RateLimitingOptions.SectionName);
 builder.Services.AddValidatedOptions<ArcUploadOptions, ArcUploadOptionsValidator>(
     builder.Configuration, ArcUploadOptions.SectionName);
+// 016-A FR-A4: sign-in lockout thresholds, applied to ASP.NET Core Identity.
+builder.Services.AddValidatedOptions<IdentityLockoutOptions, IdentityLockoutOptionsValidator>(
+    builder.Configuration, IdentityLockoutOptions.SectionName);
+builder.Services.AddOptions<IdentityOptions>()
+    .Configure<IOptions<IdentityLockoutOptions>>((o, lockout) =>
+    {
+        o.Lockout.MaxFailedAccessAttempts = lockout.Value.MaxFailedAttempts;
+        o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(lockout.Value.LockoutMinutes);
+    });
 // Company administration (030): invitation limits (R12) and the one origin for emailed links (R10).
 builder.Services.AddValidatedOptions<InvitationOptions, InvitationOptionsValidator>(
     builder.Configuration, InvitationOptions.SectionName);
