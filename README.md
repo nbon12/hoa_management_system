@@ -7,8 +7,8 @@ An HOA management portal with an Angular frontend (NekoHOA) and a .NET 9 FastEnd
 ## Technology Stack
 
 <!-- REPOWISE:START section=tech-stack -->
-- **Angular 19** — frontend (NekoHOA), served from `neko-hoa/`
-- **.NET 9 / C# 13** — REST API with **FastEndpoints** (30 endpoints, `api/v1` prefix)
+- **Angular 21** — frontend (NekoHOA), served from `neko-hoa/`
+- **.NET 9 / C# 13** — REST API with **FastEndpoints** (`api/v1` prefix)
 - **PostgreSQL 17** — primary data store via EF Core 9 + Npgsql
 - **ASP.NET Core Identity** — password hashing + user store; custom JWT auth
 - **MinIO (local) / Cloudflare R2 (production)** — document storage via AWSSDK.S3
@@ -42,6 +42,6 @@ open http://localhost:5212/swagger
 <!-- REPOWISE:START section=documentation -->
 - **API backend**: [`specs/003-dotnet-api-backend/`](specs/003-dotnet-api-backend/) — OpenAPI contract, data model, quickstart
 - **Repowise**: [`repowise/generation-prompt.md`](repowise/generation-prompt.md) — marker region catalog; PR health gate via [`.github/workflows/repowise.yml`](.github/workflows/repowise.yml)
-- **Frontend (canonical)**: [`neko-hoa/`](neko-hoa/) — Angular app; legacy `frontend/` is deprecated
-- **Tests**: `PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal` from repo root
+- **Frontend (canonical)**: [`neko-hoa/`](neko-hoa/) — Angular app
+- **Tests**: backend `dotnet test --filter "Category!=Sandbox"` from repo root (Docker required for Testcontainers; see [`HOAManagementCompany.Tests/README.md`](HOAManagementCompany.Tests/README.md)); frontend `npm run test:ci` from `neko-hoa/`
 <!-- REPOWISE:END -->

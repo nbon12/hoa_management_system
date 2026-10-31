@@ -6,7 +6,7 @@
   - `Forbidden` → 403 `FORBIDDEN`;
   - `Archived` → 409 `COMMUNITY_ARCHIVED`;
   - `NotActive` → 409 `COMMUNITY_NOT_ACTIVE`.
-- A child id (membership, invitation, property, user) that doesn't belong to the path's community gets the same 403.
+- An invitation or property id that doesn't belong to the path's community gets the same 403. A membership id that doesn't belong to it gets 404 `NOT_FOUND` (kept from 025). A user id gets the error its route lists: 422 `VALIDATION_ERROR` when it isn't in the community's people list (direct appointment, replace), and 404 `NOT_FOUND` when it isn't linked to the property (resident removal).
 
 ---
 
@@ -280,12 +280,12 @@ The property drawer.
 ### GET /communities/{communityId}/architectural-settings *(027, auth changed)*
 
 - **Auth**: `ViewArcSettings`, read (Board Members, Community Managers, Company Administrators).
-- **Change**: the response adds `companyDefaults` (the six fields), `differsFromDefaults: ["reviewPeriodDays", "reminderDays"]` and `canEdit`.
+- **Change**: the response adds `companyDefaults` (the six fields), `differsFromDefaults: ["reviewPeriodDays", "reminderDays"]` and `canEdit`. Spec 031 (FR-016) later adds `lapseRuleCitation`. It is per community: it is never in `companyDefaults` or `differsFromDefaults`, and the reset leaves it alone.
 
 ### PUT /communities/{communityId}/architectural-settings *(027, auth changed)*
 
 - **Auth**: `ManageArcSettings`, write.
-- The request shape is otherwise unchanged. One Save for the section (Clarifications 2026-10-14).
+- The request shape is otherwise 027's, plus spec 031's optional `lapseRuleCitation` (at most 300 characters; superseded in part by specs/031-arc-review-refinements FR-016). One Save for the section (Clarifications 2026-10-14).
 - **200**: the GET body, as for the reset, so the section shows the save (and which fields now differ from the company defaults) without a reload. 027's fields are all still there.
 
 ### POST /communities/{communityId}/architectural-settings/reset
