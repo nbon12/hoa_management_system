@@ -124,6 +124,23 @@ public class AlertFailureTests(TestDatabaseFixture fixture) : AlertTestBase(fixt
         Assert.Equal("email_alert", rows[0].Kind);
     }
 
+    // FR-014c: an ACH return alerts only when the payment was recurring.
+    [Fact]
+    public async Task OneTimeAchReturn_OptedIn_DoesNotAlert()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var processor = scope.ServiceProvider.GetRequiredService<WebhookProcessor>();
+        var txn = await ArrangeAsync(db, sms: false, email: true, phone: null,
+            TransactionStatus.Succeeded, PaymentMethod.Ach, isRecurring: false);
+
+        await processor.ProcessAsync(FailedEvent(txn.StripePaymentIntentId!, "R01"));
+
+        await db.Entry(txn).ReloadAsync();
+        Assert.Equal(TransactionStatus.Returned, txn.Status);
+        Assert.Empty(await db.OutboxMessages.Where(m => m.TransactionId == txn.Id).ToListAsync());
+    }
+
     [Fact]
     public async Task ProviderRejection_IsTerminal_NotRetried()
     {

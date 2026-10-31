@@ -103,8 +103,10 @@ public sealed class WebhookProcessor(
             await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, txn.GrossAmount,
                 LedgerEntryType.Reversal, $"ACH return – {txn.ReturnCode ?? "unknown"}", ct: ct);
             await ApplyNsfFeeAsync(txn, ct);
-            // A settled debit was clawed back — always alert the owner who opted in (FR-014c).
-            await alerts.EnqueueFailureAlertAsync(txn, txn.ReturnCode, ct);
+            // A settled debit was clawed back — alert the opted-in owner only for a recurring
+            // payment (FR-014c); a one-time payer is not alerted, as for failures (FR-015).
+            if (txn.IsRecurring)
+                await alerts.EnqueueFailureAlertAsync(txn, txn.ReturnCode, ct);
             metrics.RecordPaymentProcessed("returned");
         }
         else if (txn.Status is TransactionStatus.Pending or TransactionStatus.Succeeded)
