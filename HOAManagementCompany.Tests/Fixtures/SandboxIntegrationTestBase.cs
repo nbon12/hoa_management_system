@@ -63,8 +63,11 @@ public abstract class SandboxIntegrationTestBase : IntegrationTestBase
             // Force the basic-auth path: blank out any ApiKeySid that appsettings.Secrets.json
             // (or another config source) might supply, so the adapter authenticates with
             // AccountSid + AuthToken — the only auth that honors Twilio magic numbers. The empty
-            // string survives the null-filter below and overrides the inherited value.
+            // string survives the null-filter below and overrides the inherited value. ApiKeySecret
+            // goes too, so a lingering half of an API-key pairing (e.g. from a local
+            // appsettings.Secrets.json, issue #216) can't make Twilio look half-configured.
             ["Twilio:ApiKeySid"] = "",
+            ["Twilio:ApiKeySecret"] = "",
             // Magic From required under test credentials; non-magic throws.
             ["Twilio:FromNumber"] = twilio ? env("Twilio__FromNumber") ?? "+15005550006" : "",
         }

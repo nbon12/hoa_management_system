@@ -134,6 +134,8 @@ public class TwilioHarnessUnconfiguredTests(TestDatabaseFixture fixture) : Sandb
         Assert.Equal("", config["Twilio:AccountSid"]);
         Assert.Equal("", config["Twilio:AuthToken"]);
         Assert.Equal("", config["Twilio:FromNumber"]);
+        Assert.Equal("", config["Twilio:ApiKeySid"]);
+        Assert.Equal("", config["Twilio:ApiKeySecret"]);
     }
 
     [Fact]
