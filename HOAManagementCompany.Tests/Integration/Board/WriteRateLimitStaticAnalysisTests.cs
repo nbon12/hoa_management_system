@@ -44,4 +44,14 @@ public class WriteRateLimitStaticAnalysisTests
             $"FR-041: every write endpoint under Features/{folder} must call RequireRateLimiting(\"{policy}\"). "
             + $"Offending file(s): {string.Join(", ", offenders)}.");
     }
+
+    // 006 FR-028: the payment-method setup endpoints (both call Stripe) use the per-client payments policy.
+    [Theory]
+    [InlineData("Payments/Recurring/SetupIntentEndpoint.cs")]
+    [InlineData("Payments/Recurring/RecurringUpsertEndpoint.cs")]
+    public void PaymentSetupEndpoints_RequireThePaymentsRateLimit(string file)
+    {
+        var path = Path.Combine(BoardScopeEnforcementStaticAnalysisTests.LocateFeaturesDirectory().FullName, file);
+        Assert.Contains("RequireRateLimiting(\"payments\")", File.ReadAllText(path), StringComparison.Ordinal);
+    }
 }
