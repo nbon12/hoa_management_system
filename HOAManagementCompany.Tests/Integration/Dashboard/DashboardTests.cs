@@ -21,6 +21,8 @@ public class DashboardTests(TestDatabaseFixture fixture) : IntegrationTestBase(f
     {
         var response = await Client.GetAsync("/api/v1/dashboard");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        Assert.Equal("UNAUTHORIZED", body!["code"]!.ToString());
     }
 
     [Fact]

@@ -173,6 +173,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.FromSeconds(30),
             NameClaimType = ClaimTypes.NameIdentifier
         };
+        // 003 AS7 / contracts ErrorResponse: a missing, malformed or expired token gets the standard
+        // { code, message } body instead of an empty 401. The message stays generic (no oracle).
+        o.Events = new JwtBearerEvents
+        {
+            OnChallenge = async ctx =>
+            {
+                ctx.HandleResponse();
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                ctx.Response.Headers.WWWAuthenticate = "Bearer";
+                await ctx.Response.WriteAsJsonAsync(
+                    new { code = "UNAUTHORIZED", message = "Authentication is required." }, ctx.HttpContext.RequestAborted);
+            },
+        };
     });
 
 builder.Services.AddAuthorization();
