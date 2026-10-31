@@ -9,7 +9,8 @@ end-to-end (Q4 clarification), with no real charges and no production credential
 POST https://api.stripe.com/v1/webhook_endpoints      (Authorization: Bearer <STRIPE_SECRET_KEY_TEST>)
   url            = https://<pr-api-url>/api/v1/payments/webhook
   enabled_events = [payment_intent.succeeded, payment_intent.payment_failed,
-                    setup_intent.succeeded, charge.refunded, ...app's subscribed set]
+                    setup_intent.succeeded, charge.refunded, charge.dispute.created,
+                    charge.dispute.closed]   (the EVENTS list in scripts/stripe-webhook-register.sh)
   metadata[pr]   = <pr_number>
 → capture response.secret (whsec_...) → write to Secret Manager `pr-<n>-stripe-webhook`
 ```
