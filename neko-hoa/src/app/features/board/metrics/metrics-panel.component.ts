@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, computed, inject, signal } from '@angular/core';
+import { Component, Input, OnChanges, inject, signal } from '@angular/core';
 import { BoardService, MetricDescriptor } from '../../../core/services/board.service';
 import { MetricTableComponent } from './metric-table.component';
 import { GlossaryPanelComponent } from './glossary-panel.component';

@@ -66,7 +66,6 @@ export async function setMode(
 // keeps the resident dashboard so existing callers are unaffected.
 export const RESIDENT_LANDING = '**/app/dashboard';
 export const BOARD_HOME_LANDING = '**/app/board/home';
-export const BOARD_COMMUNITIES_LANDING = '**/app/board/communities';
 
 export async function loginAs(
   page: Page,

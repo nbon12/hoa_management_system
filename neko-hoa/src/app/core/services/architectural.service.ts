@@ -211,12 +211,4 @@ export class ArchitecturalService {
     return firstValueFrom(this.http.post<{ ownerEmailStatus: string | null }>(
       `${this.apps(communityId)}/${applicationId}/outcome/resend-email`, {}));
   }
-
-  getSettings(communityId: string): Promise<ArcSettings> {
-    return firstValueFrom(this.http.get<ArcSettings>(`${this.base}/communities/${communityId}/architectural-settings`));
-  }
-
-  putSettings(communityId: string, settings: ArcSettings): Promise<ArcSettings> {
-    return firstValueFrom(this.http.put<ArcSettings>(`${this.base}/communities/${communityId}/architectural-settings`, settings));
-  }
 }

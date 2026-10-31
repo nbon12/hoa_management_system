@@ -20,29 +20,6 @@ export interface MyCommunity {
   status: string;
 }
 
-export interface Membership {
-  id: string;
-  userId: string;
-  userDisplayName: string;
-  role: string;
-  status: string;
-  startDate: string;
-  endDate: string | null;
-}
-
-export interface CreateMembershipRequest {
-  userId: string;
-  role: string;
-  startDate: string;
-  endDate?: string | null;
-}
-
-export interface UpdateMembershipRequest {
-  role?: string;
-  status?: string;
-  endDate?: string | null;
-}
-
 /** Registry-driven metric row (FR-029). Mirrors the backend `MetricDescriptor` projection. */
 export interface MetricDescriptor {
   id: string;
@@ -63,22 +40,6 @@ export class BoardService {
     const params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
     return firstValueFrom(
       this.http.get<Paged<MyCommunity>>(`${this.base}/me/communities`, { params }));
-  }
-
-  async getMemberships(communityId: string, limit = 25, offset = 0): Promise<Paged<Membership>> {
-    const params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
-    return firstValueFrom(
-      this.http.get<Paged<Membership>>(`${this.base}/communities/${communityId}/memberships`, { params }));
-  }
-
-  async createMembership(communityId: string, body: CreateMembershipRequest): Promise<Membership> {
-    return firstValueFrom(
-      this.http.post<Membership>(`${this.base}/communities/${communityId}/memberships`, body));
-  }
-
-  async updateMembership(communityId: string, membershipId: string, body: UpdateMembershipRequest): Promise<Membership> {
-    return firstValueFrom(
-      this.http.patch<Membership>(`${this.base}/communities/${communityId}/memberships/${membershipId}`, body));
   }
 
   async getMetrics(communityId: string, surface: string, limit = 25, offset = 0): Promise<Paged<MetricDescriptor>> {
