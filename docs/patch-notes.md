@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-10-31 · Repo hygiene sweep: dead code, duplicate tests, spec/doc reconciliation, small spec fixes · [#PR_NUMBER](https://github.com/nbon12/hoa_management_system/pull/PR_NUMBER)
+## 2026-10-31 · Repo hygiene sweep: dead code, duplicate tests, spec/doc reconciliation, small spec fixes · [#280](https://github.com/nbon12/hoa_management_system/pull/280)
 
 One-time first pass of the planned nightly hygiene routine. No API, data or UI change for residents or staff.
 
