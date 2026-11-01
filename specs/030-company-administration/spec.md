@@ -649,7 +649,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
 ### Community settings page
 
 - **FR-029**: Each community MUST have one **Community settings** page with the sections Profile, Managers and memberships, Architectural review and Notifications. Notifications is not shown until the Notification Settings spec lands.
-  - The page is addressed by community ID, not by the board-mode active community, so it works for Onboarding and Archived communities that appear in no switcher.
+  - The page's API is addressed by community ID, not by the board-mode active community. In the company area the page address also carries the community ID (`/app/company/communities/{id}/settings/…`), so it works for Onboarding and Archived communities that appear in no switcher. In board mode, a Community Manager opens it for the active community (`/app/board/settings/…`).
   - Company Administrators reach it from the portfolio. Community Managers reach it from board mode in the active community.
   - A Community Manager of an Onboarding community sees on the Profile section that a Company Administrator must mark it Active, and that resident invitations are sent then.
   - The sections are listed in a **side list** with a **search box** (Clarifications 2026-10-14). Searching filters to matching sections and setting names, for example "Architectural review › Review period". Choosing a result opens that section and moves focus to that setting. Search covers setting names on this page only, never people or values.
@@ -745,7 +745,7 @@ As a Company Administrator, Community Manager, Board Member or Accountant who do
   - **New error codes**: `COMMUNITY_NAME_TAKEN`, `NO_ACTIVE_MANAGER`, `OPEN_WORK`, `INVALID_TRANSITION`, `COMMUNITY_ARCHIVED`, `COMMUNITY_NOT_ACTIVE`, `PARENT_CYCLE`, `PARENT_ARCHIVED`, `INVITATION_EXPIRED`, `INVITATION_INVALID`, `INVITATION_EMAIL_MISMATCH`, `INVITATION_PENDING`, `ALREADY_MEMBER`, `ALREADY_RESIDENT`, `SELF_GRANT_NOT_ALLOWED`, `LAST_COMPANY_ADMIN`.
   - **Reused codes**: `LAST_MANAGER` (422), `PROPERTY_ACCESS_DENIED` and spec 025's 403 `FORBIDDEN`.
   - Each new code's HTTP status is set in this feature's `contracts/` during planning. Out-of-scope denials reuse spec 025's 403 `FORBIDDEN` body.
-  - The ARC settings request and response shapes are unchanged; only who may call them widens.
+  - The ARC settings request shape is unchanged; who may call the endpoints widens. (Spec 031 later adds an optional `lapseRuleCitation`.) The GET response adds `companyDefaults`, `differsFromDefaults` and `canEdit`, and the PUT answers with that GET body (contracts/community-settings.md § Architectural review section). *Amended 2026-10-29 by PR #248: the PUT used to answer with 027's narrower `ArcSettingsDto`.*
 - **API implementation and docs**: New endpoints are FastEndpoints. Swagger stays available only in Development/Dev and is disabled in Production.
 - **Database/runtime**: Forward-only migrations (spec 025 FR-005), applied idempotently at Cloud Run startup. They:
   - add the management company, Company Administrator grants, company default settings and invitations;

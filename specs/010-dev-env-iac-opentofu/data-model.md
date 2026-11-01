@@ -16,6 +16,7 @@ cloud resources** and the **module's input/output interface**. All resources are
 | `neon_branch` | `name = "dev"`, `project_id` | the environment's branch |
 | `neon_database` | `name = "nekohoa"`, `owner_name = role` | |
 | `neon_role` | `name`, generated `password` (sensitive) | role/password feed the conn string |
+| `neon_endpoint` | `read_write`, `pooler_enabled = true`, `pooler_mode = "transaction"` | its host with `-pooler` inserted is the pooled host |
 | *(derived)* pooled endpoint host | `*-pooler` host | used to build the .NET keyword string |
 
 ### Google Cloud (providers `google` / `google-beta`)
@@ -24,18 +25,23 @@ cloud resources** and the **module's input/output interface**. All resources are
 |----------|----------------|----|
 | `google_cloud_run_v2_service.api` | name `nekohoa-api-${env_name}`, region var, min-instances 0, port 8080, `ASPNETCORE_ENVIRONMENT=var.aspnet_environment` (Dev), `/health` probes, secret env refs, runtime SA | FR-005/006/008 |
 | `google_cloud_run_v2_service_iam_member.public` | `roles/run.invoker` → `allUsers` | unauthenticated |
-| `google_cloud_run_domain_mapping.api` | host `api-dev.nekohoa.com` | FR-018 |
+| `google_cloud_run_domain_mapping.api` | host `api-dev.nekohoa.com` (only when `enable_api_domain`) | FR-018 |
+| `google_cloud_scheduler_job.arc_sweep` | `nekohoa-arc-sweep-${env_name}`, hourly (`7 * * * *`) POST `<service uri>/api/v1/architectural/jobs/sweep` with `X-Scheduler-Secret` | 027 |
 | `google_service_account.runtime` | `…-run-dev@` | FR-009 |
 | `google_service_account.deployer` | `…-deploy-dev@` | FR-010 |
 | `google_secret_manager_secret_iam_member.runtime[*]` | `roles/secretmanager.secretAccessor` per secret → runtime SA | FR-009 |
 | `google_project_iam_member.deployer_run_admin` | `roles/run.admin` → deployer SA | FR-010 |
+| `google_project_iam_member.deployer_owner` | `roles/owner` → deployer SA (FR-010 deviation: CI runs `tofu apply` of the whole environment) | FR-010 |
+| `google_storage_bucket_iam_member.deployer_state` | `roles/storage.objectAdmin` on `var.state_bucket` → deployer SA (CI reads/writes remote state) | FR-020 |
 | `google_service_account_iam_member.deployer_sa_user` | `roles/iam.serviceAccountUser` on runtime SA → deployer SA | FR-010 |
-| `google_iam_workload_identity_pool.github` | pool id `github-pool` | FR-011 |
+| `google_iam_workload_identity_pool.github` | pool id `github-pool-${env_name}` (Dev: `github-pool-dev`); provider id `github-provider` | FR-011 |
 | `google_iam_workload_identity_pool_provider.github` | OIDC issuer, attr map, condition `repository=="nbon12/hoa_management_system"` | FR-011/012 |
 | `google_service_account_iam_member.wif_deployer` | `roles/iam.workloadIdentityUser` → `principalSet:.../attribute.repository/<repo>` | FR-012 |
 | `google_secret_manager_secret.*` (×9) | IDs `${secret_prefix}-…` (Dev → the exact `dev-*` IDs) | FR-013 |
 | `google_secret_manager_secret_version.db_connection` | payload = Neon keyword string | FR-014 |
 | `google_secret_manager_secret_version.<8 operator secrets>` | payload from tfvars; `ignore_changes=[secret_data]` | FR-015 |
+| `google_artifact_registry_repository.images` | `images-${env_name}` (DOCKER), region var; deletes `pr-*` tags after 14 days | FR-007 (PR #242) |
+| `google_artifact_registry_repository_iam_member.deployer_writer` | `roles/artifactregistry.writer` → deployer SA | FR-010 |
 
 ### Cloudflare (provider `cloudflare`)
 
@@ -52,7 +58,7 @@ cloud resources** and the **module's input/output interface**. All resources are
 | Resource | Key attributes | FR |
 |----------|----------------|----|
 | `google_storage_bucket.tfstate` | versioned, UBLA on; backends use `prefix="state/<env>"` | FR-020/031 |
-| `google_project_service.*` | enable run/secretmanager/iam/iamcredentials/sts/storage APIs | bootstrap |
+| `google_project_service.*` | enable run/secretmanager/iam/iamcredentials/sts/storage, cloudresourcemanager/serviceusage (010 deviation), billingbudgets (013), cloudscheduler (027), artifactregistry (PR #242) APIs | bootstrap |
 
 ## Dependency edges (apply order)
 
@@ -78,12 +84,15 @@ cloudflare: pages_project → pages_domain(dev.nekohoa.com); r2_bucket; record.f
 | `aspnet_environment` | string | `"Dev"` (maps dev→Dev, staging→Staging, prod→**Production**) | no |
 | `secret_prefix` | string | `"dev"` (Dev resolves the literal `dev-*` IDs; FR-013/029) | no |
 | `gcp_project_id` | string | `"nekohoa"` | no |
+| `state_bucket` | string | `"nekohoa-dev-tfstate"` (must equal the `backend.tf` bucket) | no |
 | `gcp_region` | string | `"us-central1"` | no |
 | `github_repository` | string | `"nbon12/hoa_management_system"` | no |
 | `frontend_domain` | string | `"dev.nekohoa.com"` | no |
 | `api_domain` | string | `"api-dev.nekohoa.com"` | no |
-| `api_dns_proxied` | bool | `false` → `true` (step 2) | no |
-| `container_image` | string | `"sakurapatch/nekohoa-api:latest"` (placeholder; ignored after) | no |
+| `enable_api_domain` | bool | module default `false`; Dev root default `true` (needs one-time Google domain verification, FR-018) | no |
+| `api_dns_proxied` | bool | `false` → `true` (step 2); Dev root now defaults `true` | no |
+| `stripe_publishable_key` | string | `"pk_test_…"` (plain env var `Stripe__PublishableKey`, FR-006) | no |
+| `container_image` | string | `"us-docker.pkg.dev/cloudrun/container/hello"` (default; Google's public sample, used for the first create only and ignored after; PR #242) | no |
 | `neon_region_id` | string | `"aws-us-east-1"` | no |
 | `neon_api_key` | string | — | **yes** |
 | `cloudflare_api_token` | string | — | **yes** |
@@ -104,6 +113,7 @@ cloudflare: pages_project → pages_domain(dev.nekohoa.com); r2_bucket; record.f
 | `cloudflare_api_token` | **yes** | secret `CLOUDFLARE_API_TOKEN` (echoed input) |
 | `deploy_alert_webhook_url` | **yes** | secret `DEPLOY_ALERT_WEBHOOK_URL` (echoed input) |
 | `cloud_run_service_url` | no | sanity check / health probe target |
+| `image_repository` | no | (internal: the Artifact Registry path `test.yml`/`pr-env.yml` push to; PR #242) |
 | `next_steps` | no | human checklist ending with "set `DEV_DEPLOY_ENABLED=true` **last**" |
 
 ## Validation / invariants

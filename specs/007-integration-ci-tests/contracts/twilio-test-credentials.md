@@ -10,7 +10,7 @@
 |-------|------|------|
 | `ApiKeySid` empty, `AccountSid`+`AuthToken` set | `SendAsync` | `TwilioClient.Init(AccountSid, AuthToken)` (basic auth) |
 | `ApiKeySid` set (production) | `SendAsync` | `TwilioClient.Init(ApiKeySid, ApiKeySecret, AccountSid)` (unchanged) |
-| test creds, `From=+15005550006`, `To=+15005550006` | `SendAsync` | message accepted, `Sid` returned, `AlertSendResult.Ok(sid)`, **no real SMS** |
+| test creds, `From=+15005550006`, `To=` an ordinary valid NANP number (e.g. `+12128675309`, "validated normally") | `SendAsync` | message accepted, `Sid` returned, `AlertSendResult.Ok(sid)`, **no real SMS**. If the account refuses for provisioning reasons (21606/21408), the test Skips |
 | test creds, `To=+15005550001` | `SendAsync` | Twilio `ApiException` (invalid number) → caught → `AlertSendResult.Fail(...)` |
 | not `IsConfigured` | `SendAsync` | `AlertSendResult.Fail("Twilio is not configured.")` (unchanged) |
 
@@ -29,8 +29,10 @@ The opt-out STOP suffix and `From`/`To` handling are unchanged.
 
 | Number | Role | Result |
 |--------|------|--------|
-| `+15005550006` | required `From`, and a valid `To` | success |
+| `+15005550006` | required `From` (not usable as `To`: `To == From` is rejected) | success as `From` |
 | `+15005550001` | `To` | invalid-number error (exercises error mapping) |
+
+*(Amended 2026-10-31: Twilio test credentials have no success magic `To`; see commit 53ebab3 / PR #29.)*
 
 A non-magic `From` throws under test credentials, so `Twilio:FromNumber` MUST be `+15005550006` in Stage 2.
 

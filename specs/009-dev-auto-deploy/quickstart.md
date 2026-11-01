@@ -7,6 +7,8 @@ it. Steps marked **one-time** are platform setup; the day-to-day flow is just "m
 
 ## One-time provisioning (platform)
 
+> **Superseded by specs/010-dev-env-iac-opentofu:** OpenTofu (`infra/environments/dev`) now provisions steps 1–5. Follow the [010 quickstart](../010-dev-env-iac-opentofu/quickstart.md). The steps below remain as the list of what must exist.
+
 1. **Neon Dev database** — create an isolated Dev database/branch. Note its pooled connection
    string (add `Maximum Pool Size=<low>` for Cloud Run). Enable scale-to-zero.
 2. **Cloudflare R2 Dev bucket** — create a Dev documents bucket; create scoped access/secret keys.
@@ -16,11 +18,11 @@ it. Steps marked **one-time** are platform setup; the day-to-day flow is just "m
    [`contracts/environment-matrix.md`](./contracts/environment-matrix.md):
    `ConnectionStrings__DefaultConnection`, `Jwt__Secret`, `Sentry__Dsn`, `Stripe__SecretKey`,
    `Stripe__WebhookSigningSecret`, `Storage__*`, `Jobs__SchedulerSharedSecret`, optional
-   `Twilio__*`/`SendGrid__*`.
+   `Twilio__*`/`Ses__*` (SendGrid was replaced by Amazon SES; see specs/026-ses-email-provider).
 5. **Cloudflare** — create a Dev Pages project; map `api-dev.nekohoa.com` (proxied) to the Cloud
    Run service; confirm authenticated responses are not cached.
 6. **GitHub Actions secrets** — add Workload Identity Federation provider + GCP service account,
-   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DEPLOY_ALERT_WEBHOOK_URL`. (Docker Hub secrets
+   `GCP_PROJECT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DEPLOY_ALERT_WEBHOOK_URL`. (Docker Hub secrets, still used by `docker-push` for the Docker Hub copy that the nightly Trivy re-scan reads,
    already exist.)
 7. **Enable the deploy** — the `deploy-dev` job is a **no-op until** the repo variable
    `DEV_DEPLOY_ENABLED` is set to `true`. Set it (and `GCP_REGION`) only after steps 1–6 are done,
@@ -36,6 +38,8 @@ The authored `deploy-dev` job references these names — provision them with the
 | GitHub **variable** | `GCP_REGION` | Cloud Run region (e.g. `us-central1`) |
 | GitHub **secret** | `GCP_WIF_PROVIDER` | WIF provider resource name |
 | GitHub **secret** | `GCP_DEPLOY_SERVICE_ACCOUNT` | deployer service-account email |
+| GitHub **secret** | `GCP_PROJECT_ID` | GCP project id: Artifact Registry image path (`<region>-docker.pkg.dev/<project>/images-dev/nekohoa-api`) and the scheduler-secret read (PR #100, PR #242) |
+| GitHub **variable** | `SHARED_SECRET_PREFIX` (optional) | Secret Manager prefix for `<prefix>-scheduler-secret`; defaults to `dev` |
 | GitHub **secret** | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | Pages deploy auth |
 | GitHub **secret** | `DEPLOY_ALERT_WEBHOOK_URL` | team-chat webhook (failure alerts) |
 | Cloud Run service | `nekohoa-api-dev` | the Dev backend service |
@@ -47,7 +51,7 @@ The authored `deploy-dev` job references these names — provision them with the
 | Secret Manager `dev-storage-service-url` / `dev-storage-access-key` / `dev-storage-secret-key` | → `Storage__ServiceUrl` / `Storage__AccessKey` / `Storage__SecretKey` | R2 Dev bucket |
 | Secret Manager `dev-scheduler-secret` | → env `Jobs__SchedulerSharedSecret` | scheduler auth |
 
-(The Secret Manager IDs are wired to env-var names via `--set-secrets` in the job; the env-var
+(The Secret Manager IDs are wired to env-var names by OpenTofu in `infra/modules/environment/cloud_run.tf`, not by the job; superseded by specs/010 FR-007, PR #47. The env-var
 names themselves are the ones in [`contracts/environment-matrix.md`](./contracts/environment-matrix.md).)
 
 ## Code changes delivered by this feature

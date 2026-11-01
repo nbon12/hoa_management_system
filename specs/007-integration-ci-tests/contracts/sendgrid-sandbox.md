@@ -1,5 +1,7 @@
 # Contract: SendGrid sandbox-mode seam
 
+> **Superseded by specs/026-ses-email-provider (PR #208, 2026-10-06).** SendGrid, `SendGridEmailProvider.cs` and `SendGridOptions` were removed. The email no-deliver seam is now `Ses:SimulatorOnly` in `Infrastructure/Payments/Alerts/SesEmailProvider.cs` (recipients limited to `@simulator.amazonses.com`). See specs/026-ses-email-provider/contracts/ses-email-adapter.md and contracts/ci-sandbox-ses.md. This file is kept for history only.
+
 **File**: `HOAManagementCompany/Infrastructure/Payments/Alerts/SendGridEmailProvider.cs`
 **Option**: `SendGridOptions.Sandbox` (new, default `false`)
 **Requirements**: FR-015, FR-016; safety FR-008/FR-009/SC-003

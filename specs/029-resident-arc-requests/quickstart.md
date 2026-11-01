@@ -13,7 +13,7 @@ dotnet run --project HOAManagementCompany
 cd neko-hoa && npm ci && npm start          # http://localhost:4200
 ```
 
-Sign in as a resident who owns a seeded property (the existing resident seed user / claim-code flow). All ARC actions below are scoped to the resident's **active property** (the `propertyId` claim); use **Switch property** to change it.
+Sign in as a resident who owns a seeded property (the existing resident seed user / claim-code flow). All ARC actions below are scoped to the resident's **active property** (the `propertyId` claim); if you have two or more homes, change it with the home switcher (the address ▾ in the top strip, labelled "Switch home").
 
 ## Check the user stories
 
@@ -29,10 +29,10 @@ Sign in as a resident who owns a seeded property (the existing resident seed use
    - Open an attachment — it opens via a link that stops working after 5 minutes.
    - For a denied request, the detail shows the wording ("Revisions requested"/"Denied"), the manager's reason and the formal disapproval statement — and **no** votes, voters, or board comments.
    - `GET /api/v1/property/architectural-applications/{idOfAnotherProperty}` returns `403 FORBIDDEN`.
-3. **Respond to more info (US3)**: have a board member (027, e.g. `board@nekohoa.dev`) use **Request info** on your submitted request.
+3. **Respond to more info (US3)**: have a board member (027, e.g. `board@nekohoa.dev`) use **Ask question** (called "Request info" before 031) on your submitted request.
    - Your **dashboard** shows a "more information requested" alert; the request detail shows the question.
    - Reply with a message and an attachment → the marker clears, the due date is unchanged, and the board/manager can see your reply.
-4. **Withdraw (US4)**: on an undecided request, **Withdraw** → it becomes **Withdrawn** in your list and leaves the board's Open list.
+4. **Withdraw (US4)**: on an undecided request, click the red **Withdraw request** button at the top right and confirm → it becomes **Withdrawn** in your list and leaves the board's Open list.
    - It is absent from the board's default Closed tab; a board member enabling **Show withdrawn** (`?includeWithdrawn=true`) sees it.
    - Withdrawing a decided request returns `409 APPLICATION_DECIDED` (or `409 APPLICATION_CLOSED` once closed).
 5. **Revise and resubmit (US6)**: on a **Denied** request, click **Revise and resubmit**.

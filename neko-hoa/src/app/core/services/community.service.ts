@@ -124,14 +124,6 @@ export class CommunityService {
     return res.items.map(d => this._mapDocument(d));
   }
 
-  async searchDocuments(query: string): Promise<HOADocument[]> {
-    const params = new HttpParams().set('search', query).set('pageSize', '200');
-    const res = await firstValueFrom(
-      this.http.get<ApiPage<ApiDocument>>(`${this.base}/community/documents`, { params })
-    );
-    return res.items.map(d => this._mapDocument(d));
-  }
-
   async getDocumentDownloadUrl(documentId: string): Promise<{ url: string; expiresAt: string }> {
     return firstValueFrom(
       this.http.get<{ url: string; expiresAt: string }>(

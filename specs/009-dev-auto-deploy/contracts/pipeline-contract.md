@@ -16,7 +16,7 @@ on:
 `deploy-dev` runs only when:
 
 ```yaml
-if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.DEV_DEPLOY_ENABLED == 'true'
 needs: [docker-push]      # reuse the image CI already built & pushed
 concurrency:
   group: deploy-dev
@@ -27,7 +27,7 @@ concurrency:
 
 | Input | Source |
 |-------|--------|
-| Backend image | `sakurapatch/nekohoa-api:${{ github.sha }}` (from `docker-push`) |
+| Backend image | `${{ vars.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/images-dev/nekohoa-api:${{ github.sha }}` (Artifact Registry, pushed by `docker-push`). The same digest also goes to Docker Hub `sakurapatch/nekohoa-api` for the nightly Trivy re-scan. *(Amended 2026-10-28 by PR #242.)* |
 | GCP auth | Workload Identity Federation (`google-github-actions/auth`) |
 | Cloudflare auth | `secrets.CLOUDFLARE_API_TOKEN`, `secrets.CLOUDFLARE_ACCOUNT_ID` |
 | Failure alert | `secrets.DEPLOY_ALERT_WEBHOOK_URL` |
@@ -36,18 +36,19 @@ concurrency:
 ## Steps (ordered)
 
 1. **Deploy backend candidate** (no traffic):
-   `gcloud run deploy nekohoa-api-dev --image sakurapatch/nekohoa-api:${SHA} --no-traffic --tag candidate
-   --region <region> --set-env-vars ASPNETCORE_ENVIRONMENT=Dev --set-secrets <secret refs>`
+   `gcloud run deploy nekohoa-api-dev --image <region>-docker.pkg.dev/<project>/images-dev/nekohoa-api:${SHA}
+   --no-traffic --tag candidate --region <region>`. This is an **image-only** deploy: the new revision inherits
+   `ASPNETCORE_ENVIRONMENT=Dev`, the secret refs, probes and scaling from the OpenTofu-managed service.
+   *(Superseded by specs/010-dev-env-iac-opentofu FR-007, PR #47: re-asserting `--set-env-vars` wiped
+   tofu's non-secret env vars and crashed startup. Image path amended by PR #242.)*
    → migrations apply + seed run at candidate startup against the **Neon Dev** DB.
 2. **Health gate**: poll the candidate tagged URL `…/health` until `Healthy` (with timeout that
    accommodates startup migration time). Fail the job on timeout/unhealthy.
-3. **Deploy frontend preview**: `npm ci && npm run build -- --configuration=dev`, then deploy
-   `dist/neko-hoa/browser` to Cloudflare Pages as a **preview** deployment.
-4. **E2E gate**: run the full E2E suite against the Dev frontend preview URL (API via
-   `api-dev` domain or candidate URL). Fail the job on any test failure.
+3. **Deploy frontend preview**: `npm ci`; point `src/environments/environment.dev.ts` at the **candidate** URL; `npm run build -- --configuration=dev`; stamp `_headers` for that origin (`scripts/stamp-headers.mjs`); then `pages deploy dist/neko-hoa/browser --project-name=nekohoa-dev --branch=preview-<sha>`. *(Amended by PR #120, a 020-D follow-up: cookie auth binds the refresh token to its login origin, so the pre-promotion frontend must call the candidate.)*
+4. **E2E gates**: (a) the Cypress suite (`npm run e2e:dev`) against the preview URL; (b) read `<SHARED_SECRET_PREFIX or dev>-scheduler-secret` from Secret Manager (PR #100, 017-A) and run the Playwright `@smoke` subset (`npm run e2e:playwright-smoke`) against the preview URL and candidate API (specs/012; curated by specs/014 FR-005, PR #71). Fail the job on any failure.
 5. **Promote (only if steps 1–4 pass)**:
    - Backend: `gcloud run services update-traffic nekohoa-api-dev --to-tags candidate=100`.
-   - Frontend: promote the preview to the Dev production alias.
+   - Frontend: rebuild against the stable `https://api-dev.nekohoa.com` origin, restamp `_headers`, and `pages deploy ... --branch=main` (the Pages production branch). The preview build itself is not promoted.
 6. **Notify on failure**: `if: failure()` → POST to `DEPLOY_ALERT_WEBHOOK_URL` with commit + failed
    step. Success emits no chat message (relies on GitHub deployment status).
 

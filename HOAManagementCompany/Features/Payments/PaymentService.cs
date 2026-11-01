@@ -38,6 +38,7 @@ public class PaymentService(
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderByDescending(e => e.EntryDate)
+            .ThenByDescending(e => e.Sequence)
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
             .Select(e => new LedgerItemDto(e.Id, e.EntryDate, e.DocumentNumber, e.Description, e.ChargeAmount, e.PaymentAmount, e.RunningBalance, e.EntryType.ToString()))

@@ -25,25 +25,25 @@ Sign in as `board@nekohoa.dev` / `Password1!` and click **Enter board mode**.
 
 1. **List (US1)**: open **Architectural Applications** in the sidebar.
    - The tabs read "Open · N" and "Closed · M".
-   - The header pill reads "1 awaiting your vote".
+   - The header pill counts the open applications you haven't voted on (ARC-1042, plus the demo resident's open request from the 029 seed).
    - Search "Pattyam" leaves only ARC-1042.
    - Calling `GET /api/v1/communities/{otherCommunityId}/architectural-applications` returns `403 FORBIDDEN`.
-2. **Vote (US2)**: on ARC-1042 click **Approve**.
-   - The cell reads "you voted approve", the tally goes up, and the pill disappears.
+2. **Vote (US2)**: on ARC-1042 pick **Approve**, then **Submit** (031 two-step voting).
+   - The cell reads "you voted approve", the tally goes up, and the pill count drops by one.
    - Voting again with curl returns `409 ALREADY_VOTED`.
 3. **Detail and attachments (US3)**: select ARC-1042. The panel shows the owner, the received date and three files. Open `fence-plan.pdf` and it opens in a new tab. Load the same link again after 5 minutes and it fails.
-4. **Request info (US4)**: on any open application, click **Info**, enter a message and send. The "info requested" marker appears, the due date is unchanged, and the "doesn't pause the review period" notice is shown.
+4. **Request info (US4)**: on any open application, click **Ask question**, enter a message and send. The "info requested" marker appears, the due date is unchanged, and the notice "Info requests do not delay the due date of the board vote result…" is shown (031 FR-012).
 5. **Needs your vote (US5)**: go to **Community Home**. The card lists unvoted applications, and **All architectural applications →** goes to the list.
 6. **Decision and outcome (US6)**:
-   - Sign in as the seeded board members `board2@nekohoa.dev` … `board5@nekohoa.dev` (same password) and vote **Revisions needed** until three of five are on the denial side. The row reads "decision reached: denied · revisions requested".
-   - Sign in as `manager@nekohoa.dev` and record the outcome with a reason.
+   - Sign in as the seeded board members `board2@nekohoa.dev` … `board5@nekohoa.dev` (same password) and vote **Request revisions** (pick, then Submit) on an application other than ARC-1042 until three of five are on the denial side. The row reads "decision reached: denied · revisions requested".
+   - Sign in as `manager@nekohoa.dev` and record the outcome with a reason. The decision is final one day after the threshold was met (capped at the end of the due date, or of the threshold day when that is later). Before then, recording returns `409 DECISION_NOT_FINAL` (031 FR-006). Locally, wait, or set the row's `DecisionFinalAt` in the past (dev database only).
    - Check the email (below) for the reason, the formal statement and the Revise-and-resubmit link.
    - The v2 application shows its badge and a link back to v1.
 
 ## Settings (manager)
 
-As `manager@nekohoa.dev`, open **ARC Settings**:
-- Set the review period to 45 and the lapse rule to **Deemed approved**. Applications already received keep their old due date.
+As `manager@nekohoa.dev`, open **Community settings › Architectural review** (030 FR-030; the old `/app/board/arc-settings` address redirects there):
+- Set the review period to 45 and the lapse rule to **Auto approve** (`DeemedApproved`). Applications already received keep their old due date.
 - A board member calling `PUT …/architectural-settings` gets `403 FORBIDDEN`.
 
 ## Reminder and lapse sweep (in deployed environments, the `nekohoa-arc-sweep-<env>` Cloud Scheduler job runs it hourly)
@@ -60,7 +60,7 @@ To force a lapse locally, set an open application's `DueDate` in the past (dev d
 
 ## Email locally
 
-Links in emails use `ArchitecturalReview:AppBaseUrl` (deployed environments set it to `https://<frontend_domain>`; locally it is empty, so links are relative). Without SES credentials, outbox rows are marked `Failed` with "No configured provider" (existing behavior). Inspect them:
+Links in emails use `App:BaseUrl`, falling back to the older `ArchitecturalReview:AppBaseUrl` (030 R10). Deployed environments set one of them to `https://<frontend_domain>`; locally both are empty, so links are relative. Without SES credentials, outbox rows are marked `Failed` with "No configured provider" (existing behavior). Inspect them:
 
 ```sql
 SELECT "Kind", "DedupKey", "Status", "PayloadJson" FROM "OutboxMessages"

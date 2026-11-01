@@ -54,9 +54,9 @@ The unit provisioned per qualifying pull request. Identified by the PR number.
 ## Referenced shared primitives (never recreated per PR)
 
 GCP project · Neon **project** `super-water-18090867` · WIF pool/provider `github-pool-dev` ·
-runtime + deployer service accounts · 8 shared operator secrets (jwt, sentry, **Stripe test**
-secret key, storage access/secret keys, scheduler) · `Stripe:PublishableKey` (test) ·
-SendGrid + Twilio sandbox credentials · the `nekohoa-dev` Pages project · the `pr-base` Neon
+runtime + deployer service accounts · 7 shared operator secrets (jwt, sentry, **Stripe test**
+secret key, storage service-url/access/secret keys, scheduler) · `Stripe:PublishableKey` (test) ·
+(no email or SMS credentials yet: per-PR Cloud Run gets neither Amazon SES, which replaced SendGrid per specs/026-ses-email-provider, nor Twilio; see FR-013) · the `nekohoa-dev` Pages project · the `pr-base` Neon
 branch · the state bucket `nekohoa-dev-tfstate`.
 
 ## Entity: Environment Credentials

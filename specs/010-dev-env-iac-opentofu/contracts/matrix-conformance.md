@@ -15,7 +15,7 @@ SC-002). This table is the acceptance checklist — a mismatch breaks the pipeli
 | 4 | Env name | `ASPNETCORE_ENVIRONMENT=Dev` | container env literal |
 | 5 | Access | `--allow-unauthenticated` | `run.invoker` → `allUsers` |
 | 6 | Health probe | `/health` | startup + liveness probe path |
-| 7 | Image (not built here) | `sakurapatch/nekohoa-api:<sha>` | `ignore_changes` on image; pipeline sets it |
+| 7 | Image (not built here) | `<region>-docker.pkg.dev/<project>/images-dev/nekohoa-api:<sha>` (Artifact Registry; amended by PR #242) | `google_artifact_registry_repository.images`; `ignore_changes` on image; pipeline sets it |
 | 8 | Secret `dev-db-connection` → `ConnectionStrings__DefaultConnection` | Neon pooled, .NET keyword | auto-wired version |
 | 9 | Secret `dev-jwt-secret` → `Jwt__Secret` | operator value | secret + version |
 | 10 | Secret `dev-sentry-dsn` → `Sentry__Dsn` | operator value | secret + version |
@@ -29,7 +29,7 @@ SC-002). This table is the acceptance checklist — a mismatch breaks the pipeli
 | 18 | Pages project | `nekohoa-dev`, branch `main` | `cloudflare_pages_project.frontend` |
 | 19 | Frontend domain | `dev.nekohoa.com` | `cloudflare_pages_domain` + record |
 | 20 | API domain | `api-dev.nekohoa.com` → `ghs.googlehosted.com`, grey→proxied | domain mapping + record |
-| 21 | GH secrets read by job | `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SERVICE_ACCOUNT`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DEPLOY_ALERT_WEBHOOK_URL` | outputs (see wiring contract) |
+| 21 | GH secrets read by job | `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DEPLOY_ALERT_WEBHOOK_URL` | outputs (see wiring contract); `GCP_PROJECT_ID` is the `gcp_project_id` input |
 | 22 | GH variables | `GCP_REGION`, `DEV_DEPLOY_ENABLED` | output + manual `true` last |
 
 ## Verification procedure

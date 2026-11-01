@@ -3,6 +3,8 @@
 **Feature**: 001-dashboard-violations-summary  
 **Audience**: Backend implementers, frontend consumers, test authors
 
+> **Superseded (amended 2026-10-31).** `/api/violations/mine` was removed with the Blazor app in PR #10. The list is now `GET /api/v1/community/violations` (Bearer JWT; selected property only; optional `status`, `category`, `page`, `pageSize`; response `{ items, totalCount, page, pageSize }`). It is defined by specs/003-dotnet-api-backend FR-033 and `HOAManagementCompany/Features/Community/Violations/`.
+
 ## Authentication
 
 All endpoints require an authenticated user. Data is scoped to the current user's properties only (FR-005, FR-010).

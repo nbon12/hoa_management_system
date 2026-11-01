@@ -12,14 +12,17 @@ Proves control of an email address before any registration/claim state is reveal
 | `Id` | uuid (PK) | |
 | `Email` | text | normalized/lowercased |
 | `Purpose` | text/enum | `registration` \| `email_change` |
-| `UserId` | uuid (FK, nullable) | null for pre-registration; set for email-change |
+| `UserId` | text (nullable; Identity user id, no FK) | null for pre-registration; set for email-change |
 | `CodeHash` | text | SHA-256 of the one-time code (never store raw) |
 | `ExpiresAt` | timestamptz | short-lived (e.g., 30 min) for verification codes |
-| `ConsumedAt` | timestamptz (nullable) | single-use |
+| `ConfirmedAt` | timestamptz (nullable) | set when the code is confirmed |
+| `ProofHash` | text (nullable) | SHA-256 of the short-lived proof (`verificationToken`) returned by `/auth/verify-email/confirm` |
+| `ProofExpiresAt` | timestamptz (nullable) | proof lifetime (15 min) |
+| `ConsumedAt` | timestamptz (nullable) | proof spent by registration (single-use) |
 | `AttemptCount` | int | attempt-limited |
 | `CreatedAt` | timestamptz | |
 
-Indexes: `(Email, Purpose)`; `ExpiresAt` for cleanup.
+Indexes: `(Email, Purpose)`; `ProofHash` (proof lookup at registration). There is no cleanup job or `ExpiresAt` index yet.
 
 ### New: `PropertyClaimCode`
 Authorizes binding a user to a property (FR-A1). Single-use, 90-day validity, delivered only to the owner's contact on file.
@@ -32,7 +35,7 @@ Authorizes binding a user to a property (FR-A1). Single-use, 90-day validity, de
 | `DeliveredToContact` | text | masked record of the destination (audit) |
 | `ExpiresAt` | timestamptz | issuance + 90 days |
 | `RedeemedAt` | timestamptz (nullable) | single-use |
-| `RedeemedByUserId` | uuid (nullable) | |
+| `RedeemedByUserId` | text (nullable; Identity user id) | |
 | `AttemptCount` | int | attempt-limited before regeneration |
 | `CreatedAt` | timestamptz | |
 

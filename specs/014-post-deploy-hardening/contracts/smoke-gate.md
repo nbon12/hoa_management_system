@@ -5,7 +5,7 @@
 - Curated deployment-health checks are tagged `@smoke` (Playwright `{ tag: '@smoke' }`), mirroring the existing `@local-only` convention.
 - The post-deploy gate runs **only** `@smoke`: `npm run e2e:playwright-smoke` → `playwright test --grep @smoke`.
 - The full regression suite remains runnable unchanged via `npm run e2e` (and `e2e:dev` Cypress) for local/PR use.
-- CI (`.github/workflows/test.yml`, "Playwright smoke suite" step) invokes `e2e:playwright-smoke` instead of `e2e:playwright-dev`.
+- CI (`.github/workflows/test.yml`, `deploy-dev` job, "Playwright smoke gate (vs Dev preview)" step) invokes `e2e:playwright-smoke` instead of `e2e:playwright-dev`.
 
 ## Smoke set membership rules
 

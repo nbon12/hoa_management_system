@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests for scripts/pr-env-clear-stale-lock.sh and scripts/pr-env-audit.sh against stubbed curl, gcloud and
+# Tests for scripts/pr-env-clear-stale-lock.sh, scripts/pr-env-audit.sh and scripts/stripe-webhook-register.sh
+# against stubbed curl, gcloud and
 # gh (no network, no cloud). Same harness as pr-env-reap.test.sh: each case writes the HTTP routes the stub
 # serves, runs a script, and checks its exit code, its output and the calls it made.
 # Run: bash scripts/tests/pr-env-ops.test.sh
@@ -18,12 +19,12 @@ pass=0 fail=0
 cat >"$STUB_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 echo "curl $*" >>"$STUB_DIR/argv"
-method=GET out=/dev/stdout url="" auth=no
+method=GET out=/dev/stdout url="" auth=no w=no
 while [ $# -gt 0 ]; do
   case "$1" in
     -X) method="$2"; shift 2 ;;
     -o) out="$2"; shift 2 ;;
-    -w) shift 2 ;;
+    -w) w=yes; shift 2 ;;
     -H) if [[ "$2" == @* ]] && grep -q '^Authorization: Bearer ' "${2#@}"; then auth=yes; fi; shift 2 ;;
     http*) url="$1"; shift ;;
     *) shift ;;
@@ -35,7 +36,9 @@ while IFS=$'\t' read -r m re c b; do
   if [ "$m" = "$method" ] && [[ "$url" =~ $re ]]; then code="$c" body="$b"; break; fi
 done <"$STUB_DIR/routes"
 printf '%s' "$body" >"$out"
-printf '%s' "$code"
+# The status code is printed only for -w (scripts that read it); otherwise curl prints just the body.
+if [ "$w" = yes ]; then printf '%s' "$code"; fi
+
 EOF
 cat >"$STUB_DIR/bin/gcloud" <<'EOF'
 #!/usr/bin/env bash
@@ -264,6 +267,22 @@ t "audit: tokens go through a file descriptor and every call is authenticated"; 
 orphans_217; audit
 grep -qE 'gcp-test-token|neon-test-token|cf-test-token' "$STUB_DIR/argv" && bad "a token reached curl's argv" || ok
 grep -q 'auth=no' "$STUB_DIR/calls" && bad "a call went out without a token" || ok
+dump_on_fail "$f0"
+
+# ── stripe-webhook-register.sh ────────────────────────────────────────────────────────────────────────
+# The stub picks the method from -X only, so the create call (curl -d …) is routed as GET.
+t "stripe webhook: subscribes to every event the app handles"; f0=$fail
+route GET 'api\.stripe\.com/v1/webhook_endpoints\?limit=100$' 200 '{"data":[]}'
+route GET 'api\.stripe\.com/v1/webhook_endpoints$' 200 '{"secret":"whsec_test"}'
+run stripe-webhook-register.sh STRIPE_SECRET_KEY_TEST=sk_test_x PR_NUMBER=217 \
+  API_URL=https://pr-217.example.run.app GCP_PROJECT_ID=nekohoa-dev
+exit_is 0
+for e in payment_intent.succeeded payment_intent.payment_failed charge.refunded \
+  charge.dispute.created charge.dispute.closed; do
+  grep -qF -- "enabled_events[]=${e}" "$STUB_DIR/argv" && ok || bad "no enabled_events[]=${e}"
+done
+grep -qF 'enabled_events[]=charge.refund.updated' "$STUB_DIR/argv" && bad "subscribed charge.refund.updated" || ok
+called 'gcloud secrets versions add pr-217-stripe-webhook'
 dump_on_fail "$f0"
 
 echo "pr-env ops tests: ${pass} passed, ${fail} failed"

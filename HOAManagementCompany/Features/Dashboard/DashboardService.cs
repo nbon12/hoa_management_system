@@ -16,12 +16,13 @@ public class DashboardService(ApplicationDbContext db)
         var property = await db.Properties.FindAsync([propertyId], ct)
             ?? throw new Features.Auth.DomainException("NOT_FOUND", "Property not found.", 404);
 
-        var latestEntry = await db.LedgerEntries
+        // 006: Sequence, not EntryDate, is the authoritative ledger order (a backdated entry can be
+        // appended later), so the current balance is the RunningBalance of the highest Sequence.
+        var currentBalance = await db.LedgerEntries
             .Where(e => e.PropertyId == propertyId)
-            .OrderByDescending(e => e.EntryDate)
+            .OrderByDescending(e => e.Sequence)
+            .Select(e => e.RunningBalance)
             .FirstOrDefaultAsync(ct);
-
-        var currentBalance = latestEntry?.RunningBalance ?? 0m;
         var balanceDueDate = CalculateDueDate(property.AssessmentDueDay);
 
         var openViolations = await db.Violations
@@ -57,6 +58,7 @@ public class DashboardService(ApplicationDbContext db)
         var recentActivity = await db.LedgerEntries
             .Where(e => e.PropertyId == propertyId)
             .OrderByDescending(e => e.EntryDate)
+            .ThenByDescending(e => e.Sequence)
             .Take(5)
             .Select(e => new LedgerSummary(e.Id, e.EntryDate, e.Description, e.ChargeAmount, e.PaymentAmount, e.RunningBalance, e.EntryType.ToString()))
             .ToListAsync(ct);

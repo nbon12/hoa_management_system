@@ -69,12 +69,16 @@ Absence MUST NOT block startup. A **partially-configured** provider MUST be reje
 | All Twilio fields empty | Valid (alerts disabled). |
 | Any Twilio field set | `AccountSid` and `FromNumber` MUST be present, **and** a usable auth pair MUST exist: (`ApiKeySid` + `ApiKeySecret`) OR `AuthToken` — mirrors `TwilioOptions.IsConfigured`. |
 
-## SendGridOptions  (section `SendGrid`) — optional integration (FR-012)
+## SesOptions  (section `Ses`) — optional integration (FR-012)
+
+> Superseded by specs/026-ses-email-provider: the `SendGrid` section, `SendGridOptions` and
+> `SendGridOptionsValidator` were removed and replaced by `SesOptions` / `SesOptionsValidator`
+> (full rule table in `specs/026-ses-email-provider/data-model.md`).
 
 | Condition | Rule |
 |-----------|------|
-| All SendGrid fields empty | Valid (alerts disabled). |
-| Any SendGrid field set | `ApiKey` and `FromEmail` MUST be present; `FromEmail` MUST be a valid email — mirrors `SendGridOptions.IsConfigured`. |
+| `Region`, `FromEmail`, `AccessKeyId`, `SecretAccessKey` all empty | Valid (email disabled). |
+| Any of those set | `Region` MUST be present and a known AWS region; `FromEmail` MUST be present and a valid email; `AccessKeyId` and `SecretAccessKey` MUST be set together. |
 
 ## Frontend runtime configuration  (`environment.ts`)
 
@@ -90,8 +94,8 @@ Validated at boot only when `production === true` (FR-017/FR-018).
 
 - **`FluentValidateOptions<T>`** — generic `IValidateOptions<T>` adapter; resolves
   `IValidator<T>`, returns `ValidateOptionsResult.Fail(failures)` or `Success`.
-- **`AddValidatedOptions<TOptions, TValidator>(section)`** — DI extension: registers the
+- **`AddValidatedOptions<TOptions, TValidator>(configuration, sectionName[, postConfigure])`** — DI extension: registers the
   validator as `IValidator<TOptions>`, binds the section, adds the adapter, calls
   `ValidateOnStart()`.
 - **Runtime environment** — selects the configuration *source* (placeholders vs. real
-  secrets); does **not** alter which rules apply.
+  secrets); does **not** alter which rules apply to this feature's option groups (later groups may be environment-aware per constitution §8; see the spec.md FR-005 amendment).

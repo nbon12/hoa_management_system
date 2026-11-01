@@ -71,7 +71,7 @@ Locally:
    - Invite `kim@example.com`, accept from the vault link, and Kim sees the home.
    - **Remove** `resident@nekohoa.dev` from 1 Sakura Drive. Its seeded autopay predates this feature and has no enroller recorded, so the preview says it will be cancelled. The schedule becomes `inactive` with reason `resident_removed`, and resident@'s next resident request returns `403 PROPERTY_ACCESS_DENIED`.
    - Scheduled invitations in an Onboarding community are checked in step 4.
-7. **Company defaults (US4)**: change the lapse rule to *Deemed approved*, add a community, and it inherits the change. Existing communities don't change. As `manager@`, the defaults are read-only.
+7. **Company defaults (US4)**: change the lapse rule to *Auto approve* (spec 027's "deemed approved", `DeemedApproved`; relabelled by PR #247), add a community, and it inherits the change. Existing communities don't change. As `manager@`, the defaults are read-only.
 8. **Settings page (US5)**:
    - In the side list, search "review". **Architectural review › Review period** is listed and jumps to the field.
    - **Reset architectural review to company defaults** keeps the next `ARC-` number.

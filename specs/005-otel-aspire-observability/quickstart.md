@@ -12,11 +12,14 @@ database) in the local dashboard within ~5 minutes (SC-007), with no accounts or
 ## 1. Start the stack
 
 ```bash
-docker compose up --build
+docker compose --profile full up --build
 ```
 
-This brings up the existing services (`db`, `minio`, `api`, `ui`) plus the new
-**`aspire-dashboard`** service.
+This brings up `db`, `minio` and the **`aspire-dashboard`** service, plus `api` and `ui`, which
+sit behind the `full` Compose profile (PR #173). Without `--profile full` only `db`, `minio` and
+`aspire-dashboard` start. If you run the API natively instead, set
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:18890`, because the default `aspire-dashboard` host
+name only resolves inside the Compose network.
 
 ## 2. Open the dashboard
 

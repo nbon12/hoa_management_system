@@ -17,8 +17,9 @@ These are repo/ops settings, not code (see research D10/D11):
 3. **Enable billing budgets API** — bootstrap enables `billingbudgets.googleapis.com`;
    supply the billing account id and `pr_env_monthly_budget=25` tfvar; `tofu apply` the
    shared root once so the `google_billing_budget` (alert at 80%) exists.
-4. **Seed the base branch** — ensure the `pr-base` Neon branch exists and is seeded (the
-   sweep self-heals it from Dev if missing).
+4. **Seed the base branch** — ensure the `pr-base` Neon branch exists and is seeded
+   (`scripts/create-pr-base.sh`, then seed it and set `NEON_PR_BASE_BRANCH_ID` / `NEON_PR_ROLE_PASSWORD`).
+   The daily sweep only reports a missing `pr-base`; it does not recreate it.
 5. *(optional)* enable **"Require actions to be pinned to a full-length commit SHA"** after
    confirming all workflows pin actions to SHAs.
 
@@ -32,14 +33,15 @@ These are repo/ops settings, not code (see research D10/D11):
    - **API**: `https://nekohoa-api-pr-<n>-…run.app`
    - **Web**: `https://pr-<n>.nekohoa-dev.pages.dev`
    and a passing/failing check.
-4. Push more commits → the env refreshes (concurrency-cancels the in-flight run).
+4. Push more commits → the env refreshes. A run in flight is never cancelled (a cancelled `tofu apply` strands its state lock; amended by PR #235, issue #234). The newest push waits and runs once the current run finishes.
 5. Merge or close → `pr-env-teardown.yml` destroys everything within 30 min.
 
 ## Reclaim / re-up
 
 - An open PR with **no new commits for 7 days** is reclaimed by the sweep (a comment says so).
 - **Re-up**: push any qualifying commit, or re-run `pr-env.yml` from the Actions tab. A fresh
-  env rebuilds identically; both behaviors reset the 7-day clock.
+  env rebuilds identically. Only a push resets the 7-day clock: the sweep measures inactivity from the PR's
+  latest commit, so an env rebuilt by a re-run alone is reclaimed again by the next daily sweep.
 
 ## Verifying the feature (maps to acceptance scenarios)
 

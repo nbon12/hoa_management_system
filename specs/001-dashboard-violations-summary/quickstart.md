@@ -7,7 +7,7 @@
 
 - .NET 9 SDK
 - PostgreSQL (local or configured connection string)
-- Okta or ASP.NET Core Identity configured (per project)
+- Docker (PostgreSQL and MinIO via `docker compose up -d` from the repo root). ASP.NET Core Identity + JWT are preconfigured for local Development in `HOAManagementCompany/appsettings.Development.json`
 
 ## Build
 
@@ -37,13 +37,13 @@ Ensure appsettings (or environment) has the correct PostgreSQL connection string
 
 Per workspace rules and constitution:
 
-- **Unit / integration**: `PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal`
-- **UI (Playwright)**: Tests use namespaced data; do not rely on a clean DB. Create and dispose data unique to the test run.
+- **Unit / integration (backend)**: `dotnet test` (xUnit + Testcontainers; needs Docker)
+- **UI (Playwright)**: from `neko-hoa/`, run `npm run e2e`. Tests use namespaced data; do not rely on a clean DB. Create and dispose data unique to the test run.
 
 From repository root:
 
 ```bash
-PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal
+dotnet test
 ```
 
 ## Feature artifacts
@@ -61,5 +61,5 @@ PLAYWRIGHT_HEADLESS=true dotnet test --verbosity normal
 
 1. **Data model**: Add Property entity and Violation.PropertyId; migration(s). Existing violations can be erased (no production DB; early development).
 2. **Backend**: Dashboard summary endpoint (open violation count + placeholders); My Violations list endpoint (paginated, scoped to current user). On failure, return user-friendly message "Failed to load violation count".
-3. **Frontend (Angular in `frontend/`)**: Dashboard page with 2×2 grid; Violations box with loading state, count, link to My Violations; My Violations page with paginated list; placeholders for other three boxes.
+3. **Frontend (Angular; originally `frontend/`, removed in PR #10. The app is now `neko-hoa/`)**: Dashboard page with 2×2 grid; Violations box with loading state, count, link to My Violations; My Violations page with paginated list; placeholders for other three boxes.
 4. **Tests**: Unit tests for count/list logic; integration tests for API and DB; Playwright for login → dashboard → My Violations flow (namespaced data).

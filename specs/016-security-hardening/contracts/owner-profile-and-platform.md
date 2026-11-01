@@ -1,7 +1,7 @@
 # Contract: Owner Profile & Platform Behaviors — Sub-spec C
 
-## PATCH /owners/{id} (verified email change + input caps)
-- **Auth**: authenticated; property-scoped (existing tenancy check preserved).
+## PATCH /property/owner (verified email change + input caps)
+- **Auth**: authenticated; the owner is that of the caller's selected home (no id in the path), with the per-request resident check (030 FR-024g) preserved.
 - **Request** (partial): `firstName?`, `lastName?`, `mailingAddress?`, `phone?`, `email?`
 - **Validation** (FluentValidation): all string fields `MaximumLength` bounded; `phone` E.164; `email` well-formed. Privileged fields (e.g., voting rights) remain **non-editable** (no over-posting) — preserved and tested.
 - **Email change**: if `email` changes, the new value does **not** take effect immediately. The endpoint initiates an `EmailVerification` (purpose=`email_change`) to the new address; the change applies only after `POST /auth/verify-email/confirm` succeeds, at which point the login/identity store is synced. Response indicates "verification pending" for the email field.
@@ -15,7 +15,7 @@
 - Deployed non-local environments (incl. Dev) return `{ error: <generic message>, correlationId }` with no type/stack/internals. Full detail only in local `Development` and server-side logs keyed by `correlationId`. Production unchanged.
 
 ## Security headers (C FR-C7)
-- API responses carry the hardened baseline via repo-controlled app middleware: `X-Content-Type-Options: nosniff`, frame options, and `Strict-Transport-Security` where applicable. Asserted by test. (Frontend CSP is delivered separately via `neko-hoa/src/assets/_headers`, enforcing — Sub-spec D.)
+- API responses carry the hardened baseline via repo-controlled app middleware: `X-Content-Type-Options: nosniff`, frame options, and `Strict-Transport-Security` where applicable. Asserted by test. (Frontend CSP is delivered separately via `neko-hoa/src/_headers`, copied to the build root by `angular.json` and stamped per deployment by `scripts/stamp-headers.mjs`, enforcing — Sub-spec D, `specs/020-security-hardening-subspec-d/`.)
 
 ## Rate limiting (C FR-C3/FR-C4)
 - Telemetry proxy limiter partitions by trusted-edge client identity (not the edge address). A global default limiter applies to endpoints without a specific policy, including anonymous registration.

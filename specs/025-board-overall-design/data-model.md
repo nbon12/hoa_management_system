@@ -11,12 +11,12 @@ The tenant boundary for all board-side features. Replaces the denormalized
 |---|---|---|
 | `Id` | `Guid` | Primary key. |
 | `LegalName` | `string` | Nullable at migration time; backfilled empty, filled in later by a community manager (no UI in this spec). |
-| `CommunityName` | `string` | The management company's human-readable handle. **Unique** (see research.md R1). Backfilled from `Property.CommunityName`. |
+| `CommunityName` | `string` | The management company's human-readable handle. **Unique** (see research.md R1). Backfilled from `Property.CommunityName`. *Changed by 030 (FR-007, R15):* unique per management company, ignoring case and surrounding spaces (`ManagementCompanyId` + `NormalizedName`); 030 also adds `ManagementCompanyId` and lifecycle stamps (see 030 data-model.md). |
 | `County` | `string?` | Nullable. |
 | `FormationDate` | `DateOnly?` | Nullable. |
 | `ManagementStartDate` | `DateOnly?` | Nullable. |
 | `Description` | `string?` | Nullable, free text. |
-| `Status` | `CommunityStatus` | `Active` \| `Inactive`. New rows default `Active`. |
+| `Status` | `CommunityStatus` | `Active` \| `Inactive`. New rows default `Active`. *Superseded by specs/030-company-administration (FR-010):* `Onboarding` \| `Active` \| `Archived`; a new community starts `Onboarding`; `Inactive` was migrated to `Archived`. |
 | `ParentCommunityId` | `Guid?` | Self-referencing FK. Null for a master association or a standalone community; set for a sub-association (FR-003). |
 | `CreatedAt` | `DateTimeOffset` | `DateTimeOffset.UtcNow` default, matching existing entity convention (`Property.CreatedAt`, `Violation.CreatedAt`). |
 
@@ -47,7 +47,7 @@ Clarifications 2026-08-23; research.md R4). Scope stays per `Community` row: nei
 widened across the master/sub-association hierarchy.
 
 **Effective-permission rule** (FR-010): a membership confers no permission when
-`Status != Active`, or `EndDate` is non-null and `EndDate < today (UTC)`. This is evaluated at
+`Status != Active`, or `EndDate` is non-null and `EndDate < today (UTC)`, or (030 FR-012) its community is `Archived`. This is evaluated at
 read time by `ICommunityScopeResolver` (research.md R4) — never cached or baked into the JWT
 (FR-014).
 
@@ -83,12 +83,13 @@ public enum MembershipStatus
 ```csharp
 public enum CommunityStatus
 {
+    Onboarding, // 030
     Active,
-    Inactive,
+    Archived,   // 030; Inactive was migrated to Archived
 }
 ```
 
-An inactive `Community` makes every membership in it non-board-accessible regardless of the
+An `Archived` `Community` (030 FR-010, FR-012; formerly `Inactive`) makes every membership in it non-board-accessible regardless of the
 membership's own status (spec Edge Cases: "A user holds exactly one community but it is
 inactive/offboarded").
 

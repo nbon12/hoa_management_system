@@ -1,113 +1,28 @@
-# Integration Tests
+# HOAManagementCompany.Tests
 
-This directory contains integration tests for the HOA Management Company application.
+xUnit tests for the backend API, in `Integration/`, `Unit/`, `Performance/` and `Startup/`, with shared harness code in `Fixtures/` and `Factories/`.
 
-## Test Structure
+## How tests get a database
 
-- **TestBase.cs**: Base class providing database setup, cleanup, and helper methods
-- **ViolationIntegrationTests.cs**: Tests for Violation entity operations
-- **ViolationTypeIntegrationTests.cs**: Tests for ViolationType entity operations  
-- **ComplexIntegrationTests.cs**: Complex workflow and performance tests
+No local PostgreSQL, test database or `dotnet ef` step is needed. Docker must be running.
 
-## Local Development
+- `Fixtures/TestDatabaseFixture.cs` starts throwaway `postgres:17` and MinIO containers with Testcontainers, applies the EF Core migrations and seeds test data (`Fixtures/TestDataSeeder.cs`).
+- `Fixtures/IntegrationTestBase.cs` hosts the API in-process with `WebApplicationFactory<Program>` in the `Test` environment (`HOAManagementCompany/appsettings.Test.json`) and points it at those containers.
+- Test parallelization is disabled (`AssemblyInfo.cs`).
 
-### Prerequisites
+## Running tests
 
-- .NET 9.0 SDK
-- PostgreSQL 15+ running locally
-- Entity Framework CLI tools
+From the repo root:
 
-### Running Tests Locally
+```bash
+dotnet test --filter "Category!=Sandbox"   # what the CI `test` job runs
+```
 
-1. **Setup test database** (one-time setup):
-   ```bash
-   ./scripts/setup-test-db.sh
-   ```
+The `Sandbox` category runs the real Stripe/SES/Twilio adapters against provider test modes and needs test-mode secrets; see [`Integration/Sandbox/README.md`](Integration/Sandbox/README.md).
 
-2. **Run tests**:
-   ```bash
-   # Using the test database
-   export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=test_hoa;Username=postgres;Password=postgres"
-   dotnet test HOAManagementCompany.Tests
-   
-   # Or using your local development database
-   dotnet test HOAManagementCompany.Tests
-   ```
+## CI
 
-### Test Data Namespacing
+`.github/workflows/test.yml` runs on pushes and pull requests to `main` or `develop`:
 
-All tests use namespaced data to prevent interference:
-- Each test creates data with a unique prefix based on the test method name
-- Example: `CreateViolation_ShouldSucceed` creates violation types named `CreateViolation_ShouldSucceed_GRASS_VIOLATION`
-- This ensures tests can run in parallel without conflicts
-
-## GitHub Actions
-
-The `.github/workflows/test.yml` workflow automatically:
-
-1. **Sets up PostgreSQL 15** as a service container
-2. **Runs database migrations** to create the test schema
-3. **Executes all integration tests** against the test database
-4. **Uploads test results** as artifacts
-
-### Workflow Triggers
-
-- Push to `main` or `develop` branches
-- Pull requests to `main` or `develop` branches
-
-### Environment Variables
-
-The workflow uses these environment variables:
-- `ConnectionStrings__DefaultConnection`: Points to the test PostgreSQL instance
-- `ASPNETCORE_ENVIRONMENT`: Set to `Development`
-
-## Test Database Configuration
-
-### Local Development
-- **Database**: `sequestria` (from appsettings.json)
-- **User**: `sequestria1`
-- **Password**: `HXCKFJ3498fajjAJR94`
-
-### CI/CD (GitHub Actions)
-- **Database**: `test_hoa`
-- **User**: `postgres`
-- **Password**: `postgres`
-
-## Troubleshooting
-
-### Common Issues
-
-1. **PostgreSQL not running**:
-   ```bash
-   # Start with Docker
-   docker run --name postgres-test -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=test_hoa -p 5432:5432 -d postgres:15
-   ```
-
-2. **Migration errors**:
-   ```bash
-   cd HOAManagementCompany
-   dotnet ef database update
-   ```
-
-3. **Connection string issues**:
-   - Ensure the connection string environment variable is set correctly
-   - Check that PostgreSQL is accessible on localhost:5432
-
-### Test Cleanup
-
-Tests automatically clean up their data after execution. If you encounter issues:
-
-1. **Manual cleanup**:
-   ```sql
-   -- Connect to your database and run:
-   DELETE FROM "Violations" WHERE "Description" LIKE '%_%';
-   DELETE FROM "ViolationTypes" WHERE "Name" LIKE '%_%' AND "Id" NOT IN (SELECT DISTINCT "ViolationTypeId" FROM "Violations");
-   ```
-
-2. **Reset database**:
-   ```bash
-   cd HOAManagementCompany
-   dotnet ef database drop --force
-   dotnet ef database update
-   ```
-test222
+- `test` job: `dotnet test --filter "Category!=Sandbox"` with `ASPNETCORE_ENVIRONMENT=Test`, plus coverage (Codecov, and a diff-coverage report on pull requests).
+- `integration-sandbox` job (push to `main` only): `dotnet test --filter "Category=Sandbox"` with test-scoped provider secrets.

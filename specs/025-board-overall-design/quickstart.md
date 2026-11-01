@@ -24,7 +24,7 @@ rather than a raw SQL insert — this also exercises FR-042 in the same pass:
 2. Sign in as an existing user with a `CommunityManager` membership (or grant one directly via
    the migration's backfilled data if this is the very first run).
 3. `POST /api/v1/communities/{communityId}/memberships` to grant a second user a `BoardMember`
-   membership in community A only.
+   membership in community A only. Under 030 the user must already live in, or hold a membership in, community A; anyone else is invited with `{ "role": "BoardMember", "email": "…" }` (030 FR-018).
 
 ## Verify the user stories
 
@@ -34,9 +34,9 @@ rather than a raw SQL insert — this also exercises FR-042 in the same pass:
    membership) you land directly on that community's home. Switch back to Resident; confirm the
    dashboard is unchanged. Sign out and back in: you return to the mode you left in (FR-022).
 2. **Community scope (US2)** — as the community-A Board Member, call any board-scoped endpoint
-   (e.g. `GET /api/v1/communities/{communityA}/memberships`) — succeeds. Substitute community B's
-   id — `403 FORBIDDEN`, same body as a nonexistent community id (FR-016). Check `SecurityEvents`
-   (or the equivalent Serilog sink) for an audit entry after viewing association-wide data
+   (e.g. `GET /api/v1/board/metrics?communityId={communityA}&surface=CommunityMetrics`) — succeeds. Substitute community B's
+   id — `403 FORBIDDEN`, same body as a nonexistent community id (FR-016). Check the API log
+   for a `BoardAssociationDataAccess` event (Actor, Community, Resource, At) after viewing association-wide data
    (FR-017).
 3. **Navigate the board shell (US3)** — sign in as Board Member, Community Manager, and
    Accountant against the same seeded community in turn; confirm the sidebar differs per role, and
@@ -47,14 +47,14 @@ rather than a raw SQL insert — this also exercises FR-042 in the same pass:
    empty state, not a headerless table.
 5. **Grant and edit membership (US5)** — as the Community Manager, grant a membership per
    step 3 above; confirm the new Board Member's mode control appears on their very next request
-   with no engineering/seed-script step (SC-009). Edit the membership's `endDate` to yesterday;
+   with no engineering/seed-script step (SC-009). End the membership with `PATCH …/memberships/{id}` `{ "end": true }` (030; an end date before the start date is refused with 422);
    confirm the member loses board access on their next request (FR-023).
 
 ## Automated checks
 
 ```bash
 # Backend — resolver + membership + migration coverage (95%-critical files per constitution §9)
-dotnet test HOAManagementCompany.Tests --filter "FullyQualifiedName~CommunityScope|FullyQualifiedName~CommunityMembership"
+dotnet test HOAManagementCompany.Tests --filter "FullyQualifiedName~CommunityScope|FullyQualifiedName~MembershipAdmin|FullyQualifiedName~CommunityBackfill"
 
 # Frontend — mode service, nav-derivation (0/1/2+ community counts), shell, metric table, glossary
 cd neko-hoa && npm run test:ci
@@ -65,8 +65,8 @@ npx playwright test --grep "board-mode|role-gate"
 # Cypress E2E — sign-in → board mode → community home
 npm run e2e:ci
 
-# Storybook — shell, banner, metric table, hero stats, glossary panel visual regression
-npm run storybook -- --ci
+# Storybook — builds the shell, banner, metric table, hero stats and glossary panel stories (the CI step)
+npm run build-storybook
 ```
 
 ## Repowise

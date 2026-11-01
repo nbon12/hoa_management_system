@@ -31,12 +31,12 @@ Record the bucket name; it goes into each environment's `backend.tf`.
 cd ../../environments/dev
 cp terraform.tfvars.example terraform.tfvars     # gitignored — never commit
 $EDITOR terraform.tfvars                          # fill secrets/inputs (Neon key, CF token, etc.)
-$EDITOR backend.tf                                # set bucket = <UNIQUE_STATE_BUCKET>, prefix = state/dev
+$EDITOR backend.tf main.tf                        # set bucket = <UNIQUE_STATE_BUCKET> in backend.tf AND state_bucket in main.tf (both ship as nekohoa-dev-tfstate); prefix = state/dev
 ```
 
 `terraform.tfvars` supplies: `neon_api_key`, `cloudflare_api_token`, `cloudflare_account_id`,
 `cloudflare_zone_id`, `gcp_project_id`, `gcp_region`, `github_repository`, the eight
-`operator_secrets`, and `deploy_alert_webhook_url`. Leave `api_dns_proxied = false` for now.
+`operator_secrets`, `deploy_alert_webhook_url`, `stripe_publishable_key`, and `billing_account_id` (013 PR-env budget; no default). Leave `api_dns_proxied = false` for now. Set `enable_api_domain = false` until `nekohoa.com` is ownership-verified with Google (Search Console): the Dev root defaults it to `true`, and the domain mapping cannot be created before verification (FR-018).
 
 ## Step 3 — Plan & apply (cert step 1: grey-cloud)
 
@@ -46,13 +46,13 @@ tofu plan -out tf.plan
 tofu apply tf.plan
 ```
 
-This creates Neon, Cloud Run `nekohoa-api-dev`, the SAs + WIF, the nine secrets (with
+This creates Neon, Cloud Run `nekohoa-api-dev`, the Artifact Registry repository `images-dev` (while the temporary `import` block in `main.tf` remains, it adopts an existing `images-dev`; on a fresh project create the repository first or delete that block), the hourly Cloud Scheduler job `nekohoa-arc-sweep-dev` (027), the PR-environment billing budget (013), the SAs + WIF, the nine secrets (with
 `dev-db-connection` auto-wired), Pages `nekohoa-dev`, the R2 bucket, and DNS with the API record
 **unproxied** so Google can issue the custom-domain certificate.
 
 ## Step 4 — Flip the API domain to proxied (cert step 2)
 
-Wait for the Cloud Run domain mapping to report the cert as active, then:
+Once the domain is verified, set `enable_api_domain = true` and apply. Wait for the Cloud Run domain mapping to report the cert as active, then:
 
 ```bash
 # set api_dns_proxied = true in terraform.tfvars

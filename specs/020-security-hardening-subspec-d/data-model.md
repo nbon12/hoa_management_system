@@ -18,13 +18,13 @@ Removed from localStorage: `neko_token`, `neko_refresh`, `neko_user` (all three 
 ```text
 Set-Cookie: neko_refresh=<opaque token>;
   HttpOnly; Secure;
-  SameSite=<Auth:RefreshCookie:SameSite>;   # Strict (Prod, Dev) | None (PR envs) | Lax (local Development)
+  SameSite=<Auth:RefreshCookie:SameSite>;   # Strict (Production) | None (Dev + PR envs: preview origins are cross-site) | Lax (local Development/Test)
   Path=/api/v1/auth;
   Max-Age=2592000                            # 30 days = Jwt:RefreshTokenExpiryDays
 ```
 
 - Cleared on logout and on failed refresh: same attributes with `Max-Age=0`.
-- `Auth:RefreshCookie` options are FluentValidation-validated at startup: `SameSite ∈ {Strict, Lax, None}`; `None` additionally requires Secure (always true) and a non-empty CORS allowlist.
+- `Auth:RefreshCookie` options are FluentValidation-validated at startup: `SameSite ∈ {Strict, Lax, None}`. `Secure` is always set, so `None` never goes out without it. The refresh endpoint's Origin check uses the resolved CORS allowlist (`CorsOriginSettings`), which falls back to localhost when `Cors:AllowedOrigins` is unset.
 
 ## State transitions
 
@@ -41,4 +41,4 @@ App start, no hint ──▶ Anonymous (no network call)
 ## Cross-tab coordination artifacts (frontend, ephemeral)
 
 - Web Lock name: `neko-refresh` (exclusive) — holder performs the single rotation.
-- `BroadcastChannel('neko-auth')` messages: `{type:'token', token, expiresAt}` on refresh success; `{type:'logout'}` on logout/refresh failure (all tabs drop to Anonymous).
+- `BroadcastChannel('neko-auth')` messages: `{type:'token', token}` on refresh success (receiving tabs read expiry from the JWT `exp` claim); `{type:'logout'}` on logout/refresh failure (all tabs drop to Anonymous).

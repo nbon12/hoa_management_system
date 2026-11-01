@@ -3,6 +3,8 @@
 **Feature**: 001-dashboard-violations-summary  
 **Date**: 2025-03-14
 
+> **Superseded (amended 2026-10-31).** This schema was dropped with the Blazor app in PR #10 (003-dotnet-api-backend). There is no `ViolationType` entity, `Property.OwnerUserId` or `Property.DisplayName`. Users link to properties through `UserProperties` (many-to-many). `Violation` carries `PropertyId`, `CommunityId` (GUID FK since 025), `Title`, `Description`, `Category`, `Status`, `IssuedDate`, `ResolvedDate`, `DueDate`, `FineAmount` and `ImageUrl`. See [specs/003-dotnet-api-backend/data-model.md](../003-dotnet-api-backend/data-model.md).
+
 ## Scope
 
 This document describes entities and relationships required to support the Dashboard (violation count) and My Violations list, including changes to the existing model.

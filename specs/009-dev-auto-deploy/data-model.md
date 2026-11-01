@@ -77,12 +77,12 @@ Dev and Staging/Prod.
 | Attribute | Description |
 |-----------|-------------|
 | `commit` | `${{ github.sha }}` that triggered the run (merge to `main`) |
-| `image` | `sakurapatch/nekohoa-api:${commit}` published by `docker-push` |
+| `image` | `<region>-docker.pkg.dev/<project>/images-dev/nekohoa-api:${commit}`, published to Artifact Registry by `docker-push` and mirrored to Docker Hub `sakurapatch/nekohoa-api` (amended by PR #242) |
 | `backend_candidate` | Cloud Run revision deployed `--no-traffic --tag=candidate` |
-| `frontend_preview` | Cloudflare Pages preview deployment |
+| `frontend_preview` | Cloudflare Pages preview deployment (`--branch=preview-<sha>`) built against the candidate API URL |
 | `gate_health` | `/health` on the candidate returns healthy |
-| `gate_e2e` | full E2E suite passes against Dev URLs |
-| `promoted` | traffic shifted to candidate + preview promoted to Dev alias (only if gates pass) |
+| `gate_e2e` | Cypress suite (`e2e:dev`) and the Playwright `@smoke` subset pass against the preview/candidate |
+| `promoted` | traffic shifted to the candidate, and the frontend rebuilt for `api-dev.nekohoa.com` and deployed to the Pages `main` branch (only if gates pass) |
 | `status` | success / failure (failure → chat notification) |
 
 **State transitions**:

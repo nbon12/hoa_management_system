@@ -4,6 +4,8 @@
 
 These schemas and endpoints are **additions** to `neko-hoa/api/openapi.yaml` introduced during the clarification phase. They must be merged into `openapi.yaml` before or during implementation.
 
+> **Partly superseded (amended 2026-10-31).** [017](../../017-security-hardening-subspec-a/spec.md) FR-A1/FR-A3/FR-A5 (PR #100) replaced `RegisterRequest` below (`email` + `accountNumber`) and the `ACCOUNT_NOT_FOUND` / `ACCOUNT_ALREADY_CLAIMED` codes. Registration now takes `verificationToken`, `password`, `firstName`, `lastName` and `claimCode`, and a failed proof or code, a taken email or a claimed property is HTTP 422 `REGISTRATION_FAILED`. [020](../../020-security-hardening-subspec-d/contracts/auth-session.md) FR-D1 (PR #103) removed `AuthResponse.refreshToken` and the `/auth/refresh` request body. The refresh token travels only in the HttpOnly `neko_refresh` cookie, and `/auth/refresh` has an empty body. Spec 030 added `communityId`, `communityName` and `communityStatus` to each `CurrentUser.properties` item.
+
 ---
 
 ## Modified Schemas

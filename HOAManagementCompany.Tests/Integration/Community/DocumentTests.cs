@@ -27,6 +27,21 @@ public class DocumentTests(TestDatabaseFixture fixture) : IntegrationTestBase(fi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // 003 FR-036: optional pinned filter.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetDocuments_PinnedFilter_ReturnsOnlyMatchingDocuments(bool pinned)
+    {
+        await SetAuthHeaderAsync();
+        var response = await Client.GetAsync($"/api/v1/community/documents?pinned={pinned.ToString().ToLowerInvariant()}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var items = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray().ToList();
+        Assert.NotEmpty(items);
+        Assert.All(items, d => Assert.Equal(pinned, d.GetProperty("pinned").GetBoolean()));
+    }
+
     [Fact]
     public async Task GetDocumentDownload_UnknownId_Returns404()
     {

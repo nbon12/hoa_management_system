@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, signal, viewChild, untracked } from '@angular/core';
+import { Component, OnDestroy, OnInit, effect, inject, signal, viewChild, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ArcCounts, ArcListItem, ArcVoteChoice, ArchitecturalService } from '../../../core/services/architectural.service';

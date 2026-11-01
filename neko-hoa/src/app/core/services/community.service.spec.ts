@@ -117,16 +117,6 @@ describe('CommunityService', () => {
     });
   });
 
-  describe('searchDocuments()', () => {
-    it('passes search as query param', async () => {
-      const promise = svc.searchDocuments('budget');
-      const req = http.expectOne(r => r.url.includes('/community/documents'));
-      expect(req.request.params.get('search')).toBe('budget');
-      req.flush({ items: [], totalCount: 0, page: 1, pageSize: 200 });
-      await promise;
-    });
-  });
-
   describe('getDocumentDownloadUrl()', () => {
     it('calls /community/documents/{id}/download and returns presigned url', async () => {
       const promise = svc.getDocumentDownloadUrl('doc-123');

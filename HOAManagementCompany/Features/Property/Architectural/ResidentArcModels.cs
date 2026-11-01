@@ -65,12 +65,6 @@ public sealed class ResidentArcDraftAttachmentRoute
     public Guid AttachmentId { get; set; }
 }
 
-public sealed class ResidentArcDraftUploadRequest
-{
-    public Guid DraftId { get; set; }
-    public IFormFile? File { get; set; }
-}
-
 public sealed class ResidentArcRoute
 {
     public Guid Id { get; set; }
