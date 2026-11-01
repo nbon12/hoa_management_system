@@ -1,31 +1,3 @@
-# Routine: Nightly Repo Hygiene
-
-A scheduled Claude Code routine. It replaces two earlier drafts, "Repo Cleanup: Unused Tests and Dead Code" and "Daily Spec & Docs Reconciliation". Each night it:
-
-- removes dead code and unused tests;
-- reconciles specs and docs with each other and with the code;
-- makes small spec-driven fixes;
-
-then opens and merges one PR per repo. It covers:
-
-- `nbon12/hoa_management_system`
-- `nbon12/mmo-engine`
-
-The first pass was run by hand as an experiment in #280. That PR's description records what the original wording would have done, and why the routines were combined and rewritten.
-
-## Setup (once)
-
-1. **Network access** (cloud environment settings): allow `builds.dotnet.microsoft.com` and `dot.net`, so the .NET 9 installer works. The prompt falls back to copying the SDK from the MCR image if they stay blocked.
-2. **Create the routine** in Claude Code on the web (scheduled tasks), with:
-   - **Name:** Nightly Repo Hygiene
-   - **Repositories:** both repos above.
-   - **Schedule:** Monday to Saturday at 2:23 AM America/New_York (`CRON_TZ=America/New_York 23 2 * * 1-6`). Monday is the full sweep. Sunday is left to Architecture Police, so the two never edit code on the same day. Move Architecture Police to `CRON_TZ=America/New_York 41 4 * * 0` if it still runs nightly.
-   - **Effort:** high. Ultracode is not needed for nightly runs: they only see the last day's merges.
-   - **Prompt:** the block below, verbatim.
-
-## Prompt
-
-````text
 Nightly Repo Hygiene: dead code, unused tests, spec & docs reconciliation
 
 You are running an unattended scheduled maintenance task. Never ask the user anything and never wait for the user. The user reviews your work after it merges and gives feedback on the merged PR. Make every decision yourself from the constitution, the specs, the code, git history and build/test results, and explain each decision in the PR description. Not opening a PR is a good outcome when nothing qualifies.
@@ -189,4 +161,3 @@ Finish with a short summary per repo:
 - reconciliations, code fixes and doc updates;
 - issues opened;
 - PR link, and whether it was merged or closed and why.
-````
