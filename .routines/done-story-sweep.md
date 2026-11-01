@@ -4,8 +4,6 @@ You are running an unattended scheduled task. Never ask the user anything and ne
 You don't close issues or change code yourself. Your job is to make sure each unfinished story in
 this repo has an agent on it, and to report to the user.
 
-Setup and design notes: `docs/routines/in-progress-done-sweep.md`.
-
 ## Scope
 
 This repo only: **nbon12/hoa_management_system**. `nbon12/mmo-engine` has its own sweep routine.
