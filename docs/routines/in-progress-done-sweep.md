@@ -1,10 +1,10 @@
-# Routine: In Progress → Done sweep
+# Routine: Done story sweep (In Progress → Done)
 
-A scheduled Claude Code routine. Once a day it makes sure every unfinished story has an agent on it,
-in two repos:
+A scheduled Claude Code routine. Once a day it makes sure every unfinished story in
+`nbon12/hoa_management_system` has an agent on it.
 
-- `nbon12/hoa_management_system`
-- `nbon12/mmo-engine`
+`nbon12/mmo-engine` runs its own copy of this routine, kept in that repo's
+`.routines/done-story-sweep.md`. Each routine handles only its own repo's issues and sessions.
 
 If an agent is already working on a story, the routine leaves it alone. If a matching session is
 idle, the routine nudges it. If there is none, the routine starts a new cloud session. That agent
@@ -25,7 +25,7 @@ issues or changes code. It reports to you what it handed off and what is waiting
 
 2. **Look for an agent already on the story.** It checks, in this order:
    - **Cloud sessions, and local sessions with Remote Control.** First a session tagged
-     `story:<repo>:<n>`. Otherwise a session whose title or latest summary names the issue; the
+     `story:hoa_management_system:<n>`. Otherwise a session whose title or latest summary names the issue; the
      routine then tags it, so the next run finds it exactly.
    - **`@claude` runs.** An in-progress run of the Claude workflow for that issue.
    - **Agents it can't see,** such as local sessions without Remote Control. A push or PR update for
@@ -37,7 +37,7 @@ issues or changes code. It reports to you what it handed off and what is waiting
    | Working | Nothing. |
    | Waiting on you | Tells you. It never answers for you. |
    | Idle | Sends it the worker message. The message is queued, so it never interrupts a turn. |
-   | None, archived or failed | Starts a new cloud session with the worker message, tagged `story:<repo>:<n>`. |
+   | None, archived or failed | Starts a new cloud session with the worker message, tagged `story:hoa_management_system:<n>`. |
 
 4. **The worker** checks the story against the done rules:
    - **Done:** it posts the evidence on the issue and closes it as completed. The project's
@@ -60,20 +60,19 @@ A cloud session has the full GitHub tools, shows up in your Claude app, and can 
 ## Setup (once)
 
 1. **Project auto-move.** In <https://github.com/users/nbon12/projects/1>, open **⋯ → Workflows**. Set
-   both **Item closed** and **Pull request merged** to Status **Done**. If `mmo-engine`'s issues are
-   on a different project, do the same there.
+   both **Item closed** and **Pull request merged** to Status **Done**.
 2. **Create the routine** in Claude Code on the web (scheduled tasks):
-   - **Name:** In Progress → Done sweep
-   - **Repositories:** both repos above.
+   - **Name:** Done story sweep (hoa_management_system)
+   - **Repository:** `nbon12/hoa_management_system` only.
    - **Schedule:** daily at 6:47 AM America/New_York (`CRON_TZ=America/New_York 47 6 * * *`), after
-     the 5:30 AM routines.
+     the 5:30 AM routines. The `mmo-engine` sweep runs at 7:13 AM, so the two don't overlap.
    - **Prompt:** the contents of [`.routines/done-story-sweep.md`](../../.routines/done-story-sweep.md),
      copied as it is.
    - **Notifications:** push on.
 
    The worker sessions it starts use the routine's environment and permission mode. That mode has to
    let an unattended session edit, commit, push and open PRs, as your other routines already do.
-3. **Steering.** Worker sessions are titled `Story <repo>#<n>: …` and show up in your Claude app. You
+3. **Steering.** Worker sessions are titled `Story hoa_management_system#<n>: …` and show up in your Claude app. You
    can watch or redirect them there. To stop the sweep from touching a story, reopen it after a sweep
    closure, or close it yourself.
 
@@ -84,7 +83,7 @@ worker message the routine sends to each agent.
 
 ## Notes
 
-- **Cost.** Each run reads up to 50 issues per repo and starts at most 3 sessions. A worker is a full
+- **Cost.** Each run reads up to 50 issues and starts at most 3 sessions. A worker is a full
   agent run, so the cap and the 72-hour cooldown are what limit the spend.
 - **Messages to your own sessions.** A worker message arrives in an idle session as a new turn,
   marked as coming from another session. Archive a session to stop the sweep messaging it. If the
