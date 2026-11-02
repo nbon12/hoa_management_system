@@ -14,7 +14,7 @@ Tooling only. No application behavior, API or data change.
 
 - **A scheduled task that starts a fresh session never gets the session tools.** These are `list_sessions`, `create_session`, `send_message` and the rest. This holds whether the task was made in the claude.ai UI or from a session (both tested 2026-11-02). Its `claude-code-remote` server has at most `add_repo` and the PR subscribe tools. That is why the "Daily done checker" run on 2026-11-02 did nothing.
 - **A session started from another session does have them** (origin `claude_code_mcp_seed`), and so does a scheduled task that messages that session.
-- **The `@claude` workflow (`claude.yml`) can't do work yet.** Every real run fails with "Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN … is required", because neither repo secret is set. The sweep doesn't rely on it.
+- **The `@claude` workflow (`claude.yml`) works as of 2026-11-02.** Before that, every real run failed with "Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN … is required". The first successful run was [41497347693](https://github.com/nbon12/hoa_management_system/actions/runs/41497347693). The sweep doesn't start `@claude` runs. It hands off to sessions, and only counts an `@claude` run already in progress as "agent already on it" (Step 3).
 
 **How the sweep runs now** (`.routines/done-story-sweep.md`, Step 0 picks the mode)
 
@@ -34,7 +34,7 @@ Tooling only. No application behavior, API or data change.
 
 **Left open**
 
-- If you want `@claude` handoffs, set `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` in this repo's secrets. mmo-engine has no `claude.yml` at all.
+- If the dispatcher keeps failing, the watchdog could fall back to posting `@claude` comments in this repo. It doesn't do that today, to avoid duplicate handoffs. mmo-engine has no `claude.yml` at all.
 
 ---
 
