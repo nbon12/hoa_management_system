@@ -89,6 +89,7 @@ Run up to six probes. Pick the riskiest NLTs in blocking scope: denial scenarios
    - Backend: `dotnet test HOAManagementCompany.Tests --filter "FullyQualifiedName~<Class>.<Method>"`. The first run builds the solution. Integration tests need Docker for Testcontainers and `ASPNETCORE_ENVIRONMENT=Test`, which CI sets.
    - Frontend unit: run `npm --prefix neko-hoa ci` once, then `npm --prefix neko-hoa run test:ci -- --include <path relative to neko-hoa>`.
    - Playwright and Cypress tests need a running app. Don't probe them; judge them by reading.
+   In CI only these command forms are allowed, plus piping into `head`, `tail` or `grep`: no `cd`, `&&` or redirects. If one is refused, retry it in the exact form above before calling the probe inconclusive. Docker is available there for Testcontainers.
 3. Restore the file with `git restore <file>`. Before the next probe, check that `git status --porcelain` matches the output you saved.
 
 If the test still passes, it **survived**: the NLT is Weak, and the finding is confirmed. If it fails on your change, that supports Faithful. If it fails for an unrelated reason (a build error, Docker unavailable), the probe is inconclusive. Say so and rely on reading.

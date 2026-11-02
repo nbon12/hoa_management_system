@@ -15,7 +15,7 @@
 #           with a Spec-Test-Review-Fix trailer, posts the report and then the attempt's comment, and
 #           pushes, which starts the next review. A crashed attempt pushes an empty commit so the next pass
 #           retries. Writes pushed, superseded and unresolved to $GITHUB_OUTPUT. Env: REPO PR HEAD_REF
-#           HEAD_SHA ATTEMPT MAX_FIX_ATTEMPTS MERGE_TOKEN FIX_OUTPUT (the fixer's JSON) PATCH_FILE
+#           HEAD_SHA ATTEMPT MAX_FIX_ATTEMPTS MERGE_TOKEN FIX_OUTPUT (the fixer's JSON) FIX_RESULT PATCH_FILE
 #           REPORT_FILE RUN_URL; PUSH_URL overrides the remote (tests).
 #   decide  The Spec test verdict check: exits 0 (pass) or 1 (fail). A pass with findings left is the
 #           last one: it files them in a follow-up issue and passes, so the loop always ends green. A later
@@ -65,8 +65,10 @@ scope() {
 
 make_patch() {
   local dest="${1:?usage: patch OUT}"
-  "${GIT[@]}" add -A -- . "${CONFIG_EXCLUDES[@]}"
-  "${GIT[@]}" diff --cached --binary --no-textconv --no-ext-diff >"$dest"
+  # Stage everything, then leave the agent config out when diffing: naming an ignored path (the action
+  # ignores .claude-pr/) in `git add`, even to exclude it, is an error.
+  "${GIT[@]}" add -A .
+  "${GIT[@]}" diff --cached --binary --no-textconv --no-ext-diff -- . "${CONFIG_EXCLUDES[@]}" >"$dest"
 }
 
 # Changed and untracked paths, one per line; both sides of a rename.
@@ -123,7 +125,8 @@ push() {
   fi
   local url="${PUSH_URL:-https://x-access-token:${MERGE_TOKEN}@github.com/${REPO}.git}"
   local fixed="" disputes="" unresolved="" summary="" paths="" why="" crashed=no remote body sha id err
-  if [ -n "${FIX_OUTPUT:-}" ] && jq -e 'type == "object"' >/dev/null 2>&1 <<<"$FIX_OUTPUT"; then
+  # A failed fix job (FIX_RESULT) counts as a crash too: its patch may be missing even when its JSON isn't.
+  if [ "${FIX_RESULT:-success}" = success ] && [ -n "${FIX_OUTPUT:-}" ] && jq -e 'type == "object"' >/dev/null 2>&1 <<<"$FIX_OUTPUT"; then
     fixed="$(jq -r '[.fixed[]?] | join(", ")' <<<"$FIX_OUTPUT")"
     disputes="$(jq -r '.disputes[]? | "- **\(.id)**: \(.evidence)"' <<<"$FIX_OUTPUT")"
     unresolved="$(jq -r '.unresolved[]? | "- **\(.id)**: \(.reason)"' <<<"$FIX_OUTPUT")"

@@ -79,7 +79,7 @@ jobs:
       REVIEW_ARGS: |
         --model opus
         --max-turns 150
-        --allowedTools "Read,Glob,Grep,Edit,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*)"
+        --allowedTools "Read,Glob,Grep,Edit,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(docker info:*)"
         --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","findings","not_applicable"]},"report":{"type":"string"}},"required":["verdict","report"],"additionalProperties":false}'
     steps:
       - name: Checkout repository
@@ -254,7 +254,9 @@ jobs:
                - Frontend: `npm --prefix neko-hoa ci` once, then
                  `npm --prefix neko-hoa run test:ci -- --include <path relative to neko-hoa>`
                Then check that it can fail: break the production behavior it covers, see the test fail, and
-               undo the break with `git restore <file>`.
+               undo the break with `git restore <file>`. Docker is available for Testcontainers. Only
+               these command forms are allowed (plus piping into `head`, `tail` or `grep`): no `cd`, `&&`
+               or redirects. If one is refused, retry it in the exact form above.
             2. **Leave it unresolved** when the faithful test fails because the production code doesn't do
                what the scenario says. That is a bug in the implementation, not the test. Undo that test
                change, and give the failure as the reason.
@@ -278,7 +280,7 @@ jobs:
           claude_args: |
             --model opus
             --max-turns 150
-            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(docker info:*)"
             --json-schema '{"type":"object","properties":{"fixed":{"type":"array","items":{"type":"string"}},"disputes":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"evidence":{"type":"string"}},"required":["id","evidence"]}},"unresolved":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"reason":{"type":"string"}},"required":["id","reason"]}},"summary":{"type":"string"}},"required":["fixed","disputes","unresolved","summary"]}'
 
       - name: Save the fix as a patch
@@ -320,6 +322,7 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       ATTEMPT: ${{ needs.fix.outputs.attempt }}
       FIX_OUTPUT: ${{ needs.fix.outputs.result }}
+      FIX_RESULT: ${{ needs.fix.result }}
       REPORT: ${{ needs.review.outputs.report }}
     steps:
       # A clean checkout. Nothing the fixer, or the tests it ran, left behind in its tree reaches this token.
