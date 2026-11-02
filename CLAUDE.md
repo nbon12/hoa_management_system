@@ -84,8 +84,8 @@ C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard con
 
 ## Never at-mention Claude in what you post to GitHub
 
-Everything a session posts to GitHub posts as nbon12 (OWNER). `.github/workflows/claude.yml` starts a paid
-run when the at-sign followed by `claude` appears, in any letter case, in:
+Everything a session posts to GitHub posts as nbon12 (OWNER). `.github/workflows/claude.yml` starts a job
+(and a Claude run, if the action's own trigger check also matches) when the at-sign followed by `claude` appears, in any letter case, in:
 - an issue or PR comment, a PR review comment, or a submitted review's body;
 - an issue's title or body, when the issue is **opened or assigned**.
 
@@ -96,7 +96,7 @@ the workflow matches the raw text. So:
 - **Never open or assign an issue** whose title or body contains it.
 
 The only exception: nbon12 asked you, in this conversation, to start that workflow on a specific issue
-or PR. This is the one copy of the rule; routines point here.
+or PR. Routines that post to GitHub restate this rule in one line and point here. Keep them in step.
 
 ## Patch notes: read them, and add to them when you merge
 
