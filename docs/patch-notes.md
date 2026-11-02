@@ -6,6 +6,32 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · PR_LINK_PENDING
+
+Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **The maintainer is no longer a step in the pipeline.** New constitution section 14 ("Autonomous Delivery & Human Input", numbered after Governance so section 13 citations stay valid). New and changed specs, plans, tasks, checklists, quickstarts and PR descriptions must not contain:
+  - tasks or checklist items assigned to a person;
+  - manual verification or QA;
+  - "STOP and validate", approval or sign-off checkpoints;
+  - "things only a human can do" sections.
+
+  Every check is an automated test or CI check. Existing specs are not rewritten only to remove an earlier human step.
+- **Ambiguity is decided, not asked.** Pick the most defensible default, record it under the spec's Assumptions, and continue. No `[NEEDS CLARIFICATION]` markers and no mid-workflow questions. `CLAUDE.md` says this overrides the upstream Spec Kit text that asks the user: the clarification questions in `/speckit.specify` and the "incomplete checklists, proceed anyway?" prompt in `/speckit.implement`.
+- **The automated checks are the merge gate.** A PR is not held for human review, and CI/CD or ops controls are automated guards (dry run, rate limit, kill switch, audit trail), not required reviewers. Product features where people act (a board vote, a moderation queue) are unaffected.
+- **Exceptions are narrow:** third-party accounts and root credentials, billing, admin-only settings, amending the constitution, and an irreversible action on production data or real money that no guard bounds. Even then the work ships inert and safe by default, the maintainer is told once with exact steps, and nothing blocks a merge.
+- **Templates changed.** The spec template's Constitution Requirements and Assumptions text, the plan template's Constitution Check, and the tasks template: "STOP and VALIDATE" is now "VALIDATE … continue when green", "Deploy/Demo" is "Deploy", quickstart validation is an automated check, and the Polish phase has a human-step audit task.
+- **Testing constitution 2.1:** "approved in writing" now reads "documented in the plan", so it can't be read as an approval gate.
+
+**Left open**
+
+- `.routines/done-story-sweep.md` (here and in `nbon12/mmo-engine`) still reserves merges, approvals and reviews for the owner. Section 14 supersedes that. The edit is task S3 of the [zero-touch handoff](handoffs/2026-11-02-zero-touch-operations.md).
+- Amendments to the constitution stay owner-merged under section 13, this one included. The owner can relax that by amending section 13.
+
+---
+
 ## 2026-11-02 · Zero-touch ops: a policy gate replaces the `ops` approval, the sweep reaps orphans · [#298](https://github.com/nbon12/hoa_management_system/pull/298)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) (#295). Tooling only. No application behavior, API or data change.

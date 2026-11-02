@@ -67,6 +67,12 @@ Confirm the plan satisfies the active HOA Management Company Constitution:
   shared component it must land after) is explicitly documented here and minimized; where this
   feature was split from a larger effort, the split is designed so sibling specs can be worked
   on in parallel.
+- **Autonomous delivery (section 14)**: The plan contains no task, checkpoint, or verification
+  that assigns work to a person or needs manual QA, review, approval, or sign-off. Ambiguities are
+  recorded Assumptions, not open questions. CI/CD and ops controls are automated guards (dry run,
+  rate limit, kill switch, audit trail), not required reviewers. Any unavoidable human action
+  (third-party accounts or root credentials, billing, admin-only settings) is off the critical path:
+  the work ships inert and safe by default and the maintainer is notified once.
 
 ## Project Structure
 
