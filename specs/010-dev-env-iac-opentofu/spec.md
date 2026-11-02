@@ -24,7 +24,7 @@ rest with no further manual cloud setup.
 ### Session 2026-06-13
 
 - Q: How should the OpenTofu code under `infra/` be structured for multi-environment reuse with isolated state? → A: A reusable shared module (`infra/modules/*`) called by per-environment directories (`infra/environments/dev`, `.../staging`, `.../prod`), each with its own tfvars and backend config.
-- Q: What gate should guard the apply-on-merge workflow? → A: ~~**Prod** apply requires manual approval (protected GitHub Environment with a required reviewer)~~ **Amended 2026-11-02** (decision D2, `docs/handoffs/2026-11-02-zero-touch-operations.md` §5; constitution §14): **Prod** applies automatically behind automated gates, while repo variable `PROD_OPS_AUTOMATED` is `on`. **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
+- Q: What gate should guard the apply-on-merge workflow? → A: ~~**Prod** apply requires manual approval (protected GitHub Environment with a required reviewer)~~ **Amended 2026-11-02** (decision D2, `docs/handoffs/2026-11-02-zero-touch-operations.md` §5; constitution §14): **Prod** is promoted automatically by a scheduled workflow behind automated gates, while repo variable `PROD_OPS_AUTOMATED` is exactly `on`. The `prod` GitHub Environment stays, limited to `main` and holding the Prod secrets, with no required reviewer. **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
 - Q: How should remote state (GCS) be isolated across environments? → A: A single versioned GCS state bucket with a distinct prefix/path per environment (e.g. `state/dev`, `state/staging`, `state/prod`).
 - Q: Beyond restricting deployer-SA impersonation to this repo, should the WIF trust also be ref-restricted? → A: No — repo-scoped only (any branch/ref in this repo may impersonate the deployer); this keeps PR plan-only runs able to authenticate without a second identity.
 
@@ -126,9 +126,10 @@ the gated apply runs and converges the environment.
    **Then** it produces a plan only and makes no changes to live resources.
 2. **Given** an infrastructure change to **Dev** (or Staging) is merged, **When** the apply
    workflow runs, **Then** it applies the change automatically to that environment; **Given** the
-   change targets **Prod**, the apply runs automatically only while repo variable
-   `PROD_OPS_AUTOMATED` is `on` and the FR-026 gates pass. Otherwise it skips the Prod apply, changes
-   nothing, and reports why. It never waits for a person.
+   change targets **Prod**, it is promoted automatically only while repo variable
+   `PROD_OPS_AUTOMATED` is exactly `on` and the FR-026 gates pass. Otherwise the promotion is refused,
+   changes nothing, and reports which gate refused. It never waits for a person. (Gate tests:
+   `scripts/tests/prod-promotion-gate.test.sh`.)
 3. **Given** either workflow runs, **When** it authenticates to the cloud accounts, **Then** it does
    so without any long-lived static credentials committed to the repo.
 
@@ -299,10 +300,12 @@ new isolated state target — not duplicating or editing the resource definition
   the infrastructure definitions, making **no** changes to live resources.
 - **FR-026** (amended 2026-11-02, decision D2): A GitHub Actions workflow MUST run an **apply** on
   merge to `main`. For **Dev** (and Staging), the apply runs **automatically** with no approval step.
-  **Prod** also applies automatically, with no required reviewer or manual approval (constitution
-  §14), but only when all of these hold:
-  - repo variable `PROD_OPS_AUTOMATED` is `on`. This is the Prod kill switch: unset or any other value
-    skips the Prod apply and reports it on the ops log;
+  **Prod** is promoted automatically by a scheduled workflow, with no required reviewer or manual
+  approval (constitution §14). It runs in the `prod` GitHub Environment, which is limited to `main` and
+  holds the Prod secrets, so they are never repo-wide. It promotes only when all of these hold, each
+  checked by `scripts/prod-promotion-gate.sh` or a CI gate:
+  - repo variable `PROD_OPS_AUTOMATED` is exactly `on`. This is the Prod kill switch: unset or any
+    other value refuses the promotion and reports why on the ops log;
   - Staging was applied with the same commit and has been green for at least 24 h;
   - the Staging smoke and E2E gates pass;
   - the Prod plan has no `destroy` or `replace` on a stateful resource (Neon project or branch, R2

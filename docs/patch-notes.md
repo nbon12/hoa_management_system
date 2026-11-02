@@ -6,6 +6,33 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · [#308](https://github.com/nbon12/hoa_management_system/pull/308)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §5 and §8 (#295, [decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)). Spec: [`specs/010-dev-env-iac-opentofu/spec.md`](../specs/010-dev-env-iac-opentofu/spec.md) FR-026 (amended). No application change.
+
+**Changes earlier assumptions**
+
+- **D1: never ask nbon12 to review, approve or merge a PR.** A guarded-path PR gets the independent automated review in [`.routines/merge-policy.md`](../.routines/merge-policy.md) and then merges, followed by a notification. Constitution amendments are the only exception (§13, §14).
+- **D2: Prod is no longer gated by a required reviewer.** Spec 010 FR-026 is amended, and the clarification and acceptance scenario 2 change with it.
+  - A scheduled promotion workflow promotes to Prod while repo variable **`PROD_OPS_AUTOMATED`** is exactly `on`. Unset or any other value, including `ON`, refuses the promotion and reports why.
+  - These gates must also pass:
+    - Staging has run the same commit for 24 h;
+    - the Staging smoke and E2E gates pass;
+    - the Prod plan has no delete or replace of a stateful resource.
+  - After the apply, Cloud Run rolls back on its own if health fails within 15 min.
+  - The `prod` GitHub Environment stays: it limits deploys to `main` and scopes the Prod secrets. It just has no reviewer.
+
+**Shared pieces to reuse**
+
+- `scripts/prod-promotion-gate.sh switch|soak|plan`, tested in `scripts/tests/prod-promotion-gate.test.sh`, which CI runs under "Ops scripts". Nothing calls it until Prod exists.
+
+**Left open**
+
+- Build `prod-promote.yml` when `infra/environments/prod` is added. Its shape is sketched at the bottom of `infra-apply.yml`. `PROD_OPS_AUTOMATED` doesn't need setting until then.
+- Z1 (#295 S7) runs on its own once the P3 window clears on 2026-11-03.
+
+---
+
 ## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
 
 Tooling only. No application behavior, API or data change.
@@ -48,27 +75,6 @@ Spec: none (constitution amendment). Process and agent guidance only. No applica
 - Amendments to the constitution stay owner-merged under section 13. This one merged on the owner's explicit approval. The owner can relax the rule by amending section 13.
 
 **Read together with the merge policy.** [`.routines/merge-policy.md`](../.routines/merge-policy.md) (#299, handoff task S3) landed first and agrees with section 14: no human review, and guarded paths get an independent *automated* review. `CLAUDE.md` now links it, which closes the open item in the #299 entry below.
-
----
-
-## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · [#308](https://github.com/nbon12/hoa_management_system/pull/308)
-
-Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §5 and §8 (#295). Spec: [`specs/010-dev-env-iac-opentofu/spec.md`](../specs/010-dev-env-iac-opentofu/spec.md) FR-026 (amended). No application change.
-
-**Changes earlier assumptions**
-
-- **D1: never ask nbon12 to review, approve or merge a PR.** A guarded-path PR gets the independent automated review in [`.routines/merge-policy.md`](../.routines/merge-policy.md) and then merges, followed by a notification. Constitution amendments are the only exception (§13, §14).
-- **D2: Prod is no longer gated by a required reviewer.** Spec 010 FR-026 is amended, and the clarification and acceptance scenario 2 change with it. Prod applies on its own while repo variable **`PROD_OPS_AUTOMATED`** is `on`, and only if these gates pass:
-  - Staging was applied with the same commit and has been green for 24 h;
-  - the Staging smoke and E2E gates pass;
-  - the Prod plan has no destroy or replace on a stateful resource.
-
-  After a promotion, Cloud Run rolls back on its own if health fails within 15 min. Unset or any other value skips the Prod job, which reports it and never waits. Don't create a `prod` GitHub Environment with a reviewer.
-
-**Left open**
-
-- Prod doesn't exist yet. Build the FR-026 gates when `infra/environments/prod` is added. The commented `apply-prod` job in `infra-apply.yml` shows the shape. `PROD_OPS_AUTOMATED` doesn't need setting until then.
-- Z1 (#295 S7) runs on its own once the P3 window clears on 2026-11-03.
 
 ---
 

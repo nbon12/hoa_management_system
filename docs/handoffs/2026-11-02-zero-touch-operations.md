@@ -22,6 +22,16 @@ can't be read through the cloud session's proxy, so their current values are tak
 
 Read this first. Where it differs from the plan below, this section wins.
 
+**Decisions answered (2026-11-02, [record on #295](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)):**
+- **D1:** guarded-path PRs get the automated review in §3, then merge without asking nbon12.
+- **D2:** Prod is promoted automatically behind the §5 gates while `PROD_OPS_AUTOMATED` is exactly `on`.
+  The `prod` Environment stays (`main` only, Prod secrets) with no reviewer. The gate checks are in
+  `scripts/prod-promotion-gate.sh`, with tests. The scheduled promotion workflow is built when
+  `infra/environments/prod` exists.
+- **D3:** the default limits stay.
+
+O1–O3 are done. What's left is Z1 (S7), which is scheduled to run on its own.
+
 **Done in the S1/S2/S4–S6 PR:**
 - **S1.** `pr-env-repair.yml` runs `scripts/pr-env-policy-gate.sh` in place of "Require the ops approval
   gate". `preflight` checks P1, P3, P4, P5 and P8 before any credential is minted. `check-plan` runs P7 on a
@@ -235,7 +245,7 @@ infra/**                      HOAManagementCompany/Features/Auth/**
 HOAManagementCompany/Features/Payments/**                **/Migrations/**
 ```
 
-**Independent automated review (recommended answer to D1):**
+**Independent automated review (D1, answered 2026-11-02: this, with no permission asked):**
 - **Who reviews:** a *separate* session, started with `create_session` and given only the PR link
   and the diff. It runs the `code-review` skill at `high` and posts its findings on the PR.
 - **What happens next:** the authoring session fixes every confirmed blocking finding, then merges.
@@ -281,8 +291,8 @@ Prod doesn't exist (`infra/environments/prod` is absent), so G5 isn't urgent. De
 built.
 
 **Decided (D2, 2026-11-02):** Prod promotes **automatically**, and spec 010 FR-026 is amended. Repo
-variable `PROD_OPS_AUTOMATED` = `on` turns the automation on. Unset or any other value means the Prod
-job skips and posts on the ops log, with no approval wait. The gates are:
+variable `PROD_OPS_AUTOMATED` = `on` (exact) turns the automation on. Unset or any other value means
+the promotion is refused and the reason is posted on the ops log, with no approval wait. The gates are:
 - Staging applied with the same commit, and green for at least 24 h;
 - the Staging smoke and E2E gates pass (the same Playwright and Cypress gates as Dev);
 - `infra-plan` for Prod has no `destroy` or `replace` on stateful resources (Neon project or
@@ -292,8 +302,10 @@ job skips and posts on the ops log, with no approval wait. The gates are:
 
 The owner is notified of each Prod promotion.
 
-The gates are built when `infra/environments/prod` is created. Until then, the commented `apply-prod`
-job in `infra-apply.yml` shows the shape.
+The gate checks are in `scripts/prod-promotion-gate.sh` (`switch`, `soak` and `plan`), with tests.
+The scheduled `prod-promote.yml` that runs them is built when `infra/environments/prod` is created. Its
+shape is sketched at the bottom of `infra-apply.yml`. The `prod` Environment keeps `main` only and the
+Prod secrets, with no reviewer.
 
 ## 6. Verification
 
@@ -355,8 +367,9 @@ in "Ops scripts (shellcheck + tests)": P7's name filter must reject a shared nam
   in §3, then merge without asking nbon12 for permission. nbon12 gets a notification after the merge.
   Constitution amendments are the only PRs nbon12 still merges, under constitution §13 and §14.
 - **D2: Prod is fully automated**, behind the gates in §5, with its own kill switch: the repo variable
-  `PROD_OPS_AUTOMATED`. When it is `on`, Prod promotes on its own. When it is unset or anything else,
-  the Prod job skips and posts on the ops log; it never waits for a person. Spec 010 FR-026 is amended
+  `PROD_OPS_AUTOMATED`. When it is exactly `on`, Prod promotes on its own. When it is unset or
+  anything else, the promotion is refused and the reason is posted on the ops log; it never waits for a
+  person. Spec 010 FR-026 is amended
   to match.
 - **D3** keeps the default limits.
 

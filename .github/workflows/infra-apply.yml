@@ -1,6 +1,7 @@
-# Apply on merge to main for infra/ changes (FR-026). Dev (and later Staging) auto-apply; Prod is
-# GATED behind a protected GitHub Environment (`prod`) with a required reviewer — see the commented
-# job below and T030. Authenticates via WIF (FR-027).
+# Apply on merge to main for infra/ changes (FR-026). Dev (and later Staging) auto-apply. Prod is not
+# applied from here: it is promoted automatically by a scheduled workflow behind automated gates, with no
+# required reviewer (FR-026 as amended 2026-11-02, decision D2; see the sketch at the bottom of this
+# file). Authenticates via WIF (FR-027).
 name: infra-apply
 
 on:
@@ -57,44 +58,29 @@ jobs:
       - name: tofu apply
         run: tofu apply -input=false -auto-approve -lock-timeout=10m
 
-  # --- Prod apply (ENABLE WHEN environments/prod EXISTS) -------------------------------------------
-  # Prod applies automatically, with no required reviewer (FR-026 amended 2026-11-02, decision D2;
-  # constitution §14). It runs only while repo variable PROD_OPS_AUTOMATED is `on` (the Prod kill switch).
-  # When the Prod env directory is added, build the FR-026 gates as steps before the apply:
-  #   - Staging was applied with this commit and has been green for 24 h;
-  #   - the Staging smoke and E2E gates pass;
-  #   - the plan has no destroy or replace on a stateful resource;
-  #   - automatic Cloud Run rollback if health fails within 15 min.
-  # Then uncomment this job and point working-directory at infra/environments/prod. While the switch is off,
-  # report the skip on the ops-log issue.
+  # --- Prod promotion (BUILD WHEN infra/environments/prod EXISTS) -----------------------------------
+  # Not a job here. A push-triggered job can't meet FR-026's 24 h Staging soak, so Prod gets its own
+  # workflow, `prod-promote.yml`. Its shape (FR-026 amended 2026-11-02, decision D2; constitution §14):
   #
-  # apply-prod:
-  #   name: Apply (prod) — gated
-  #   needs: apply-dev
-  #   runs-on: ubuntu-latest
-  #   if: vars.PROD_OPS_AUTOMATED == 'on'   # Prod kill switch; no Environment reviewer
-  #   defaults:
-  #     run:
-  #       working-directory: infra/environments/prod
-  #   env:
-  #     TF_VAR_gcp_project_id: ${{ secrets.PROD_GCP_PROJECT_ID }}
-  #     TF_VAR_neon_api_key: ${{ secrets.PROD_NEON_API_KEY }}
-  #     TF_VAR_cloudflare_api_token: ${{ secrets.PROD_CLOUDFLARE_API_TOKEN }}
-  #     TF_VAR_cloudflare_account_id: ${{ secrets.PROD_CLOUDFLARE_ACCOUNT_ID }}
-  #     TF_VAR_cloudflare_zone_id: ${{ secrets.PROD_CLOUDFLARE_ZONE_ID }}
-  #     TF_VAR_deploy_alert_webhook_url: ${{ secrets.PROD_DEPLOY_ALERT_WEBHOOK_URL }}
-  #     TF_VAR_operator_secrets: ${{ secrets.PROD_TF_VAR_OPERATOR_SECRETS }}
-  #   steps:
-  #     - uses: actions/checkout@v7.0.1
-  #     - id: auth
-  #       uses: google-github-actions/auth@v3
-  #       with:
-  #         workload_identity_provider: ${{ secrets.PROD_GCP_WIF_PROVIDER }}
-  #         service_account: ${{ secrets.PROD_GCP_DEPLOY_SERVICE_ACCOUNT }}
-  #     - uses: opentofu/setup-opentofu@v2
-  #       with:
-  #         tofu_version: "1.8.0"
-  #     - name: tofu init
-  #       run: tofu init -input=false
-  #     - name: tofu apply
-  #       run: tofu apply -input=false -auto-approve
+  #   on: schedule (daily) + workflow_dispatch
+  #   environment: prod   # keeps "Deployment branches: main only" and the Environment-scoped PROD_*
+  #                       # secrets (never repo-wide); NO required reviewer
+  #   steps, each failing closed with a red run:
+  #     1. scripts/prod-promotion-gate.sh switch      PROD_OPS_AUTOMATED exactly "on" (tested: case-
+  #                                                   sensitive, unlike an Actions `==`). On refusal,
+  #                                                   post the reason on the ops-log issue: never a
+  #                                                   silent job-level skip.
+  #     2. pick the newest main commit whose Staging apply succeeded ≥ 24 h ago, and check it with
+  #        scripts/prod-promotion-gate.sh soak (STAGING_SHA, STAGING_APPLIED_AT)
+  #     3. the Staging smoke and E2E gates are green for that commit
+  #     4. tofu plan -out, then scripts/prod-promotion-gate.sh plan on its "<actions> <address>" lines:
+  #        no delete or replace of a stateful resource
+  #     5. tofu apply the saved plan
+  #     6. after the apply: watch health and error rate for 15 min; on failure, move Cloud Run traffic
+  #        back to the previous revision
+  #     7. always: report the promotion (or why it didn't happen) on the ops-log issue and in the summary
+  #
+  # Secrets it will need, in the `prod` Environment: PROD_GCP_PROJECT_ID, PROD_NEON_API_KEY,
+  # PROD_CLOUDFLARE_API_TOKEN, PROD_CLOUDFLARE_ACCOUNT_ID, PROD_CLOUDFLARE_ZONE_ID,
+  # PROD_DEPLOY_ALERT_WEBHOOK_URL, PROD_TF_VAR_OPERATOR_SECRETS, PROD_GCP_WIF_PROVIDER,
+  # PROD_GCP_DEPLOY_SERVICE_ACCOUNT.

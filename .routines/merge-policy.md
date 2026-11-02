@@ -1,7 +1,7 @@
 # Merge policy: when a session merges its own PR
 
-Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 and decision D1 (issue #295), which nbon12
-answered on 2026-11-02: guarded-path PRs get an automated review and merge without asking for
+Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 and its §8 decision D1 (issue #295), which
+nbon12 answered on 2026-11-02 ([decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)): guarded-path PRs get an automated review and merge without asking for
 permission. Constitution §14 ("Merge on green, always") requires the same thing. Never ask nbon12 to
 review, approve or merge a PR. The one exception is a constitution amendment (below).
 
