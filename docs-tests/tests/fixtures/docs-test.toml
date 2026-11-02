@@ -1,0 +1,13 @@
+# Config for the harness's own fixtures. The real corpus excludes this directory,
+# and docs-tests/tests/test_suite.py points the suite here on purpose.
+
+[corpus]
+include = ["docs-tests/tests/fixtures/**/*.md"]
+point_in_time = ["docs-tests/tests/fixtures/point-in-time.md"]
+
+[references]
+check_anchors = true
+ignore_paths = ["docs/deliberately-hypothetical.md"]
+
+[shell]
+default_timeout = 15

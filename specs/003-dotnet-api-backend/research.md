@@ -125,7 +125,7 @@ var claims = new[]
 **Rationale**: MinIO and Cloudflare R2 both implement the S3 API. Using the same `AWSSDK.S3` client with environment-specific endpoint configuration means zero code change between local and production — only `appsettings` values differ.
 
 **Configuration**:
-```json
+```jsonc docs-test=skip reason="appsettings fragments, two of them"
 // appsettings.Development.json (MinIO)
 "Storage": {
   "ServiceUrl": "http://localhost:9000",

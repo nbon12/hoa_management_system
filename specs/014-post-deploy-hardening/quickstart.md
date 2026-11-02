@@ -19,7 +19,7 @@ dotnet test --filter FullyQualifiedName~RateLimitingTests
 
 **Configuration (per environment, no code change):**
 
-```jsonc
+```jsonc docs-test=skip reason="appsettings fragment"
 // appsettings.{Environment}.json
 "RateLimiting": {
   "AuthPermitsPerMinute": 20,        // per client IP

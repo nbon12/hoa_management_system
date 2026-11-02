@@ -1,0 +1,176 @@
+name: Docs Tests
+
+# Executable documentation testing (see docs-tests/README.md). Two depths:
+#   1. PR gate     → the documents the PR touches, plus the harness's own tests.
+#                    Python only, so needs=<tool> blocks skip. Seconds.
+#   2. Weekly sweep → the whole corpus with .NET and Node available so annotated
+#                    blocks really run, plus an external link check. Files one
+#                    issue when documentation has rotted, closes it when clean.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * 1'   # Mondays, 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.12'
+  SWEEP_ISSUE_LABEL: docs-sweep
+  SWEEP_ISSUE_TITLE: 'Weekly docs sweep is failing'
+
+jobs:
+  # ── PR gate: blocking, and cheap enough to run on every pull request ─────────
+  gate:
+    name: Docs gate (changed documents)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # the changed-document set is a diff against the base
+
+      - name: Fetch the base branch
+        run: |
+          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" || true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Documentation tests
+        run: |
+          scripts/docs-test.sh --changed "origin/${BASE_REF}" -- \
+            --junit-xml=docs-test-report.xml
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-test-report
+          path: docs-test-report.xml
+          if-no-files-found: warn
+
+  # ── Weekly sweep: the whole corpus, with the tools runnable blocks may need ──
+  sweep:
+    name: Docs sweep (whole corpus)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write   # files/updates the sweep issue below
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Tool setup only — no restore, no npm ci. A runnable block has to bring
+      # whatever else it needs within its own timeout.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '9.0.x'
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Documentation tests (whole corpus)
+        id: suite
+        run: |
+          scripts/docs-test.sh --all -- --junit-xml=docs-test-report.xml | tee docs-test.log
+
+      - name: External links
+        id: links
+        if: always()
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --no-progress
+            --max-retries 2
+            --accept 200,204,206,429
+            --exclude-path node_modules
+            --exclude-path .cursor
+            --exclude-path .claude
+            --exclude-path wireframes
+            --exclude-path docs-tests/tests/fixtures
+            './**/*.md'
+          output: lychee-report.md
+          fail: true
+          jobSummary: true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-sweep-report
+          path: |
+            docs-test-report.xml
+            docs-test.log
+            lychee-report.md
+          if-no-files-found: warn
+
+      # One issue, reused: a comment per failing sweep, closed when clean again.
+      - name: File or update the sweep issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUITE_OUTCOME: ${{ steps.suite.outcome }}
+          LINKS_OUTCOME: ${{ steps.links.outcome }}
+        run: |
+          set -euo pipefail
+          gh label create "$SWEEP_ISSUE_LABEL" \
+            --color B60205 \
+            --description "Weekly executable documentation sweep" 2>/dev/null || true
+
+          {
+            echo "The weekly documentation sweep failed on \`main\`."
+            echo
+            echo "| Step | Outcome |"
+            echo "| --- | --- |"
+            echo "| Documentation tests | $SUITE_OUTCOME |"
+            echo "| External links | $LINKS_OUTCOME |"
+            echo
+            echo "[Run and reports]($RUN_URL) — the \`docs-sweep-report\` artifact has the JUnit"
+            echo "report, the suite log and the link report."
+            echo
+            echo "Reproduce locally:"
+            echo
+            echo '```bash'
+            echo "scripts/docs-test.sh --all"
+            echo '```'
+          } > sweep-body.md
+
+          existing="$(gh issue list --state open --label "$SWEEP_ISSUE_LABEL" \
+            --search "$SWEEP_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file sweep-body.md
+          else
+            gh issue create --title "$SWEEP_ISSUE_TITLE" \
+              --label "$SWEEP_ISSUE_LABEL" --body-file sweep-body.md
+          fi
+
+      - name: Close the sweep issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          existing="$(gh issue list --state open --label "$SWEEP_ISSUE_LABEL" \
+            --search "$SWEEP_ISSUE_TITLE in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "The sweep is clean again as of ${GITHUB_SHA}."
+          fi

@@ -1,6 +1,13 @@
 # Contract: SendGrid sandbox-mode seam
 
-**File**: `HOAManagementCompany/Infrastructure/Payments/Alerts/SendGridEmailProvider.cs`
+> **Superseded by [`026-ses-email-provider`](../../026-ses-email-provider/spec.md).** SendGrid was
+> replaced by Amazon SES and SendGridEmailProvider.cs was removed, so the seam below no longer
+> exists in the code. The provider is now
+> [`SesEmailProvider.cs`](../../../HOAManagementCompany/Infrastructure/Payments/Alerts/SesEmailProvider.cs),
+> covered by [`SesEmailProviderTests.cs`](../../../HOAManagementCompany.Tests/Unit/Alerts/SesEmailProviderTests.cs).
+> Kept as the record of what 007 shipped.
+
+**File**: SendGridEmailProvider.cs (removed in 026)
 **Option**: `SendGridOptions.Sandbox` (new, default `false`)
 **Requirements**: FR-015, FR-016; safety FR-008/FR-009/SC-003
 

@@ -182,4 +182,27 @@ whenever a change implements, modifies, or claims to complete a Spec Kit feature
   the scenario. A finding without both the cited scenario and the cited test-or-gap is not a
   finding.
 
+## Documentation is executable: the docs gate runs on every PR
+
+`scripts/docs-test.sh` runs the examples and claims in our Markdown, and
+`.github/workflows/docs-test.yml` gates every pull request on the documents it touches.
+Run `scripts/docs-test.sh --changed origin/main` before you push a documentation change.
+What it holds you to:
+
+- A **backticked repository path is a claim that the path exists** — `neko-hoa/src/_headers`,
+  `HOAManagementCompany/Program.cs`. When you write about something that was removed, leave
+  the path as prose instead of backticking it.
+- A **documented command has to be real**: `npm run <script>` must exist in
+  `neko-hoa/package.json`, `dotnet … --project <path>` must point at a project, and
+  `docker compose <command> <service>` must name a service the compose file defines.
+- **Shell blocks must parse** as bash (`<placeholders>` are fine), and **`json` and `yaml`
+  blocks must parse**. A block that is a fragment rather than a whole document says so with
+  `docs-test=skip reason="..."` on its fence line.
+- `tasks.md`, `plan.md`, `research.md`, handoffs and `docs/patch-notes.md` are
+  **point-in-time**: their path claims are not checked, which matches constitution
+  section 11. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
+
+The annotation contract — including how to make a block actually execute in CI — is in
+`docs-tests/README.md`.
+
 <!-- MANUAL ADDITIONS END -->

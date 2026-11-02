@@ -68,7 +68,6 @@ dotnet test HOAManagementCompany.Tests \
 cd neko-hoa
 # Production build with an empty publishable key → full-page config error on load.
 npm test            # Jasmine/Karma unit tests for the guard
-npm run lint
 ```
 
 ## Definition of done (maps to spec)
