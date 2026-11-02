@@ -51,7 +51,7 @@ Spec: none (constitution amendment). Process and agent guidance only. No applica
 
 ---
 
-## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · PR link pending
+## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · [#308](https://github.com/nbon12/hoa_management_system/pull/308)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §5 and §8 (#295). Spec: [`specs/010-dev-env-iac-opentofu/spec.md`](../specs/010-dev-env-iac-opentofu/spec.md) FR-026 (amended). No application change.
 
