@@ -163,9 +163,16 @@ before it. This is a side project; the maintainer wants to review as little as p
   questions in `/speckit.specify`, the "incomplete checklists, proceed anyway? (yes/no)" prompt in
   `/speckit.implement`), that text does not apply: pick the most defensible default, record it under
   **Assumptions**, and continue.
+- **Unless otherwise specified:** when the maintainer themselves runs `/speckit.specify` or
+  `/speckit.clarify` in the session (or says they want to be involved), follow their lead and ask
+  what those commands call for. That covers those two phases only. Plan, tasks, analyze, implement,
+  the PR and the merge stay hands-off whether or not they drove the earlier phases, and an
+  explicit instruction from them applies only to the scope they named. A command that an agent,
+  scheduled task or routine starts on its own is never maintainer-driven.
 - Do **not** ask the maintainer to review a PR or leave it waiting on a review. The automated
-  checks are the merge gate. Report judgment calls after the fact, in the PR description and the
-  `docs/patch-notes.md` entry.
+  checks are the merge gate: when every required check passes, merge (or enable auto-merge)
+  without waiting. This always holds, even if the maintainer drove specify or clarify. Report
+  judgment calls after the fact, in the PR description and the `docs/patch-notes.md` entry.
 - Do **not** add a required reviewer or manual approval as a control in CI/CD or ops. Build an
   automated guard (dry run, rate limit, kill switch, audit trail) instead.
 - The only exceptions are things no automation can do: creating third-party accounts or rotating

@@ -10,8 +10,11 @@ Added sections:
     pipeline. Agents decide and continue (ambiguity becomes a recorded Assumption, never a question
     or a [NEEDS CLARIFICATION] marker); specs, plans, tasks, checklists and PR descriptions carry no
     human-assigned tasks, manual verification, or approval/sign-off gates; CI/CD and ops controls are
-    automated guards, not required reviewers; the automated checks are the merge gate; human input
-    arrives as feedback after work lands. The only exceptions are actions no automation can do
+    automated guards, not required reviewers; the automated checks are the merge gate and a green
+    PR always merges; human input arrives as feedback after work lands. "Unless otherwise specified":
+    when the maintainer drives /speckit.specify or /speckit.clarify themselves, or says so, the agent
+    engages and asks in those phases only; everything after them stays hands-off. The only other
+    exceptions are actions no automation can do
     (third-party accounts and root credentials, billing, admin-only settings, amending this
     constitution, unbounded irreversible actions on production), and even those never block a merge.
   Numbered 14, after Governance, instead of being inserted before it, so existing citations of
@@ -488,7 +491,8 @@ This section governs how work is specified, built, verified, merged, and operate
 limit what the product does: features in which people act (a board vote, a moderation queue, an
 owner approving a request) are product behavior and are specified normally.
 
-- **Decide, don't ask.** Agents MUST carry work from request to merge on their own judgment. When
+- **Decide, don't ask.** Unless the maintainer specifies otherwise (see "Unless otherwise
+  specified" below), agents MUST carry work from request to merge on their own judgment. When
   something is ambiguous, the agent MUST choose the most defensible default, record it under the
   spec's **Assumptions**, and continue. It MUST NOT stop to ask a question and MUST NOT leave a
   `[NEEDS CLARIFICATION]` marker for a person to resolve. A wrong assumption is corrected through
@@ -509,14 +513,43 @@ owner approving a request) are product behavior and are specified normally.
   run before the write, a rate limit, a kill switch, and an audit trail. Taking a person out of the
   loop never takes the check out: a human gate is replaced by an automated one, not by nothing, and
   the safeguards in sections 9 and 11 (tests, coverage, Sonar, no skipped tests) still hold.
-- **Merge on green.** Apart from amendments to this constitution (section 13), the automated checks
-  (section 9) are the merge gate. A pull request MUST NOT be held for human review, and no process
-  may depend on a person approving or merging it.
+- **Merge on green, always.** Apart from amendments to this constitution (section 13), the
+  automated checks (section 9) are the merge gate. When every required check passes, the agent
+  merges the pull request, or enables auto-merge, without waiting. A pull request MUST NOT be held
+  for human review, no person is asked to review at that stage, and no process may depend on a
+  person approving or merging it. This holds whether or not the maintainer drove the earlier phases;
+  the "Unless otherwise specified" section below never applies to merging.
 - **Feedback after the fact.** Judgment calls and anything the maintainer may want to know (an
   assumption made, a sensitive path touched, a failed run) are reported once the work lands: in the
   spec's Assumptions, the PR description, and the open follow-ups of the `docs/patch-notes.md`
   entry. The maintainer's feedback arrives as new requests or comments and is handled as ordinary
   work.
+
+### Unless otherwise specified: maintainer-driven specify and clarify
+
+The maintainer sometimes sits down and runs the Spec Kit commands themselves, particularly
+`/speckit.specify` and `/speckit.clarify`, and may want to be involved in those phases. They will
+not always do so. The "Decide, don't ask" default above gives way **only** in these cases:
+
+- **The maintainer drives the phase.** When the maintainer starts `/speckit.specify` or
+  `/speckit.clarify` themselves in the session, or says they want to be involved, the agent engages
+  in that phase: it asks the questions those commands call for and follows the maintainer's answers.
+  A command that an agent, a scheduled task, or a routine starts on its own is never maintainer-driven.
+- **The maintainer says otherwise.** An explicit instruction from the maintainer for the session or
+  task at hand ("ask me about X", "stop after the plan") is followed for the scope they named. It
+  does not carry over to other work.
+
+Limits on the exception:
+
+- It ends when `specify` and `clarify` end. Everything after them (plan, tasks, analyze,
+  checklist, implement, converge, the PR, and the merge) is hands-off: no questions, no gates, no
+  waiting for the maintainer to come back, whether or not they drove the earlier phases.
+- It relaxes only "Decide, don't ask". Even in a phase the maintainer is driving, specs, plans,
+  tasks and PR descriptions still carry no human-assigned tasks, manual verification, or
+  approval/sign-off gates; CI/CD and ops controls are still automated guards; and merge on green
+  still applies.
+- Where the maintainer is not driving, the default applies in full: decide, record the Assumption,
+  and continue.
 
 ### Unavoidable human actions (the only exceptions)
 
@@ -547,7 +580,8 @@ When one applies:
   an added human step, gate, or manual verification as a violation of this constitution.
 - Where a Spec Kit command or template tells an agent to stop, ask, or wait for a person (resolving
   clarification markers, proceeding past incomplete checklists, "stop and validate" checkpoints),
-  this section prevails: the agent decides and continues.
+  this section prevails: the agent decides and continues, except in a phase the maintainer is
+  driving or has told the agent to ask in (see "Unless otherwise specified" above).
 - This section applies to artifacts written or changed from now on. Existing specs are not
   rewritten only to remove an earlier human step.
 
