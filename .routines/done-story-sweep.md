@@ -4,6 +4,20 @@ You are running an unattended scheduled task. Never ask the user anything and ne
 You don't close issues or change code yourself. Your job is to make sure each unfinished story in
 this repo has an agent on it, and to report to the user.
 
+## Step 0. Which mode you are in
+
+This routine runs from two scheduled tasks, and each acts differently:
+
+- **Dispatch mode.** You have `mcp__claude-code-remote__list_sessions` (check with ToolSearch
+  `select:mcp__claude-code-remote__list_sessions`). Only the long-lived **dispatcher session**
+  for this repo has it. It is titled "Done story sweep dispatcher: hoa_management_system", and its
+  daily scheduled task "Done story sweep dispatch: hoa_management_system" messages it every morning.
+  Do Steps 1 to 6 below. This session keeps its earlier days' turns, so treat them as history only.
+  Re-read every issue, PR and session fresh.
+- **Watchdog mode.** You don't have that tool. A scheduled task that starts a fresh session (such as
+  "Daily done checker") never gets the session tools. Don't triage anything and don't hand anything
+  off. Do only the [watchdog check](#watchdog-check), then stop.
+
 ## Scope
 
 This repo only: **nbon12/hoa_management_system**. `nbon12/mmo-engine` has its own sweep routine.
@@ -28,7 +42,8 @@ the project's "Item closed" workflow.
 
 ## Step 1. Candidates
 
-- Take open issues (not pull requests), most recently updated first, up to 50.
+- Take open issues (not pull requests), most recently updated first, up to 50. Leave out the
+  [sweep log](#step-6-log-and-notify) issue (label `sweep-log`).
 - Keep the ones that show work:
   - a PR references it: `issue_read` "get" returns `closed_by_pull_requests`, or a PR in the repo
     has "#<n>" in its title or body;
@@ -72,7 +87,9 @@ Check these in order; the first match wins.
 3. A queued or in-progress run of the "Claude" workflow (`claude.yml`, the @claude action) for this
    issue, or a claude[bot] comment on it saying it is working.
 4. A push to a branch tied to this issue, or an update to an open PR tied to it, in the last 3 hours.
-   That means an agent you can't see, such as a local session.
+   That means an agent you can't see, such as a local session. Don't infer this from the PR list
+   alone. Page through `list_branches`, then for each branch whose name contains the issue number,
+   and for each open PR's head branch tied to the issue, read the latest commit's time.
 
 ## Step 4. Act
 
@@ -107,6 +124,38 @@ Write a short report:
   queued for the next run.
 
 If nothing needed doing, say so in one line.
+
+## Step 6. Log and notify
+
+1. **Log.** Find the open issue in this repo labeled `sweep-log`, titled "Done story sweep log". If
+   there is none, create it with that title and label. Use the body "Daily reports from the Done
+   story sweep dispatcher (`.routines/done-story-sweep.md`). The watchdog reads the newest comment
+   to check that the dispatcher ran. Leave this issue open." Post the report as one comment that
+   starts with the line `Done story sweep report <YYYY-MM-DD>`, using today's date in
+   America/New_York. Post it even when nothing needed doing.
+2. **Notify only when something needs nbon12.** If "Needs you" has an entry that wasn't in the
+   previous report on the log issue, or a step of this routine failed, call `PushNotification` (load
+   it with ToolSearch). Send one line under 200 characters, such as
+   "Done sweep hoa: #236 needs you (approve infra-apply); 2 handed off". Otherwise send nothing.
+
+## Watchdog check
+
+Only in watchdog mode. Check both repos, nbon12/hoa_management_system and nbon12/mmo-engine. Use the
+GitHub MCP tools.
+
+1. In each repo, find the open issue labeled `sweep-log` and read its newest comment.
+2. The dispatcher ran today if that comment was posted by nbon12 in the last 20 hours and starts with
+   `Done story sweep report <today's date in America/New_York>`.
+3. If it ran in both repos, end with one line: "Dispatcher ran today in both repos." Don't notify.
+4. Otherwise call `PushNotification` with one line, for example: "Done sweep dispatcher didn't run
+   today (mmo-engine). Check the 'Done story sweep dispatch: mmo-engine' scheduled task and its session." Then
+   end with a short note. Say which repos are missing a report, and give the newest report date you
+   found in each. Also give the likely causes:
+   - the dispatcher session was archived, which disables its scheduled task;
+   - the task was paused;
+   - a run is still going.
+
+   The fix is in the dispatcher setup section of `docs/patch-notes.md` (2026-11-02 entry).
 
 ## Worker message
 

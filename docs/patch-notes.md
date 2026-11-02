@@ -6,6 +6,38 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Done story sweep: dispatcher session + watchdog · [#289](https://github.com/nbon12/hoa_management_system/pull/289)
+
+Tooling only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **A scheduled task that starts a fresh session never gets the session tools.** These are `list_sessions`, `create_session`, `send_message` and the rest. This holds whether the task was made in the claude.ai UI or from a session (both tested 2026-11-02). Its `claude-code-remote` server has at most `add_repo` and the PR subscribe tools. That is why the "Daily done checker" run on 2026-11-02 did nothing.
+- **A session started from another session does have them** (origin `claude_code_mcp_seed`), and so does a scheduled task that messages that session.
+- **The `@claude` workflow (`claude.yml`) works as of 2026-11-02.** Before that, every real run failed with "Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN … is required". The first successful run was [41497347693](https://github.com/nbon12/hoa_management_system/actions/runs/41497347693). The sweep doesn't start `@claude` runs. It hands off to sessions, and only counts an `@claude` run already in progress as "agent already on it" (Step 3).
+
+**How the sweep runs now** (`.routines/done-story-sweep.md`, Step 0 picks the mode)
+
+- **Dispatch:** each repo has a long-lived dispatcher session and a daily scheduled task that messages it:
+  - "Done story sweep dispatcher: hoa_management_system (scheduled daily; do not archive)", messaged by **"Done story sweep dispatch: hoa_management_system"** at 5:17 AM America/New_York;
+  - the mmo-engine pair, messaged at 5:29 AM.
+
+  Each dispatcher runs its own repo's routine: triage, hand off to worker sessions, then post a `Done story sweep report <date>` comment on the open `sweep-log` issue. It sends a push notification only when something new needs nbon12, or a step failed. There is one dispatcher per repo because a session started from a session can't `add_repo` a second repo: auto mode denies it.
+- **Watchdog:** the existing **"Daily done checker"** task (6:30 AM, a fresh session, push notifications on) runs the same file. With no session tools, it only checks that today's report exists in both repos, and pushes a notification if one is missing.
+- The sweep skips the `sweep-log` issue as a candidate.
+
+**Dispatcher setup / repair** (if the watchdog says the dispatcher didn't run)
+
+1. The usual cause is that the dispatcher session was archived, which disables its scheduled task. From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
+2. Point a daily task at it: `create_trigger` with `persistent_session_id` set to the new session, the old task's cron and the old task's prompt. Then delete the old task.
+3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools, and that session only runs the watchdog check (seen 2026-11-02). Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
+
+**Left open**
+
+- If the dispatcher keeps failing, the watchdog could fall back to posting `@claude` comments in this repo. It doesn't do that today, to avoid duplicate handoffs. mmo-engine has no `claude.yml` at all.
+
+---
+
 ## 2026-10-31 · Repo hygiene sweep: dead code, duplicate tests, spec/doc reconciliation, small spec fixes · [#280](https://github.com/nbon12/hoa_management_system/pull/280)
 
 One-time first pass of the planned nightly hygiene routine. No API, data or UI change for residents or staff.
