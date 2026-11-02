@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · Auto-merge for nbon12's PRs; all CI jobs are required checks · [#PR_NUMBER](https://github.com/nbon12/hoa_management_system/pull/PR_NUMBER)
+## 2026-11-02 · Auto-merge for nbon12's PRs; all CI jobs are required checks · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
 
 Tooling only. No application behavior, API or data change.
 
