@@ -57,17 +57,33 @@ Run ids and names are on #234.
    Stripe repair tokens are not created. Repair is the approved `repair` job, running as CI's deployer. O13
    applies only if Tier 2 is ever created.
 4. **The `nekohoa-ops` cloud environment (O7, O10) is optional.** It holds no credentials. A cloud session
-   only needs to be able to dispatch `pr-env-repair`. What is still open is the cloud half of
-   Verification 8: a cloud session must be refused when it tries to approve its own `ops` run.
-5. **The self-approval gap is accepted for local sessions.** A local session uses the operator's `gh`
+   only needs to be able to dispatch `pr-env-repair`. ~~What is still open is the cloud half of
+   Verification 8: a cloud session must be refused when it tries to approve its own `ops` run.~~
+   Superseded by decision 7: there is no approval left to probe.
+5. **(Superseded by decision 7, 2026-11-02.) The self-approval gap is accepted for local sessions.** A local session uses the operator's `gh`
    login, so GitHub would accept its approval (`current_user_can_approve: true`). The gate relies on the
    session never sending one, which is the same trust as any tool run under the operator's login. If a
    cloud session can approve, give sessions their own GitHub identity and turn on "Prevent self-review".
 6. **No Tier 1 Neon key for now (O6, operator, 2026-10-27).** `diagnose` and `verify` report Neon as "not
    checked". The daily sweep's name audit, using CI's key, covers Neon orphans fleet-wide.
+7. **The approval gate is replaced by a policy gate (2026-11-02,
+   [`2026-11-02-zero-touch-operations.md`](2026-11-02-zero-touch-operations.md), #295).**
+   - `pr-env-repair`'s `repair` job no longer waits for a required reviewer once the owner removes it
+     from `ops` (that handoff's task O1). `scripts/pr-env-policy-gate.sh` refuses instead, unless every
+     check holds:
+     - the `OPS_AUTOMATION` kill switch is `on`;
+     - there are at most 3 writes a day;
+     - no other run for the PR is live;
+     - destroy and reap act only on closed PRs;
+     - the dispatcher has write access;
+     - a dry run plans only this PR's per-PR names (at most 10).
+   - `allow_open_pr` is gone. The daily sweep now reaps closed PRs' orphans itself.
+   - This makes Verification 8, task O10 and decision 5 moot. The new handoff's Verification Z1–Z6
+     replaces them.
 
 **Open**
-- The cloud half of Verification 8 (decision 4): an operator starts one cloud session.
+- ~~The cloud half of Verification 8 (decision 4): an operator starts one cloud session.~~ Superseded by
+  decision 7. The new handoff's Z1–Z6 are what's left (its task S7).
 - Under #236: scope the sweep's live-run check (`CHECK_LIVE_RUNS`) to each PR's own runs. Today a live run
   for any PR, or a repair run waiting for `ops`, keeps every stale lock.
 
@@ -1000,12 +1016,13 @@ How a session uses it (GitHub MCP):
    `ref: main`, `inputs: {"pr_number": "217", "action": "diagnose"}`.
 2. `actions_list` with `list_workflow_runs` on `pr-env-repair.yml` to find the run, then
    `get_job_logs` to read the result.
-3. For a real change, dispatch again with `"dry_run": "false"`. The run shows as waiting. Tell the
-   operator which run to approve (Actions → the run → Review deployments), and that it blocks
-   `pr-env` and teardown for that PR until approved or rejected. The session never approves a
-   deployment itself; Verification 8 checks that it cannot.
+3. For a real change, dispatch again with `"dry_run": "false"`. (Since decision 7) the run goes ahead
+   if the policy gate passes. Read the job summary. If it refused, report which check and why (the
+   summary names it, P1–P8), and don't retry into the same refusal: P3 counts refused runs too.
+   Report the result on the issue. The session never approves a deployment.
 
-GitHub Environment `ops` (operator, once): Settings → Environments → New environment `ops` →
+(Since decision 7, `ops` keeps only "Deployment branches: `main` only"; its required reviewer is removed
+by the 2026-11-02 handoff's task O1.) GitHub Environment `ops` (operator, once): Settings → Environments → New environment `ops` →
 Required reviewers: the operator; Deployment branches: `main` only. Leave "Prevent self-review" off;
 the session dispatches as the operator's account, so self-review blocking would make every run
 unapprovable. If Verification 8 shows the session can approve, make a separate GitHub account the
@@ -1348,7 +1365,8 @@ secret is attached.
    stripe_api STRIPE_AGENT_RO_KEY_TEST /webhook_endpoints/we_agentprobe -X DELETE -o /dev/null -w '%{http_code}\n'   # 403
    ```
 
-8. **GitHub and ops workflows** (needs `pr-env-repair.yml` on `main` and the `ops` Environment, so it
+8. **(Superseded by decision 7, 2026-11-02: no approval is left to bypass. Run the new handoff's
+   Verification Z1–Z6 instead.) GitHub and ops workflows** (needs `pr-env-repair.yml` on `main` and the `ops` Environment, so it
    runs in A3, not A1). MCP `actions_list` → `list_workflows` shows `pr-env-repair.yml` on `main`. A
    `diagnose` dispatch completes without approval. Then dispatch `action=unlock` with
    `dry_run=false` for a PR number with no state (for example `0`); it shows as waiting for `ops`.
@@ -1402,7 +1420,7 @@ secret is attached.
       `CLOUDFLARE_AGENT_RO_API_TOKEN`, `STRIPE_AGENT_RO_KEY_TEST` and `NEON_AGENT_RO_API_KEY` for
       `diagnose` (or separate tokens of the same scope).
 - [x] **O9a.** Review and merge the A2 PR (`pr-env-repair.yml`, `pr-env-reap.sh`, Root-cause item 1).
-- [ ] **O10.** (Any cloud session will do: it runs the cloud half of Verification 8.) Start a new session in `nekohoa-ops` pointed at this file.
+- [x] **O10.** (Superseded by decision 7, 2026-11-02.) (Any cloud session will do: it runs the cloud half of Verification 8.) Start a new session in `nekohoa-ops` pointed at this file.
 - [x] **O11.** Approve the `pr-env-repair` runs the session asks for, after reading their dry-run
       output, and approve or reject waiting runs promptly (they block `pr-env` for that PR).
 - [x] **O12.** Review and merge the A5 PR (Root-cause fixes 2-7).
@@ -1450,7 +1468,7 @@ secret is attached.
       check, with results on the issue. Declined or unavailable credentials are recorded on the
       issue, and `pr-env-repair` `diagnose` covers them.
 - [ ] The Tier 1 GCP key is either recorded as accepted risk (016 FR-004) or explicitly declined.
-- [ ] `pr-env-repair.yml` is on `main`. Verification 8 passed, including the self-approval check. A
+- [ ] `pr-env-repair.yml` is on `main`. Z1–Z6 passed (decision 7; this replaced "Verification 8 passed, including the self-approval check"). A
       `diagnose` run and an approved `dry_run=false` run both completed.
 - [ ] `pr-env.yml` no longer cancels in-flight runs and clears stale locks; teardown and sweep keep
       state after a failed destroy; the sweep clears stale locks and is green with no per-PR

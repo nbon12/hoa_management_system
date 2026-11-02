@@ -232,6 +232,27 @@ run_reap
 exit_is 0; out_has "would delete: Stripe webhook endpoint we_2"
 dump_on_fail "$f0"
 
+t "ITEMS_OUT lists the dry run's deletions, and the policy gate's P7 accepts every one"; f0=$fail
+leftovers
+route GET "${STRIPE}\\?" 200 '{"data":[{"id":"we_2","url":"https://nekohoa-api-pr-217-x.a.run.app/h","metadata":{"pr":"217"}}],"has_more":false}'
+route GET "${CF}/pages/projects/nekohoa-dev/deployments\\?" 200 '{"result":[{"id":"dep-1","deployment_trigger":{"metadata":{"branch":"pr-217"}}},{"id":"dep-2","deployment_trigger":{"metadata":{"branch":"main"}}}],"result_info":{"total_pages":1}}'
+route GET "${GCS}" 200 '{"items":[{"name":"state/pr/217/default.tfstate","generation":"7","timeCreated":"'"$OLD"'"}]}'
+run_reap ITEMS_OUT="$STUB_DIR/items"
+exit_is 0
+for line in "would delete: Cloud Run service nekohoa-api-pr-217" "would delete: R2 bucket nekohoa-pr-217-documents (emptied first)" \
+  "would delete: secret pr-217-db-connection" "would delete: secret pr-217-stripe-webhook" "would delete: Neon branch pr-217 (br-pr217)" \
+  "would delete: Stripe webhook endpoint we_2 (host nekohoa-api-pr-217-x.a.run.app)" "would delete: Pages deployment dep-1 (branch pr-217)" \
+  "would delete: gs://nekohoa-dev-tfstate/state/pr/217/default.tfstate#7"; do
+  grep -qxF -- "$line" "$STUB_DIR/items" && ok || bad "ITEMS_OUT lacks '${line}'"
+done
+[ "$(wc -l <"$STUB_DIR/items")" -eq 8 ] && ok || bad "ITEMS_OUT has $(wc -l <"$STUB_DIR/items") lines, expected 8"
+env -i PATH="$PATH" ACTION=reap PR_NUMBER=217 PLAN_FILE="$STUB_DIR/items" bash "$ROOT/scripts/pr-env-policy-gate.sh" check-plan >"$STUB_DIR/out" 2>&1
+echo $? >"$STUB_DIR/rc"; exit_is 0
+reset; run_reap ITEMS_OUT="$STUB_DIR/items"
+exit_is 0; [ -f "$STUB_DIR/items" ] && [ ! -s "$STUB_DIR/items" ] && ok || bad "nothing to delete should leave an empty ITEMS_OUT"
+rm -f "$STUB_DIR/items"
+dump_on_fail "$f0"
+
 t "an open PR is refused unless ALLOW_OPEN_PR=true"; f0=$fail
 leftovers; echo open >"$STUB_DIR/pr_state"
 run_reap DRY_RUN=false

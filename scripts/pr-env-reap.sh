@@ -5,7 +5,9 @@
 #
 # Callers:
 #   pr-env-repair.yml `diagnose`   DRY_RUN=true   read-only tokens: inventory + what a reap would delete
-#   pr-env-repair.yml `reap`       DRY_RUN=false  CI's write tokens, only after the `ops` approval
+#   pr-env-repair.yml `reap`       DRY_RUN=true, then DRY_RUN=false  CI's write tokens; the dry run's
+#                                  ITEMS_OUT goes through the policy gate (P7) before the real run
+#   pr-env-sweep.yml               the same, for orphans of PRs closed over 24 h ago (at most 3 a run)
 #   pr-env.yml, before tofu apply  ONLY_UNTRACKED=true  deletes only what `tofu state list` does not track
 #
 # Order: Cloud Run (the only writer to the bucket; holds the branch's connections) → R2 bucket (emptied
@@ -25,7 +27,8 @@
 # Env (required): PR_NUMBER PROJECT REGION PREFIX NEON_PROJECT_ID NEON_PR_BASE_BRANCH_ID CF_ACCOUNT DRY_RUN
 #                 ONLY_UNTRACKED; tokens NEON_API_KEY CF_TOKEN; gcloud logged in (WIF in CI).
 # Env (optional): STRIPE_SECRET_KEY_TEST (the Stripe step is skipped with a notice when unset);
-#                 REPO + GH_TOKEN, ALLOW_OPEN_PR (open-PR guard of a full reap).
+#                 REPO + GH_TOKEN, ALLOW_OPEN_PR (open-PR guard of a full reap; no workflow sets it);
+#                 ITEMS_OUT (a file: each "would delete: …" or "deleted: …" line, for the policy gate).
 #                 With DRY_RUN=true any token may be read-only or empty; an empty one is "not checked".
 # Output is names, ids and states only: this public repo's Actions logs are world-readable. Tokens reach
 # curl through a file descriptor, never argv.
@@ -261,7 +264,7 @@ if [ "$FULL" = true ]; then
         [ -n "$we" ] || continue
         echo "  ${we}  host ${host}"
         if [[ "$host" != "${SERVICE}-"* ]]; then fail "Stripe endpoint ${we} has metadata.pr=${PR_NUMBER} but host ${host}; not deleting it."
-        else remove "Stripe webhook endpoint ${we}" delete_stripe_endpoint "$we"
+        else remove "Stripe webhook endpoint ${we} (host ${host})" delete_stripe_endpoint "$we"
         fi
       done < <(jq -r '.[] | [.id, .host] | @tsv' <<<"$endpoints")
     fi
@@ -285,7 +288,7 @@ if [ "$FULL" = true ]; then
       [ -z "${deployments//$'\n'/}" ] && echo "  none"
       while read -r dep; do
         [ -n "$dep" ] || continue
-        remove "Pages deployment ${dep}" delete_pages_deployment "$dep"
+        remove "Pages deployment ${dep} (branch ${BRANCH})" delete_pages_deployment "$dep"
       done <<<"$deployments"
     fi
   fi
@@ -302,6 +305,10 @@ if [ "$FULL" = true ]; then
 fi
 
 echo "== Summary"
+if [ -n "${ITEMS_OUT:-}" ]; then
+  : >"$ITEMS_OUT"
+  if [ "${#done_items[@]}" -gt 0 ]; then printf '%s\n' "${done_items[@]}" >"$ITEMS_OUT"; fi
+fi
 if [ "${#done_items[@]}" -eq 0 ]; then echo "  nothing to delete"; else printf '  %s\n' "${done_items[@]}"; fi
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
