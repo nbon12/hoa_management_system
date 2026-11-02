@@ -16,7 +16,7 @@ Tooling only. These are the review fixes for #312, which merged before they land
   - lists the real triggers: comments, PR review comments, submitted review bodies, and an issue's title or body when it is opened or **assigned**. PR titles and bodies aren't checked;
   - covers any letter case and text inside backticks or quotes;
   - forbids opening or assigning an issue that contains the mention.
-- **One rule finds the newest report** on the `sweep-log` issue (Step 6, "Finding the newest report"), for both the notify step and the watchdog. It reads comments with `perPage: 100` and keeps fetching until a page returns fewer than 100, because comments come oldest first. Without it, once the log passed about 30 reports, either step would read an old report: the notify step would send a repeat push every day, and the watchdog would raise a false "didn't run" alert.
+- **One rule finds the newest report** on the `sweep-log` issue (Step 6, "Finding the newest report"), for both the notify step (before it posts) and the watchdog. It reads the comment count, fetches only the last page with `perPage: 100`, and steps back a page only if needed. A failed fetch is retried once, then treated as a failed lookup, never as a partial list. Without it, once the log passed 30 comments, bot replies included, either step could read an old report: the notify step would send repeat pushes, and the watchdog would raise a false "didn't run" alert.
 
 **Left open**
 

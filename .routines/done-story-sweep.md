@@ -131,10 +131,15 @@ If nothing needed doing, say so in one line.
 ## Step 6. Log and notify
 
 **Finding the newest report.** Step 6.1 and the watchdog both need the newest report on a log issue.
-Call `issue_read` with method `get_comments` and `perPage: 100`, starting at page 1. Keep fetching the
-next page until a page returns fewer than 100 comments, because comments come oldest first. Among all
-of them, take the last comment that was posted by nbon12 and starts with `Done story sweep report`.
-Ignore everything else, such as bot replies.
+Comments come oldest first, so read from the end:
+1. Call `issue_read` with method `get`, and read the issue's comment count *n*. If *n* is 0, there is
+   no report.
+2. Otherwise fetch page ceil(*n*/100) with method `get_comments` and `perPage: 100`. Take the last
+   comment on it that was posted by nbon12 and starts with `Done story sweep report`, ignoring
+   everything else, such as bot replies. If that page has none, step back one page at a time.
+3. If a fetch fails, retry it once. If it fails again, the lookup failed: don't use a partial list.
+   - In step 6.1, still post the report, and in step 2 treat every "Needs you" entry as new.
+   - In the watchdog, say the check couldn't run for that repo, and notify.
 
 1. **Log.** Find the open issue in this repo labeled `sweep-log`, titled "Done story sweep log". If
    there is none, create it with that title and label. **Before posting,** find its newest report as
