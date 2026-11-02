@@ -44,7 +44,7 @@ on:
   workflow_run:
     # Every workflow that runs on pull requests into main, so the last check to finish brings the
     # decision back here.
-    workflows: [CI, Security Scan (Trivy), pr-env, Repowise]
+    workflows: [CI, Security Scan (Trivy), pr-env, Repowise, Spec test review]
     types: [completed]
 
 permissions: {}
@@ -165,10 +165,12 @@ jobs:
             fi
 
             # Every check on the head commit, by name (the latest run of each), plus commit
-            # statuses. This job's own check doesn't count. One API call per assignment, so set -e
-            # stops the run when any of them fails.
+            # statuses. This job's own check doesn't count, and neither do the spec test review's inner
+            # jobs: "Spec test verdict" always runs after them and speaks for them, passing on the last
+            # pass even when one of them failed (spec-test-review.yml). One API call per assignment, so
+            # set -e stops the run when any of them fails.
             check_runs="$(gh api --paginate "repos/${REPO}/commits/${head}/check-runs?per_page=100" \
-              --jq '.check_runs[] | select(.name != "auto-merge") | [.name, (if .status == "completed" then (.conclusion // "") else "pending" end)] | @tsv')"
+              --jq '.check_runs[] | select(.name != "auto-merge" and .name != "Review tests against specs" and .name != "Fix the tests" and .name != "Push the fix") | [.name, (if .status == "completed" then (.conclusion // "") else "pending" end)] | @tsv')"
             statuses="$(gh api "repos/${REPO}/commits/${head}/status" \
               --jq '.statuses[] | [.context, (if .state == "error" then "failure" else .state end)] | @tsv')"
             checks="$(printf '%s\n%s\n' "$check_runs" "$statuses")"

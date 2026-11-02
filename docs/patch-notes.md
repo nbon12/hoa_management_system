@@ -28,6 +28,7 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
   - If a follow-up issue can't be filed, the check fails instead of passing silently.
 - **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
 - **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
+- **Auto-merge (#306) knows about it.** `auto-merge.yml` re-decides when "Spec test review" finishes, and from that workflow it counts only `Spec test verdict`. The inner jobs ("Review tests against specs", "Fix the tests", "Push the fix") can end red on a pass that the verdict still settles green.
 - **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
 
 **Shared pieces you can reuse**
