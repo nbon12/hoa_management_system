@@ -1,0 +1,162 @@
+name: Spec test review
+
+# Adversarial review of a PR's tests against its Spec Kit spec (issue #302). Claude maps every Acceptance
+# Scenario and Independent Test the PR touches to the automated test that covers it, checks that the test
+# really asserts the scenario (CLAUDE.md, "every natural-language test MUST map to a real, faithful automated
+# test"), and probes suspect tests: it breaks the behavior in production code, runs only that test and
+# restores the file. A test that still passes is a confirmed finding. The procedure is
+# .claude/commands/review-spec-tests.md, which also runs locally as /review-spec-tests <PR#>.
+#
+# Runs when a PR to main is opened ready, marked ready, reopened, or pushed to while ready. Drafts are
+# skipped, and so are PRs that change only Markdown, docs/, specs/ or wireframes/ (scripts/spec-test-review.sh).
+# The report is one sticky PR comment. The Verdict job fails on blocking findings, which blocks a merge
+# under .routines/merge-policy.md rule 1. To dispute a finding, reply on the PR and re-run the workflow.
+#
+# Secrets: CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY, the same as claude.yml.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+    branches: [main]
+
+concurrency:
+  group: spec-test-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  review:
+    name: Review tests against specs
+    # Fork PRs get no secrets, and Dependabot runs get only Dependabot's.
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Read-only: the reviewer reads the PR and posts nothing. The Verdict job posts the report.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      verdict: ${{ steps.verdict.outputs.verdict }}
+      report: ${{ steps.verdict.outputs.report }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number }}
+      # Probes run backend tests the way test.yml does.
+      ASPNETCORE_ENVIRONMENT: Test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Scope
+        id: scope
+        run: |
+          scope="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' \
+            | bash scripts/spec-test-review.sh scope)"
+          echo "scope=$scope" >>"$GITHUB_OUTPUT"
+          if [ "$scope" = skip ]; then
+            echo "Only Markdown, docs/, specs/ or wireframes/ changed. There are no tests to review." >>"$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Toolchains for the probes, which run single tests (see the allowed tools).
+      - name: Setup .NET
+        if: steps.scope.outputs.scope == 'review'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Node
+        if: steps.scope.outputs.scope == 'review'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '20'
+
+      - name: Review
+        id: review
+        if: steps.scope.outputs.scope == 'review'
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
+        with:
+          # Whichever secret is set is used; leave the other unset.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The job's read-only token instead of the Claude app's.
+          github_token: ${{ github.token }}
+          # The repo's rtk hooks compact command output (diffs included). The reviewer needs it raw.
+          settings: '{"disableAllHooks": true}'
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR HEAD: ${{ github.event.pull_request.head.sha }}
+
+            Review this pull request. Read `.claude/commands/review-spec-tests.md` and follow it, with the
+            PR number above as its input. The working tree is the PR merged into main and is clean, so the
+            probes in its step 5 are safe here.
+
+            Don't post anything to GitHub. The workflow posts your report as the PR's sticky comment.
+            Return the verdict and the Markdown report as your structured output.
+          claude_args: |
+            --model opus
+            --max-turns 150
+            --allowedTools "Read,Glob,Grep,Edit,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*)"
+            --json-schema '{"type":"object","properties":{"verdict":{"type":"string","enum":["pass","findings","not_applicable"]},"report":{"type":"string"}},"required":["verdict","report"],"additionalProperties":false}'
+
+      - name: Verdict
+        id: verdict
+        if: steps.scope.outputs.scope == 'review'
+        env:
+          OUTPUT: ${{ steps.review.outputs.structured_output }}
+        run: |
+          verdict="$(jq -r '.verdict // empty' <<<"${OUTPUT:-null}")"
+          if [ -z "$verdict" ]; then
+            echo "::error::The reviewer returned no verdict. Re-run the workflow."
+            exit 1
+          fi
+          delim="REPORT_$(openssl rand -hex 16)"
+          {
+            echo "verdict=$verdict"
+            echo "report<<$delim"
+            jq -r '.report' <<<"$OUTPUT"
+            echo "$delim"
+          } >>"$GITHUB_OUTPUT"
+
+  report:
+    name: Verdict
+    needs: review
+    if: needs.review.outputs.verdict != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      VERDICT: ${{ needs.review.outputs.verdict }}
+      REPORT: ${{ needs.review.outputs.report }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout the posting script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          sparse-checkout: scripts/spec-test-review.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Post the report
+        run: |
+          printf '%s\n' "$REPORT" >"$RUNNER_TEMP/report.md"
+          { printf '## Spec test review: %s\n\n' "$VERDICT"; cat "$RUNNER_TEMP/report.md"; } >>"$GITHUB_STEP_SUMMARY"
+          REPORT_FILE="$RUNNER_TEMP/report.md" bash scripts/spec-test-review.sh post
+
+      - name: Fail on blocking findings
+        if: env.VERDICT == 'findings'
+        run: |
+          echo "::error::Acceptance scenarios this PR touches lack a faithful test. The spec test review comment on the PR lists them."
+          exit 1

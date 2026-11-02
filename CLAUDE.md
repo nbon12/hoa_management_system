@@ -221,5 +221,10 @@ whenever a change implements, modifies, or claims to complete a Spec Kit feature
   text from `spec.md` and naming either the missing test or the test whose assertions do not match
   the scenario. A finding without both the cited scenario and the cited test-or-gap is not a
   finding.
+- **Enforced in CI.** `.github/workflows/spec-test-review.yml` runs this review when a PR is ready
+  for review and again on every push. It follows `.claude/commands/review-spec-tests.md`, which you
+  can also run yourself before marking a PR ready: `/review-spec-tests <PR#>`. Blocking findings fail
+  its **Verdict** check. Fix the test, or reply on the PR with the finding's ID and your evidence,
+  then re-run the workflow.
 
 <!-- MANUAL ADDITIONS END -->
