@@ -280,7 +280,9 @@ None of these is needed once G1 is gone.
 Prod doesn't exist (`infra/environments/prod` is absent), so G5 isn't urgent. Decide before Prod is
 built.
 
-**Recommended:** amend spec 010 FR-026 so that Prod promotes **automatically** behind these gates:
+**Decided (D2, 2026-11-02):** Prod promotes **automatically**, and spec 010 FR-026 is amended. Repo
+variable `PROD_OPS_AUTOMATED` = `on` turns the automation on. Unset or any other value means the Prod
+job skips and posts on the ops log, with no approval wait. The gates are:
 - Staging applied with the same commit, and green for at least 24 h;
 - the Staging smoke and E2E gates pass (the same Playwright and Cypress gates as Dev);
 - `infra-plan` for Prod has no `destroy` or `replace` on stateful resources (Neon project or
@@ -290,8 +292,8 @@ built.
 
 The owner is notified of each Prod promotion.
 
-The alternative is to keep FR-026's required reviewer for Prod only. That's the one remaining click,
-and it guards real customer data.
+The gates are built when `infra/environments/prod` is created. Until then, the commented `apply-prod`
+job in `infra-apply.yml` shows the shape.
 
 ## 6. Verification
 
@@ -343,10 +345,22 @@ in "Ops scripts (shellcheck + tests)": P7's name filter must reject a shared nam
   blocked through the cloud proxy, and it needs admin.)
 - [ ] **O2.** Settings → Secrets and variables → Actions → Variables → add `OPS_AUTOMATION` = `on`.
   Setting it to `off` later is the kill switch.
-- [ ] **O3.** Answer D1 and D2 below in a comment on the tracking issue. Until D1 is answered,
-  sessions use the recommended answer.
+- [x] **O3.** Answer D1 and D2 below in a comment on the tracking issue. Until D1 is answered,
+  sessions use the recommended answer. (Answered 2026-11-02; see §8.)
 
 ## 8. Decisions for the owner
+
+**Answered by nbon12 on 2026-11-02:**
+- **D1: automated review, never ask.** PRs that touch guarded paths get the independent automated review
+  in §3, then merge without asking nbon12 for permission. nbon12 gets a notification after the merge.
+  Constitution amendments are the only PRs nbon12 still merges, under constitution §13 and §14.
+- **D2: Prod is fully automated**, behind the gates in §5, with its own kill switch: the repo variable
+  `PROD_OPS_AUTOMATED`. When it is `on`, Prod promotes on its own. When it is unset or anything else,
+  the Prod job skips and posts on the ops log; it never waits for a person. Spec 010 FR-026 is amended
+  to match.
+- **D3** keeps the default limits.
+
+The original options:
 
 - **D1. Guarded paths: automated review, or human merge?**
   - **Recommended:** an independent automated review plus a notification after the merge (§3).

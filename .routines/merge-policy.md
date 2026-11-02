@@ -1,7 +1,9 @@
 # Merge policy: when a session merges its own PR
 
-Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 (issue #295). Decision D1 is still open
-there. Until nbon12 answers it, sessions follow the recommended answer, which is what this file says.
+Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 and decision D1 (issue #295), which nbon12
+answered on 2026-11-02: guarded-path PRs get an automated review and merge without asking for
+permission. Constitution §14 ("Merge on green, always") requires the same thing. Never ask nbon12 to
+review, approve or merge a PR. The one exception is a constitution amendment (below).
 
 A session **squash-merges its own PR**, or turns on auto-merge with `mcp__github__enable_pr_auto_merge`,
 when every rule below holds on the PR's current head commit. "Its own PR" means a PR this session, or the

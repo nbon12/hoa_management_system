@@ -24,7 +24,7 @@ rest with no further manual cloud setup.
 ### Session 2026-06-13
 
 - Q: How should the OpenTofu code under `infra/` be structured for multi-environment reuse with isolated state? → A: A reusable shared module (`infra/modules/*`) called by per-environment directories (`infra/environments/dev`, `.../staging`, `.../prod`), each with its own tfvars and backend config.
-- Q: What gate should guard the apply-on-merge workflow? → A: **Prod** apply requires manual approval (protected GitHub Environment with a required reviewer); **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
+- Q: What gate should guard the apply-on-merge workflow? → A: ~~**Prod** apply requires manual approval (protected GitHub Environment with a required reviewer)~~ **Amended 2026-11-02** (decision D2, `docs/handoffs/2026-11-02-zero-touch-operations.md` §5; constitution §14): **Prod** applies automatically behind automated gates, while repo variable `PROD_OPS_AUTOMATED` is `on`. **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
 - Q: How should remote state (GCS) be isolated across environments? → A: A single versioned GCS state bucket with a distinct prefix/path per environment (e.g. `state/dev`, `state/staging`, `state/prod`).
 - Q: Beyond restricting deployer-SA impersonation to this repo, should the WIF trust also be ref-restricted? → A: No — repo-scoped only (any branch/ref in this repo may impersonate the deployer); this keeps PR plan-only runs able to authenticate without a second identity.
 
@@ -126,8 +126,9 @@ the gated apply runs and converges the environment.
    **Then** it produces a plan only and makes no changes to live resources.
 2. **Given** an infrastructure change to **Dev** (or Staging) is merged, **When** the apply
    workflow runs, **Then** it applies the change automatically to that environment; **Given** the
-   change targets **Prod**, the apply MUST pause for a required reviewer's approval (protected
-   environment) before touching live resources.
+   change targets **Prod**, the apply runs automatically only while repo variable
+   `PROD_OPS_AUTOMATED` is `on` and the FR-026 gates pass. Otherwise it skips the Prod apply, changes
+   nothing, and reports why. It never waits for a person.
 3. **Given** either workflow runs, **When** it authenticates to the cloud accounts, **Then** it does
    so without any long-lived static credentials committed to the repo.
 
@@ -296,11 +297,21 @@ new isolated state target — not duplicating or editing the resource definition
 
 - **FR-025**: A GitHub Actions workflow MUST run a **plan-only** preview on pull requests that touch
   the infrastructure definitions, making **no** changes to live resources.
-- **FR-026**: A GitHub Actions workflow MUST run an **apply** on merge to `main`. For **Dev** (and
-  Staging) the apply runs **automatically** with no approval step; for **Prod** the apply MUST be
-  **gated** behind a protected GitHub Environment requiring a reviewer's manual approval before any
-  live change. (This feature delivers the Dev path; the gate configuration MUST be designed so Prod
-  is approval-gated when added.)
+- **FR-026** (amended 2026-11-02, decision D2): A GitHub Actions workflow MUST run an **apply** on
+  merge to `main`. For **Dev** (and Staging), the apply runs **automatically** with no approval step.
+  **Prod** also applies automatically, with no required reviewer or manual approval (constitution
+  §14), but only when all of these hold:
+  - repo variable `PROD_OPS_AUTOMATED` is `on`. This is the Prod kill switch: unset or any other value
+    skips the Prod apply and reports it on the ops log;
+  - Staging was applied with the same commit and has been green for at least 24 h;
+  - the Staging smoke and E2E gates pass;
+  - the Prod plan has no `destroy` or `replace` on a stateful resource (Neon project or branch, R2
+    buckets, secrets). Any of those stops the run and reports it.
+
+  After a promotion, Cloud Run traffic MUST roll back to the previous revision on its own if the
+  health or error-rate gate fails within 15 minutes. Each promotion is reported after the fact. This
+  feature delivers the Dev path. The Prod job is built with these gates when `infra/environments/prod`
+  is added.
 - **FR-027**: The automation workflows MUST authenticate to the cloud accounts without committing
   long-lived static credentials to the repo (using the federated identity from FR-011).
 - **FR-028**: The configuration MUST be idempotent: re-running the plan against an unchanged

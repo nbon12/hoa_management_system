@@ -58,15 +58,21 @@ jobs:
         run: tofu apply -input=false -auto-approve -lock-timeout=10m
 
   # --- Prod apply (ENABLE WHEN environments/prod EXISTS) -------------------------------------------
-  # Prod is gated: the `environment: prod` reference pauses the job for a required reviewer configured
-  # on that protected GitHub Environment (FR-026, T030). Uncomment and point working-directory at
-  # infra/environments/prod once the Prod env directory is added (Phase 6 / future).
+  # Prod applies automatically, with no required reviewer (FR-026 amended 2026-11-02, decision D2;
+  # constitution §14). It runs only while repo variable PROD_OPS_AUTOMATED is `on` (the Prod kill switch).
+  # When the Prod env directory is added, build the FR-026 gates as steps before the apply:
+  #   - Staging was applied with this commit and has been green for 24 h;
+  #   - the Staging smoke and E2E gates pass;
+  #   - the plan has no destroy or replace on a stateful resource;
+  #   - automatic Cloud Run rollback if health fails within 15 min.
+  # Then uncomment this job and point working-directory at infra/environments/prod. While the switch is off,
+  # report the skip on the ops-log issue.
   #
   # apply-prod:
   #   name: Apply (prod) — gated
   #   needs: apply-dev
   #   runs-on: ubuntu-latest
-  #   environment: prod        # ← protected Environment with a required reviewer (manual approval)
+  #   if: vars.PROD_OPS_AUTOMATED == 'on'   # Prod kill switch; no Environment reviewer
   #   defaults:
   #     run:
   #       working-directory: infra/environments/prod
