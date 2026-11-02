@@ -6,6 +6,15 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Done story sweep: no `@claude` in sweep comments; watchdog reads the newest report · [#PR_HOA](https://github.com/nbon12/hoa_management_system/pull/PR_HOA)
+
+Tooling only.
+
+- **Sweep comments no longer start the Claude workflow by accident.** The 18:20 UTC report on #290 quoted the text "@claude" while describing Step 3. It posted as nbon12, so `claude.yml` ran on the log issue (run 41499658412, "No action taken"). The routine and its worker message now forbid that mention in any comment, title or body, and the report template says "Claude workflow run" instead.
+- **The watchdog now reads the newest *report* on the `sweep-log` issue**, meaning nbon12's newest comment that starts with `Done story sweep report`, rather than the newest comment of any kind. A bot reply there can no longer cause a false "didn't run" alert.
+
+---
+
 ## 2026-11-02 · Auto-merge for nbon12's PRs once every check passes · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
 
 Tooling only. No application behavior, API or data change.
