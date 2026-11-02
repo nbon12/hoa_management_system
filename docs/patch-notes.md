@@ -6,6 +6,18 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Merge policy: the independent review runs in a subagent · [#311](https://github.com/nbon12/hoa_management_system/pull/311)
+
+Process and agent guidance only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **A guarded-path PR is reviewed by a fresh subagent, not a separate session** (`.routines/merge-policy.md`, the independent review's step 1). Pass it your session's `model`. The policy is nbon12's standing request for that subagent, so don't ask first. This replaces "a separate session" in #299's entry below and in the zero-touch handoff's §3.
+- **Why:** in the desktop app, a session can start another session only on nbon12's own message. From an automated turn (an Auto-fix alert, a finished session) the start becomes a card nbon12 has to click, which happened twice on #306.
+- **Fallback:** if the subagent fails twice, start a separate session: `create_session` in the cloud, `start_session` on the desktop. If that can only be a card, say on the PR that it's waiting for a reviewer, and start the reviewer in the next turn nbon12 starts.
+
+---
+
 ## 2026-11-02 · Auto-merge for nbon12's PRs once every check passes · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
 
 Tooling only. No application behavior, API or data change.

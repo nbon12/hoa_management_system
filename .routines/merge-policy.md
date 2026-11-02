@@ -2,6 +2,8 @@
 
 Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 (issue #295). Decision D1 is still open
 there. Until nbon12 answers it, sessions follow the recommended answer, which is what this file says.
+Since #311, the independent review runs in a subagent rather than the handoff's separate session (see
+`docs/patch-notes.md`).
 
 A session's own PR is merged by `.github/workflows/auto-merge.yml` once the session marks it ready (see
 [Auto-merge](#auto-merge)), unless it touches a guarded path: then the session **squash-merges it**
@@ -48,13 +50,19 @@ PRs out of auto-merge. Change the list there, and only there.
 
 ## Independent automated review (guarded paths)
 
-1. **Start an independent reviewer.** Use a fresh subagent (the `Agent` tool, `general-purpose`): it
-   runs in any turn with no click from nbon12. Use a separate session (`create_session`, titled "Review
-   <owner>/<repo>#<n>") only when the subagent can't run, because the desktop app lets one session
-   start another only on nbon12's own message: anywhere else it becomes a card nbon12 has to click.
-   Either way, give it only the PR link and tell it to read the diff from the PR. Don't give it your
-   own summary or conclusions. Its prompt: run the `code-review` skill at `high` against that PR with
-   `--comment`, so its findings are posted on the PR, and then end its turn.
+1. **Start an independent reviewer.** Spawn a fresh subagent (the `Agent` tool, `general-purpose`) and
+   pass it the `model` this session runs on, so the review never falls to a cheaper default. This
+   policy, linked from `CLAUDE.md`, is nbon12's standing request for that subagent: don't ask first. It
+   runs in any turn with no click. If it fails to start or errors, retry it once.
+   - **Fallback, only if the retry fails too:** a separate session titled "Review <owner>/<repo>#<n>".
+     In a cloud or routine session, `create_session` starts one with no click. In the desktop app,
+     `start_session` starts one only on nbon12's own message. From any other turn it becomes a card
+     nbon12 has to click, so don't leave it at that. Say on the PR that the merge is waiting for a
+     reviewer and why, then start the reviewer yourself in the next turn nbon12 starts.
+
+   Either way, give the reviewer only the PR link and tell it to read the diff from the PR. Don't give it
+   your own summary or conclusions. Its prompt: run the `code-review` skill at `high` against that PR
+   with `--comment`, so its findings are posted on the PR, and then end its turn.
 2. **Fix every confirmed blocking finding.** Push the fixes, and answer each finding on the PR: fixed, or
    why it isn't a problem. If you make more than a small, targeted fix, have a new reviewer check it
    again.
