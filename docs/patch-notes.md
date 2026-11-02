@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · Merge policy: sessions merge their own PRs · PR link pending
+## 2026-11-02 · Merge policy: sessions merge their own PRs · [#299](https://github.com/nbon12/hoa_management_system/pull/299)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §3–4 (#295, task S3). Tooling only.
 
