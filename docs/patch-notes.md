@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · PR link below
+## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
 
 Tooling only. No application behavior, API or data change.
 
