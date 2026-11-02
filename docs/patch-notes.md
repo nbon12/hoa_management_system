@@ -6,6 +6,38 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Zero-touch ops: a policy gate replaces the `ops` approval, the sweep reaps orphans · [#298](https://github.com/nbon12/hoa_management_system/pull/298)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) (#295). Tooling only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **`pr-env-repair` writes no longer need a person to approve them.** This takes effect once nbon12 removes the `ops` Environment's required reviewer (handoff task O1). Until then, runs wait for approval *and* pass the new checks. The job now refuses, changes nothing and goes red unless all of these hold (`scripts/pr-env-policy-gate.sh`):
+  - **P1:** repo variable `OPS_AUTOMATION` is `on`. This is the kill switch: unset or `off` refuses.
+  - **P3:** there have been at most 3 write dispatches in 24 h, refused ones included.
+  - **P4:** no other pr-env, teardown or repair run for the PR is unfinished.
+  - **P5:** for `destroy` and `reap`, the PR is closed.
+  - **P8:** the dispatcher has write access.
+  - **P7:** a dry run in the same job plans only this PR's per-PR names (at most 10 resources), or, for `destroy`, only deletes under `module.pr_environment`.
+- **The `allow_open_pr` input is removed.** An open PR's leftovers are reaped by its own next `pr-env` run.
+- **The run-name is now `pr-env-repair <action> dry_run=<bool> (pr-<n>)`.** It still ends in `(pr-<n>)`. P3 counts the `dry_run=false` ones.
+- **`pr-env-sweep` reaps orphans by name on its own.** These are closed PRs' leftovers with no state prefix, the PR 217 class. It acts only once the PR has been closed 24 h, does at most 3 PRs a run, and goes through the same gate and P7 check. The job is red only if orphans remain after the reap.
+- **Failures are reported on the ops log issue [#296](https://github.com/nbon12/hoa_management_system/issues/296)** (label `ops-log`). Each repair write is also summarised on its PR.
+- **#234's Verification 8 and task O10 are superseded** (decision 7 in the 2026-10-26 handoff). Run the new handoff's Z1–Z6 instead, in the order its Status section gives.
+
+**Shared pieces to reuse**
+
+- `scripts/pr-env-policy-gate.sh preflight|check-plan`: callers `repair` and `sweep`.
+- `pr-env-reap.sh` `ITEMS_OUT=<file>` lists what a run would delete or did delete. Stripe and Pages lines now name their host or branch.
+- `pr-env-audit.sh` `ORPHANS_OUT=<file>` lists the closed PRs that have orphans.
+
+**Left open**
+
+- Owner tasks O1 (remove the `ops` reviewer, after this merges), O2 (set `OPS_AUTOMATION=on`) and O3 (answer decisions D1 and D2).
+- S7: run Z1–Z6 once O1 and O2 are done.
+
+---
+
 ## 2026-11-02 · Done story sweep: dispatcher session + watchdog · [#289](https://github.com/nbon12/hoa_management_system/pull/289)
 
 Tooling only. No application behavior, API or data change.
