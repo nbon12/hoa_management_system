@@ -29,9 +29,9 @@ Templates requiring updates:
   docs/patch-notes.md ✅ entry added
 Version bump rationale (MINOR): new section added; no existing rule removed or redefined.
 Follow-up TODOs:
-  - .routines/done-story-sweep.md still reserves merges, approvals and reviews for the owner. Section
-    14 supersedes that; the zero-touch handoff (docs/handoffs/2026-11-02-zero-touch-operations.md,
-    task S3) tracks the edit.
+  - .routines/merge-policy.md (#299, zero-touch handoff task S3) lets sessions merge their own PRs and
+    agrees with section 14: no human review, and guarded paths get an independent automated review.
+    It keeps constitution amendments owner-merged until section 13 is amended.
   - Upstream Spec Kit command text (.claude/commands/speckit.*.md) is not edited, because Spec Kit
     owns it. Section 14 and CLAUDE.md prevail where it says to ask the user or wait.
 

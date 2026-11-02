@@ -28,8 +28,30 @@ Spec: none (constitution amendment). Process and agent guidance only. No applica
 
 **Left open**
 
-- `.routines/done-story-sweep.md` (here and in `nbon12/mmo-engine`) still reserves merges, approvals and reviews for the owner. Section 14 supersedes that. The edit is task S3 of the [zero-touch handoff](handoffs/2026-11-02-zero-touch-operations.md).
-- Amendments to the constitution stay owner-merged under section 13, this one included. The owner can relax that by amending section 13.
+- Amendments to the constitution stay owner-merged under section 13. This one merged on the owner's explicit approval. The owner can relax the rule by amending section 13.
+
+**Read together with the merge policy.** [`.routines/merge-policy.md`](../.routines/merge-policy.md) (#299, handoff task S3) landed first and agrees with section 14: no human review, and guarded paths get an independent *automated* review. `CLAUDE.md` now links it, which closes the open item in the #299 entry below.
+
+---
+
+## 2026-11-02 · Merge policy: sessions merge their own PRs · [#299](https://github.com/nbon12/hoa_management_system/pull/299)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §3–4 (#295, task S3). Tooling only.
+
+**Changes earlier assumptions**
+
+- **Sessions now squash-merge their own PRs under [`.routines/merge-policy.md`](../.routines/merge-policy.md).** The conditions are:
+  - checks are green;
+  - no unresolved review threads and no "changes requested" review;
+  - the PR is ready, and its description lists what was verified;
+  - patch notes are included when required.
+
+  A PR that touches guarded paths also needs an independent automated review by a separate session, and nbon12 gets a push notification after the merge. These paths are workflows, `scripts/pr-env-*`, `.routines/`, `CLAUDE.md`, `infra/`, Auth, Payments and migrations. Constitution changes stay owner-merged.
+- **The Done story sweep's OWNER ONLY class no longer includes approvals or "merges reserved for the owner".** Workers merge under the policy. The sweep also skips the `ops-log` issue (#296).
+
+**Left open**
+
+- `CLAUDE.md` doesn't link the merge policy yet. The session's auto-mode check refuses `CLAUDE.md` edits.
 
 ---
 
