@@ -17,6 +17,23 @@ Test harness only. No application behavior, API or data change.
 
 ---
 
+## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **`/merge`** (`.github/workflows/merge-command.yml`): when the owner comments `/merge` (first line, exactly) on an open PR, the workflow marks a draft ready, runs `gh pr update-branch`, then `gh pr merge --squash --auto`. It merges at once if every requirement is met, otherwise GitHub merges when the required checks pass. Conflicts stop it with a comment. No model is involved.
+- It runs only for a comment the owner typed: `author_association == OWNER` **and** no `performed_via_github_app`. Comments that Claude sessions post as nbon12 carry `performed_via_github_app: claude`, so **agents cannot trigger `/merge`**. Don't post it from a session, and don't tell a session that it can.
+- It uses the `MERGE_TOKEN` secret (fine-grained PAT: Contents + Pull requests, read/write), not `GITHUB_TOKEN`, so the squash push to `main` still starts the push-to-main workflows. It also needs Settings → "Allow auto-merge".
+
+**Changes earlier assumptions**
+
+- **`@claude` (`claude.yml`) can now check and update a PR branch.** It has a full-history checkout, plus `git fetch/log/diff/status/merge/merge-base/rev-parse` and `gh pr view/checks/diff/update-branch`. It still has **no merge tool on purpose**. Before this, "is it ready / update the branch" failed with permission denials (seen on #291).
+- A Claude session subscribed to a PR still won't merge because a GitHub comment asked it to. Merge with `/merge`, the button, or by asking in the session itself.
+
+---
+
 ## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · [#300](https://github.com/nbon12/hoa_management_system/pull/300)
 
 Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
