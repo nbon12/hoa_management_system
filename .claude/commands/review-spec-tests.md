@@ -80,7 +80,7 @@ A test is Weak when, for example:
 
 Static reading misses tests that look right and assert nothing. Confirm by breaking the behavior.
 
-Probe only when `git status --porcelain` is empty. In CI the checkout is the PR merged into `main`. Locally, run `gh pr checkout <N>` on a clean tree first, or skip the probes and say so.
+Before the first probe, save the output of `git status --porcelain`. Probe only if it lists nothing outside the agent config paths: `.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `.mcp.json`, `.claude.json`, `.gitmodules`, `.ripgreprc` and `.husky/`. In CI, claude-code-action restores those paths from `main` before you start, because a PR's copies are untrusted. The PR's versions are kept in `.claude-pr/` for reading. Those changes are expected, so leave them alone. The rest of the CI checkout is the PR merged into `main`. Locally, run `gh pr checkout <N>` on a clean tree first, or skip the probes and say so.
 
 Run up to six probes. Pick the riskiest NLTs in blocking scope: denial scenarios, NLTs whose only evidence is one assertion, and Weak verdicts a probe would settle. For each one:
 
@@ -89,7 +89,7 @@ Run up to six probes. Pick the riskiest NLTs in blocking scope: denial scenarios
    - Backend: `dotnet test HOAManagementCompany.Tests --filter "FullyQualifiedName~<Class>.<Method>"`. The first run builds the solution. Integration tests need Docker for Testcontainers and `ASPNETCORE_ENVIRONMENT=Test`, which CI sets.
    - Frontend unit: run `npm --prefix neko-hoa ci` once, then `npm --prefix neko-hoa run test:ci -- --include <path relative to neko-hoa>`.
    - Playwright and Cypress tests need a running app. Don't probe them; judge them by reading.
-3. Restore the file with `git restore <file>`, and check that `git status --porcelain` is empty before the next probe.
+3. Restore the file with `git restore <file>`. Before the next probe, check that `git status --porcelain` matches the output you saved.
 
 If the test still passes, it **survived**: the NLT is Weak, and the finding is confirmed. If it fails on your change, that supports Faithful. If it fails for an unrelated reason (a build error, Docker unavailable), the probe is inconclusive. Say so and rely on reading.
 

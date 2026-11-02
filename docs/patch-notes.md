@@ -24,6 +24,7 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
 **Shared pieces you can reuse**
 
 - `/review-spec-tests <PR#>` (`.claude/commands/review-spec-tests.md`) runs the same review in a session before you mark a PR ready. Probes edit the working tree, so they only run on a clean checkout of the PR.
+  - In CI, claude-code-action restores `.claude/` and `CLAUDE.md` from `main`, so a PR is always reviewed under `main`'s procedure. A change to the procedure takes effect once it merges.
 - `scripts/spec-test-review.sh` has two subcommands. `scope` decides from changed paths whether a PR needs review. `post` upserts the marker-keyed sticky comment.
 
 ---

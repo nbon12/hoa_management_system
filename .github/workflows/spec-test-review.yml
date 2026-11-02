@@ -94,8 +94,10 @@ jobs:
             PR HEAD: ${{ github.event.pull_request.head.sha }}
 
             Review this pull request. Read `.claude/commands/review-spec-tests.md` and follow it, with the
-            PR number above as its input. The working tree is the PR merged into main and is clean, so the
-            probes in its step 5 are safe here.
+            PR number above as its input. That copy is main's: this action restores `.claude/` and the other
+            agent config paths from main, so a PR can't change its own review. Only if main has no copy yet
+            (the PR adds it) should you use the PR's copy, `.claude-pr/.claude/commands/review-spec-tests.md`.
+            The rest of the working tree is the PR merged into main, so the probes in step 5 are safe here.
 
             Don't post anything to GitHub. The workflow posts your report as the PR's sticky comment.
             Return the verdict and the Markdown report as your structured output.
