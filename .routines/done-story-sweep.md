@@ -134,6 +134,12 @@ If nothing needed doing, say so in one line.
 
 ## Step 6. Log and notify
 
+**Finding the newest report.** Steps 6.2 and the watchdog both need the newest report on a log issue.
+Call `issue_read` with method `get_comments` and `perPage: 100`, starting at page 1. Keep fetching the
+next page until a page returns fewer than 100 comments, because comments come oldest first. Among all
+of them, take the last comment that was posted by nbon12 and starts with `Done story sweep report`.
+Ignore everything else, such as bot replies.
+
 1. **Log.** Find the open issue in this repo labeled `sweep-log`, titled "Done story sweep log". If
    there is none, create it with that title and label. Use the body "Daily reports from the Done
    story sweep dispatcher (`.routines/done-story-sweep.md`). The watchdog reads the newest report comment
@@ -141,8 +147,8 @@ If nothing needed doing, say so in one line.
    starts with the line `Done story sweep report <YYYY-MM-DD>`, using today's date in
    America/New_York. Post it even when nothing needed doing.
 2. **Notify only when something needs nbon12.** If "Needs you" has an entry that wasn't in the
-   previous report (the newest earlier comment on the log issue by nbon12 that starts with
-   `Done story sweep report`; ignore bot replies), or a step of this routine failed, call `PushNotification` (load
+   previous report (the newest report before today's, found as in "Finding the newest report"
+   above), or a step of this routine failed, call `PushNotification` (load
    it with ToolSearch). Send one line under 200 characters, such as
    "Done sweep hoa: #236 needs you (approve infra-apply); 2 handed off". Otherwise send nothing.
 
@@ -151,9 +157,8 @@ If nothing needed doing, say so in one line.
 Only in watchdog mode. Check both repos, nbon12/hoa_management_system and nbon12/mmo-engine. Use the
 GitHub MCP tools.
 
-1. In each repo, find the open issue labeled `sweep-log`. Find its newest comment that was posted by
-   nbon12 and starts with `Done story sweep report`. Ignore other comments, such as bot replies.
-   Comments come oldest first, so page to the last page before choosing the newest.
+1. In each repo, find the open issue labeled `sweep-log`, and find its newest report as in "Finding
+   the newest report" (Step 6).
 2. The dispatcher ran today if that report was posted in the last 20 hours and starts with
    `Done story sweep report <today's date in America/New_York>`.
 3. If it ran in both repos, end with one line: "Dispatcher ran today in both repos." Don't notify.
