@@ -33,6 +33,17 @@ Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-
 
 ---
 
+## 2026-11-02 · Email-provider removal test scans only git-tracked files · [#291](https://github.com/nbon12/hoa_management_system/pull/291) · Closes [#216](https://github.com/nbon12/hoa_management_system/issues/216)
+
+Test harness only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- `EmailProviderRemovalTests` (026 SC-006) now scans the files `git ls-files` lists under `HOAManagementCompany/`, `HOAManagementCompany.Tests/` and `.github/workflows/`. Untracked and gitignored files, such as a local `appsettings.Secrets.json` with a stale pre-026 email-provider section, no longer fail it. Without git, it falls back to every file on disk, as before.
+- With failure 2 already fixed in #280, a plain local `dotnet test` no longer fails because of a developer's local secrets file. This resolves #216.
+
+---
+
 ## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
 
 Tooling only. No application behavior, API or data change.
@@ -40,7 +51,7 @@ Tooling only. No application behavior, API or data change.
 **New**
 
 - **`/merge`** (`.github/workflows/merge-command.yml`): when the owner comments `/merge` (first line, exactly) on an open PR, the workflow marks a draft ready, runs `gh pr update-branch`, then `gh pr merge --squash --auto`. It merges at once if every requirement is met, otherwise GitHub merges when the required checks pass. Conflicts stop it with a comment. No model is involved.
-- It runs only for a comment the owner typed: `author_association == OWNER` **and** no `performed_via_github_app`. Comments that Claude sessions post as nbon12 carry `performed_via_github_app: claude`, so **agents cannot trigger `/merge`**. Don't post it from a session, and don't tell a session that it can.
+- It runs only for an owner comment that no app posted: `author_association == OWNER` **and** no `performed_via_github_app`. Comments that Claude cloud sessions post as nbon12 carry `performed_via_github_app: claude`, so **cloud sessions can't trigger `/merge`**. A local agent that comments through nbon12's own `gh` login or browser can, and nbon12 allows it: agents may post `/merge`.
 - It uses the `MERGE_TOKEN` secret (fine-grained PAT: Contents + Pull requests, read/write), not `GITHUB_TOKEN`, so the squash push to `main` still starts the push-to-main workflows. It also needs Settings → "Allow auto-merge".
 
 **Changes earlier assumptions**
