@@ -13,6 +13,10 @@ Tooling only.
 - **Sweep comments no longer start the Claude workflow by accident.** The 18:20 UTC report on #290 quoted the text "@claude" while describing Step 3. It posted as nbon12, so `claude.yml` ran on the log issue (run 41499658412, "No action taken"). The routine and its worker message now forbid that mention in any comment, title or body, and the report template says "Claude workflow run" instead.
 - **The watchdog now reads the newest *report* on the `sweep-log` issue**, meaning nbon12's newest comment that starts with `Done story sweep report`, rather than the newest comment of any kind. A bot reply there can no longer cause a false "didn't run" alert.
 
+**Left open**
+
+- A prompt rule depends on every writer remembering it. The root-cause fix is a guard in `.github/workflows/claude.yml`, for example skipping issues labeled `sweep-log`, or requiring a marker. That is a workflow change, so it is a separate, guarded-path PR.
+
 ---
 
 ## 2026-11-02 · Auto-merge for nbon12's PRs once every check passes · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
