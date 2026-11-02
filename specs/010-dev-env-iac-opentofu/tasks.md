@@ -112,8 +112,8 @@ Prod gated behind a protected GitHub Environment.
 authenticate via WIF with no committed static keys.
 
 - [X] T028 [P] [US3] Author `.github/workflows/infra-plan.yml`: `pull_request` + `paths: [infra/**]`; `google-github-actions/auth` via WIF (`GCP_WIF_PROVIDER`/`GCP_DEPLOY_SERVICE_ACCOUNT`); `tofu init/fmt -check/validate/plan` for `environments/dev`; post plan summary to the PR; CF/Neon creds via `TF_VAR_*` GitHub secrets (FR-025/027)
-- [X] T029 [P] [US3] Author `.github/workflows/infra-apply.yml`: `push` to `main` + `paths: [infra/**]`; a **Dev** apply job that runs automatically; a placeholder/commented **Prod** apply job targeting a protected GitHub Environment `prod` with a required reviewer (auto-apply Dev/Staging, gate Prod) (FR-026)
-- [X] T030 [US3] Document/create the GitHub Environment `prod` (required reviewer) and confirm `infra-plan.yml` makes no live changes while `infra-apply.yml` is path-filtered to `infra/**` (SC-007)
+- [X] T029 [P] [US3] Author `.github/workflows/infra-apply.yml`: `push` to `main` + `paths: [infra/**]`; a **Dev** apply job that runs automatically; a placeholder/commented **Prod** apply job targeting a protected GitHub Environment `prod` with a required reviewer (auto-apply Dev/Staging, gate Prod) (FR-026). *Superseded 2026-11-02 by amended FR-026 (decision D2): the commented job is now a sketch of a scheduled, reviewer-free Prod promotion.*
+- [X] T030 [US3] Document/create the GitHub Environment `prod` (required reviewer; *superseded 2026-11-02: `main` only, no reviewer, per amended FR-026*) and confirm `infra-plan.yml` makes no live changes while `infra-apply.yml` is path-filtered to `infra/**` (SC-007)
 
 **Checkpoint**: Infra changes flow through reviewed plan → gated apply.
 
