@@ -87,7 +87,9 @@ Check these in order; the first match wins.
 3. A queued or in-progress run of the "Claude" workflow (`claude.yml`, the @claude action) for this
    issue, or a claude[bot] comment on it saying it is working.
 4. A push to a branch tied to this issue, or an update to an open PR tied to it, in the last 3 hours.
-   That means an agent you can't see, such as a local session.
+   That means an agent you can't see, such as a local session. Don't infer this from the PR list
+   alone. Page through `list_branches`, then for each branch whose name contains the issue number,
+   and for each open PR's head branch tied to the issue, read the latest commit's time.
 
 ## Step 4. Act
 
