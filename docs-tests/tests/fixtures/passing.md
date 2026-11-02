@@ -84,7 +84,7 @@ definitely-not-a-real-tool --version
 
 ## References
 
-A link to [the harness](../../README.md) and to a [heading in it](../../README.md#what-is-checked),
+A link to [the repository root](../../..), to [the harness](../../README.md) and to a [heading in it](../../README.md#what-is-checked),
 an inline path `docs-tests/docs_test/plugin.py`, a [hypothetical doc](../../../docs/deliberately-hypothetical.md)
 that `docs-test.toml` ignores, and a path that only exists when something is built,
 `neko-hoa/dist/neko-hoa/browser/_headers`.

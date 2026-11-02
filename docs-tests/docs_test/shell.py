@@ -152,6 +152,23 @@ def _tail(text: str) -> str:
     return "\n".join(["…"] + lines[-MAX_OUTPUT_LINES:])
 
 
+def denied_command(block: Block) -> str | None:
+    """Is this runnable block asking for something no example may do?
+
+    Checked for every ``docs-test=run`` block, whether or not it is about to run:
+    a destructive example is a problem in the document, and finding it only on the
+    machine that happens to have the tool installed would defeat the point.
+    """
+    for pattern in runtime().config.exec_denylist:
+        if re.search(pattern, block.source, re.IGNORECASE):
+            return (
+                f"{block.where()}: this block is annotated docs-test=run but matches the "
+                f"denied command pattern {pattern!r}. Runnable examples have to be safe to "
+                "run on any checkout; leave destructive commands unannotated."
+            )
+    return None
+
+
 def execute(block: Block) -> str | None:
     """Run a ``docs-test=run`` block and check its exit code and output."""
     import pytest
@@ -159,17 +176,13 @@ def execute(block: Block) -> str | None:
     attributes = block.attributes
     config = runtime().config
 
+    denied = denied_command(block)
+    if denied:
+        return denied
+
     missing = [tool for tool in attributes.needs if shutil.which(tool) is None]
     if missing:
         pytest.skip(f"needs {', '.join(missing)}, which is not installed here")
-
-    for pattern in config.exec_denylist:
-        if re.search(pattern, block.source):
-            return (
-                f"{block.where()}: this block is annotated docs-test=run but matches the "
-                f"denied command pattern {pattern!r}. Runnable examples have to be safe to "
-                "run on any checkout; leave destructive commands unannotated."
-            )
 
     cwd = repo_root() / (attributes.cwd or ".")
     if not cwd.is_dir():
@@ -226,6 +239,11 @@ def evaluate(example) -> str | None:
         )
 
     if block.attributes.runnable:
+        # Policy first: a denied command fails whether or not this run executes
+        # anything, and whether or not `needs=` would have skipped the block.
+        denied = denied_command(block)
+        if denied:
+            return denied
         if not runtime().execute:
             import pytest
 

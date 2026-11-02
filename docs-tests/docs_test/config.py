@@ -77,19 +77,39 @@ DEFAULT_LANGUAGES: dict[str, str] = {
     "yml": "yaml",
 }
 
+#: Check kinds an evaluator exists for. A ``[languages]`` table may only map onto
+#: these.
+KINDS: frozenset[str] = frozenset({"shell", "json", "yaml"})
+
 #: Commands a ``docs-test=run`` block may never contain, however it is annotated:
-#: a runnable example has to be safe on any checkout. In code rather than in
-#: docs-test.toml so that editing the config cannot make the gate destructive.
+#: a runnable example has to be safe on any checkout, on a laptop as much as in
+#: CI. Matched case-insensitively against the block's source. In code rather than
+#: in docs-test.toml so that editing the config cannot make the gate destructive.
+#:
+#: This is a backstop against a careless example, not a sandbox: it cannot stop a
+#: determined one. Execution safety rests on the gate running without secrets and
+#: on review of what gets annotated; the denylist catches the obvious mistakes.
 DEFAULT_DENYLIST: tuple[str, ...] = (
-    r"rm +-[a-zA-Z]*[rf]",
-    r"git +(push|reset +--hard|clean +-[a-zA-Z]*f)",
-    r"(tofu|terraform) +(apply|destroy)",
-    r"gcloud +[a-z-]+ +(delete|remove)",
-    r"docker +compose +down +[^\n]*-v",
-    r"curl[^\n|]*\| *(ba)?sh",
-    r"(^|\s)(shutdown|reboot|mkfs|dd +if=)",
-    r"npm +publish",
-    r"dotnet +ef +database +drop",
+    # Deleting things
+    r"\brm\s+(-[a-z]*[rf]|--(recursive|force))",
+    r"\bfind\s+[^\n]*(-delete|-exec\s+rm)",
+    r"\b(shutdown|reboot|mkfs\S*|dd\s+if=)",
+    # Rewriting or publishing history
+    r"\bgit\s+(push|apply|am|reset\s+--hard|clean\s+-[a-z]*f|branch\s+-D|tag\s+-d|"
+    r"checkout\s+--|restore\s)",
+    r"\b(npm|yarn|pnpm)\s+(un)?publish",
+    r"\bdotnet\s+nuget\s+push",
+    r"\bgh\s+(release\s+(create|delete)|repo\s+delete|pr\s+(merge|close)|issue\s+close)",
+    # Changing infrastructure or clusters
+    r"\b(tofu|terraform)\s+(apply|destroy|import|state\s+(rm|push))",
+    r"\bkubectl\s+(apply|delete|drain|patch|scale|replace)",
+    r"\b(gcloud|aws|az)\s+[a-z0-9-]+\s+[a-z0-9-]*\s*(delete|destroy|remove|rm)\b",
+    r"\bdocker\s+(compose\s+down[^\n]*-v|rm\b|rmi\b|volume\s+rm|system\s+prune)",
+    # Dropping data
+    r"\bdotnet\s+ef\s+database\s+(drop|update)",
+    r"\b(drop|truncate)\s+(table|database|schema)\b",
+    # Running something the network just handed us
+    r"\b(curl|wget)[^\n|]*\|\s*(ba|z|k)?sh",
 )
 
 
@@ -128,20 +148,36 @@ class Config:
 
 
 def load_config(path: Path | None = None) -> Config:
-    """Read ``docs-test.toml``. A missing file yields the dataclass defaults."""
-    path = path or DEFAULT_CONFIG_PATH
-    if not path.exists():
-        return Config()
+    """Read ``docs-test.toml``.
+
+    With no argument the repository's own config is read, and the dataclass
+    defaults stand in when it is absent. A path passed explicitly — ``pytest
+    --docs-config`` — has to exist: falling back to the defaults there would
+    change the scope of the run while still reporting green.
+    """
+    if path is None:
+        path = DEFAULT_CONFIG_PATH
+        if not path.exists():
+            return Config()
+    elif not path.exists():
+        raise FileNotFoundError(f"docs-test config not found: {path}")
 
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     corpus = raw.get("corpus", {})
     references = raw.get("references", {})
     shell = raw.get("shell", {})
+
+    # A `[languages]` table adds to the defaults; replacing them wholesale would
+    # quietly stop checking most of the corpus.
     languages = dict(DEFAULT_LANGUAGES)
-    if "languages" in raw:
-        languages = {
-            name.lower(): kind for kind, names in raw["languages"].items() for name in names
-        }
+    for kind, names in raw.get("languages", {}).items():
+        if kind not in KINDS:
+            raise ValueError(
+                f"{path}: [languages] maps onto {kind!r}, which nothing checks; "
+                f"it has to be one of {', '.join(sorted(KINDS))}"
+            )
+        for name in names:
+            languages[name.lower()] = kind
 
     defaults = Config()
     return Config(

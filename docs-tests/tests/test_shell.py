@@ -147,6 +147,27 @@ def test_missing_tools_skip_rather_than_fail() -> None:
         shell.evaluate(example("nope --version\n", mode="run", needs=("definitely-not-a-tool",)))
 
 
+def test_a_denied_command_is_reported_even_when_the_tool_is_missing() -> None:
+    """Otherwise it stays silent until it reaches a machine that can run it."""
+    message = shell.evaluate(
+        example("kubectl delete ns prod\n", mode="run", needs=("definitely-not-a-tool",))
+    )
+    assert "denied command pattern" in message
+
+
+def test_a_denied_command_is_reported_with_execution_off() -> None:
+    configure(execute=False)
+    try:
+        message = shell.evaluate(example("git push origin main\n", mode="run"))
+    finally:
+        configure(execute=True)
+    assert "denied command pattern" in message
+
+
+def test_the_denylist_ignores_case() -> None:
+    assert "denied command pattern" in shell.evaluate(example("RM -RF build\n", mode="run"))
+
+
 def test_no_exec_skips_execution() -> None:
     configure(execute=False)
     try:

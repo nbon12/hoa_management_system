@@ -121,6 +121,8 @@ def check(relative_path: str, config: Config) -> list[str]:
             report(position, f"link to {target} points outside the repository")
             continue
 
+        if claim == ".":
+            continue  # a link to the repository root, which always exists
         if config.path_claim_ignored(claim):
             continue
         if not claims.path_exists(claim):

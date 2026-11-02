@@ -28,7 +28,9 @@ scripts/docs-test.sh --changed HEAD~1 -- -vv # pass anything else through to pyt
 ```
 
 The script creates `.venv-docs-tests/` on first use and reinstalls it whenever
-`docs-tests/requirements.txt` changes. Nothing else needs to be installed.
+`docs-tests/requirements.txt` changes. It needs Python 3.11 or newer (the harness
+reads TOML with `tomllib`); set `PYTHON=/path/to/python3.12` if the default
+`python3` is older, as it is on a stock macOS. Nothing else has to be installed.
 
 The corpus the suite will look at is printable on its own:
 
@@ -43,9 +45,10 @@ PYTHONPATH=docs-tests python3 -m docs_test.corpus --all | tail -3
 | Example | Check |
 |---|---|
 | `bash`, `sh`, `shell`, `zsh`, `console` | parses as bash (`<placeholders>` allowed); every repository thing it names really exists; runs, if annotated |
-| `json`, `jsonc` | parses — as one document, as JSON with comments, or as one payload per line |
+| `json` | parses, as one document or as one payload per line |
+| `jsonc` | the same, with `//` and `/* */` comments and trailing commas allowed |
 | `yaml`, `yml` | parses, single- or multi-document |
-| any document | relative links resolve, `#anchors` exist, and backticked repository paths exist |
+| any document | relative links resolve, `#anchors` exist, and backticked repository paths exist (see below) |
 
 The claims a shell example makes are checked without running anything:
 
@@ -59,9 +62,13 @@ The claims a shell example makes are checked without running anything:
 A path git ignores — `coverage/`, `neko-hoa/dist/`, `appsettings.Secrets.json` —
 is never a failure: documentation may name it and we cannot verify it.
 
-**A backticked repository path is a claim that the path exists.** When writing about
-something that was removed, leave the path as prose or mark the document
-point-in-time; don't backtick it.
+**A backticked path rooted at one of the repository's top-level directories is a
+claim that the path exists** — `specs/…`, `docs/…`, `neko-hoa/…`,
+`HOAManagementCompany/…` and the rest of `PATH_ROOTS` in
+`docs-tests/docs_test/claims.py`. Prose with a slash in it (`api/v1/properties`,
+`and/or`) is not a claim, and neither is a path with an ellipsis in it
+(`specs/…/tasks.md`), which is a shape. When writing about something that was
+removed, leave the path as prose; don't backtick it.
 
 ## Annotating a block
 
@@ -125,11 +132,24 @@ failure too — otherwise it would never run.
 `docs-test=run` executes the block with `bash -e -o pipefail` from the repository
 root (or `cwd=`), so it has to be hermetic on any checkout: no pushes, no `apply`,
 no deletes, nothing that needs a credential. `DEFAULT_DENYLIST` in
-`docs-tests/docs_test/config.py` refuses the obvious ones however they are
-annotated, and lives in code so that editing the config cannot make the gate
-destructive. `needs=` skips a block — rather than failing it — where the tool is
-not installed, which is how the same document works on a laptop, in the lean pull
-request gate, and in the fuller weekly sweep.
+`docs-tests/docs_test/config.py` refuses the obvious ones — matched
+case-insensitively, checked for every `docs-test=run` block whether or not this
+run executes anything — and lives in code so that editing the config cannot make
+the gate destructive. `needs=` skips a block, rather than failing it, where the
+tool is not installed, which is how the same document works on a laptop and on a
+runner that has more installed than it does. No block may ask for longer than
+`MAX_TIMEOUT` (300s).
+
+**The denylist is a backstop against a careless example, not a sandbox.** It
+matches command patterns, so it cannot stop `node -e '…'` or anything else that
+reaches the same place by another route. Be clear-eyed about what the gate is:
+it executes blocks the pull request introduced, before anyone has reviewed them,
+exactly as the test workflow runs the branch's test code. What bounds that is the
+job it runs in — `contents: read`, no secrets, the checkout token not persisted
+into `.git/config`, and a 10-minute `timeout-minutes` — not the denylist. On a
+fork's pull request GitHub narrows it further, to a read-only token and no
+secrets at all. If that trade stops being worth it, pass `--docs-no-exec` in the
+gate and let the weekly sweep be the only place blocks run.
 
 ## Scope
 
@@ -139,15 +159,19 @@ request gate, and in the fuller weekly sweep.
   vendored Spec Kit commands, generated agent context and the wireframe bundle.
 - **`corpus.point_in_time`** — documents that record a moment: `tasks.md`,
   `plan.md`, `research.md`, handoffs, patch notes. Their examples are still
-  checked; their path claims are not, because constitution section 11 puts the
-  freshness obligation on `spec.md` and leaves these as point-in-time artifacts.
+  checked, and so are their links and the claims inside their examples; what is
+  not checked is the backticked paths in their prose, because constitution
+  section 11 puts the freshness obligation on `spec.md` and leaves these as
+  point-in-time artifacts.
 - **`references.ignore_paths`** — deliberately hypothetical paths, like the
   `infra/insecure.tf` in a walkthrough of what a Trivy finding looks like.
 
 Vendored and excluded directories are genuinely out:
 
 ```bash docs-test=run
-! PYTHONPATH=docs-tests python3 -m docs_test.corpus --all | grep -q '^\.cursor/'
+corpus="$(PYTHONPATH=docs-tests python3 -m docs_test.corpus --all)"
+test -n "$corpus"
+! printf '%s\n' "$corpus" | grep -q '^\.cursor/'
 ```
 
 ## In CI
@@ -156,11 +180,13 @@ Vendored and excluded directories are genuinely out:
 two ways:
 
 - **Pull request gate** (blocking) — the documents the pull request touches, plus
-  this harness's own tests. Python only, so `needs=dotnet` and `needs=npm` blocks
-  skip. Seconds, not minutes.
-- **Weekly sweep** — the whole corpus with .NET and Node available so annotated
-  blocks really run, plus an external link check. It files one issue when
-  something has rotted and closes it when the sweep is clean again.
+  this harness's own tests. Seconds, not minutes. It sets up Python, but the
+  GitHub runner image also carries git, node/npm and dotnet, so a `docs-test=run`
+  block runs there whenever the image happens to have what `needs=` asks for.
+  Keep annotated blocks quick, and remember the default 60s timeout.
+- **Weekly sweep** — the whole corpus with pinned .NET and Node, so annotated
+  blocks run against the versions we ship, plus an external link check. It files
+  one issue when something has rotted and closes it when the sweep is clean again.
 
 A pull request that touches no documents collects no document tests, so the gate
 costs nothing on code-only changes.
@@ -168,7 +194,7 @@ costs nothing on code-only changes.
 ## Working on the harness
 
 ```bash docs-test=skip reason="the suite would be running itself"
-scripts/docs-test.sh --all -- docs-tests/tests
+scripts/docs-test.sh --tests-only
 ```
 
 `docs-tests/tests/` unit-tests each check, and `test_suite.py` runs the whole

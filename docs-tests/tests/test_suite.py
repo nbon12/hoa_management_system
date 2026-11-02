@@ -86,3 +86,25 @@ def test_fixtures_are_outside_the_real_corpus() -> None:
     from docs_test import corpus
 
     assert not any(path.startswith("docs-tests/tests/fixtures/") for path in corpus.tracked_docs())
+
+
+def test_a_missing_config_is_a_usage_error_not_a_traceback(tmp_path) -> None:
+    root = repo_root()
+    result = subprocess.run(
+        (
+            sys.executable, "-m", "pytest",
+            "-c", "docs-tests/pytest.ini",
+            "--rootdir", str(root),
+            "--docs-config", str(tmp_path / "absent.toml"),
+            "-p", "no:cacheprovider",
+            "docs-tests/tests/fixtures",
+        ),
+        cwd=root,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(root / "docs-tests")},
+    )
+
+    assert result.returncode != 0
+    assert "INTERNALERROR" not in result.stdout + result.stderr
+    assert "docs-test: docs-test config not found" in result.stdout + result.stderr

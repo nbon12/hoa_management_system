@@ -15,8 +15,8 @@ No application code. It adds a blocking pull request check over the Markdown a c
 - **A backticked repository path is now a claim.** `scripts/docs-test.sh` checks that every backticked path in a document exists, so writing about something that was removed means leaving the path as prose instead of backticking it.
 - **Documented commands have to be real.** `npm run <script>` must exist in `neko-hoa/package.json`, `dotnet … --project <path>` must point at a project, `docker compose <command> <service>` must name a service the compose file defines, and `gh workflow run <file>` must name a workflow.
 - **Shell, JSON and YAML blocks have to parse.** Shell blocks go through `bash -n` with `<placeholders>` substituted first; a block that is a fragment rather than a whole document says so with `docs-test=skip reason="..."` on its fence line.
-- **`tasks.md`, `plan.md`, `research.md`, handoffs and this file are point-in-time**, as constitution section 11 says: their examples are checked, their path claims are not. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
-- A block annotated `docs-test=run` is **executed** in CI. The annotation contract — `cwd`, `needs`, `timeout`, `exit`, `expect`, and the denylist that keeps runnable examples hermetic — is in `docs-tests/README.md`.
+- **`tasks.md`, `plan.md`, `research.md`, handoffs and this file are point-in-time**, as constitution section 11 says: their examples and links are still checked; the backticked paths in their prose are not. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
+- A block annotated `docs-test=run` is **executed** in CI, on the pull request that introduces it, in a job with no secrets, an unpersisted read-only token and a 10-minute cap. The annotation contract — `cwd`, `needs`, `timeout`, `exit`, `expect`, and the denylist that keeps runnable examples hermetic — is in `docs-tests/README.md`.
 
 **Shared pieces you can reuse**
 
@@ -31,8 +31,11 @@ No application code. It adds a blocking pull request check over the Markdown a c
 
 **Left open**
 
-- `csharp`, `sql` and `hcl` blocks are collected but not checked — compiling them needs a toolchain the gate does not have.
+- `csharp`, `sql` and `hcl` blocks are not checked at all — checking them needs a toolchain the gate does not have.
 - External links are checked weekly, not per PR, because they are flaky.
+
+---
+
 ## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
 
 Tooling only. No application behavior, API or data change.

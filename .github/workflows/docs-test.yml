@@ -2,14 +2,17 @@ name: Docs Tests
 
 # Executable documentation testing (see docs-tests/README.md). Two depths:
 #   1. PR gate     → the documents the PR touches, plus the harness's own tests.
-#                    Python only, so needs=<tool> blocks skip. Seconds.
-#   2. Weekly sweep → the whole corpus with .NET and Node available so annotated
-#                    blocks really run, plus an external link check. Files one
-#                    issue when documentation has rotted, closes it when clean.
+#                    Only Python is set up here, but the runner image also carries
+#                    git, node/npm and dotnet, so a docs-test=run block whose
+#                    needs= tools the image happens to have does run. Seconds.
+#   2. Weekly sweep → the whole corpus with pinned .NET and Node, so annotated
+#                    blocks run against the versions we ship, plus an external
+#                    link check. Files one issue when documentation has rotted,
+#                    closes it when clean.
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   schedule:
     - cron: '0 8 * * 1'   # Mondays, 08:00 UTC
   workflow_dispatch: {}
@@ -32,16 +35,19 @@ jobs:
     name: Docs gate (changed documents)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # This job runs code the pull request introduced — a docs-test=run block is
+    # executed, the same way the test suite runs the branch's test code. Bounded
+    # rather than trusted: no secrets, contents: read, the checkout token is not
+    # left in .git/config, and the job cannot outlast this timeout.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0   # the changed-document set is a diff against the base
-
-      - name: Fetch the base branch
-        run: |
-          git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}" || true
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # Full history so the changed-document set can be diffed against the
+          # base commit, which this checkout already contains — no fetch, and so
+          # no credential to leave behind.
+          fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -49,10 +55,10 @@ jobs:
 
       - name: Documentation tests
         run: |
-          scripts/docs-test.sh --changed "origin/${BASE_REF}" -- \
+          scripts/docs-test.sh --changed "$BASE_SHA" -- \
             --junit-xml=docs-test-report.xml
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
       - name: Upload report
         if: always()
@@ -67,6 +73,7 @@ jobs:
     name: Docs sweep (whole corpus)
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       issues: write   # files/updates the sweep issue below
@@ -85,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Documentation tests (whole corpus)
         id: suite
@@ -109,6 +116,7 @@ jobs:
             --exclude-path .claude
             --exclude-path wireframes
             --exclude-path docs-tests/tests/fixtures
+            --exclude-path .venv-docs-tests
             './**/*.md'
           output: lychee-report.md
           fail: true
@@ -127,7 +135,9 @@ jobs:
 
       # One issue, reused: a comment per failing sweep, closed when clean again.
       - name: File or update the sweep issue
-        if: failure()
+        if: >-
+          always() && github.ref == 'refs/heads/main'
+          && (steps.suite.outcome == 'failure' || steps.links.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -167,7 +177,9 @@ jobs:
           fi
 
       - name: Close the sweep issue
-        if: success()
+        if: >-
+          always() && github.ref == 'refs/heads/main'
+          && steps.suite.outcome == 'success' && steps.links.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

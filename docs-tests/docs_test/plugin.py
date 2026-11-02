@@ -40,10 +40,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config: pytest.Config) -> None:
     override = config.getoption("--docs-config")
-    configure(
-        execute=not config.getoption("--docs-no-exec"),
-        cfg=load_config(Path(override).resolve()) if override else None,
-    )
+    try:
+        cfg = load_config(Path(override).resolve()) if override else load_config()
+    except (FileNotFoundError, ValueError, OSError) as error:
+        # A readable line, rather than pytest's INTERNALERROR traceback.
+        raise pytest.UsageError(f"docs-test: {error}") from error
+    configure(execute=not config.getoption("--docs-no-exec"), cfg=cfg)
     config._docs_sybil = Sybil(  # type: ignore[attr-defined]
         parsers=[default_parser(runtime().config), SkipParser()],
         patterns=["*.md", "*.markdown"],

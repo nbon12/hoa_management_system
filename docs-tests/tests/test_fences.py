@@ -6,7 +6,13 @@ import pytest
 from sybil import Document
 
 from docs_test.config import Config
-from docs_test.fences import AnnotationError, Block, FenceParser, parse_attributes
+from docs_test.fences import (
+    MAX_TIMEOUT,
+    AnnotationError,
+    Block,
+    FenceParser,
+    parse_attributes,
+)
 
 
 def test_no_annotations() -> None:
@@ -45,11 +51,39 @@ def test_unrelated_metadata_is_left_alone() -> None:
         "docs-test=run timeout=soon",
         "docs-test=run exit=later",
         'docs-test=run reason="unbalanced',
+        # A duration has to be one, and an exit code has to be one.
+        "docs-test=run timeout=0",
+        "docs-test=run timeout=-5",
+        "docs-test=run exit=-1",
+        "docs-test=run exit=999",
+        "docs-test=run timeout=301",
     ],
 )
 def test_broken_annotations_are_errors(text: str) -> None:
     with pytest.raises(AnnotationError):
         parse_attributes(text)
+
+
+@pytest.mark.parametrize("text", ["docs_test=run", "DOCS-TEST=run", "docs-tests=run"])
+def test_a_misspelled_gateway_key_is_a_typo_not_metadata(text: str) -> None:
+    """On its own, with nothing correctly spelled beside it to give it away."""
+    with pytest.raises(AnnotationError, match="did you mean"):
+        parse_attributes(text)
+
+
+@pytest.mark.parametrize("text", ["expected=4", "exec=true", "timout=30", "name=setup"])
+def test_another_tool_s_metadata_is_not_our_typo(text: str) -> None:
+    """Fuzzy-matching every key would make `expected=` a misspelled `expect`."""
+    assert not parse_attributes(text).annotated
+
+
+def test_a_misspelled_key_beside_one_of_ours_is_still_an_error() -> None:
+    with pytest.raises(AnnotationError, match="timout"):
+        parse_attributes("docs-test=run timout=30")
+
+
+def test_the_longest_allowed_timeout_is_accepted() -> None:
+    assert parse_attributes(f"docs-test=run timeout={MAX_TIMEOUT}").timeout == MAX_TIMEOUT
 
 
 def _parse(text: str, config: Config | None = None):

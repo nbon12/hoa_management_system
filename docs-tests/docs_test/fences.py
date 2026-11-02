@@ -11,6 +11,7 @@ annotations are invisible in rendered documentation.
 
 from __future__ import annotations
 
+import difflib
 import re
 import shlex
 from dataclasses import dataclass, field
@@ -27,6 +28,12 @@ INFO_PATTERN = re.compile(r"(?P<language>[A-Za-z0-9_+#.-]*)[ \t]*(?P<attributes>
 
 MODES = {"run", "check", "skip"}
 KEYS = {"docs-test", "reason", "cwd", "needs", "timeout", "exit", "expect"}
+#: The key that turns checking on: a near-miss of it is a typo wherever it
+#: appears, because nothing else would notice that the block is not being tested.
+GATEWAY_KEY = "docs-test"
+#: An example that takes longer than this is not an example. Also keeps one
+#: block from holding the CI job open until the job's own timeout.
+MAX_TIMEOUT = 300
 
 
 class AnnotationError(Exception):
@@ -74,12 +81,24 @@ def parse_attributes(text: str) -> Attributes:
 
     pairs: list[tuple[str, str]] = []
     unknown: list[str] = []
+    typos: list[str] = []
     for token in tokens:
         key, _, value = token.partition("=")
         if key in KEYS:
             pairs.append((key, value))
+        elif _near_miss(key):
+            typos.append(token)
         else:
             unknown.append(token)
+
+    # A near-miss of a real key is a typo wherever it appears — reporting it only
+    # when a correctly spelled key sits beside it would let the annotation that
+    # was meant to run a block silently do nothing.
+    if typos:
+        suggestions = ", ".join(
+            f"{token!r} (did you mean {_near_miss(token.partition('=')[0])!r}?)" for token in typos
+        )
+        raise AnnotationError(f"unrecognised annotation(s) {suggestions}")
 
     if not pairs:
         return Attributes()
@@ -96,10 +115,13 @@ def parse_attributes(text: str) -> Attributes:
         raise AnnotationError(f"docs-test={mode!r} is not one of {', '.join(sorted(MODES))}")
 
     timeout = values.get("timeout")
+    if timeout is not None and not (re.fullmatch(r"\d+", timeout) and 0 < int(timeout) <= MAX_TIMEOUT):
+        raise AnnotationError(
+            f"timeout={timeout!r} is not a number of seconds between 1 and {MAX_TIMEOUT}"
+        )
     exit_code = values.get("exit", "0")
-    for name, number in (("timeout", timeout), ("exit", exit_code)):
-        if number is not None and not re.fullmatch(r"-?\d+", number):
-            raise AnnotationError(f"{name}={number!r} is not an integer")
+    if not (re.fullmatch(r"\d+", exit_code) and int(exit_code) <= 255):
+        raise AnnotationError(f"exit={exit_code!r} is not an exit code (0-255)")
 
     return Attributes(
         mode=mode,
@@ -111,6 +133,23 @@ def parse_attributes(text: str) -> Attributes:
         expect=values.get("expect"),
         annotated=True,
     )
+
+
+def _near_miss(key: str) -> str | None:
+    """The key the author probably meant, or ``None``.
+
+    Deliberately narrow: a key that is one of ours but miscased or
+    underscored (``docs_test``, ``Timeout``), or a near-miss of ``docs-test``
+    itself (``docs-tests``). A fuzzy match against every key would flag another
+    tool's ``expected=`` or ``exec=`` as our typo, and an info line with none of
+    our keys on it is not ours to complain about.
+    """
+    normalised = key.lower().replace("_", "-")
+    if normalised in KEYS:
+        return normalised
+    if difflib.get_close_matches(normalised, [GATEWAY_KEY], n=1, cutoff=0.8):
+        return GATEWAY_KEY
+    return None
 
 
 @dataclass(frozen=True)
