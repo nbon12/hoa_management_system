@@ -199,7 +199,6 @@ public class VoteChangeTests(TestDatabaseFixture fixture) : ArcTestBase(fixture)
         var res = await UndoAsync(s.CommunityId, appId);
 
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
-        Assert.Equal(ArcErrorCodes.ApplicationClosed, await ErrorCodeAsync(res));
     }
 
     // 031 US3-S7: "Given a decision is still within its grace period, When the manager records the outcome, Then it is

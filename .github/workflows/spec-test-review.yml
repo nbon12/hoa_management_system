@@ -39,7 +39,7 @@ permissions: {}
 
 env:
   # Auto-fix attempts per PR before the last pass moves what's left to a follow-up issue.
-  MAX_FIX_ATTEMPTS: 1 # canary only: the next findings are the last pass
+  MAX_FIX_ATTEMPTS: 3
 
 jobs:
   review:
