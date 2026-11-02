@@ -8,6 +8,10 @@ name: Claude
 #   2. Add ONE of these repository secrets:
 #        CLAUDE_CODE_OAUTH_TOKEN  — Claude Pro/Max subscription (`claude setup-token`)
 #        ANTHROPIC_API_KEY        — Anthropic Console API key (billed per token)
+#
+# Merging: Claude can check readiness, update the branch from main (`gh pr update-branch`, or
+# `git merge` to resolve conflicts) and push, but it has no merge tool on purpose: it reads PR text
+# that anyone can write. To merge, the owner comments `/merge` (merge-command.yml).
 
 on:
   issue_comment:
@@ -51,7 +55,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1
+          # Full history so Claude can compare the branch with main and merge main into it.
+          fetch-depth: 0
 
       # Toolchains so Claude can build and run the tests it touches (see claude_args).
       - name: Setup .NET
@@ -75,4 +80,4 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: |
             --max-turns 100
-            --allowedTools "Bash(dotnet restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm ci:*),Bash(npm run build:*),Bash(npm run test:ci:*)"
+            --allowedTools "Bash(dotnet restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm ci:*),Bash(npm run build:*),Bash(npm run test:ci:*),Bash(git fetch:*),Bash(git log:*),Bash(git diff:*),Bash(git status:*),Bash(git merge:*),Bash(git merge-base:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh pr diff:*),Bash(gh pr update-branch:*)"

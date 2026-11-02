@@ -95,7 +95,7 @@ If the test still passes, it **survived**: the NLT is Weak, and the finding is c
 
 ## 6. Settle disputes
 
-For each reply to the earlier report that disputes a finding by its ID, re-check the finding against the evidence given (a test you missed, a misread scenario, a probe that broke something else). Withdraw the finding if the evidence holds. If it doesn't, keep the finding and answer in one or two sentences. A finding a probe confirmed stands unless the reply shows the probe itself was wrong.
+Replies include the **Spec test auto-fix** comments the workflow posts after each fix attempt. Their "Disputed" lists carry evidence too. For each reply to the earlier report that disputes a finding by its ID, re-check the finding against the evidence given (a test you missed, a misread scenario, a probe that broke something else). Withdraw the finding if the evidence holds. If it doesn't, keep the finding and answer in one or two sentences. A finding a probe confirmed stands unless the reply shows the probe itself was wrong.
 
 ## 7. Verdict and report
 
