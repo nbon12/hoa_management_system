@@ -159,6 +159,8 @@ guard_ok "rewriting an assertion in place is allowed" "$T"
 
 echo "patch"
 mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; edit CLAUDE.md 'main rules'
+# claude-code-action snapshots the PR's config into .claude-pr/ and ignores it.
+mkdir -p "$REPO_DIR/.claude-pr" && echo x >"$REPO_DIR/.claude-pr/CLAUDE.md" && echo '/.claude-pr/' >>"$REPO_DIR/.git/info/exclude"
 edit .claude/settings.json '{"restored":true}'; echo 'it("x", () => { expect(1).toBe(1); });' >"$REPO_DIR/neko-hoa/src/app/new.spec.ts"
 (cd "$REPO_DIR" && bash "$SCRIPT" patch "$PATCH") >"$STUB_DIR/out" 2>&1; rc=$?
 files="$(grep '^diff --git' "$PATCH" | awk '{print $3}' | tr '\n' ' ')"
@@ -239,6 +241,12 @@ run_push ""
 [ "$(remote_head)" != "$START" ] && ghout_has pushed=true && remote_msg | grep -q 'did not finish' \
   && ok "a crashed attempt pushes an empty commit so the next pass retries" \
   || bad "a crashed attempt pushes an empty commit so the next pass retries" "$(cat "$STUB_DIR/out")"
+
+reset; mkrepo; mkclean; rm -f "$PATCH"
+run_push "$FIXED" FIX_RESULT=failure
+[ "$(remote_head)" != "$START" ] && [ -z "$(remote_files)" ] && remote_msg | grep -q 'did not finish' \
+  && ok "a failed fix job (no patch) retries instead of deferring" \
+  || bad "a failed fix job (no patch) retries instead of deferring" "$(cat "$STUB_DIR/out")"
 
 reset; mkrepo; fixer_patch; mkclean
 run_push "$FIXED" PUSH_URL= MERGE_TOKEN=
