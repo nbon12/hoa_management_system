@@ -6,6 +6,28 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Spec test review: an adversarial check that tests match the spec · [#304](https://github.com/nbon12/hoa_management_system/pull/304)
+
+Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **PRs to `main` get a new check, `Spec test review / Verdict`.** It runs when a PR is opened ready, marked ready, reopened, or pushed to while ready. Drafts, forks, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/` are skipped.
+- **The `CLAUDE.md` NLT rule is now enforced, not only advisory.** Claude maps each Acceptance Scenario and Independent Test the PR touches (`US3-AS4`, `US3-IT`) to its test and judges the test Faithful, Weak, Missing or Skipped. It probes suspect tests by breaking the behavior in production code and running only that test, so a test that survives is a confirmed finding.
+- **The check fails** when a scenario whose behavior, code or test the diff adds or changes lacks a faithful test. Under `.routines/merge-policy.md` rule 1 that blocks a merge. Gaps elsewhere in the touched stories are listed as earlier debt and don't fail it.
+- **To get past a finding:**
+  - fix the test and push, which runs the review again; or
+  - reply on the PR with the finding's ID and evidence, then re-run the workflow (`gh run rerun <id>`). The next run re-checks the finding against the evidence and withdraws it if the evidence holds.
+
+  A red check caused by the reviewer itself (no verdict, a quota error) needs a re-run, not a code change.
+
+**Shared pieces you can reuse**
+
+- `/review-spec-tests <PR#>` (`.claude/commands/review-spec-tests.md`) runs the same review in a session before you mark a PR ready. Probes edit the working tree, so they only run on a clean checkout of the PR.
+- `scripts/spec-test-review.sh` has two subcommands. `scope` decides from changed paths whether a PR needs review. `post` upserts the marker-keyed sticky comment.
+
+---
+
 ## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · [#300](https://github.com/nbon12/hoa_management_system/pull/300)
 
 Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
