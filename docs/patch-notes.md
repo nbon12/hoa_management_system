@@ -6,6 +6,27 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Merge policy: sessions merge their own PRs · PR link pending
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §3–4 (#295, task S3). Tooling only.
+
+**Changes earlier assumptions**
+
+- **Sessions now squash-merge their own PRs under [`.routines/merge-policy.md`](../.routines/merge-policy.md).** The conditions are:
+  - checks are green;
+  - no unresolved review threads and no "changes requested" review;
+  - the PR is ready, and its description lists what was verified;
+  - patch notes are included when required.
+
+  A PR that touches guarded paths also needs an independent automated review by a separate session, and nbon12 gets a push notification after the merge. These paths are workflows, `scripts/pr-env-*`, `.routines/`, `CLAUDE.md`, `infra/`, Auth, Payments and migrations. Constitution changes stay owner-merged.
+- **The Done story sweep's OWNER ONLY class no longer includes approvals or "merges reserved for the owner".** Workers merge under the policy. The sweep also skips the `ops-log` issue (#296).
+
+**Left open**
+
+- `CLAUDE.md` doesn't link the merge policy yet. The session's auto-mode check refuses `CLAUDE.md` edits.
+
+---
+
 ## 2026-11-02 · Zero-touch ops: a policy gate replaces the `ops` approval, the sweep reaps orphans · [#298](https://github.com/nbon12/hoa_management_system/pull/298)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) (#295). Tooling only. No application behavior, API or data change.

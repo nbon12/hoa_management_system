@@ -41,10 +41,11 @@ Read this first. Where it differs from the plan below, this section wins.
   3. it comments on each reaped PR;
   4. it re-audits, and that step fails the job if orphans remain;
   5. on failure, it comments on the ops-log issue.
-- **S3 is not done.** The session's auto-mode permission check refused edits to agent instructions
-  (`CLAUDE.md`, `.routines/**`) as self-modification. A draft `.routines/merge-policy.md` is waiting for
-  nbon12 to allow those edits or make them. Until S3 lands, the sweep's old merge and OWNER ONLY rules
-  still apply.
+- **S3 (follow-up PR, mostly done).** `.routines/merge-policy.md` is added, and
+  `.routines/done-story-sweep.md` is updated as in §4 (nbon12 authorized these edits on 2026-11-02). The
+  mmo-engine copy is updated in its own PR. **Still open:** the `CLAUDE.md` link to the merge policy.
+  The session's auto-mode check refuses `CLAUDE.md` edits as self-modification, so nbon12 adds it or
+  authorizes it.
 - **S4.** The 2026-10-26 handoff has decision 7, and Verification 8, O10 and decision 5 are marked
   superseded. #234 has a comment.
 - **S5.** The ops log is [#296](https://github.com/nbon12/hoa_management_system/issues/296) (label
