@@ -6,6 +6,17 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Email-provider removal test scans only git-tracked files · Closes [#216](https://github.com/nbon12/hoa_management_system/issues/216)
+
+Test harness only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- `EmailProviderRemovalTests` (026 SC-006) now scans the files `git ls-files` lists under `HOAManagementCompany/`, `HOAManagementCompany.Tests/` and `.github/workflows/`. Untracked and gitignored files, such as a local `appsettings.Secrets.json` with a stale pre-026 email-provider section, no longer fail it. Without git, it falls back to every file on disk, as before.
+- With failure 2 already fixed in #280, a plain local `dotnet test` no longer fails because of a developer's local secrets file. This resolves #216.
+
+---
+
 ## 2026-10-31 · Repo hygiene sweep: dead code, duplicate tests, spec/doc reconciliation, small spec fixes · [#280](https://github.com/nbon12/hoa_management_system/pull/280)
 
 One-time first pass of the planned nightly hygiene routine. No API, data or UI change for residents or staff.
