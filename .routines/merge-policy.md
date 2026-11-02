@@ -48,13 +48,16 @@ PRs out of auto-merge. Change the list there, and only there.
 
 ## Independent automated review (guarded paths)
 
-1. **Start a separate reviewer session.** Use `create_session` with this repo as the source, titled
-   "Review <owner>/<repo>#<n>". Give it only the PR link and tell it to read the diff from the PR.
-   Don't give it your own summary or conclusions. Its prompt: run the `code-review` skill at `high`
-   against that PR with `--comment`, so its findings are posted on the PR, and then end its turn.
+1. **Start an independent reviewer.** Use a fresh subagent (the `Agent` tool, `general-purpose`): it
+   runs in any turn with no click from nbon12. Use a separate session (`create_session`, titled "Review
+   <owner>/<repo>#<n>") only when the subagent can't run, because the desktop app lets one session
+   start another only on nbon12's own message: anywhere else it becomes a card nbon12 has to click.
+   Either way, give it only the PR link and tell it to read the diff from the PR. Don't give it your
+   own summary or conclusions. Its prompt: run the `code-review` skill at `high` against that PR with
+   `--comment`, so its findings are posted on the PR, and then end its turn.
 2. **Fix every confirmed blocking finding.** Push the fixes, and answer each finding on the PR: fixed, or
-   why it isn't a problem. If you make more than a small, targeted fix, have a new reviewer session check
-   it again.
+   why it isn't a problem. If you make more than a small, targeted fix, have a new reviewer check it
+   again.
 3. **Merge, then notify.** When rules 1–4 hold again, merge. Then send nbon12 one push notification
    (`PushNotification`), such as "merged #N touching guarded paths: <paths>", so they can review it after
    the fact.
