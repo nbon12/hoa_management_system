@@ -224,7 +224,7 @@ whenever a change implements, modifies, or claims to complete a Spec Kit feature
 - **Enforced in CI.** `.github/workflows/spec-test-review.yml` runs this review when a PR is ready
   for review and again on every push. It follows `.claude/commands/review-spec-tests.md`, which you
   can also run yourself before marking a PR ready: `/review-spec-tests <PR#>`. Blocking findings fail
-  its **Verdict** check. Fix the test, or reply on the PR with the finding's ID and your evidence,
+  its **Spec test verdict** check. Fix the test, or reply on the PR with the finding's ID and your evidence,
   then re-run the workflow.
 
 <!-- MANUAL ADDITIONS END -->

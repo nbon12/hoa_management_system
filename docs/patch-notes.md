@@ -12,14 +12,15 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
 
 **Changes earlier assumptions**
 
-- **PRs to `main` get a new check, `Spec test review / Verdict`.** It runs when a PR is opened ready, marked ready, reopened, or pushed to while ready. Drafts, forks, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/` are skipped.
+- **PRs to `main` get a new check, `Spec test verdict`.** It runs when a PR is opened ready, marked ready, reopened, or pushed to while ready. Drafts, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/` pass without a review. Fork PRs fail it, because they get no secrets, so a maintainer merges those. If the review job itself fails, this check fails rather than skipping, so it is safe to require.
 - **The `CLAUDE.md` NLT rule is now enforced, not only advisory.** Claude maps each Acceptance Scenario and Independent Test the PR touches (`US3-AS4`, `US3-IT`) to its test and judges the test Faithful, Weak, Missing or Skipped. It probes suspect tests by breaking the behavior in production code and running only that test, so a test that survives is a confirmed finding.
-- **The check fails** when a scenario whose behavior, code or test the diff adds or changes lacks a faithful test. Under `.routines/merge-policy.md` rule 1 that blocks a merge. Gaps elsewhere in the touched stories are listed as earlier debt and don't fail it.
+- **The check fails** when a scenario whose behavior, code or test the diff adds or changes lacks a faithful test. Under `.routines/merge-policy.md` rule 1 that blocks a session's merge. GitHub blocks it for everyone once `Spec test verdict` is a required status check on `main`. Gaps elsewhere in the touched stories are listed as earlier debt and don't fail it.
 - **To get past a finding:**
   - fix the test and push, which runs the review again; or
   - reply on the PR with the finding's ID and evidence, then re-run the workflow (`gh run rerun <id>`). The next run re-checks the finding against the evidence and withdraws it if the evidence holds.
 
   A red check caused by the reviewer itself (no verdict, a quota error) needs a re-run, not a code change.
+- **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. The check is the gate, and it goes green when a re-run finds no blocking findings.
 
 **Shared pieces you can reuse**
 
