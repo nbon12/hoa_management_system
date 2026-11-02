@@ -4,16 +4,23 @@
 #
 # Two jobs:
 #   diagnose  always. Read-only: WIF as nekohoa-agent-ro-dev plus read-only provider tokens. No approval.
-#   repair    a real change, or a destroy dry run (reading state needs the deployer). Waits for the `ops`
-#             Environment's required reviewer, then runs as the deployer with CI's write tokens.
+#   repair    a real change, or a destroy dry run (reading state needs the deployer). Runs as the deployer
+#             with CI's write tokens once the policy gate passes (scripts/pr-env-policy-gate.sh;
+#             docs/handoffs/2026-11-02-zero-touch-operations.md §2.1). No person approves it: the gate
+#             checks the kill switch (P1), the daily limit (P3), live runs (P4), a closed PR (P5) and the
+#             dispatcher (P8), and a dry run's plan must name only this PR's resources (P7). A refusal
+#             changes nothing and fails the run. Every write is summarised on the PR, and a failure also
+#             on the open `ops-log` issue.
 # Actions:
 #   diagnose  PR state, state objects (lock generation + age), and by exact name: Cloud Run, secrets, Neon
 #             branch, R2 bucket, Stripe endpoints, Pages deployments. Never runs tofu: an init would write
 #             an empty state under the prefix, which the sweep would then try to reclaim. For any other
 #             action it also prints what a reap would delete.
-#   unlock    removes state/pr/<n>/default.tflock, only if lock_id is its generation and it is ≥ 45 min old.
-#   destroy   tofu destroy from the existing per-PR state; the state is deleted only if the destroy worked.
-#   reap      deletes by exact name (scripts/pr-env-reap.sh): leftovers that no state tracks.
+#   unlock    removes state/pr/<n>/default.tflock, only if lock_id is its generation and it is ≥ 45 min old
+#             (P6).
+#   destroy   tofu destroy from the existing per-PR state, closed PRs only; the state is deleted only if the
+#             destroy worked.
+#   reap      deletes by exact name (scripts/pr-env-reap.sh), closed PRs only: leftovers no state tracks.
 #   verify    checks the read-only identities themselves (scripts/pr-env-verify-ro.sh, handoff Verification
 #             1-3 and 5-7): reads work, writes and secret reads are refused. pr_number is ignored (pass 0).
 #             Runs in the diagnose job only; it never waits for approval.
@@ -22,8 +29,9 @@
 # uses them (FR-E4); actions are SHA-pinned (FR-E6). Output is names, ids and states only: this public
 # repo's Actions logs are world-readable.
 name: pr-env-repair
-# Ends in "(pr-<n>)": pr-env-clear-stale-lock.sh matches a live run to its PR by it (sweep, #236).
-run-name: 'pr-env-repair ${{ inputs.action }} (pr-${{ inputs.pr_number }})'
+# Ends in "(pr-<n>)": pr-env-clear-stale-lock.sh and the policy gate match a live run to its PR by it
+# (#236). "dry_run=false" marks a write, which the policy gate's daily limit (P3) counts.
+run-name: 'pr-env-repair ${{ inputs.action }} dry_run=${{ inputs.dry_run }} (pr-${{ inputs.pr_number }})'
 
 on:
   workflow_dispatch:
@@ -48,11 +56,6 @@ on:
         required: false
         type: boolean
         default: true
-      allow_open_pr:
-        description: "Let destroy or reap act on an open PR"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -138,51 +141,38 @@ jobs:
       github.ref == 'refs/heads/main' && inputs.action != 'diagnose' && inputs.action != 'verify' &&
       (inputs.dry_run == false || inputs.action == 'destroy')
     runs-on: ubuntu-latest
-    environment: ops # required reviewer = the operator; a session can dispatch but never approve
-    # The group pr-env.yml and pr-env-teardown.yml use. A run waiting here for approval holds it, so it
-    # blocks pr-env and teardown for this PR until approved or rejected.
+    # `ops` limits the job to `main` and scopes its secrets. It no longer has a required reviewer: the
+    # policy gate below is the control (handoff 2026-11-02 §2.1, task O1).
+    environment: ops
+    # The group pr-env.yml and pr-env-teardown.yml use, so a repair never overlaps them for this PR.
     concurrency:
       group: pr-env-${{ inputs.pr_number }}
       cancel-in-progress: false
     permissions:
-      actions: read # read the ops Environment's protection rules
+      actions: read # gh run list: the policy gate's live-run check (P4) and daily limit (P3)
       contents: read
       id-token: write # WIF as the deployer
-      pull-requests: read
+      issues: write # failure comment on the ops-log issue
+      pull-requests: write # the audit comment on the PR
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # GitHub creates a missing Environment on first use, with no protection rules: refuse to act unless
-      # `ops` exists with a required reviewer, which is what made this run wait for approval.
-      - name: Require the ops approval gate
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          n="$(gh api "repos/${REPO}/environments/ops" --jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length')"
-          if [ "$n" -lt 1 ]; then
-            echo "::error::The ops Environment has no required reviewer, so this run was not approved. Add one (handoff task O9) and dispatch again."; exit 1
-          fi
+      # Every step below appends what it did or refused to this file; the last step posts it.
+      - name: Start the audit trail
+        run: echo "AUDIT_FILE=${RUNNER_TEMP}/ops-audit.md" >>"$GITHUB_ENV"
 
-      - name: Open-PR guard
-        if: inputs.action == 'destroy' || inputs.action == 'reap'
+      # Before any credential is minted. P2 (main only) is the job's `if:`; P6 (unlock) and P7 (the plan)
+      # run further down, next to what they check.
+      - name: Policy gate
         env:
-          ALLOW_OPEN_PR: ${{ inputs.allow_open_pr }}
+          CALLER: repair
+          DRY_RUN: ${{ inputs.dry_run }}
+          OPS_AUTOMATION: ${{ vars.OPS_AUTOMATION }}
+          ACTOR: ${{ github.actor }}
+          RUN_ID: ${{ github.run_id }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          state="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq .state)"
-          if [ "$state" = closed ]; then echo "PR #${PR_NUMBER} is closed."; exit 0; fi
-          if [ "$ALLOW_OPEN_PR" != true ]; then
-            echo "::error::PR #${PR_NUMBER} is ${state}. Refusing to ${ACTION} it without allow_open_pr=true."; exit 1
-          fi
-          # An open PR's next push must queue behind this job, not cancel it mid-destroy (root-cause item 1).
-          if ! grep -A2 '^concurrency:' .github/workflows/pr-env.yml | grep -q 'cancel-in-progress: false'; then
-            echo "::error::pr-env.yml still cancels in-flight runs, so a push could kill this ${ACTION}. Refusing."; exit 1
-          fi
-          echo "::warning::PR #${PR_NUMBER} is open; acting on it because allow_open_pr=true."
+        run: scripts/pr-env-policy-gate.sh preflight
 
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
@@ -192,7 +182,7 @@ jobs:
       # ── unlock ────────────────────────────────────────────────────────────────────────────────────────
       # Needs no `tofu init`: the GCS backend's lock is an object whose generation is the Lock ID, and the
       # generation precondition makes the delete a no-op if the lock changed since it was checked.
-      - name: Remove the stale state lock
+      - name: Remove the stale state lock (P6)
         if: inputs.action == 'unlock'
         env:
           LOCK_ID: ${{ inputs.lock_id }}
@@ -213,6 +203,7 @@ jobs:
           fi
           gcloud storage rm "$lock" --if-generation-match="$LOCK_ID"
           echo "Removed state lock ${LOCK_ID} (${age_min} min old)."
+          echo "- Removed state lock ${LOCK_ID} (${age_min} min old) for PR #${PR_NUMBER}." >>"$AUDIT_FILE"
 
       # ── destroy ───────────────────────────────────────────────────────────────────────────────────────
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
@@ -261,8 +252,19 @@ jobs:
           # The plan's own diff prints every attribute, so it goes to /dev/null; its addresses are listed instead.
           tofu plan -destroy -input=false "${lock_args[@]}" -out=destroy.tfplan >/dev/null
           echo "The destroy would remove:"
+          # "<actions> <address>" per managed resource change, for the policy gate (P7).
           tofu show -json destroy.tfplan \
-            | jq -r '.resource_changes[]? | select(.change.actions | index("delete")) | "  \(.address)"'
+            | jq -r '.resource_changes[]? | select(.mode == "managed") | select(.change.actions != ["no-op"])
+                | "\(.change.actions | join("+")) \(.address)"' >"${RUNNER_TEMP}/destroy-plan.txt"
+          sed 's/^/  /' "${RUNNER_TEMP}/destroy-plan.txt"
+          { echo "- Destroy plan for PR #${PR_NUMBER} (dry_run=${DRY_RUN}):"; sed 's/^/  - /' "${RUNNER_TEMP}/destroy-plan.txt"; } >>"$AUDIT_FILE"
+
+      # Before anything is deleted, including the Stripe webhook and the R2 objects below.
+      - name: Policy gate (P7, the destroy plan)
+        if: inputs.action == 'destroy'
+        env:
+          PLAN_FILE: ${{ runner.temp }}/destroy-plan.txt
+        run: scripts/pr-env-policy-gate.sh check-plan
 
       - name: Deregister the Stripe webhook
         if: inputs.action == 'destroy' && !inputs.dry_run
@@ -297,13 +299,40 @@ jobs:
       # invisible orphans (the 2026-10-26 incident).
       - name: Delete the per-PR state
         if: inputs.action == 'destroy' && !inputs.dry_run && steps.destroy.outcome == 'success'
-        run: gcloud storage rm --all-versions "gs://${STATE_BUCKET}/state/pr/${PR_NUMBER}/**"
+        run: |
+          gcloud storage rm --all-versions "gs://${STATE_BUCKET}/state/pr/${PR_NUMBER}/**"
+          echo "- Destroy applied; state/pr/${PR_NUMBER} deleted." >>"$AUDIT_FILE"
 
       - name: Remove the plan file
         if: always() && inputs.action == 'destroy'
         run: rm -f infra/environments/pr/destroy.tfplan # holds every variable value, including the tokens
 
       # ── reap ──────────────────────────────────────────────────────────────────────────────────────────
+      # Dry run first, in this job and with the same tokens, so the policy gate sees what the real run would
+      # delete (P7). The real run deletes by the same exact names, so it can only do less.
+      - name: Reap dry run
+        if: inputs.action == 'reap'
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PR_BASE_BRANCH_ID: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+          ITEMS_OUT: ${{ runner.temp }}/reap-plan.txt
+          DRY_RUN: "true"
+          ONLY_UNTRACKED: "false"
+        run: scripts/pr-env-reap.sh
+
+      - name: Policy gate (P7, the reap plan)
+        if: inputs.action == 'reap'
+        env:
+          PLAN_FILE: ${{ runner.temp }}/reap-plan.txt
+        run: scripts/pr-env-policy-gate.sh check-plan
+
       - name: Reap by exact name
         if: inputs.action == 'reap'
         env:
@@ -316,9 +345,49 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
-          ALLOW_OPEN_PR: ${{ inputs.allow_open_pr }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          ITEMS_OUT: ${{ runner.temp }}/reap-done.txt
           DRY_RUN: "false"
           ONLY_UNTRACKED: "false"
-        run: scripts/pr-env-reap.sh
+        run: |
+          set -euo pipefail
+          rc=0
+          scripts/pr-env-reap.sh || rc=$?
+          { echo "- Reap of PR #${PR_NUMBER}:"
+            if [ -s "$ITEMS_OUT" ]; then sed 's/^/  - /' "$ITEMS_OUT"; else echo "  - nothing to delete"; fi
+          } >>"$AUDIT_FILE"
+          exit "$rc"
+
+      # ── audit trail ───────────────────────────────────────────────────────────────────────────────────────
+      # Always: what the run did (or why it refused) goes on the PR for a write, and a failure also goes on
+      # the open ops-log issue, which the owner watches. Names, PR numbers and run links only.
+      - name: Post the audit trail
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          body="$(mktemp)"
+          {
+            echo "**pr-env-repair \`${ACTION}\`** on PR #${PR_NUMBER} (dry_run=${DRY_RUN}): **${JOB_STATUS}**. [Run](${RUN_URL})"
+            echo
+            if [ -s "$AUDIT_FILE" ]; then cat "$AUDIT_FILE"; else echo "- no step recorded anything"; fi
+          } >"$body"
+          cat "$body" >>"$GITHUB_STEP_SUMMARY"
+          if [ "$DRY_RUN" = false ]; then
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body" \
+              || echo "::warning::Could not comment on PR #${PR_NUMBER}."
+          fi
+          if [ "$JOB_STATUS" != success ]; then
+            log="$(gh issue list --repo "$REPO" --label ops-log --state open --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+            if [ -n "$log" ]; then
+              gh issue comment "$log" --repo "$REPO" --body-file "$body" || echo "::warning::Could not comment on ops-log issue #${log}."
+            else
+              echo "::warning::No open issue labeled ops-log; the failure is only in this run."
+            fi
+          fi
