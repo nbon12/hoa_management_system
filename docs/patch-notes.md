@@ -6,6 +6,34 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · [#300](https://github.com/nbon12/hoa_management_system/pull/300)
+
+Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **The maintainer is no longer a step in the pipeline.** New constitution section 14 ("Autonomous Delivery & Human Input", numbered after Governance so section 13 citations stay valid). New and changed specs, plans, tasks, checklists, quickstarts and PR descriptions must not contain:
+  - tasks or checklist items assigned to a person;
+  - manual verification or QA;
+  - "STOP and validate", approval or sign-off checkpoints;
+  - "things only a human can do" sections.
+
+  Every check is an automated test or CI check. Existing specs are not rewritten only to remove an earlier human step.
+- **Ambiguity is decided, not asked.** Pick the most defensible default, record it under the spec's Assumptions, and continue. No `[NEEDS CLARIFICATION]` markers and no mid-workflow questions. `CLAUDE.md` says this overrides the upstream Spec Kit text that asks the user: the clarification questions in `/speckit.specify` and the "incomplete checklists, proceed anyway?" prompt in `/speckit.implement`.
+- **Unless otherwise specified:** when the maintainer themselves runs `/speckit.specify` or `/speckit.clarify` (or says they want to be involved), the agent engages and asks in those two phases. Plan, tasks, analyze, implement, the PR and the merge stay hands-off either way. Commands an agent, scheduled task or routine starts on its own are never maintainer-driven. The exception relaxes only "decide, don't ask": no human steps in artifacts and merge on green still apply.
+- **A green PR always merges.** When every required check passes, the agent merges it or enables auto-merge, and nobody is asked to review at that stage. CI/CD or ops controls are automated guards (dry run, rate limit, kill switch, audit trail), not required reviewers. Product features where people act (a board vote, a moderation queue) are unaffected.
+- **Exceptions are narrow:** third-party accounts and root credentials, billing, admin-only settings, amending the constitution, and an irreversible action on production data or real money that no guard bounds. Even then the work ships inert and safe by default, the maintainer is told once with exact steps, and nothing blocks a merge.
+- **Templates changed.** The spec template's Constitution Requirements and Assumptions text, the plan template's Constitution Check, and the tasks template: "STOP and VALIDATE" is now "VALIDATE … continue when green", "Deploy/Demo" is "Deploy", quickstart validation is an automated check, and the Polish phase has a human-step audit task.
+- **Testing constitution 2.1:** "approved in writing" now reads "documented in the plan", so it can't be read as an approval gate.
+
+**Left open**
+
+- Amendments to the constitution stay owner-merged under section 13. This one merged on the owner's explicit approval. The owner can relax the rule by amending section 13.
+
+**Read together with the merge policy.** [`.routines/merge-policy.md`](../.routines/merge-policy.md) (#299, handoff task S3) landed first and agrees with section 14: no human review, and guarded paths get an independent *automated* review. `CLAUDE.md` now links it, which closes the open item in the #299 entry below.
+
+---
+
 ## 2026-11-02 · Merge policy: sessions merge their own PRs · [#299](https://github.com/nbon12/hoa_management_system/pull/299)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §3–4 (#295, task S3). Tooling only.
