@@ -30,7 +30,7 @@ Tooling only. No application behavior, API or data change.
 
 1. The usual cause is that the dispatcher session was archived, which disables its scheduled task. From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
 2. Point a daily task at it: `create_trigger` with `persistent_session_id` set to the new session, the old task's cron and the old task's prompt. Then delete the old task.
-3. Fire it once (`fire_trigger`) and check that today's report appears on the `sweep-log` issues.
+3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools, and that session only runs the watchdog check (seen 2026-11-02). Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
 
 **Left open**
 
