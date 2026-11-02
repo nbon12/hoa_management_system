@@ -20,11 +20,12 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
   - It probes suspect tests: it breaks the behavior in production code and runs only that test. A test that survives is a confirmed finding.
   - Blocking findings are scenarios whose behavior, code or test the diff adds or changes. Gaps elsewhere in the touched stories are listed as earlier debt and don't count.
 - **Findings are fixed automatically, and the loop always ends green.**
-  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, and pushes to the PR branch. That push starts the next review. **Pull before you push again.**
-  - A guard refuses an attempt that changes anything but test code, or that skips or focuses a test.
+  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, in a read-only job. A separate job applies its patch to a clean checkout and pushes to the PR branch with `MERGE_TOKEN`, which starts the next review. **Pull before you push again.**
+  - A guard refuses an attempt that changes anything but test code, skips or focuses a test (including `Skip.If`), or ends with fewer test declarations or assertions than it started with.
   - Commits carry a `Spec-Test-Review-Fix: <n>` trailer. After three attempts, or when there's nothing the fixer can change (for example, the faithful test fails because the code is wrong), the last pass files the remaining findings in a follow-up issue, "Spec test gaps deferred from #N", and the check passes.
   - A later green pass on the same PR closes that issue.
-  - A review that crashes is retried once. If it still can't run, that is filed the same way.
+  - A review that crashes is retried once. If it still can't run (an outage, or a missing or expired Claude token), it gets its own issue, "Spec test review couldn't run on #N", and the check passes. Constitution section 14 says a credentials problem must not block a merge, but the maintainer is told. Watch for these issues: they mean PRs are merging unreviewed.
+  - If a follow-up issue can't be filed, the check fails instead of passing silently.
 - **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
 - **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
 - **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
@@ -35,6 +36,7 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
   - In CI, claude-code-action restores `.claude/` and `CLAUDE.md` from `main`, so a PR is always reviewed under `main`'s procedure. A change to the procedure takes effect once it merges.
 - `scripts/spec-test-review.sh` holds the deterministic parts, each tested in `scripts/tests/spec-test-review.test.sh`:
   - `scope`: whether a PR needs review;
+  - `patch`: the fixer's changes as a patch;
   - `guard`: what a fix may commit;
   - `push`: commit and push a fix attempt;
   - `decide`: the check, including the follow-up issue;
