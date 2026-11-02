@@ -6,27 +6,40 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · Spec test review: an adversarial check that tests match the spec · [#304](https://github.com/nbon12/hoa_management_system/pull/304)
+## 2026-11-02 · Spec test review: tests are checked against the spec, and fixed automatically · [#304](https://github.com/nbon12/hoa_management_system/pull/304)
 
 Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI only. No application behavior, API or data change.
 
 **Changes earlier assumptions**
 
-- **PRs to `main` get a new check, `Spec test verdict`.** It runs when a PR is opened ready, marked ready, reopened, or pushed to while ready. Drafts, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/` pass without a review. Fork PRs fail it, because they get no secrets, so a maintainer merges those. If the review job itself fails, this check fails rather than skipping, so it is safe to require.
-- **The `CLAUDE.md` NLT rule is now enforced, not only advisory.** Claude maps each Acceptance Scenario and Independent Test the PR touches (`US3-AS4`, `US3-IT`) to its test and judges the test Faithful, Weak, Missing or Skipped. It probes suspect tests by breaking the behavior in production code and running only that test, so a test that survives is a confirmed finding.
-- **The check fails** when a scenario whose behavior, code or test the diff adds or changes lacks a faithful test. Under `.routines/merge-policy.md` rule 1 that blocks a session's merge. GitHub blocks it for everyone once `Spec test verdict` is a required status check on `main`. Gaps elsewhere in the touched stories are listed as earlier debt and don't fail it.
-- **To get past a finding:**
-  - fix the test and push, which runs the review again; or
-  - reply on the PR with the finding's ID and evidence, then re-run the workflow (`gh run rerun <id>`). The next run re-checks the finding against the evidence and withdraws it if the evidence holds.
-
-  A red check caused by the reviewer itself (no verdict, a quota error) needs a re-run, not a code change.
-- **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. The check is the gate, and it goes green when a re-run finds no blocking findings.
+- **PRs to `main` get a new check, `Spec test verdict`** (`.github/workflows/spec-test-review.yml`).
+  - **When it runs:** when a PR is opened ready, marked ready, reopened, or pushed to while ready.
+  - **What passes without a review:** drafts, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/`.
+  - **Fork PRs fail it.** They get no secrets, so a maintainer merges those.
+- **The `CLAUDE.md` NLT rule is now enforced, not only advisory.** Claude maps each Acceptance Scenario and Independent Test the PR touches (`US3-AS4`, `US3-IT`) to its test and judges the test Faithful, Weak, Missing or Skipped.
+  - It probes suspect tests: it breaks the behavior in production code and runs only that test. A test that survives is a confirmed finding.
+  - Blocking findings are scenarios whose behavior, code or test the diff adds or changes. Gaps elsewhere in the touched stories are listed as earlier debt and don't count.
+- **Findings are fixed automatically, and the loop always ends green.**
+  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, and pushes to the PR branch. That push starts the next review. **Pull before you push again.**
+  - A guard refuses an attempt that changes anything but test code, or that skips or focuses a test.
+  - Commits carry a `Spec-Test-Review-Fix: <n>` trailer. After three attempts, or when there's nothing the fixer can change (for example, the faithful test fails because the code is wrong), the last pass files the remaining findings in a follow-up issue, "Spec test gaps deferred from #N", and the check passes.
+  - A later green pass on the same PR closes that issue.
+  - A review that crashes is retried once. If it still can't run, that is filed the same way.
+- **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
+- **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
+- **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
 
 **Shared pieces you can reuse**
 
 - `/review-spec-tests <PR#>` (`.claude/commands/review-spec-tests.md`) runs the same review in a session before you mark a PR ready. Probes edit the working tree, so they only run on a clean checkout of the PR.
   - In CI, claude-code-action restores `.claude/` and `CLAUDE.md` from `main`, so a PR is always reviewed under `main`'s procedure. A change to the procedure takes effect once it merges.
-- `scripts/spec-test-review.sh` has two subcommands. `scope` decides from changed paths whether a PR needs review. `post` upserts the marker-keyed sticky comment.
+- `scripts/spec-test-review.sh` holds the deterministic parts, each tested in `scripts/tests/spec-test-review.test.sh`:
+  - `scope`: whether a PR needs review;
+  - `guard`: what a fix may commit;
+  - `push`: commit and push a fix attempt;
+  - `decide`: the check, including the follow-up issue;
+  - `post`: the sticky comment.
+- The fix pushes use `MERGE_TOKEN`. A push made with `GITHUB_TOKEN` starts no workflows, so it would never be reviewed.
 
 ---
 
