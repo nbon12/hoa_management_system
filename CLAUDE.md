@@ -89,6 +89,10 @@ C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard con
 - **Before starting work**, skim the entries newer than the last merge you know about, especially any that touch the area you're changing.
 - **When a PR merges a feature or a behavior-changing fix**, add an entry at the top of `docs/patch-notes.md` **in that same PR**. Follow the existing entry's shape: date, title, spec link, PR link, then the sections that apply. Keep it to what someone working nearby needs to know. Dependency bumps and doc-only changes don't need an entry.
 
+## Merging your own PR
+
+Sessions squash-merge their own PRs under [`.routines/merge-policy.md`](.routines/merge-policy.md): green checks, settled reviews, a ready description and patch notes when required. A PR that touches guarded paths (workflows, `scripts/pr-env-*`, `.routines/`, `CLAUDE.md`, `infra/`, Auth, Payments, migrations) also needs an independent automated review and a push notification to nbon12 after the merge. Constitution changes stay owner-merged.
+
 ## Spec Kit workflow: PR watching
 
 Spec Kit commands other than `/speckit.implement` (i.e. `/speckit.specify`,

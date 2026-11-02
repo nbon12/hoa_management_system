@@ -41,11 +41,9 @@ Read this first. Where it differs from the plan below, this section wins.
   3. it comments on each reaped PR;
   4. it re-audits, and that step fails the job if orphans remain;
   5. on failure, it comments on the ops-log issue.
-- **S3 (follow-up PR, mostly done).** `.routines/merge-policy.md` is added, and
+- **S3 (follow-up PRs).** `.routines/merge-policy.md` is added, and
   `.routines/done-story-sweep.md` is updated as in §4 (nbon12 authorized these edits on 2026-11-02). The
-  mmo-engine copy is updated in its own PR. **Still open:** the `CLAUDE.md` link to the merge policy.
-  The session's auto-mode check refuses `CLAUDE.md` edits as self-modification, so nbon12 adds it or
-  authorizes it.
+  mmo-engine copy is updated in its own PR. `CLAUDE.md` links the merge policy (a later PR).
 - **S4.** The 2026-10-26 handoff has decision 7, and Verification 8, O10 and decision 5 are marked
   superseded. #234 has a comment.
 - **S5.** The ops log is [#296](https://github.com/nbon12/hoa_management_system/issues/296) (label
@@ -327,7 +325,7 @@ in "Ops scripts (shellcheck + tests)": P7's name filter must reject a shared nam
   Merge it while the reviewer is still on (G1 overlap).
 - [x] **S2.** `scripts/pr-env-audit.sh`: write parseable output. `pr-env-sweep.yml`: add the "Reap
   orphans of closed PRs" step (§2.2).
-- [ ] **S3.** Add `.routines/merge-policy.md`, link it from `CLAUDE.md`, and update
+- [x] **S3.** Add `.routines/merge-policy.md`, link it from `CLAUDE.md`, and update
   `.routines/done-story-sweep.md` (§4). Do the same in `nbon12/mmo-engine`.
 - [x] **S4.** Update the 2026-10-26 handoff (decision 7; supersede V8, O10 and decision 5) and
   comment on #234.
