@@ -2,13 +2,17 @@
 # required check on main passes. Claude sessions open pull requests as nbon12, so this covers them
 # too. Anyone else's pull request, Dependabot's included, is left alone.
 #
-# These stay manual, and a later push, label or draft switch that makes a pull request one of them
-# turns auto-merge back off:
+# These stay manual:
 #   - drafts;
 #   - pull requests labelled `hold`;
 #   - pull requests touching a guarded path from .routines/merge-policy.md (GUARDED_PATHS below),
 #     which need that policy's independent review first. All of .github/ counts, not only
 #     workflows, because composite actions run inside workflows.
+#
+# Each pull request this workflow turns auto-merge on for gets the `auto-merge` label. If a later
+# push, label or draft switch makes one of those manual, it turns auto-merge back off and removes
+# the label. It leaves alone auto-merge that the owner turned on, for example with /merge on a
+# guarded pull request, except that `hold` turns off anyone's.
 #
 # It runs on pull_request_target, so it always runs this file as it is on main: a pull request can't
 # loosen these rules for itself. It never checks out or runs pull request code.
@@ -25,10 +29,12 @@ on:
 
 permissions: {} # GITHUB_TOKEN is not used
 
-# Each run decides from the pull request as it is now, so the newest run can replace older ones.
+# Runs for a pull request queue instead of cancelling each other: adding or removing the
+# `auto-merge` label starts another run, which must not cut this one short. Each run decides from
+# the pull request as it is then, so the queue settles on the current state.
 concurrency:
   group: auto-merge-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   auto-merge:
@@ -45,6 +51,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          MARK: auto-merge
           # Extended regexes, one per line, matched against each changed path and the old path of a
           # rename. Keep in step with "Guarded paths" in .routines/merge-policy.md.
           GUARDED_PATHS: |
@@ -81,11 +88,15 @@ jobs:
             exit 0
           fi
 
+          auto_on="$(jq -r '.autoMergeRequest != null' <<<"$pr")"
+          marked="$(jq -r --arg m "$MARK" '.labels | any(.name == $m)' <<<"$pr")"
+          held="$(jq -r '.labels | any(.name == "hold")' <<<"$pr")"
+
           reasons=()
           if [ "$(jq -r .isDraft <<<"$pr")" = "true" ]; then
             reasons+=("it is a draft")
           fi
-          if jq -e '.labels | any(.name == "hold")' <<<"$pr" >/dev/null; then
+          if [ "$held" = "true" ]; then
             reasons+=("it has the hold label")
           fi
           # Listed on its own line so a failed API call stops the run instead of reading as "no guarded paths".
@@ -99,14 +110,30 @@ jobs:
           if [ "${#reasons[@]}" -gt 0 ]; then
             why="$(printf '%s; ' "${reasons[@]}")"
             why="${why%; }"
-            if [ "$(jq -r '.autoMergeRequest != null' <<<"$pr")" = "true" ]; then
+            # Only auto-merge this workflow turned on (it carries the label) is turned off, so the
+            # owner's /merge on a guarded pull request stands. `hold` turns off anyone's.
+            if [ "$auto_on" = "true" ] && { [ "$marked" = "true" ] || [ "$held" = "true" ]; }; then
               gh pr merge "$PR" --repo "$REPO" --disable-auto
               report "Auto-merge turned off for #${PR} because ${why}."
+            elif [ "$auto_on" = "true" ]; then
+              report "Auto-merge left on for #${PR}: this workflow didn't turn it on, though ${why}."
             else
               report "Auto-merge left off for #${PR} because ${why}."
             fi
+            if [ "$marked" = "true" ]; then
+              gh api --method DELETE "repos/${REPO}/issues/${PR}/labels/${MARK}" >/dev/null
+            fi
             exit 0
           fi
+
+          if [ "$auto_on" = "true" ]; then
+            report "Auto-merge is already on for #${PR}."
+            exit 0
+          fi
+
+          # Label first: a label left behind by a failed run is harmless, but auto-merge without
+          # the label is auto-merge this workflow could never turn back off.
+          gh api --method POST "repos/${REPO}/issues/${PR}/labels" -f "labels[]=${MARK}" >/dev/null
 
           # --match-head-commit: only the commit whose files were just checked can merge.
           if out="$(gh pr merge "$PR" --repo "$REPO" --squash --auto --match-head-commit "$head" 2>&1)"; then

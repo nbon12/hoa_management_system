@@ -13,7 +13,8 @@ Tooling only. No application behavior, API or data change.
 **New**
 
 - **Auto-merge** (`.github/workflows/auto-merge.yml`): a PR into `main` that nbon12 opens gets squash auto-merge, so GitHub merges it once the required checks pass. That includes every Claude session's PR, since sessions open PRs as nbon12. Dependabot's and anyone else's PRs are untouched.
-- Left manual: drafts, PRs labelled `hold`, and PRs touching a guarded path from `.routines/merge-policy.md` (all of `.github/` counts). A later push, the `hold` label or a switch to draft turns auto-merge back off. The run's summary says why it skipped a PR.
+- Left manual: drafts, PRs labelled `hold`, and PRs touching a guarded path from `.routines/merge-policy.md` (all of `.github/` counts). The run's summary says what it did and why.
+- **The `auto-merge` label** marks the PRs the workflow turned auto-merge on for. If a later push, `hold` or a switch to draft makes one of them manual, the workflow turns auto-merge back off and removes the label. It leaves alone auto-merge the owner turned on, so `/merge` on a guarded PR still works. `hold` turns off anyone's auto-merge.
 - Like `/merge`, it uses `MERGE_TOKEN`, so the squash push still starts the push-to-main workflows.
 
 **Changes earlier assumptions**
