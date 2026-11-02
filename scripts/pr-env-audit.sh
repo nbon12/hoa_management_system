@@ -2,7 +2,8 @@
 # Name-based orphan audit of the ephemeral per-PR environments (issue #236; handoff "Ops workflows to add"
 # §2). Lists every per-PR resource by name and reports each PR that owns some but has no state/pr/<n>
 # prefix: no tofu destroy, teardown or sweep will ever reclaim those (PR 217 after the 2026-10-26
-# incident). Read-only. Reaping goes through pr-env-repair.yml action=reap.
+# incident). Read-only. pr-env-sweep.yml reaps a closed PR's orphans from ORPHANS_OUT once the PR has been
+# closed 24 h (scripts/pr-env-policy-gate.sh); any other reap goes through pr-env-repair.yml action=reap.
 #
 #   Cloud Run service  nekohoa-api-pr-<n>     Secret Manager  pr-<n>-*
 #   Neon branch        pr-<n>                 R2 bucket       nekohoa-pr-<n>-documents
@@ -15,7 +16,8 @@
 #
 # Env (required): PROJECT REGION NEON_PROJECT_ID CF_ACCOUNT REPO; tokens NEON_API_KEY CF_TOKEN, GH_TOKEN
 #                 for gh; gcloud logged in (WIF in CI).
-# Env (optional): STATE_BUCKET (nekohoa-dev-tfstate).
+# Env (optional): STATE_BUCKET (nekohoa-dev-tfstate); ORPHANS_OUT (a file: the number of each closed or
+#                 unknown PR with orphans, one per line, the ones this script reports as ::error::).
 # Output is names and PR numbers only: this public repo's Actions logs are world-readable. Tokens reach
 # curl through a file descriptor, never argv.
 set -euo pipefail
@@ -24,6 +26,7 @@ set -euo pipefail
   "${NEON_API_KEY:?}" "${CF_TOKEN:?}"
 STATE_BUCKET="${STATE_BUCKET:-nekohoa-dev-tfstate}"
 
+if [ -n "${ORPHANS_OUT:-}" ]; then : >"$ORPHANS_OUT"; fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 GCP_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
@@ -90,6 +93,7 @@ for n in $prs; do
   else
     echo "::error::PR #${n} is ${state} and has ${count} untracked per-PR resource(s). Reap them: ${fix}"
     failed=1
+    if [ -n "${ORPHANS_OUT:-}" ]; then echo "$n" >>"$ORPHANS_OUT"; fi
   fi
   summary+="- PR #${n} (${state}): ${count} untracked resource(s)"$'\n'
 done
