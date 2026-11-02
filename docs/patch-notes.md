@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · Zero-touch ops: a policy gate replaces the `ops` approval, the sweep reaps orphans · PR link pending
+## 2026-11-02 · Zero-touch ops: a policy gate replaces the `ops` approval, the sweep reaps orphans · [#298](https://github.com/nbon12/hoa_management_system/pull/298)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) (#295). Tooling only. No application behavior, API or data change.
 
