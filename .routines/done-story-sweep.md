@@ -132,14 +132,18 @@ If nothing needed doing, say so in one line.
 ## Step 6. Log and notify
 
 **Finding the newest report.** Step 6.1 and the watchdog both need the newest report on a log issue.
-Comments come oldest first, so read from the end:
+A report is a comment posted by nbon12 that starts with `Done story sweep report`. Ignore everything
+else, such as bot replies. Comments come oldest first, so read from the end:
 1. Call `issue_read` with method `get`, and read the issue's comment count *n*. If *n* is 0, there is
    no report.
-2. Otherwise fetch page ceil(*n*/100) with method `get_comments` and `perPage: 100`. Take the last
-   comment on it that was posted by nbon12 and starts with `Done story sweep report`, ignoring
-   everything else, such as bot replies. If that page has none, step back one page at a time.
-3. If a fetch fails, retry it once. If it fails again, the lookup failed: don't use a partial list.
-   - In step 6.1, still post the report, and in step 2 treat every "Needs you" entry as new.
+2. Fetch page ceil(*n*/100) with method `get_comments` and `perPage: 100`. If that page has 100
+   comments, also fetch the next page, in case a comment landed after you read *n*. Take the last
+   report on the latest non-empty page. If it has none, step back one page at a time. If page 1 has
+   none either, there is no report.
+3. If any call in this lookup fails (the `get` or a page fetch), retry it once. If it fails again, the
+   lookup failed: never use a partial list.
+   - In step 6.1, it counts as a failed step for step 2, and the push names it, for example "Done
+     sweep hoa: couldn't read the previous report; #236 needs you".
    - In the watchdog, mark that repo "couldn't check". Watchdog step 4 handles it.
 
 1. **Log.** Find the open issue in this repo labeled `sweep-log`, titled "Done story sweep log". If
