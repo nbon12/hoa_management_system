@@ -84,12 +84,19 @@ C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard con
 
 ## Never at-mention Claude in what you post to GitHub
 
-Everything a session posts to GitHub posts as nbon12 (OWNER), and `.github/workflows/claude.yml` starts a
-paid run whenever a comment, review, issue title or issue body contains the at-sign followed by `claude`, in any
-letter case. Backticks, code blocks and quotes don't hide it, because the workflow matches the raw text.
-So never write it in a comment, review, issue, or PR title or body. Write "the Claude workflow" instead,
-and replace the mention the same way when you quote text that contains it. The only exception: nbon12
-asked you, in this conversation, to start that workflow on a specific issue or PR.
+Everything a session posts to GitHub posts as nbon12 (OWNER). `.github/workflows/claude.yml` starts a paid
+run when the at-sign followed by `claude` appears, in any letter case, in:
+- an issue or PR comment, a PR review comment, or a submitted review's body;
+- an issue's title or body, when the issue is **opened or assigned**.
+
+PR titles and bodies aren't checked. Backticks, code blocks and quotes don't hide the mention, because
+the workflow matches the raw text. So:
+- **Never write it** in a comment, review or issue. Write "the Claude workflow" instead, and replace
+  the mention the same way when you quote or copy text that contains it.
+- **Never open or assign an issue** whose title or body contains it.
+
+The only exception: nbon12 asked you, in this conversation, to start that workflow on a specific issue
+or PR. This is the one copy of the rule; routines point here.
 
 ## Patch notes: read them, and add to them when you merge
 
