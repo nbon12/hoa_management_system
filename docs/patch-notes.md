@@ -21,6 +21,24 @@ Tooling only. No application behavior, API or data change.
 - **Required checks on `main`** are now Build & Test, Frontend (neko-hoa) and Ops scripts (shellcheck + tests), as well as the two Trivy scans. This was a settings change made alongside this PR. Before it, a PR could merge while Build & Test was still running (#299 did).
 - **Open a PR as a draft until it is ready to merge.** Auto-merge checks required checks, drafts, `hold` and guarded paths, and none of the merge policy's other rules: resolved review threads, the verification list in the description, patch notes. A ready PR merges as soon as its checks pass.
 - A session no longer merges its own non-guarded PR; auto-merge does. Guarded-path PRs still follow the merge policy's independent review.
+- Agents still can't trigger `/merge` (#297, below), but their non-guarded PRs no longer need it. `/merge` is still how the owner merges a guarded PR, or one auto-merge skipped.
+
+---
+
+## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **`/merge`** (`.github/workflows/merge-command.yml`): when the owner comments `/merge` (first line, exactly) on an open PR, the workflow marks a draft ready, runs `gh pr update-branch`, then `gh pr merge --squash --auto`. It merges at once if every requirement is met, otherwise GitHub merges when the required checks pass. Conflicts stop it with a comment. No model is involved.
+- It runs only for a comment the owner typed: `author_association == OWNER` **and** no `performed_via_github_app`. Comments that Claude sessions post as nbon12 carry `performed_via_github_app: claude`, so **agents cannot trigger `/merge`**. Don't post it from a session, and don't tell a session that it can.
+- It uses the `MERGE_TOKEN` secret (fine-grained PAT: Contents + Pull requests, read/write), not `GITHUB_TOKEN`, so the squash push to `main` still starts the push-to-main workflows. It also needs Settings → "Allow auto-merge".
+
+**Changes earlier assumptions**
+
+- **`@claude` (`claude.yml`) can now check and update a PR branch.** It has a full-history checkout, plus `git fetch/log/diff/status/merge/merge-base/rev-parse` and `gh pr view/checks/diff/update-branch`. It still has **no merge tool on purpose**. Before this, "is it ready / update the branch" failed with permission denials (seen on #291).
+- A Claude session subscribed to a PR still won't merge because a GitHub comment asked it to. Merge with `/merge`, the button, or by asking in the session itself.
 
 ---
 
