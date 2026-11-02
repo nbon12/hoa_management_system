@@ -1,0 +1,137 @@
+# Turn on squash auto-merge for pull requests that nbon12 opens, so GitHub merges them once every
+# required check on main passes. Claude sessions open pull requests as nbon12, so this covers them
+# too. Anyone else's pull request, Dependabot's included, is left alone.
+#
+# These stay manual, and a later push, label or draft switch that makes a pull request one of them
+# turns auto-merge back off:
+#   - drafts;
+#   - pull requests labelled `hold`;
+#   - pull requests touching a guarded path from .routines/merge-policy.md (GUARDED_PATHS below),
+#     which need that policy's independent review first. All of .github/ counts, not only
+#     workflows, because composite actions run inside workflows.
+#
+# It runs on pull_request_target, so it always runs this file as it is on main: a pull request can't
+# loosen these rules for itself. It never checks out or runs pull request code.
+#
+# It uses MERGE_TOKEN (fine-grained token for this repository only: Contents and Pull requests, Read
+# and write), not GITHUB_TOKEN, because a merge made with GITHUB_TOKEN doesn't start the push-to-main
+# workflows (dev deploy, image push). It also needs Settings → General → "Allow auto-merge".
+name: Auto-merge own PRs
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled, unlabeled]
+
+permissions: {} # GITHUB_TOKEN is not used
+
+# Each run decides from the pull request as it is now, so the newest run can replace older ones.
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    # Only nbon12's pull requests, from a branch in this repository (a fork's branch lives in the fork).
+    if: >
+      contains(fromJSON('["nbon12"]'), github.event.pull_request.user.login) &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Turn auto-merge on or off
+        env:
+          GH_TOKEN: ${{ secrets.MERGE_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          # Extended regexes, one per line, matched against each changed path and the old path of a
+          # rename. Keep in step with "Guarded paths" in .routines/merge-policy.md.
+          GUARDED_PATHS: |
+            ^\.github/
+            ^scripts/pr-env-
+            ^\.routines/
+            ^\.specify/memory/constitution\.md$
+            (^|/)CLAUDE\.md$
+            ^infra/
+            ^HOAManagementCompany/Features/Auth/
+            ^HOAManagementCompany/Features/Payments/
+            (^|/)Migrations/
+        run: |
+          set -euo pipefail
+
+          report() {
+            echo "::notice::$1"
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret MERGE_TOKEN is not set. Add a fine-grained token for this repository with Contents and Pull requests: Read and write."
+            exit 1
+          fi
+
+          # Read the pull request now rather than trusting the event: a newer event may have
+          # cancelled the run that would have handled it.
+          pr="$(gh pr view "$PR" --repo "$REPO" --json state,isDraft,baseRefName,headRefOid,labels,autoMergeRequest)"
+          state="$(jq -r .state <<<"$pr")"
+          base="$(jq -r .baseRefName <<<"$pr")"
+          head="$(jq -r .headRefOid <<<"$pr")"
+          if [ "$state" != "OPEN" ] || [ "$base" != "$DEFAULT_BRANCH" ]; then
+            echo "PR #${PR} is ${state}, into ${base}. Nothing to do."
+            exit 0
+          fi
+
+          reasons=()
+          if [ "$(jq -r .isDraft <<<"$pr")" = "true" ]; then
+            reasons+=("it is a draft")
+          fi
+          if jq -e '.labels | any(.name == "hold")' <<<"$pr" >/dev/null; then
+            reasons+=("it has the hold label")
+          fi
+          # Listed on its own line so a failed API call stops the run instead of reading as "no guarded paths".
+          files="$(gh api --paginate "repos/${REPO}/pulls/${PR}/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+          patterns="$(printf '%s\n' "$GUARDED_PATHS" | sed '/^[[:space:]]*$/d')"
+          guarded="$(printf '%s\n' "$files" | grep -E -f <(printf '%s\n' "$patterns") | sort -u || true)"
+          if [ -n "$guarded" ]; then
+            reasons+=("it touches guarded paths: $(paste -sd ',' - <<<"$guarded" | sed 's/,/, /g')")
+          fi
+
+          if [ "${#reasons[@]}" -gt 0 ]; then
+            why="$(printf '%s; ' "${reasons[@]}")"
+            why="${why%; }"
+            if [ "$(jq -r '.autoMergeRequest != null' <<<"$pr")" = "true" ]; then
+              gh pr merge "$PR" --repo "$REPO" --disable-auto
+              report "Auto-merge turned off for #${PR} because ${why}."
+            else
+              report "Auto-merge left off for #${PR} because ${why}."
+            fi
+            exit 0
+          fi
+
+          # --match-head-commit: only the commit whose files were just checked can merge.
+          if out="$(gh pr merge "$PR" --repo "$REPO" --squash --auto --match-head-commit "$head" 2>&1)"; then
+            echo "$out"
+          else
+            echo "$out"
+            case "$out" in
+              *"clean status"*|*"Protected branch rules not configured"*)
+                # Nothing left to wait for (every required check already passed, or main requires
+                # none), so GitHub won't take auto-merge. Merge now instead.
+                gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$head"
+                ;;
+              *"unstable status"*)
+                report "Not merged: #${PR}'s required checks passed, but another check failed or is still running. Fix it and push, or merge by hand."
+                exit 0
+                ;;
+              *)
+                echo "::error::Couldn't turn on auto-merge for #${PR}."
+                exit 1
+                ;;
+            esac
+          fi
+
+          if [ "$(gh pr view "$PR" --repo "$REPO" --json state --jq .state)" = "MERGED" ]; then
+            report "Squash-merged #${PR}."
+          else
+            report "Auto-merge is on for #${PR}. GitHub squash-merges it once the required checks pass."
+          fi

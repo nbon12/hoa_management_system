@@ -6,6 +6,24 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Auto-merge for nbon12's PRs; all CI jobs are required checks · [#PR_NUMBER](https://github.com/nbon12/hoa_management_system/pull/PR_NUMBER)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **Auto-merge** (`.github/workflows/auto-merge.yml`): a PR into `main` that nbon12 opens gets squash auto-merge, so GitHub merges it once the required checks pass. That includes every Claude session's PR, since sessions open PRs as nbon12. Dependabot's and anyone else's PRs are untouched.
+- Left manual: drafts, PRs labelled `hold`, and PRs touching a guarded path from `.routines/merge-policy.md` (all of `.github/` counts). A later push, the `hold` label or a switch to draft turns auto-merge back off. The run's summary says why it skipped a PR.
+- Like `/merge`, it uses `MERGE_TOKEN`, so the squash push still starts the push-to-main workflows.
+
+**Changes earlier assumptions**
+
+- **Required checks on `main`** are now Build & Test, Frontend (neko-hoa) and Ops scripts (shellcheck + tests), as well as the two Trivy scans. This was a settings change made alongside this PR. Before it, a PR could merge while Build & Test was still running (#299 did).
+- **Open a PR as a draft until it is ready to merge.** Auto-merge checks required checks, drafts, `hold` and guarded paths, and none of the merge policy's other rules: resolved review threads, the verification list in the description, patch notes. A ready PR merges as soon as its checks pass.
+- A session no longer merges its own non-guarded PR; auto-merge does. Guarded-path PRs still follow the merge policy's independent review.
+
+---
+
 ## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · [#300](https://github.com/nbon12/hoa_management_system/pull/300)
 
 Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
