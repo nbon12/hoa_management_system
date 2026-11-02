@@ -6,6 +6,36 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Documentation is executable: a docs gate on every PR · [#309](https://github.com/nbon12/hoa_management_system/pull/309)
+
+No application code. It adds a blocking pull request check over the Markdown a change touches, so it will fail your PR if a document says something that is not true.
+
+**Changes earlier assumptions**
+
+- **A backticked repository path is now a claim.** `scripts/docs-test.sh` checks that every backticked path in a document exists, so writing about something that was removed means leaving the path as prose instead of backticking it.
+- **Documented commands have to be real.** `npm run <script>` must exist in `neko-hoa/package.json`, `dotnet … --project <path>` must point at a project, `docker compose <command> <service>` must name a service the compose file defines, and `gh workflow run <file>` must name a workflow.
+- **Shell, JSON and YAML blocks have to parse.** Shell blocks go through `bash -n` with `<placeholders>` substituted first; a block that is a fragment rather than a whole document says so with `docs-test=skip reason="..."` on its fence line.
+- **`tasks.md`, `plan.md`, `research.md`, handoffs and this file are point-in-time**, as constitution section 11 says: their examples are checked, their path claims are not. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
+- A block annotated `docs-test=run` is **executed** in CI. The annotation contract — `cwd`, `needs`, `timeout`, `exit`, `expect`, and the denylist that keeps runnable examples hermetic — is in `docs-tests/README.md`.
+
+**Shared pieces you can reuse**
+
+- `scripts/docs-test.sh --changed origin/main` is what the gate runs; `--all` is the weekly sweep; `--no-exec` skips execution. It builds `.venv-docs-tests/` itself.
+- `.github/workflows/docs-test.yml` has both depths: the PR gate (Python only, seconds) and a Monday sweep over the whole corpus with .NET and Node available plus an external link check. The sweep keeps one issue open while documentation is rotten and closes it when clean.
+- The harness is [Sybil](https://sybil.readthedocs.io/) plus this repository's parsers in `docs-tests/docs_test/`. To check a new fence language, add it to `DEFAULT_LANGUAGES`, write an evaluator, register it in `fences.py`.
+- Scope lives in `docs-tests/docs-test.toml` (corpus, point-in-time documents, deliberately hypothetical paths).
+
+**Fixed on the way in**
+
+`npm run lint` in 008's quickstart (never existed), three links in 009 to a handoff note that was never written (the work shipped as 010), 007's SendGrid sandbox contract pointing at the provider 026 removed, 025's citation of the 021 spec's location, the CSP `_headers` path in 016's contract, two `appsettings` fragments fenced as whole JSON documents, and 020's quickstart commands that only work from `neko-hoa/`. `.claude/settings.local.json` is now git-ignored, as 016's checklist assumes.
+
+**Left open**
+
+- `csharp`, `sql` and `hcl` blocks are collected but not checked — compiling them needs a toolchain the gate does not have.
+- External links are checked weekly, not per PR, because they are flaky.
+
+---
+
 ## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#247](https://github.com/nbon12/hoa_management_system/pull/247)
 
 Frontend only, no API or data change. It touches the architectural review form shared by Community settings › Architectural review and Company defaults (030 briefs 07 and 08).
