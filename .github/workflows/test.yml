@@ -114,7 +114,8 @@ jobs:
       - name: shellcheck
         run: >-
           shellcheck scripts/pr-env-reap.sh scripts/pr-env-clear-stale-lock.sh scripts/pr-env-audit.sh
-          scripts/pr-env-verify-ro.sh scripts/pr-env-policy-gate.sh scripts/tests/pr-env-reap.test.sh
+          scripts/pr-env-verify-ro.sh scripts/pr-env-policy-gate.sh scripts/docs-test.sh
+          scripts/tests/pr-env-reap.test.sh
           scripts/tests/pr-env-ops.test.sh
           scripts/tests/pr-env-verify-ro.test.sh
       - name: pr-env-reap tests (stubbed providers, no network)
