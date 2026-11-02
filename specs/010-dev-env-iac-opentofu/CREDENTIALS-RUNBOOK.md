@@ -26,7 +26,7 @@
    disk (e.g. via a script that reads from a source and writes the file) rather than printing values.
 3. **Do not overwrite the 4 already-filled values** in `operator_secrets`: `jwt-secret` (freshly
    generated), `stripe-secret-key`, `stripe-webhook-secret`, `scheduler-secret` (pulled from the
-   gitignored `HOAManagementCompany/appsettings.Secrets.json`). Only fill the `REPLACE_ME_*` lines.
+   gitignored `HOAManagementCompany/appsettings.Secrets.json`). Only fill the remaining placeholder lines.
 4. The cloud credentials are **infrastructure accounts the human owns** — you cannot create Google /
    Cloudflare / Neon accounts or mint their tokens. Guide the human; have them paste values, or have
    them run the verification commands.
@@ -40,28 +40,31 @@
 
 ---
 
-## The 10 placeholders to fill (with line numbers + expected format)
+## The placeholders to fill (with line numbers + expected format)
 
-Open `infra/environments/dev/terraform.tfvars`. Replace each `REPLACE_ME_*`:
+Copy `infra/environments/dev/terraform.tfvars.example` to `infra/environments/dev/terraform.tfvars` and replace every placeholder (`your-gcp-project-id`, `REPLACE_WITH_*`, `pk_test_REPLACE`, `sk_test_REPLACE`, `whsec_REPLACE`, `<account>`, `XXXXXX-XXXXXX-XXXXXX`). Line numbers below refer to the example file. A fresh copy also has placeholders for the four operator secrets that rule 3 calls already filled:
 
 | Line | Key | Expected value / format |
 |------|-----|--------------------------|
-| 7  | `gcp_project_id` | GCP **project ID** (not name), e.g. `nekohoa-prod-1234` |
-| 21 | `neon_api_key` | Neon API key string (starts `napi_…`) |
-| 24 | `cloudflare_api_token` | Cloudflare API token (~40 chars), scoped Pages+R2+DNS |
-| 25 | `cloudflare_account_id` | 32-char hex account id |
-| 26 | `cloudflare_zone_id` | 32-char hex zone id for `nekohoa.com` |
-| 31 | `operator_secrets["sentry-dsn"]` | Sentry DSN `https://…@…ingest….sentry.io/…`, or `""` to disable |
-| 34 | `operator_secrets["storage-service-url"]` | `https://<account_id>.r2.cloudflarestorage.com` |
-| 35 | `operator_secrets["storage-access-key"]` | R2 Access Key ID |
-| 36 | `operator_secrets["storage-secret-key"]` | R2 Secret Access Key |
-| 41 | `deploy_alert_webhook_url` | Slack/Discord webhook URL (or placeholder; non-blocking) |
+| 5  | `gcp_project_id` | GCP **project ID** (not name), e.g. `nekohoa-prod-1234` |
+| 18 | `stripe_publishable_key` | Stripe **test** publishable key `pk_test_…` (non-secret; becomes `Stripe__PublishableKey`) |
+| 22 | `neon_api_key` | Neon API key string (starts `napi_…`) |
+| 25 | `cloudflare_api_token` | Cloudflare API token (~40 chars), scoped Pages+R2+DNS |
+| 26 | `cloudflare_account_id` | 32-char hex account id |
+| 27 | `cloudflare_zone_id` | 32-char hex zone id for `nekohoa.com` |
+| 31, 33, 34, 38 | `operator_secrets["jwt-secret" / "stripe-secret-key" / "stripe-webhook-secret" / "scheduler-secret"]` | Dev JWT signing key / `sk_test_…` / `whsec_…` / random shared secret |
+| 32 | `operator_secrets["sentry-dsn"]` | Sentry DSN `https://…@…ingest….sentry.io/…`, or `""` to disable |
+| 35 | `operator_secrets["storage-service-url"]` | `https://<account_id>.r2.cloudflarestorage.com` |
+| 36 | `operator_secrets["storage-access-key"]` | R2 Access Key ID |
+| 37 | `operator_secrets["storage-secret-key"]` | R2 Secret Access Key |
+| 42 | `deploy_alert_webhook_url` | Slack/Discord webhook URL (or placeholder; non-blocking) |
+| 45 | `billing_account_id` | GCP billing account id `XXXXXX-XXXXXX-XXXXXX` (013 PR-env budget; no default) |
 
-Also note `gcp_region` (line 8, default `us-central1`) and `neon_region_id` (line 20, default
+Also note `gcp_region` (line 6, default `us-central1`) and `neon_region_id` (line 21, default
 `aws-us-east-1`) — defaults are fine unless the human prefers another region.
 
-Quick check that nothing is left: `grep -n REPLACE_ME infra/environments/dev/terraform.tfvars`
-(should return only the comment on line 4 once done — that line can stay).
+Quick check that nothing is left: `grep -nE 'REPLACE|<account>|your-gcp-project-id|XXXXXX' infra/environments/dev/terraform.tfvars`
+(should return nothing once done).
 
 ---
 
@@ -70,6 +73,7 @@ Quick check that nothing is left: `grep -n REPLACE_ME infra/environments/dev/ter
 - **A GCP project with billing enabled.** Verify: `gcloud projects describe <PROJECT_ID>`.
 - **`nekohoa.com` added as a Cloudflare zone** (registered + nameservers pointed at Cloudflare).
   Without the zone, `cloudflare_zone_id` won't exist and DNS records will fail.
+- **`nekohoa.com` ownership-verified with Google** (Search Console) before the `api-dev.nekohoa.com` Cloud Run domain mapping can be created (010 FR-018). Until then, set `enable_api_domain = false` in `terraform.tfvars`; the Dev root defaults it to `true`.
 
 ---
 
@@ -158,8 +162,8 @@ tofu init
 tofu apply -var gcp_project_id=<PROJECT_ID> -var bucket_name=<GLOBALLY_UNIQUE_BUCKET>
 
 # 2) Point the Dev backend at that bucket:
-#    edit infra/environments/dev/backend.tf line 9 →
-#      bucket = "<GLOBALLY_UNIQUE_BUCKET>"     (replaces REPLACE_WITH_STATE_BUCKET_FROM_BOOTSTRAP)
+#    edit infra/environments/dev/backend.tf line 7 (bucket = "nekohoa-dev-tfstate") AND the matching
+#    state_bucket in infra/environments/dev/main.tf line 30 → "<GLOBALLY_UNIQUE_BUCKET>"
 
 # 3) Plan (GO/NO-GO gate — review against the matrix, change nothing yet)
 cd ../../environments/dev
@@ -199,13 +203,14 @@ Two consumers need GitHub config; they overlap, so set each secret once.
 |---------------|------|---------|
 | `GCP_WIF_PROVIDER` | `tofu output -raw wif_provider` | 009 deploy + infra CI |
 | `GCP_DEPLOY_SERVICE_ACCOUNT` | `tofu output -raw deployer_service_account` | 009 deploy + infra CI |
-| `GCP_PROJECT_ID` | the project id | infra CI |
+| `GCP_PROJECT_ID` | the project id | 009 deploy (Artifact Registry image path, scheduler-secret read) + infra CI |
 | `NEON_API_KEY` | the Neon key | infra CI |
 | `CLOUDFLARE_API_TOKEN` | `tofu output -raw cloudflare_api_token` | 009 deploy + infra CI |
 | `CLOUDFLARE_ACCOUNT_ID` | `tofu output -raw cloudflare_account_id` | 009 deploy + infra CI |
 | `CLOUDFLARE_ZONE_ID` | the zone id | infra CI |
 | `DEPLOY_ALERT_WEBHOOK_URL` | `tofu output -raw deploy_alert_webhook_url` | 009 deploy + infra CI |
 | `TF_VAR_OPERATOR_SECRETS` | JSON of the 8 operator secrets (see below) | infra CI only |
+| `TF_VAR_BILLING_ACCOUNT_ID` | the GCP billing account id | infra CI only (013 PR-env budget; `billing_account_id` has no default) |
 
 `TF_VAR_OPERATOR_SECRETS` is the `operator_secrets` map as one **JSON object**:
 `{"jwt-secret":"…","sentry-dsn":"…","stripe-secret-key":"…","stripe-webhook-secret":"…","storage-service-url":"…","storage-access-key":"…","storage-secret-key":"…","scheduler-secret":"…"}`
@@ -215,6 +220,7 @@ Two consumers need GitHub config; they overlap, so set each secret once.
 | GitHub variable | From | When |
 |-----------------|------|------|
 | `GCP_REGION` | `tofu output -raw gcp_region` | with the secrets |
+| `STRIPE_PUBLISHABLE_KEY` | the `pk_test_…` key | with the secrets (infra CI passes it as `TF_VAR_stripe_publishable_key`) |
 | `DEV_DEPLOY_ENABLED` | literal `true` | **LAST** — only after `https://api-dev.nekohoa.com/health` is green |
 
 **Protected `prod` Environment** (for later, T030): repo **Settings → Environments → New environment

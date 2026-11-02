@@ -22,7 +22,6 @@ namespace HOAManagementCompany.Tests.Integration.Payments;
 public class RecurringNoticeTests(TestDatabaseFixture fixture) : AlertTestBase(fixture)
 {
     private const string SchedulerSecret = "test-scheduler-secret";
-    private static readonly Guid PrimaryPropertyId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001");
 
     private static async Task<JsonElement> JsonAsync(HttpResponseMessage res) =>
         JsonDocument.Parse(await res.Content.ReadAsStringAsync()).RootElement;

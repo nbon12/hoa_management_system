@@ -35,4 +35,4 @@ Behavioral contract for the `auth` and `payments` rate-limit policies. Verified 
 ## Non-goals / unchanged
 
 - Response body of 429 is the framework default (unchanged).
-- The `telemetry` policy is already partitioned and out of scope (its `RemoteIpAddress` key is acceptable for browser telemetry and unchanged by this feature).
+- The `telemetry` policy is out of scope and unchanged by this feature. It keys on `RemoteIpAddress`, which is the edge proxy's address in deployed environments. *Superseded by specs/016-security-hardening Sub-spec C FR-C3, which requires it to partition by the trusted-edge client identity.*

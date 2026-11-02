@@ -12,7 +12,7 @@ How to run and verify each slice. No new dependencies; no database changes.
 **Run the targeted tests:**
 
 ```bash
-dotnet test --filter FullyQualifiedName~RateLimitingTests
+dotnet test --filter "FullyQualifiedName~ClientIdentityResolverTests|FullyQualifiedName~RateLimitingIsolationTests"
 ```
 
 **What they assert** (see `contracts/rate-limiting-behavior.md`): one client exhausting its quota does not throttle another (RL-1), a forged `CF-Connecting-IP` from an un-verified edge is ignored (RL-2), a verified edge request is attributed to the true client IP (RL-3), un-attributable requests share an isolated `"unknown"` window (RL-4), two NAT-shared users have independent payment windows (RL-5), and limits honor config (RL-6).

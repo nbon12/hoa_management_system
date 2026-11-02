@@ -12,6 +12,7 @@ these outputs (FR-023, SC-006). The configuration prints values; the operator se
 |---------------|---------------|-----------|-------|
 | `GCP_WIF_PROVIDER` | `wif_provider` | no (id only) | full provider resource name `projects/<n>/locations/global/workloadIdentityPools/<pool>/providers/<provider>` |
 | `GCP_DEPLOY_SERVICE_ACCOUNT` | `deployer_service_account` | no | deployer SA email |
+| `GCP_PROJECT_ID` | (no output; the `gcp_project_id` value from `terraform.tfvars`) | no | Artifact Registry image path and Secret Manager read in `docker-push`/`deploy-dev` (PR #100, PR #242); infra CI uses it too |
 | `CLOUDFLARE_API_TOKEN` | `cloudflare_api_token` | **yes** | echoed operator input |
 | `CLOUDFLARE_ACCOUNT_ID` | `cloudflare_account_id` | no | |
 | `DEPLOY_ALERT_WEBHOOK_URL` | `deploy_alert_webhook_url` | **yes** | echoed operator input |
@@ -25,7 +26,7 @@ these outputs (FR-023, SC-006). The configuration prints values; the operator se
 
 ## Ordering rule (enforced by the `next_steps` output)
 
-1. Set all five secrets + `GCP_REGION`.
+1. Set all six secrets + `GCP_REGION`.
 2. Confirm `tofu output` shows no missing/empty values and the Cloud Run service + custom domain are
    healthy (`https://api-dev.nekohoa.com/health`).
 3. **Only then** set `DEV_DEPLOY_ENABLED=true` — this is the switch that lets the 009 `deploy-dev`

@@ -11,13 +11,10 @@ pip install "repowise>=0.16.0"
 
 ```bash
 cd /path/to/HOAManagementCompany
-repowise init --index-only -y \
-  -x 'frontend/' \
-  -x 'message-service-completed/' \
-  -x 'neko-hoa/.angular/'
+repowise init --index-only -y
 ```
 
-Excludes also live in [`.repowiseIgnore`](../../.repowiseIgnore) at repo root.
+Excludes live in [`.repowiseIgnore`](../../.repowiseIgnore) at repo root, which `repowise init` reads. The CI gate runs `repowise init --index-only` / `repowise update --index-only` with no `-x` flags (`update` accepts only `--index-only`).
 
 ## Check before opening a PR
 

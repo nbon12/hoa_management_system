@@ -8,18 +8,21 @@ Creates only per-PR resources (D1); references shared primitives by id.
 | Variable | Type | Required | Notes |
 |----------|------|----------|-------|
 | `pr_number` | number | yes | Identity; drives all names, labels, `secret_prefix=pr-<n>` |
-| `head_sha` | string | yes | Selects the image tag `sakurapatch/nekohoa-api:pr-<n>-<sha>` |
+| `head_sha` | string | yes | Names the image tag `pr-<n>-<sha>` in the Dev Artifact Registry repo `images-dev` (`<region>-docker.pkg.dev/<project>/images-dev/nekohoa-api`). *Amended 2026-10-28 by PR #242: was Docker Hub `sakurapatch/nekohoa-api`. Cloud Run pulled Docker Hub through mirror.gcr.io, which returned 429.* |
 | `gcp_project_id` | string | yes | Shared Dev project |
 | `gcp_region` | string | yes | Default `us-central1` |
 | `neon_project_id` | string | yes | Shared Neon project `super-water-18090867` |
-| `neon_base_branch` | string | yes | `pr-base` — fork source (pre-seeded) |
-| `neon_api_key` | string (sensitive) | yes | Shared |
+| `neon_base_branch_id` | string | yes | Branch **id** of the pre-seeded `pr-base` branch (secret `NEON_PR_BASE_BRANCH_ID`), the fork source |
+| `neon_role_password` | string (sensitive) | yes | Password of the `nekohoa_app` role every fork inherits from `pr-base` (secret `NEON_PR_ROLE_PASSWORD`) |
+| `neon_role_name` / `neon_database_name` | string | no | Inherited role and database, default `nekohoa_app` / `nekohoa` |
 | `cloudflare_account_id` | string | yes | Shared |
-| `cloudflare_api_token` | string (sensitive) | yes | Shared |
 | `runtime_service_account` | string | yes | Shared `nekohoa-run-dev` SA email |
-| `shared_secret_ids` | map(string) | yes | Secret Manager ids for the 8 operator secrets |
+| `shared_secret_prefix` | string | no | Default `dev`. The 7 shared operator secrets are referenced as `<prefix>-<name>`: `jwt-secret`, `sentry-dsn`, `stripe-secret-key`, `storage-service-url`, `storage-access-key`, `storage-secret-key`, `scheduler-secret` |
 | `stripe_publishable_key` | string | yes | Test mode, non-secret env var |
+| `container_image` | string | no | Placeholder used only on first create (default `us-docker.pkg.dev/cloudrun/container/hello`); the workflow deploys the real image |
 | `labels` | map(string) | no | Merged with `{pr-env="true", pr-number=tostring(pr_number)}` |
+
+`neon_api_key` and `cloudflare_api_token` are variables of the root `infra/environments/pr`, which configures the providers; the module does not take them.
 
 ## Outputs
 
@@ -31,6 +34,8 @@ Creates only per-PR resources (D1); references shared primitives by id.
 | `db_connection_secret_id` | string | Cloud Run secret wiring |
 | `stripe_webhook_secret_id` | string | Stripe webhook script writes the signing secret here |
 | `r2_bucket_name` | string | Cloud Run `Storage__BucketName` env var |
+| `cloud_run_service_name` | string | The workflow's image-only `gcloud run deploy` |
+| `db_connection_string` | string (sensitive) | The workflow's reachability check (Neon host) |
 
 ## Guarantees
 

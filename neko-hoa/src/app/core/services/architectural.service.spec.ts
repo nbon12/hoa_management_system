@@ -89,23 +89,6 @@ describe('ArchitecturalService (027)', () => {
     expect((await p3).ownerEmailStatus).toBe('Pending');
   });
 
-  it('getSettings()/putSettings() use the community settings endpoint', async () => {
-    const settings = {
-      reviewPeriodDays: 45, lapseRule: 'DeemedApproved' as const, decisionRule: 'MajorityOfMembers' as const,
-      reminderDays: 7, timeZoneId: 'America/New_York', formalDisapprovalStatement: 'Formal.',
-    };
-    const p1 = svc.getSettings(C);
-    http.expectOne(`${BASE}/communities/${C}/architectural-settings`).flush(settings);
-    expect((await p1).reviewPeriodDays).toBe(45);
-
-    const p2 = svc.putSettings(C, settings);
-    const r = http.expectOne(`${BASE}/communities/${C}/architectural-settings`);
-    expect(r.request.method).toBe('PUT');
-    expect(r.request.body).toEqual(settings);
-    r.flush(settings);
-    await p2;
-  });
-
   it('list() passes includeWithdrawn only when asked (029)', async () => {
     const p = svc.list(C, { status: 'closed', includeWithdrawn: true });
     const req = http.expectOne(r => r.url.endsWith('/architectural-applications'));

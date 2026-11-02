@@ -12,7 +12,7 @@ This document describes how each Stripe event type is handled by `POST /payments
 |------------------|-----------|-----------------|
 | `payment_intent.succeeded` | → `Succeeded`; if was `Pending` (ACH), write deferred `LedgerEntry`; capture settlement refs (balance txn, processor fee, payout) (FR-037); issue receipt (FR-007f) | No |
 | `payment_intent.payment_failed` | → `Failed`; store `FailureCode`/`FailureMessage` | Yes, if `IsRecurring` AND opted in |
-| `charge.refunded` / `charge.refund.updated` | Set `CumulativeRefundedAmount` from `charge.amount_refunded`; write compensating `Refund` ledger entry for the delta; status `PartiallyRefunded` (< total) or `Refunded` (== total) (FR-014a/b) | No |
+| `charge.refunded` | Set `CumulativeRefundedAmount` from `charge.amount_refunded`; write compensating `Refund` ledger entry for the principal part of the delta (FR-004d); status `PartiallyRefunded` (< total) or `Refunded` (== total) (FR-014a/b) | No |
 | `charge.dispute.created` | → `Disputed`; write compensating `Chargeback` reversal (FR-014a) | No |
 | `charge.dispute.closed` | won → re-reverse, back to `Succeeded`; lost → `DisputeLost` (reversal stands) + optional NSF fee (FR-014d/e) | No |
 | ACH return after settlement *(see §ACH-return)* | → `Returned` (store `ReturnCode`); compensating `Reversal` entry; optional NSF fee (FR-014c/e) | Yes, if `IsRecurring` AND opted in |
@@ -30,7 +30,7 @@ Processing order on every webhook POST:
 1. **Verify signature** via `EventUtility.ConstructEvent` with timestamp tolerance (rejects
    replayed/stale events, FR-030). On failure → `400`, **no data mutation**.
 2. **Durable capture**: upsert `WebhookEventInbox` by `StripeEventId` (unique). If it already
-   exists → ack `200` immediately (duplicate). Otherwise insert with status `Received` and the
+   exists and is `Processed` → ack `200` immediately (duplicate); a `Received` row is processed again. Otherwise insert with status `Received` and the
    PII-scrubbed payload. **Ack `200` after capture** — before heavy processing — so no verified
    event is lost if the instance is reaped (Cloud Run scale-to-zero).
 3. **Process** (after ack, or in the same handler then mark): route by `event.Type`; apply the
@@ -57,7 +57,7 @@ This makes duplicate, out-of-order, missed, and crash-interrupted deliveries all
 5. If `IsRecurring = true` AND previous status was `Pending` (ACH recurring): write `LedgerEntry` same way.
 6. Mark the `WebhookEventInbox` row `Processed`.
 
-**OTel**: Emit `payment.succeeded` counter with tags `{ type: "card"|"ach", is_recurring: bool }`. Span name: `"webhook.payment_intent.succeeded"`.
+**OTel**: `payment.processed{status="succeeded"}` when a Pending ACH transaction settles (no metric is recorded for a card success, which settles at confirm), plus `webhook.processed{type, outcome}`. No custom span; the ASP.NET Core request span covers the webhook.
 
 ---
 
@@ -69,17 +69,19 @@ This makes duplicate, out-of-order, missed, and crash-interrupted deliveries all
 1. Resolve `PaymentTransaction` by `StripePaymentIntentId`.
 2. If no matching transaction: log warning; persist event ID; return `200`.
 3. If found and not terminal: set `Status = Failed`, `FailureCode = last_payment_error.code`, `FailureMessage = last_payment_error.message` (PII-scrubbed — strip cardholder name if present), `UpdatedAt = now`.
-4. If `IsRecurring = true`: invoke `AlertService.SendRecurringFailureAlertAsync(ownerId, transactionId)`.
+4. If `IsRecurring = true`: call `AlertService.EnqueueFailureAlertAsync(txn, failureCode)`, which writes one `OutboxMessage` per opted-in channel in the same transaction; `OutboxDispatcher` sends them right after the webhook is processed.
    - `AlertService` checks `Owner.AlertSmsOptIn` and `Owner.AlertEmailOptIn`.
    - Sends on opted-in channels only.
    - If send fails: record `alert.sent` metric `success=false`, mark span errored; do not rethrow.
 5. Mark the `WebhookEventInbox` row `Processed`.
 
-**OTel**: Emit `payment.failed` counter with tags `{ type, is_recurring }`. If recurring, emit `alert.sent` counter with `{ channel: "sms"|"email", success: bool }`. Span name: `"webhook.payment_intent.payment_failed"`.
+**OTel**: `payment.processed{status="failed"}` (or `"returned"`), plus `webhook.processed{type, outcome}`; `alert.sent{channel, success}` is recorded per outbox send.
 
 ---
 
-## Event Detail: charge.refunded / charge.refund.updated  *(partial-refund aware)*
+## Event Detail: charge.refunded  *(partial-refund aware; fires for every full or partial refund with the cumulative `amount_refunded`)*
+
+*Amended 2026-10-31: `charge.refund.updated` is not handled. Its payload is a Refund object, not a Charge, and `charge.refunded` already carries every refund's cumulative amount. It falls through to the logged default (FR-016).*
 
 **Stripe object**: `Charge` (use `amount_refunded` as the cumulative source of truth)
 
@@ -88,7 +90,7 @@ This makes duplicate, out-of-order, missed, and crash-interrupted deliveries all
 2. Compute delta = `amount_refunded` − `CumulativeRefundedAmount`. If delta ≤ 0 (duplicate), skip.
 3. Set `CumulativeRefundedAmount = amount_refunded`; status `Refunded` if it equals `Total`,
    else `PartiallyRefunded`.
-4. Write a compensating `Refund` `LedgerEntry` for the **delta** (FR-014a/b). The convenience
+4. Write a compensating `Refund` `LedgerEntry` for the **principal** part of the delta (FR-014a/b): the cumulative refund capped at `GrossAmount`, because a refunded card fee was never credited to the owner's ledger (FR-004d; amended 2026-10-31). The convenience
    fee is retained unless this is a full HOA/processing-error refund (FR-004d).
 5. Mark inbox `Processed`.
 
@@ -115,9 +117,7 @@ restoring the balance (funds held by Stripe) (FR-014a). Mark inbox `Processed`.
 ## Event Detail: ACH return after settlement  *(FR-014c)*
 
 A previously `Succeeded` `us_bank_account` charge that later returns (R01 insufficient funds,
-R02 closed account, …). **Confirm the exact Stripe event during implementation** (`charge.failed`
-on the settled charge vs `payment_intent.payment_failed` vs `charge.refunded` with a return
-reason); the reconciliation sweep is the backstop if the event is missed.
+R02 closed account, …). **Implemented trigger:** `payment_intent.payment_failed` for a transaction that is already `Succeeded` with method `Ach`; `ReturnCode` is taken from `last_payment_error.code`. `charge.failed` is not handled. The reconciliation sweep only resolves `Pending` ACH, so it does **not** catch a missed return; Stripe's webhook retries are the only recovery path.
 
 **Steps**: set `Status = Returned`, store `ReturnCode`; write a compensating `Reversal`
 `LedgerEntry`; if `IsRecurring` AND opted in → enqueue failure alert; if `NsfFeeEnabled` →
@@ -138,7 +138,7 @@ NekoHOA: Your auto-pay of $[total] on [date] failed. Update your payment method 
 - `[link]` — deep link to auto-pay page (configured via `Payments:AutoPayPageUrl`)
 - No PII (no card details, no names, no email)
 
-### Email (SendGrid)
+### Email (Amazon SES — replaced SendGrid per specs/026-ses-email-provider)
 
 **Subject**: `NekoHOA: Auto-pay charge failed`
 
@@ -154,11 +154,10 @@ NekoHOA: Your auto-pay of $[total] on [date] failed. Update your payment method 
 
 | Metric | Tags | When |
 |--------|------|------|
-| `payment.succeeded` | `type`, `is_recurring` | `payment_intent.succeeded` processed |
-| `payment.failed` | `type`, `is_recurring` | `payment_intent.payment_failed` processed |
-| `payment.refunded` | — | `charge.refunded` processed |
-| `payment.disputed` | — | `charge.dispute.created` processed |
-| `alert.sent` | `channel` (`sms`/`email`), `success` (`true`/`false`) | After each alert send attempt |
-| `webhook.processed` | `event_type`, `outcome` (`handled`/`skipped`/`unknown_transaction`) | Every webhook invocation |
+| `payment.processed` | `status` (`succeeded`/`failed`/`returned`/`partially_refunded`/`refunded`/`disputed`/`dispute_won`/`dispute_lost`) | A webhook (or the reconcile sweep settling a Pending ACH) moves a transaction to that status |
+| `alert.sent` | `channel` (`sms`/`email`), `success` (`true`/`false`) | After each outbox send attempt |
+| `webhook.processed` | `type`, `outcome` (`processed`/`duplicate`/`failed`/`invalid_signature`) | Every webhook invocation |
+
+Meter: `HOAManagementCompany.Payments`.
 
 All spans must be free of PII. Payment amounts are permitted.

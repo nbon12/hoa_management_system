@@ -97,9 +97,10 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      # PR/push: build locally (no push). Schedule: skip build, scan the published image.
+      # PR/push: build locally (no push). Schedule or manual dispatch (011 quickstart): skip the
+      # build and scan the published image.
       - name: Build image (local, no push)
-        if: github.event_name != 'schedule'
+        if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -109,14 +110,14 @@ jobs:
           tags: ${{ env.IMAGE_LOCAL_TAG }}-${{ github.sha }}
 
       - name: Pull published image (scheduled re-scan)
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: docker pull "$PUBLISHED_IMAGE"
 
       - name: Resolve scan target
         id: target
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ref=$PUBLISHED_IMAGE" >> "$GITHUB_OUTPUT"
           else
             echo "ref=${IMAGE_LOCAL_TAG}-${{ github.sha }}" >> "$GITHUB_OUTPUT"

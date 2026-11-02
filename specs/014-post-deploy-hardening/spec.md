@@ -69,6 +69,8 @@ As an engineer debugging the deployed `Dev` environment, I need environment-spec
 
 The project already uses the right pattern elsewhere (config flags such as `Startup:*` and `DevTools:*`).
 
+> *Superseded in part by specs/016-security-hardening (Sub-spec C FR-C5, clarified 2026-07-02): deployed non-local environments, including `Dev`, must return only a generic error message plus a correlation ID; full exception detail stays available only in local `Development` and in server-side logs. The SQL-text half of this story is unaffected. Not yet implemented: `DevTools:ExposeExceptionDetail` still defaults on in `Dev`.*
+
 **Why this priority**: These are debuggability gaps, not functional or user-facing failures — lowest impact, but cheap to fix and worth eliminating the foot-gun class entirely.
 
 **Independent Test**: Can be fully tested by evaluating each environment-conditional behavior under a `Dev`-style host with the enabling flag set (behavior present), under production defaults (behavior absent), and by auditing the codebase for remaining host-name gates that should also apply to `Dev`.
@@ -137,4 +139,4 @@ The project already uses the right pattern elsewhere (config flags such as `Star
 - The smoke subset is defined by tagging (or an equivalent selection mechanism) the deployment-health-appropriate checks; the full suite continues to exist unchanged for local/PR runs.
 - "Dev" debugging enablement (exception detail, SQL text) is acceptable from a data-sensitivity standpoint for a non-production environment, provided secret/PII exclusions still apply.
 - These three items are independent and may be delivered as separate slices, with US1 first as the only end-user-facing fault.
-- **Scope of rate limiting (US1)**: This feature corrects only the two defective global limiters — `auth` and `payments`. The constitution's broader rate-limiting mandate (content creation, invite, violation submission, document upload, public discovery endpoints) is **out of scope here** and is not regressed by this change; extending per-client limiting to those surfaces is tracked separately. The `telemetry` limiter is already per-client and is left unchanged.
+- **Scope of rate limiting (US1)**: This feature corrects only the two defective global limiters — `auth` and `payments`. The constitution's broader rate-limiting mandate (content creation, invite, violation submission, document upload, public discovery endpoints) is **out of scope here** and is not regressed by this change; extending per-client limiting to those surfaces is tracked separately. The `telemetry` limiter is left unchanged here. It is not effectively per-client: it keys on the connection address, which behind the edge is the proxy (see US1). *Superseded by specs/016-security-hardening Sub-spec C FR-C3: the telemetry limiter MUST partition by the trusted-edge client identity (not yet implemented).*

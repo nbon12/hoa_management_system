@@ -15,7 +15,10 @@ set -euo pipefail
 
 WEBHOOK_URL="${API_URL%/}/api/v1/payments/webhooks/stripe"
 SECRET_ID="pr-${PR_NUMBER}-stripe-webhook"
-EVENTS=(payment_intent.succeeded payment_intent.payment_failed setup_intent.succeeded charge.refunded)
+# The events WebhookProcessor handles (013 contracts/stripe-webhook.md). Not charge.refund.updated: Stripe
+# sends a Refund object for it, which the processor (written for Charge objects) cannot read.
+EVENTS=(payment_intent.succeeded payment_intent.payment_failed setup_intent.succeeded charge.refunded
+  charge.dispute.created charge.dispute.closed)
 
 api() { curl -sS -u "${STRIPE_SECRET_KEY_TEST}:" "$@"; }
 

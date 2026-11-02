@@ -187,6 +187,13 @@ present, confirm the app boots normally.
   satisfies the check.
 - **FR-005**: All validation — structural, business-rule, and secret-presence — MUST be
   enforced identically in every environment (Development, Test, and Production).
+  *Amended 2026-10-31 (PR #217, commit 5dc4177): FR-004 and FR-005 cover the option groups
+  defined by this feature. Constitution §8 requires validation rules to be environment-aware, and a
+  later option group scopes a rule to deployed environments: `AppLinksOptionsValidator`
+  (specs/030-company-administration) requires `App:BaseUrl` (or `ArchitecturalReview:AppBaseUrl`) to
+  be set and HTTPS outside local `Development` and `Test`, which may leave it empty. The known
+  environments are now `Development`, `Dev`, `Test`, `Staging` and `Production`
+  (specs/010-dev-env-iac-opentofu).*
 - **FR-006**: The payments fee policy MUST be validated such that: fee type is one of the
   supported values ("Flat" or "Percentage"); card scope is one of the supported values
   ("AllCards" or "CreditOnly"); a percentage fee MUST be scoped to credit cards only; all
@@ -239,7 +246,7 @@ present, confirm the app boots normally.
   ranges, format checks (e.g. absolute URL), and cross-field rules (e.g. percentage fee
   implies credit-only scope).
 - **Runtime environment**: The active deployment context (Development, Test, Production).
-  It does not change which validation rules apply — rules are uniform across environments —
+  For this feature's option groups it does not change which validation rules apply — rules are uniform across environments (see the FR-005 amendment) —
   but it does select which configuration source supplies values (e.g. dev config /
   test-fixture placeholders vs. real deployed secrets).
 - **Frontend runtime configuration**: The set of values the single-page application needs

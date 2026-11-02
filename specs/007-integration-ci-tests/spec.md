@@ -67,11 +67,11 @@ As an engineer changing payment-alert SMS behavior, I need the real SMS adapter 
 
 **Why this priority**: SMS alerts are an opt-in convenience, the lowest blast radius of the three. Test credentials with magic numbers let us assert both the success path and a representative failure path deterministically, validating the adapter's request shaping and error mapping.
 
-**Independent Test**: Run the SMS adapter against test credentials using the success magic number and the failure magic number; confirm the success number returns a queued/sent result and the failure number surfaces the expected provider error — with no real SMS sent.
+**Independent Test**: Run the SMS adapter against test credentials using an ordinary valid recipient (success path) and the failure magic number `+15005550001`; confirm the success send returns a queued/sent result and the failure number surfaces the expected provider error — with no real SMS sent.
 
 **Acceptance Scenarios**:
 
-1. **Given** test credentials and the success magic recipient number, **When** the adapter sends an alert, **Then** the provider returns a queued/sent result and no real SMS is delivered.
+1. **Given** test credentials, the magic `From` number and an ordinary valid recipient number, **When** the adapter sends an alert, **Then** the provider returns a queued/sent result and no real SMS is delivered.
 2. **Given** test credentials and a failure magic recipient number (e.g., an invalid number), **When** the adapter sends an alert, **Then** the provider returns the expected error and the adapter surfaces it as a handled failure rather than crashing.
 
 ---
@@ -80,7 +80,7 @@ As an engineer changing payment-alert SMS behavior, I need the real SMS adapter 
 
 - **Provider sandbox unreachable / transient 5xx**: A sandbox outage or network blip must be distinguishable from a real integration regression. Transient failures are retried a bounded number of times; if still failing, the run reports an infrastructure problem (provider unavailable) rather than silently passing or being indistinguishable from a code defect.
 - **Live credentials misconfigured into Stage 2**: The pipeline must refuse to run provider calls with non-test/live credentials, so a misconfigured secret can never cause a real charge, real email, or real SMS.
-- **Missing secret**: If a required provider secret is absent, the relevant provider check fails loudly (clear "credential not configured" message) rather than skipping silently and giving a false green.
+- **Missing secret**: If a required provider secret is absent, the relevant provider's checks report Skipped with a clear "credential not configured" message; the job stays green and the release is not blocked (see FR-007; superseded by specs/026-ses-email-provider FR-012 for email).
 - **Secret leakage in logs**: Provider responses, request dumps, and error output must never echo secret values into CI logs.
 - **Partial provider failure**: One provider failing (e.g., SMS) must not mask the pass/fail status of the others; each provider's result is independently reported.
 - **Concurrent mainline merges / shared sandbox accounts**: Stage 2 reuses the project's shared provider test accounts, so parallel runs (and manual developer testing) must not interfere. Each run relies only on isolated, self-created test objects and an isolated database instance; assertions MUST target only objects the run itself created and MUST NOT depend on global mutable sandbox state (e.g., listing/counting all objects in the account).
@@ -97,7 +97,7 @@ As an engineer changing payment-alert SMS behavior, I need the real SMS adapter 
 - **FR-004**: Each provider's verification result MUST be reported independently, so a failure in one provider is attributable and does not mask the status of the others.
 - **FR-005**: The integration stage MUST distinguish a real integration regression (fail the run) from a transient provider/sandbox outage (bounded retry, then report as an infrastructure/availability problem), so flaky external availability does not erode trust in the gate.
 - **FR-006**: Required provider credentials MUST be sourced from CI-managed secrets, never committed to the repository, and masked in all CI output.
-- **FR-007**: The stage MUST fail with a clear, actionable message when a required provider credential is missing, rather than skipping silently.
+- **FR-007**: When a required provider credential is missing, that provider's checks MUST report **Skipped** with a clear, actionable "… not configured" message (never a silent pass), and MUST NOT block the release. A non-test credential still hard-fails (FR-009). *(Amended 2026-10-31: the harness has skipped since commit 53ebab3 / PR #29, per research R8 and contracts/sandbox-test-harness.md; specs/026-ses-email-provider FR-012 makes this the rule for email.)*
 
 **Safety guardrails**
 
@@ -119,7 +119,7 @@ As an engineer changing payment-alert SMS behavior, I need the real SMS adapter 
 
 **SMS verification (P3)**
 
-- **FR-017**: The system MUST send a representative alert through the real SMS adapter using the provider's test credentials and the success magic recipient number, and assert a queued/sent result with no real delivery.
+- **FR-017**: The system MUST send a representative alert through the real SMS adapter using the provider's test credentials (magic `From` `+15005550006`) and an ordinary valid recipient number, and assert a queued/sent result (a returned message SID) with no real delivery. Twilio test credentials have no success magic *recipient*, and `To == From` is rejected. If the test account refuses the send for account-provisioning reasons (Twilio errors 21606 A2P 10DLC or 21408 geo-permissions), the check reports Skipped, not Failed. *(Amended 2026-10-31 to match commit 53ebab3 / PR #29, `TwilioSandboxTests.Accepted_send_returns_a_sid`.)*
 - **FR-018**: The system MUST exercise a failure magic recipient number and assert the adapter surfaces the provider's error as a handled failure (validating number formatting and error mapping).
 
 ### Key Entities *(include if feature involves data)*

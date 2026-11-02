@@ -12,7 +12,7 @@ backend host and the registration surface used to wire validated options.
 | C3 | A required secret is unset/whitespace (any environment) | host starts | host fails to start naming the missing secret (FR-004). |
 | C4 | Valid config with placeholder secrets (Dev/Test) | host starts | host starts successfully (FR-005, FR-016, SC-003). |
 | C5 | `Storage` section missing/empty | host starts | host fails to start with a clear storage error — **never** a `NullReferenceException` (FR-011). |
-| C6 | Optional provider (Twilio/SendGrid) fully unset | host starts | host starts; provider disabled (FR-012). |
+| C6 | Optional provider (Twilio/SES; SES replaced SendGrid per specs/026-ses-email-provider) fully unset | host starts | host starts; provider disabled (FR-012). |
 | C7 | Optional provider partially configured | host starts | host fails to start naming the missing provider field(s) (FR-012). |
 | C8 | Error message construction | any failure | message MUST NOT contain any secret value (FR-019). |
 
@@ -21,25 +21,29 @@ backend host and the registration surface used to wire validated options.
 ```csharp
 // Replaces builder.Services.Configure<T>(section) for every option group.
 builder.Services
-    .AddValidatedOptions<StripeOptions, StripeOptionsValidator>(StripeOptions.SectionName);
-// ...repeat for Payments, Jobs, Twilio, SendGrid, Storage, Observability.
+    .AddValidatedOptions<StripeOptions, StripeOptionsValidator>(builder.Configuration, StripeOptions.SectionName);
+// ...repeat for Payments, Jobs, Twilio, Ses (replaced SendGrid per specs/026-ses-email-provider), Storage, Observability.
 
 // AddValidatedOptions internally:
 //   services.AddSingleton<IValidator<TOptions>, TValidator>();
-//   services.AddOptions<TOptions>().Bind(config.GetSection(section)).ValidateOnStart();
-//   services.AddSingleton<IValidateOptions<TOptions>, FluentValidateOptions<TOptions>>();
+//   services.AddSingleton<IValidateOptions<TOptions>>(sp => new FluentValidateOptions<TOptions>(
+//       Options.DefaultName, sp.GetRequiredService<IValidator<TOptions>>()));
+//   services.AddOptions<TOptions>().Bind(configuration.GetSection(sectionName)).ValidateOnStart();
+// An overload taking Action<TOptions> postConfigure applies it after Bind, before validation.
 ```
 
 ## Generic adapter contract
 
 ```csharp
-public sealed class FluentValidateOptions<T>(IValidator<T> validator) : IValidateOptions<T>
+public sealed class FluentValidateOptions<T>(string? registeredName, IValidator<T> validator)
+    : IValidateOptions<T> where T : class
 {
     public ValidateOptionsResult Validate(string? name, T options)
     {
+        if (registeredName is not null && registeredName != name) return ValidateOptionsResult.Skip;
         var result = validator.Validate(options);
         if (result.IsValid) return ValidateOptionsResult.Success;
-        var failures = result.Errors.Select(e => $"{typeof(T).Name}: {e.ErrorMessage}");
+        var failures = result.Errors.Select(e => $"{typeof(T).Name}.{e.PropertyName}: {e.ErrorMessage}");
         return ValidateOptionsResult.Fail(failures); // never includes raw values (FR-019)
     }
 }

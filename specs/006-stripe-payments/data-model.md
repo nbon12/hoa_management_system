@@ -122,12 +122,15 @@ duplicates them (FR-034).
 | Column | Type | Nullable | Notes |
 |--------|------|----------|-------|
 | `Id` | `Guid` | No | PK |
-| `Kind` | `string` | No | `sms_alert`, `email_alert`, `receipt_email` |
-| `OwnerId` | `Guid` | No | FK → `Owners.Id` |
+| `Kind` | `string(30)` | No | `sms_alert`, `email_alert`, `receipt_email`, `variable_notice_sms`, `variable_notice_email` (FR-011c); later specs add `arc_*` (027/029) and `co_*` (030) kinds |
+| `OwnerId` | `Guid` | Yes | FK → `Owners.Id` (cascade). *Superseded by specs/027-board-arc-review (R5): nullable; exactly one of `OwnerId` / `RecipientUserId` is set (check constraint `CK_OutboxMessages_SingleRecipient`).* |
+| `RecipientUserId` | `string` | Yes | **Added by 027**: FK → `AspNetUsers` (cascade); for user/board recipients |
 | `TransactionId` | `Guid` | Yes | FK → `PaymentTransactions.Id` |
 | `PayloadJson` | `string` | No | Render inputs (no PII beyond delivery target) |
 | `Status` | `OutboxStatus` | No | Pending, Sent, Failed |
 | `Attempts` | `int` | No | Default 0 |
+| `LastError` | `string` | Yes | Provider error of a failed send (truncated) |
+| `DedupKey` | `string(255)` | Yes | Deterministic token, unique where not null, so a re-run of a producing job cannot enqueue the same notice twice (FR-011c/FR-011d; added by PR #21, migration `OutboxDedupKey`) |
 | `CreatedAt` | `DateTimeOffset` | No | UTC |
 | `SentAt` | `DateTimeOffset` | Yes | UTC |
 
@@ -145,7 +148,7 @@ not code (FR-004b, FR-007b, FR-014e, NC compliance section).
 | Column | Type | Nullable | Notes |
 |--------|------|----------|-------|
 | `Id` | `Guid` | No | PK |
-| `HoaId` / `AssociationId` | `Guid` | No | Tenant key |
+| `CommunityId` | `Guid` | No | Tenant key; FK → `Communities.Id` (restrict), unique (one config per community). *Superseded by specs/025-board-overall-design FR-006: the string community handle became the `Community` FK.* |
 | `CardFeeType` | `FeeType` | No | Flat or Percentage |
 | `CardFeeValue` | `decimal(10,4)` | No | Flat amount or rate (e.g. 0.03) |
 | `CardScope` | `CardScope` | No | AllCards or CreditOnly |
@@ -206,7 +209,12 @@ Consent changes also append an `AlertConsent` row.
 | Column | Type | Nullable | Notes |
 |--------|------|----------|-------|
 | `VaultedPaymentMethodId` | `string` | Yes | Stripe `pm_...` |
+| `MethodBrand` | `string(50)` | Yes | Card brand reported by Stripe, for display (null for a bank account) |
+| `MethodLast4` | `string(4)` | Yes | Last 4 of the card or bank account, reported by Stripe, for display |
+| `MethodFunding` | `CardFunding` | Yes | Funding of the vaulted card (credit/debit/prepaid), used for the draft surcharge (FR-004b) |
 | `CurrentAuthorizationId` | `Guid` | Yes | FK → `PaymentAuthorizations.Id` (FR-011b) |
+
+> Amended 2026-10-31 to match PR #19 (98f2547, migration `RecurringVaultedMethod`): the schedule also caches Stripe-provided display detail (card brand, last 4, card funding), so the method-on-file row and the draft fee need no Stripe call. These values come from Stripe, not from numbers the HOA masked, so FR-009/SC-008 still hold.
 
 **Removed** (migration): `RoutingNumberMasked`, `AccountNumberMasked`, `AccountType`,
 `CardNumberMasked`, `CardExpiry`, `CardholderName`, `BillingZip` (FR-009, SC-008).
@@ -234,7 +242,7 @@ to `Archived` the same way (`community_archived`, no email).
 | Column | Type | Nullable | Change |
 |--------|------|----------|--------|
 | `Sequence` | `long` | No | **NEW** monotonic per-property order key (FR-007d) |
-| `CreatedAtUtc` | `DateTimeOffset` | No | **NEW** precise UTC timestamp (existing `EntryDate` is `DateOnly`) |
+| `CreatedAt` | `DateTimeOffset` | No | Existing column, used as the precise UTC timestamp (`EntryDate` is `DateOnly`); no new column added |
 | `TransactionId` | `Guid` | Yes | **NEW** FK → `PaymentTransactions.Id` (FR-007e) |
 | `FundCode` | `string` | Yes | **NEW** optional operating/reserve/fee-income GL hook (FR-038) |
 
@@ -345,8 +353,8 @@ HoaPaymentConfig (1 per HOA)        WebhookEventInbox (standalone idempotency/de
 - Money columns `decimal(10,2)`; fee rates `decimal(10,4)`.
 - `PaymentTransaction`: filtered unique indexes on `StripePaymentIntentId` and `IdempotencyKey`.
 - `WebhookEventInbox.StripeEventId` unique, `HasMaxLength(255)`.
-- `LedgerEntry.Sequence`: per-property monotonic (DB sequence or computed `MAX+1` under the
-  property row lock used by `AllocationService`); index `(PropertyId, Sequence)`.
+- `LedgerEntry.Sequence`: per-property monotonic, computed as `MAX+1` by `LedgerService` under a
+  PostgreSQL transaction-scoped advisory lock (`pg_advisory_xact_lock`) keyed by the property; unique index `(PropertyId, Sequence)`.
 - `Owner.AlertPhone`, `PaymentAuthorization.AcceptedIp`, `AlertConsent.SourceIp`: encrypted at
   rest (FR-029) — provider-level (Neon) + column protection for the most sensitive.
 - Nullable FKs (`DraftEntry.TransactionId`, `LedgerEntry.TransactionId`) use no cascade —

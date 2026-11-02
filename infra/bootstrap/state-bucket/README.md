@@ -23,13 +23,17 @@ tofu apply \
 
 This creates:
 
-- `google_storage_bucket.<UNIQUE_STATE_BUCKET>` — **versioned**, uniform bucket-level access.
-- The enabled APIs: `run`, `secretmanager`, `iam`, `iamcredentials`, `sts`, `storage`.
+- `google_storage_bucket.tfstate`, named `<UNIQUE_STATE_BUCKET>` — **versioned**, uniform bucket-level access.
+- The enabled APIs: `run`, `secretmanager`, `iam`, `iamcredentials`, `sts`, `storage`,
+  `cloudresourcemanager` and `serviceusage` (CI applies environments as the deployer SA),
+  `billingbudgets` (013 PR-environment budget), `cloudscheduler` (027 ARC sweep job) and
+  `artifactregistry` (the backend image repository).
 
 ## After
 
-Record the bucket name (also printed as the `bucket_name` output) and put it in each environment's
-`backend.tf`:
+Record the bucket name (also printed as the `bucket_name` output). Pass it as `state_bucket` in each
+environment's `module "environment"` block (`environments/<env>/main.tf`), which grants the deployer SA
+access to the state, and put it in each environment's `backend.tf`:
 
 ```hcl
 terraform {
@@ -42,3 +46,6 @@ terraform {
 
 > The bootstrap's own `terraform.tfstate` stays local. Do not commit it (covered by `infra/.gitignore`).
 > `force_destroy = false` protects the bucket from an accidental `tofu destroy`.
+
+The current bucket, `nekohoa-dev-tfstate`, is also written into `environments/pr/backend.tf`, the
+`pr-env-*` workflows and `scripts/pr-env-*.sh`. Change those too if the bucket is ever replaced.

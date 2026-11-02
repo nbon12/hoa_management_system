@@ -112,6 +112,6 @@ trivy image --severity CRITICAL,HIGH --ignore-unfixed \
 
 ## Recommended follow-up (out of scope for this feature)
 
-`test.yml` still uses floating tags for several non-sensitive actions (`actions/checkout@v4`,
-`docker/build-push-action@v5`, `codecov/codecov-action@v4`, …). Pinning the whole file to SHAs is a
-worthwhile separate hardening PR (run `pinact run .github/workflows/test.yml`).
+Done for `test.yml` in PR #61 (011 T025): every action there is now SHA-pinned. Other workflows
+(for example `infra-plan.yml`, `infra-apply.yml` and `pr-env.yml`) still use floating tags; pinning
+them is a separate hardening PR (`pinact run .github/workflows/<file>.yml`).

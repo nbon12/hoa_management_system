@@ -143,9 +143,9 @@ As a community manager, I can create a `CommunityMembership` for a homeowner or 
 
 1. **Given** I am a community manager for community A, **When** I create a membership for a user with role Board Member and no end date, **Then** the membership is active immediately and that user's mode control appears on their next request.
 2. **Given** I am a community manager, **When** I attempt to create a membership for a community I do not manage, **Then** the request is denied server-side.
-3. **Given** an active membership I administer, **When** I change its role or end date, **Then** the change takes effect on the member's next request with no re-authentication required.
-4. **Given** an active membership I administer, **When** I end it (set an end date in the past, or set status inactive), **Then** the member loses the associated permissions on their next request per FR-023.
-5. **Given** I am not a community manager, **When** I attempt to reach the membership-admin surface, **Then** I am refused per the same role-gated navigation rules as any other restricted section (FR-027, FR-028).
+3. **Given** an active membership I administer, **When** I change its role or end date, **Then** the change takes effect on the member's next request with no re-authentication required. *(Changed by 030 (2026-10-18): an edit is one of end, downgrade (Community Manager → Board Member only) or a new end date; there is no other role change. 030 FR-019, contracts/community-settings.md.)*
+4. **Given** an active membership I administer, **When** I end it (set an end date in the past, or set status inactive), **Then** the member loses the associated permissions on their next request per FR-023. *(Changed by 030: ending sets the end date to today and the status to Inactive; an end date can't be before the start date.)*
+5. **Given** I am not a community manager, **When** I attempt to reach the membership-admin surface, **Then** I am refused per the same role-gated navigation rules as any other restricted section (FR-027, FR-028). *(Changed by 030: a Company Administrator, who holds no community membership, also manages memberships from the company area's Community settings page, 030 FR-021, FR-029.)*
 
 ---
 
@@ -266,7 +266,7 @@ As a community manager, I can create a `CommunityMembership` for a homeowner or 
 - **MetricDescriptor**: The presentation contract for a single metric — id, surface, label, definition, value, detail, status, emphasis, required capability. Drives summary statistics, tables, and glossary alike.
 - **Property** *(modified)*: Gains a real foreign key to Community; loses its denormalized community name.
 - **Violation** *(modified)*: Gains a real foreign key to Community in place of its loose string.
-- **ApplicationUser** *(unchanged)*: Gains a memberships collection; identity and authentication semantics are untouched.
+- **ApplicationUser** *(modified)*: Gains a memberships collection and the last-used mode (`LastActiveMode`, FR-022); identity and authentication semantics are untouched.
 
 ### Constitution Requirements *(mandatory when applicable)*
 

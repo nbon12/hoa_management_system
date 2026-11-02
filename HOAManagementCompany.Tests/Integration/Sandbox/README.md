@@ -7,7 +7,7 @@ emails, or SMS.
 
 ## Trait gate
 
-Every test class here carries `[Trait("Category", "Sandbox")]`.
+Every provider-calling test class here carries `[Trait("Category", "Sandbox")]`. The exception is `SesHarnessTests.cs` (026): its harness self-checks never contact SES, so they deliberately omit the trait and run in the PR suite.
 
 - The PR / unit `test` job runs `dotnet test --filter "Category!=Sandbox"` — these never run on PRs
   and require no provider secrets.

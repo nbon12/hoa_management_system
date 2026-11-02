@@ -4,7 +4,7 @@ How to run and extend the provider sandbox verification locally and in CI.
 
 ## What it does
 
-Runs the **real** Stripe / SendGrid / Twilio adapters against each provider's test/sandbox mode on every push to `main`, before the release image builds. Catches integration regressions (webhook signature, payment flow, email payload, SMS formatting) that the mocked PR suite cannot. Zero real charges, emails, or SMS.
+Runs the **real** Stripe / SES / Twilio adapters against each provider's test/sandbox mode on every push to `main`, before the release image builds. Catches integration regressions (webhook signature, payment flow, email payload, SMS formatting) that the mocked PR suite cannot. Zero real charges, emails, or SMS.
 
 ## Run locally
 
@@ -12,9 +12,11 @@ Runs the **real** Stripe / SendGrid / Twilio adapters against each provider's te
 # Requires Docker (Testcontainers spins up PostgreSQL + MinIO) and test-mode secrets.
 export Stripe__SecretKey='sk_test_...'
 export Stripe__WebhookSigningSecret='whsec_...'
-export SendGrid__ApiKey='SG....'
-export SendGrid__FromEmail='alerts@yourverifieddomain.dev'
-export SendGrid__Sandbox='true'
+export Ses__Region='us-east-1'
+export Ses__FromEmail='no-reply@mail.nekohoa.com'
+export Ses__AccessKeyId='...'
+export Ses__SecretAccessKey='...'
+export Ses__SimulatorOnly='true'
 export Twilio__AccountSid='ACxxxxxxxxtest'
 export Twilio__AuthToken='xxxxtest'
 export Twilio__FromNumber='+15005550006'
@@ -46,12 +48,12 @@ Any provider whose secrets are absent **skips** with a clear message (it does no
 
 ## Extending
 
-- Adding a provider operation → add a `[Fact]`/`[Theory]` in the matching `Integration/Sandbox/*Tests.cs`, tag `[Trait("Category","Sandbox")]`, and wrap the call in `SandboxResult.RunAsync(...)` so outages classify correctly.
+- Adding a provider operation → add a `[SkippableFact]`/`[SkippableTheory]` (plain `[Fact]`/`[Theory]` do not honor dynamic skips) in the matching `Integration/Sandbox/*Tests.cs`, tag `[Trait("Category","Sandbox")]`, and wrap the call in `SandboxResult.RunAsync(...)` so outages classify correctly.
 - New external provider → add an options seam (default-off), a `RequireX()` guardrail, and a `*SandboxTests.cs` class. Keep production behavior inert unless explicitly configured.
 
 ## Safety invariants (do not regress)
 
-1. SendGrid: never send unless `Sandbox == true` (only no-deliver guarantee).
+1. SES: never send unless `Ses:SimulatorOnly == true`, which limits recipients to `@simulator.amazonses.com`. This is the only no-deliver guarantee; `RequireSes()` hard-fails if credentials are present with the guard off (specs/026-ses-email-provider FR-005/FR-006).
 2. Twilio: `From` must be a magic number under test credentials; non-magic throws.
 3. Stripe: harness refuses non-`sk_test_`/`rk_test_` keys.
 4. Assertions target only objects the run created (shared sandbox accounts).

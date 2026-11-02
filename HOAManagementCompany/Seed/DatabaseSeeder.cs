@@ -9,7 +9,6 @@ namespace HOAManagementCompany.Seed;
 /// </summary>
 public class DatabaseSeeder(
     ApplicationDbContext db,
-    IDbContextFactory<ApplicationDbContext> dbFactory,
     IServiceProvider services,
     DocumentStorageInitializer documentStorageInitializer,
     ILogger<DatabaseSeeder> logger)

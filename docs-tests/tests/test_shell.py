@@ -87,6 +87,11 @@ def test_missing_path_is_reported() -> None:
     assert "specs/999-nothing/spec.md" in finding
 
 
+def test_elided_paths_are_shapes_not_claims() -> None:
+    assert shell.check_claims(block("cat specs/…/tasks.md\n")) == []
+    assert shell.check_claims(block("cat specs/.../tasks.md\n")) == []
+
+
 def test_commands_are_not_mistaken_for_paths() -> None:
     assert shell.check_claims(block('echo "FAIL: unstamped" && grep -q __API_ORIGIN__ out\n')) == []
 

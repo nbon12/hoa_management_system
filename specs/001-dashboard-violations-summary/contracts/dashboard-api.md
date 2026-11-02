@@ -3,6 +3,8 @@
 **Feature**: 001-dashboard-violations-summary  
 **Audience**: Backend implementers, frontend consumers, test authors
 
+> **Superseded (amended 2026-10-31).** `/api/dashboard/summary` was removed with the Blazor app in PR #10. The count is now `openViolations` in `GET /api/v1/dashboard` (Bearer JWT; scoped to the selected property from the `propertyId` claim). It is defined by specs/003-dotnet-api-backend FR-008 and `HOAManagementCompany/Features/Dashboard/`.
+
 ## Authentication
 
 All endpoints require an authenticated user (e.g. Okta/Identity). The current user's identity is used to scope data; no user id in path or query for dashboard or my-violations.

@@ -118,32 +118,6 @@ export interface LedgerEntry {
   balance: number;
 }
 
-export interface RecurringPayment {
-  status: 'active' | 'inactive';
-  amountType: 'assessment' | 'balance' | 'fixed';
-  fixedAmount: number | null;
-  method: 'ach' | 'card';
-  draftDay: number;
-  // ACH fields
-  bankName: string | null;
-  routingLast4: string | null;
-  accountLast4: string | null;
-  accountType: 'checking' | 'savings' | null;
-  // Card fields
-  cardholderName: string | null;
-  cardLast4: string | null;
-  cardExpiry: string | null;
-  cardZip: string | null;
-  processingFee: number;
-}
-
-export interface DraftEntry {
-  date: ISODate;
-  source: string;
-  amount: number;
-  status: 'paid' | 'scheduled' | 'failed';
-}
-
 // ─── Community ───────────────────────────────────────────────────────────────
 export type AnnouncementCategory = 'Board' | 'Maintenance' | 'Events' | 'Emergencies';
 

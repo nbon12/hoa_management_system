@@ -42,8 +42,9 @@ public sealed class WebhookProcessor(
             case "payment_intent.payment_failed":
                 await HandleFailedAsync((PaymentIntent)evt.Data.Object, ct);
                 break;
+            // Not charge.refund.updated: its payload is a Refund object, not a Charge. charge.refunded
+            // fires for every full or partial refund with the cumulative amount_refunded (FR-014b).
             case "charge.refunded":
-            case "charge.refund.updated":
                 await HandleRefundAsync((Charge)evt.Data.Object, ct);
                 break;
             case "charge.dispute.created":
@@ -102,8 +103,10 @@ public sealed class WebhookProcessor(
             await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, txn.GrossAmount,
                 LedgerEntryType.Reversal, $"ACH return – {txn.ReturnCode ?? "unknown"}", ct: ct);
             await ApplyNsfFeeAsync(txn, ct);
-            // A settled debit was clawed back — always alert the owner who opted in (FR-014c).
-            await alerts.EnqueueFailureAlertAsync(txn, txn.ReturnCode, ct);
+            // A settled debit was clawed back — alert the opted-in owner only for a recurring
+            // payment (FR-014c); a one-time payer is not alerted, as for failures (FR-015).
+            if (txn.IsRecurring)
+                await alerts.EnqueueFailureAlertAsync(txn, txn.ReturnCode, ct);
             metrics.RecordPaymentProcessed("returned");
         }
         else if (txn.Status is TransactionStatus.Pending or TransactionStatus.Succeeded)
@@ -129,12 +132,18 @@ public sealed class WebhookProcessor(
         var delta = cumulative - txn.CumulativeRefundedAmount;
         if (delta <= 0m) return;                              // Idempotent: already applied.
 
+        // Only the principal (GrossAmount) was credited to the owner's ledger; the card fee is HOA
+        // fee-income (FR-004d). So a refund restores at most the principal: refunded fee money goes
+        // back to the card but adds nothing to the owner's balance.
+        var principalDelta = Math.Min(cumulative, txn.GrossAmount)
+                             - Math.Min(txn.CumulativeRefundedAmount, txn.GrossAmount);
+
         txn.CumulativeRefundedAmount = cumulative;
         txn.Status = cumulative >= txn.Total ? TransactionStatus.Refunded : TransactionStatus.PartiallyRefunded;
         metrics.RecordPaymentProcessed(txn.Status == TransactionStatus.Refunded ? "refunded" : "partially_refunded");
-        // Fee is retained on refund (mirrors Stripe keeping its processing fee, FR-004d).
-        await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, delta,
-            LedgerEntryType.Refund, $"Refund – {charge.Id}", ct: ct);
+        if (principalDelta > 0m)
+            await ledger.AddCompensatingChargeAsync(txn.PropertyId, txn.Id, principalDelta,
+                LedgerEntryType.Refund, $"Refund – {charge.Id}", ct: ct);
         txn.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
     }

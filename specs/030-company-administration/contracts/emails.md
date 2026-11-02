@@ -12,9 +12,9 @@ These are sent through the email `IAlertProvider` at send time. Subjects and bod
 
 | Template | When | Subject | Body fields |
 |---|---|---|---|
-| Role invitation | membership invitation sent or resent | "You're invited to be a {role} of {community}" ("an Accountant") | community, role, term end (if any), sender name, **link**, expiry ("This link works until {local time}, 72 hours after it was sent."), how to ignore it |
-| Resident invitation | residency invitation sent or resent, including the activation fan-out | "You're invited to be a resident of {property address}" | community, property address, sender name, **link**, expiry, "If you already have an account, sign in to accept." |
-| Company Administrator invitation | `POST /company/administrators/invitations`, or the setup step | "You're invited to be a Company Administrator of {company}" | company, sender ("set up by your deployer" for the setup step), **link**, expiry |
+| Role invitation | membership invitation sent or resent | "You're invited to be a {role} of {community}" ("an Accountant") | community, role, term end (if any), sender name, **link**, expiry ("The link works once, and only for {email}. It expires {local time}, 72 hours after it was sent."), how to ignore it |
+| Resident invitation | residency invitation sent or resent, including the activation fan-out | "You're invited to be a resident of {property address}" | community, property address, sender name, **link**, expiry, and how to accept: sign in ("Sign in to accept") when the email already has an account, otherwise create an account with no claim code ("Accept invitation") |
+| Company Administrator invitation | `POST /company/administrators/invitations`, or the setup step | "You're invited to be a Company Administrator of {company}" | company, sender ("Sent by: Setup step" for the setup step), **link**, expiry |
 
 ## Notification emails: through the outbox (R10)
 

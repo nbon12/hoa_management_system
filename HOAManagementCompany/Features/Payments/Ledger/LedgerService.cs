@@ -111,28 +111,6 @@ public sealed class LedgerService(ApplicationDbContext db)
             .Select(e => e.RunningBalance)
             .FirstOrDefaultAsync(ct);
 
-    /// <summary>
-    /// Deterministically recomputes every <c>RunningBalance</c> for a property in <c>Sequence</c>
-    /// order — the canonical repair for out-of-order ACH settlements/refunds (SC-009).
-    /// Returns the final balance.
-    /// </summary>
-    public async Task<decimal> RecomputeBalancesAsync(Guid propertyId, CancellationToken ct = default)
-    {
-        var entries = await db.LedgerEntries
-            .Where(e => e.PropertyId == propertyId)
-            .OrderBy(e => e.Sequence)
-            .ToListAsync(ct);
-
-        decimal running = 0m;
-        foreach (var e in entries)
-        {
-            running += e.ChargeAmount - e.PaymentAmount;
-            e.RunningBalance = running;
-        }
-        await db.SaveChangesAsync(ct);
-        return running;
-    }
-
     private Task AcquirePropertyLockAsync(Guid propertyId, CancellationToken ct)
     {
         // Stable 64-bit key from the property id; xact lock auto-releases at commit/rollback.

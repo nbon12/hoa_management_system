@@ -99,6 +99,9 @@ def clean_path(token: str) -> str | None:
     token = token.strip().strip("`").rstrip(".,;:!?)")
     if not token or any(c in token for c in ' \t*?[]{}|<>"\'()$'):
         return None
+    # `specs/…/tasks.md` is a shape, not a path.
+    if "…" in token or "..." in token:
+        return None
     if token.startswith(("http://", "https://", "//", "-", "~", "@", "#")):
         return None
     token = token.split("#", 1)[0]

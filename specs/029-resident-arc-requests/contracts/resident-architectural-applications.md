@@ -2,9 +2,13 @@
 
 All routes carry the global `api/v1` prefix and live under `/property/architectural-applications` next to the existing resident `/property/*` endpoints. Every response sets `Cache-Control: no-store`. Errors use the existing `{ code, message }` shape.
 
-**Authorization (all endpoints)**: an authenticated resident. The active property comes from the `propertyId` JWT claim (`User.RequirePropertyId()`), and every query and command is pinned to `PropertyId == propertyId`. A draft or application on any other property gets `403 { code: "FORBIDDEN", message: "You do not have access to this request." }`, the same body whether it exists or not. No board capability is consulted, and a board or manager membership never widens access (025 FR-015).
+**Authorization (all endpoints)**: an authenticated resident. *(Amended by 030 FR-024g/FR-012a, PR #217.)* The `propertyId` JWT claim only says which home is selected. `ResidentArcScope` first calls 030's `ResidentAccess.RequireAsync`, which checks from stored data that the caller still has a `UserProperty` link to that home. Without a link, or without the claim, the request gets `403 PROPERTY_ACCESS_DENIED`. It then applies the home's community status:
+- Onboarding → `409 COMMUNITY_NOT_ACTIVE` on every endpoint.
+- Archived → `409 COMMUNITY_ARCHIVED` for drafts and every write. The list (which then leaves out drafts), the detail and the application attachment links stay readable.
 
-**Rate limiting**: every write (draft create/update/delete, upload, delete-attachment, submit, reply, withdraw, revise) carries `RequireRateLimiting("resident-writes")`. Reads don't.
+Every query and command is then pinned to that home's `PropertyId`. A draft or application on any other property gets `403 { code: "FORBIDDEN", message: "You do not have access to this request." }`, the same body whether it exists or not. So an unknown draft or application id also gets this 403, never a 404. The `404 NOT_FOUND` listed below applies only to an unknown `infoRequestId`, or an unknown draft `attachmentId` on delete, under the caller's own draft or application. No board capability is consulted, and a board or manager membership never widens access (025 FR-015).
+
+**Rate limiting**: every write (draft create/update/delete, upload, delete-attachment, submit, reply, withdraw, revise, and the 031 comment) carries `RequireRateLimiting("resident-writes")`. Reads don't.
 
 **Residents never receive board votes, voter identities or board vote comments** (FR-016). Resident DTOs have no such fields at all.
 
@@ -19,7 +23,7 @@ Two resources: **drafts** (`ArchitecturalApplicationDrafts`, editable, invisible
 ### POST /property/architectural-applications/drafts
 
 - **Request**: `{ "projectType": "Fence", "projectTitle": "…", "description": "…", "plannedStartDate": "2026-07-01"?, "plannedCompletionDate": "2026-07-20"?, "contractorName": "…"?, "contractorContact": "…"?, "acknowledged": false }`. Only `projectType` is required while drafting.
-- **Response 201**: the draft `{ id, projectType, projectTitle, description, plannedStartDate, plannedCompletionDate, contractorName, contractorContact, acknowledged, previousRevisionId: null, attachments: [], carriedAttachments: [], updatedAt }`.
+- **Response 201**: the draft `{ id, projectType, projectTitle, description, plannedStartDate, plannedCompletionDate, contractorName, contractorContact, acknowledged, previousRevisionId: null, previousDisplayId: null, attachments: [], carriedAttachments: [], removedCarriedAttachmentIds: [], updatedAt }`. On a revision draft, `previousDisplayId` is the revised request's `ARC-<n>`.
 - **Errors**: 422 `VALIDATION_ERROR` (unknown project type, over-length text, completion before start).
 
 ### GET /property/architectural-applications/drafts/{draftId}
@@ -133,7 +137,7 @@ Resident-safe detail.
   "contractorName": "…",
   "contractorContact": "…",
   "acknowledgedAt": "…",
-  "attachments": [{ "id": "guid", "fileName": "fence-plan.pdf", "sizeBytes": 1258291, "contentType": "application/pdf", "infoRequestId": null }],
+  "attachments": [{ "id": "guid", "fileName": "fence-plan.pdf", "sizeBytes": 1258291, "contentType": "application/pdf", "infoRequestId": null, "ownerCommentId": null }],
   "infoRequests": [{ "id": "guid", "message": "Please attach a plat survey", "requestedAt": "…", "responseMessage": null, "respondedAt": null }],
   "timeline": [{ "event": "Submitted", "at": "…" }, { "event": "InfoRequested", "at": "…" }],
   "decision": { "outcome": "Denied", "wording": "RevisionsRequested" },
@@ -143,16 +147,19 @@ Resident-safe detail.
   "closedAt": "…",
   "canWithdraw": false,
   "canRevise": true,
-  "revisions": [{ "id": "guid", "revision": 1, "status": "Denied", "receivedDate": "…" }]
+  "revisions": [{ "id": "guid", "revision": 1, "status": "Denied", "receivedDate": "…" }],
+  "comments": [{ "id": "guid", "body": "Lowered the fence to 5ft", "createdAt": "…", "attachments": [{ "id": "guid", "fileName": "revised-plan.pdf", "sizeBytes": 48211, "contentType": "application/pdf", "infoRequestId": null, "ownerCommentId": "guid" }] }],
+  "canComment": true
 }
 ```
 
 - `infoRequests[]` carries the board's question and the resident's reply. It never names the board member and never includes votes or vote comments.
-- `timeline` events, in time order, are `Submitted`, `InfoRequested`, `InfoReplied`, `Approved`, `Denied` and `Withdrawn`. They are derived from `ReceivedDate`/`CreatedAt`, the info-request timestamps, `ClosedAt` and `WithdrawnAt`.
+- `timeline` events, in time order, are `Submitted`, `InfoRequested`, `InfoReplied`, `Commented` (031), `Approved`, `Denied` and `Withdrawn`. They are derived from `ReceivedDate`/`CreatedAt`, the info-request timestamps, `ClosedAt` and `WithdrawnAt`.
 - `decision` is set only when `Status = Closed` with `Approved` or `Denied`. A `DecisionReached` application shows no decision until the manager records it.
 - `ownerReason` and `formalDisapprovalStatement` appear only when the request is Denied. `conditionsOfApproval` appears only when it is Approved.
 - `canWithdraw` and `canRevise` mirror the server rules so the UI can hide the actions.
 - `revisions[]` lists every revision of the same `ApplicationNumber`, oldest first.
+- `comments[]` (031) is the homeowner's own comment thread, oldest first. Its files also appear in `attachments[]` with `ownerCommentId` set. `canComment` is false only for a withdrawn request.
 - **Errors**: 403 `FORBIDDEN`; 404 `NOT_FOUND`.
 
 ### GET /property/architectural-applications/{id}/attachments/{attachmentId}/url
@@ -170,7 +177,7 @@ Upload a reply attachment (`multipart/form-data`, field `file`) while the info r
 - **Response 201**: `{ id, fileName, sizeBytes, contentType }`.
 - **Errors**:
   - 403 `FORBIDDEN`; 404 `NOT_FOUND`.
-  - 409 `INFO_ALREADY_ANSWERED` or `APPLICATION_CLOSED`.
+  - 409 `INFO_ALREADY_ANSWERED`, `APPLICATION_DECIDED` or `APPLICATION_CLOSED`.
   - 422 `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE` or `ATTACHMENT_LIMIT_REACHED`.
   - 503 `STORAGE_UNAVAILABLE` when object storage fails; nothing is written.
 
@@ -189,7 +196,8 @@ Upload a reply attachment (`multipart/form-data`, field `file`) while the info r
 - **Behavior**: under `ArcLocks.InLockedTransactionAsync`, allowed only when `Status = Open`. Sets:
   - `Status = Closed` and `DecisionOutcome = Withdrawn`;
   - `WithdrawnAt` and `ClosedAt` to now;
-  - `WithdrawnByUserId` and `ClosedByUserId` to the caller.
+  - `WithdrawnByUserId` and `ClosedByUserId` to the caller;
+  - `EligibleVoterCount` to the current eligible board size (031 FR-015), so the closed tally doesn't drift.
 
   It sends no email and logs `ArcWithdrawn`.
 - **Response 200**: the updated detail, with `status: "Withdrawn"`.
@@ -205,6 +213,19 @@ Upload a reply attachment (`multipart/form-data`, field `file`) while the info r
 - **Errors**:
   - 403 `FORBIDDEN`; 404 `NOT_FOUND`.
   - 409 `REVISION_NOT_ALLOWED`: not Closed + Denied, a newer revision exists, or a revision draft already exists.
+
+### POST /property/architectural-applications/{id}/comments
+
+*(Added by `031-arc-review-refinements` FR-020–FR-022, PR #243.)* The homeowner comments on any of their requests that wasn't withdrawn (open, decided or closed), for example to answer "revisions requested".
+
+- **Request**: `multipart/form-data` with a text field `message` (≤ 2,000 characters) and up to five files named `files`. A comment needs text, at least one file, or both.
+- **Behavior**: every file is checked by its content and against the per-application count and total limits before any file is stored. Comment files count toward those limits and carry over to a revision. Files are stored under `arc/{communityId}/{applicationNumber}/{guid}` as `ArchitecturalAttachment`s with `OwnerCommentId` set. Logs `ArcOwnerCommented` (IDs and counts only).
+- **Response 201**: the updated detail.
+- **Errors**:
+  - 403 `FORBIDDEN`.
+  - 409 `APPLICATION_CLOSED` (the request was withdrawn).
+  - 422 `VALIDATION_ERROR` (no text and no file, text over 2,000 characters, or more than five files), `UNSUPPORTED_FILE_TYPE`, `FILE_TOO_LARGE` or `ATTACHMENT_LIMIT_REACHED`.
+  - 503 `STORAGE_UNAVAILABLE`.
 
 ---
 

@@ -21,7 +21,6 @@ const TRANSACTIONS: TransactionSummary[] = [
 /** PaymentsService stub: ledger renders the statement; getTransactions feeds the Payments tab. */
 class StatementPaymentsService {
   getLedger(): Promise<LedgerEntry[]> { return Promise.resolve(LEDGER); }
-  getBalance() { return Promise.resolve({ currentBalance: 250, balanceDueDate: '2026-02-01', monthlyAssessment: 250 }); }
   getDrafts() { return Promise.resolve([]); }
   getTransactions(): Promise<TransactionSummary[]> { return Promise.resolve(TRANSACTIONS); }
 }

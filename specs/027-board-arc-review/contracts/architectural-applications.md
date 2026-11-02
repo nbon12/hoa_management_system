@@ -1,6 +1,6 @@
 # Contract: Architectural Applications (Board)
 
-All routes carry the global `api/v1` prefix. Every response sets `Cache-Control: no-store` (`BoardHttp.NoStore`), because each is authenticated and community-specific (constitution §8). Errors use the existing shape `{ code, message }`. A request outside the caller's scope returns the 025 body `403 { code: "FORBIDDEN", message: "You do not have access to this community." }`, the same whether the community or application exists or not (025 FR-016). An `applicationId` that belongs to a different community than the path's `communityId` gets the same 403.
+All routes carry the global `api/v1` prefix. Every response sets `Cache-Control: no-store` (`BoardHttp.NoStore`), because each is authenticated and community-specific (constitution §8). Errors use the existing shape `{ code, message }`. A request outside the caller's scope returns the 025 body `403 { code: "FORBIDDEN", message: "You do not have access to this community." }`, the same whether the community or application exists or not (025 FR-016). An `applicationId` that belongs to a different community than the path's `communityId` gets the same 403. *Changed by 030 (FR-004a, FR-012):* in an Archived community, a caller who would otherwise be allowed gets `409 COMMUNITY_ARCHIVED` instead (a Company Administrator can still read the settings); the vote undo answers `403 FORBIDDEN` there.
 
 Capabilities are from research R1. Write endpoints carry `RequireRateLimiting("board-writes")` (R9).
 
@@ -48,9 +48,10 @@ The list behind the Open/Closed tabs (US1) and the Needs-your-vote card (US5).
 ```
 
   - `myVote.state` is one of `CanVote`, `Voted` (with `choice`), `Recused` or `NotEligible` (managers).
-  - `decision` is `null` or `{ outcome: "Approved" | "Denied", wording: "RevisionsRequested" | "Denied" | null, source: "Votes" | "Lapse" }`.
+  - `decision` is `null` or `{ outcome: "Approved" | "Denied" | "Withdrawn" (029), wording: "RevisionsRequested" | "Denied" | null, source: "Votes" | "Lapse" }`.
   - `counts` ignores `search` and paging, so the tab labels and header pill stay stable (FR-003, FR-005).
   - No attachment URLs appear here (R8).
+  - *Added by 031:* `decisionFinal`, `votesLockAt` (when vote changes stop) and `canUndoVote` (031 FR-007).
 
 - **Errors**: 403 `FORBIDDEN`; 422 `VALIDATION_ERROR` for a bad `status` or a `search` over 100 characters.
 
@@ -79,6 +80,7 @@ The detail panel (US3), including the revision history (FR-035).
 
   - `votes` and `infoRequests` go only to board members and managers. Every caller of this endpoint is one of those, by the capability check (FR-019).
   - `revisions` lists every revision of the same `ApplicationNumber`, oldest first, the current one included.
+  - *Added by 029/031:* attachments carry `infoRequestId` and `ownerCommentId`; `infoRequests` items carry `id` and `responseMessage`; `ownerComments` (031 FR-021) and `lapseStatement` (031 FR-016) are included.
 
 - **Errors**: 403 `FORBIDDEN`.
 
@@ -105,11 +107,20 @@ Cast a vote (US2).
   | Status | Code | When |
   |---|---|---|
   | 403 | `FORBIDDEN` | Not a board member of this community |
-  | 403 | `RECUSED` | Caller owns the property |
+  | 403 | `RECUSED` | Caller is linked to the property while another board member can vote (031 FR-014) |
   | 409 | `ALREADY_VOTED` | Caller has already voted |
-  | 409 | `APPLICATION_DECIDED` | A decision has been reached |
+  | 409 | `APPLICATION_DECIDED` | The decision is final. Votes are accepted and re-evaluated during the grace period (031 FR-004) |
   | 409 | `APPLICATION_CLOSED` | The application is closed |
   | 422 | `VALIDATION_ERROR` | Bad choice or comment too long |
+
+## DELETE /communities/{communityId}/architectural-applications/{applicationId}/votes/mine
+
+Undo the caller's vote (added by 031 FR-005).
+
+- **Auth**: `VoteArchitecturalApplications`. Rate-limited. Logs `ArcVoteUndone`.
+- **Behavior**: under the row lock, removes the vote and re-runs the decision rule (031 FR-004).
+- **Response 200**: the updated list item.
+- **Errors**: 403 `FORBIDDEN`; 404 `NOT_VOTED`; 409 `APPLICATION_DECIDED` (final) / `APPLICATION_CLOSED`.
 
 ## POST /communities/{communityId}/architectural-applications/{applicationId}/info-requests
 
@@ -134,6 +145,7 @@ The manager records the outcome (FR-025) and the owner is emailed (FR-026).
   |---|---|---|
   | 403 | `FORBIDDEN` | Not a manager of this community |
   | 409 | `NO_DECISION` | No decision has been reached |
+  | 409 | `DECISION_NOT_FINAL` | The decision is still in its grace period (031 FR-006) |
   | 409 | `APPLICATION_CLOSED` | Already closed |
   | 422 | `VALIDATION_ERROR` | Reason missing on a denial, conditions on a denial, or wording on a vote-decided denial |
 
@@ -148,17 +160,17 @@ Resend a failed owner email (FR-026).
 
 ## GET /communities/{communityId}/architectural-settings
 
-- **Auth**: `ViewArchitecturalApplications`, so board members can see the rules. Returns the defaults when no row exists yet, without writing one (the row is created on the first PUT or the first application).
+- **Auth**: `ViewArchitecturalApplications`, so board members can see the rules. *Changed by 030:* `ViewArcSettings` (Board Members, Community Managers, Company Administrators). The response adds `companyDefaults`, `differsFromDefaults`, `canEdit` (030) and `lapseRuleCitation` (031); see specs/030-company-administration/contracts/community-settings.md. Returns the defaults when no row exists yet, without writing one (the row is created on the first PUT or the first application).
 - **Response 200**: `{ reviewPeriodDays, lapseRule, decisionRule, reminderDays, timeZoneId, formalDisapprovalStatement, updatedAt }`
 
 ## PUT /communities/{communityId}/architectural-settings
 
 - **Auth**: `ManageArchitecturalReview`. Rate-limited.
-- **Request**: the same fields as GET, all required.
+- **Request**: the same fields as GET, all required. *Changed by 030/031:* Auth is `ManageArcSettings` (Community Manager or Company Administrator); optional `lapseRuleCitation` (≤ 300). `POST …/architectural-settings/reset` is in the 030 contract.
 - **Behavior**: Applies to applications received afterwards; existing rows keep their snapshots (FR-030). Logs `ArcSettingsChanged` as a sensitive event with old and new values.
-- **Response 200**: the saved settings.
+- **Response 200**: the GET body (`ArcSettingsSectionDto`). *Amended 2026-10-28 by PR #248.*
 - **Errors**:
-  - 403 `FORBIDDEN`: board members and residents (US6, Scenario 17).
+  - 403 `FORBIDDEN`: board members and residents (US6, Scenario 18).
   - 422 `VALIDATION_ERROR`: a range violation, an unknown time zone, or a blank or over-1,000-character statement.
 
 ## POST /architectural/jobs/sweep
@@ -191,4 +203,4 @@ Link targets:
 | Revise and resubmit (owner) | `/app/property/architectural/{applicationId}/revise` |
 | Board emails | `/app/board/architectural?open={applicationId}` |
 
-The owner routes are built by the Resident Architectural Application Submission spec. Until it lands, those links fall through to the router's existing `**` fallback.
+The owner routes are built by the Resident Architectural Application Submission spec. They are `property/architectural/:id` and `property/architectural/:id/revise` in `neko-hoa/src/app/app.routes.ts` (029).

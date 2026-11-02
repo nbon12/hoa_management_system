@@ -90,10 +90,13 @@
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
-*Example of marking unclear requirements:*
+*Example of handling unclear requirements (constitution section 14: decide, don't ask — never
+leave a `[NEEDS CLARIFICATION]` marker for a person; state the requirement with the chosen default
+and record the choice under Assumptions. Exception: when the maintainer is driving specify or
+clarify themselves, ask what they want to be asked and record their answers):*
 
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-006**: System MUST authenticate users with email and password (see Assumptions)
+- **FR-007**: System MUST retain user data for 7 years (see Assumptions)
 
 ### Key Entities *(include if feature involves data)*
 
@@ -144,6 +147,13 @@
   explicitly, with rationale for why the split could not remove it; where this spec is one
   of several split from a larger effort, confirm the split allows the specs to be worked on
   in parallel]
+- **Autonomous delivery (no human steps)**: [Confirm this spec has no requirement, task, or
+  acceptance scenario that assigns work to a person or relies on manual verification, review,
+  approval, or sign-off; every ambiguity is resolved as a recorded Assumption (or by the
+  maintainer's answer, when they drove specify or clarify) rather than left as a question or
+  `[NEEDS CLARIFICATION]` marker; and any unavoidable human action (constitution
+  section 14: third-party accounts or root credentials, billing, admin-only settings) is described
+  as system behavior with and without that input, not as a step for a person]
 
 ## Success Criteria *(mandatory)*
 
@@ -165,6 +175,9 @@
   ACTION REQUIRED: The content in this section represents placeholders.
   Fill them out with the right assumptions based on reasonable defaults
   chosen when the feature description did not specify certain details.
+  Every ambiguity is resolved here with the most defensible default, never as a question to a
+  person (constitution section 14), unless the maintainer is driving specify or clarify. The
+  maintainer corrects a wrong default through feedback.
 -->
 
 - [Assumption about target users, e.g., "Users have stable internet connectivity"]

@@ -40,3 +40,7 @@ operator_secrets = {
 
 # --- Deploy alert webhook the 009 job posts to ---
 deploy_alert_webhook_url = "REPLACE_WITH_DEPLOY_ALERT_WEBHOOK_URL"
+
+# --- 013: PR-environment cost guardrail (budget.tf, SC-008). In CI: the TF_VAR_BILLING_ACCOUNT_ID secret ---
+billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
+# pr_env_monthly_budget = 25   # optional; USD/month, alerts at 80% and 100%

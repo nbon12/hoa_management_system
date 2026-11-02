@@ -2,7 +2,7 @@
 
 **Feature Branch**: `010-dev-env-iac-opentofu`  
 **Created**: 2026-06-13  
-**Status**: Implemented — Dev applied & live as of 2026-06-14 (backend `nekohoa-api-dev` healthy; frontend live at `dev.nekohoa.com`). Custom API domain `api-dev.nekohoa.com` is created and awaiting Google managed-cert issuance. See **Implementation Notes & Deviations (2026-06-14)** at the end for what changed during implementation.  
+**Status**: Implemented — Dev applied & live as of 2026-06-14 (backend `nekohoa-api-dev` healthy; frontend live at `dev.nekohoa.com`). Custom API domain `api-dev.nekohoa.com` is live: the managed cert was issued and the record is proxied at Full(strict) (PR #53, 2026-06-14). The Dev root defaults `enable_api_domain = true` and `api_dns_proxied = true`. See **Implementation Notes & Deviations (2026-06-14)** at the end for what changed during implementation.  
 **Input**: User description: "Create a declarative Infrastructure-as-Code setup, committed in the repo under infra/, using OpenTofu, that provisions the entire Dev environment for the 009-dev-auto-deploy pipeline so no cloud resources are created by hand."
 
 ## Why This Feature Exists
@@ -361,7 +361,7 @@ new isolated state target — not duplicating or editing the resource definition
   (§10, §3).
 - **Authorization**: No application endpoints are added. Infrastructure access control is enforced
   by least-privilege service identities and a repository-scoped federation trust condition (§7);
-  the deployer identity gets only deploy + impersonation rights and the runtime identity only
+  the deployer identity gets deploy + impersonation rights and, per the FR-010 deviation, project Owner (bounded by the repo-scoped federation condition and `main` protection), and the runtime identity only
   secret access.
 - **Database/runtime**: Provisions the isolated **Dev** managed-PostgreSQL database with pooled
   connections (the connection-string output uses the pooled endpoint per §8 low-connection/pooling
@@ -433,8 +433,8 @@ new isolated state target — not duplicating or editing the resource definition
 - **Tool is OpenTofu** and the layout lives under `infra/` in the repo, as decided in the handoff.
 - **The community database provider `kislerdm/neon`** is acceptable despite being
   community-maintained (not vendor-verified); its version is pinned and the risk is documented.
-- **The application image** `sakurapatch/nekohoa-api:<sha>` is built and published by the existing
-  `009` pipeline (Docker Hub); this feature references/pulls images and never builds them. A
+- **The application image** `<region>-docker.pkg.dev/<project>/images-dev/nekohoa-api:<sha>` is built by the existing
+  `009` pipeline and pushed to the Artifact Registry repository `images-${env_name}` that this configuration provisions (`infra/modules/environment/artifact_registry.tf`); this feature references/pulls images and never builds them. *(Amended 2026-10-28 by PR #242: Cloud Run used to pull `sakurapatch/nekohoa-api:<sha>` from Docker Hub via mirror.gcr.io, which returns 429 for uncached tags. main's image is still mirrored to Docker Hub for the nightly Trivy re-scan. The first-create placeholder is now `us-docker.pkg.dev/cloudrun/container/hello`.)* A
   placeholder/bootstrap image may be used for the very first service creation before the pipeline
   has pushed a real revision.
 - **The custom-domain certificate ordering** for `api-dev.nekohoa.com` may require a documented

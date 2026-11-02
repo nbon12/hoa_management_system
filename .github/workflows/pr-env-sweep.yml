@@ -4,7 +4,8 @@
 #   - INACTIVE: PR is open but has had no new commit for > 7 days (FR-007; clock resets on push,
 #               no absolute-age cap). A reclaimed open PR re-provisions on its next push.
 # Also self-heals the pre-seeded `pr-base` Neon branch if it has gone missing (research D3), and audits
-# per-PR resources by NAME for orphans that have no state prefix at all, which nothing above can see (#236).
+# per-PR resources by NAME for orphans that have no state prefix at all, which nothing above can see (#236),
+# and reaps those of PRs closed over 24 h ago through the policy gate (handoff 2026-11-02 §2.2, #295).
 name: pr-env-sweep
 
 on:
@@ -16,7 +17,8 @@ permissions:
   actions: read # gh run list: keep a stale lock while a pr-env, teardown or repair run is live
   contents: read
   id-token: write # WIF OIDC
-  pull-requests: write # reclaim comment
+  issues: write # failure comment on the ops-log issue
+  pull-requests: write # reclaim and reap comments
 
 concurrency:
   group: pr-env-sweep
@@ -120,7 +122,8 @@ jobs:
             fi
 
             # A lock left by a killed run is past the 45-min floor by now; the sweep runs outside the
-            # pr-env-<n> group, so it also keeps the lock while any pr-env, teardown or repair run is live.
+            # pr-env-<n> group, so it also keeps the lock while a pr-env, teardown or repair run for that PR
+            # (matched by its "(pr-<n>)" run-name; untagged runs count) is live.
             # The lock is cleared BEFORE init: with no default.tfstate beside it, init takes the lock to
             # write an empty state and fails with a 412 on a stale one (the #234 A6 test).
             # The state is deleted only after a successful destroy, so a failed one is retried tomorrow.
@@ -143,10 +146,79 @@ jobs:
           exit "$failed"
 
       # Per-PR resources with no state prefix (a killed apply, or a teardown that deleted the state after
-      # a failed destroy) are invisible to the reclaim above. A closed PR's fail the run; reap them with
-      # pr-env-repair.yml action=reap. Runs even when the reclaim failed.
+      # a failed destroy) are invisible to the reclaim above. Runs even when the reclaim failed. A closed
+      # PR's orphans are listed for the reap below; this step's failure alone doesn't fail the job, the
+      # re-audit after the reap does.
       - name: Audit for orphans by name
+        id: audit
         if: always()
+        continue-on-error: true
+        env:
+          REPO: ${{ github.repository }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ORPHANS_OUT: ${{ runner.temp }}/orphans.txt
+        run: scripts/pr-env-audit.sh
+
+      # For each closed PR the audit reported (at most MAX_REAPS a run; the rest wait for tomorrow): the
+      # policy gate (kill switch P1, no live run P4, closed over 24 h P5), a dry run, the plan check (P7),
+      # then the real reap and a comment on the PR. A PR the gate refuses is skipped and stays red below.
+      - name: Reap orphans of closed PRs
+        if: always() && steps.audit.outcome != 'success'
+        env:
+          REPO: ${{ github.repository }}
+          OPS_AUTOMATION: ${{ vars.OPS_AUTOMATION }}
+          ORPHANS: ${{ runner.temp }}/orphans.txt
+          MAX_REAPS: "3"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+          PREFIX: ${{ vars.SHARED_SECRET_PREFIX || 'dev' }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PR_BASE_BRANCH_ID: ${{ secrets.NEON_PR_BASE_BRANCH_ID }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STRIPE_SECRET_KEY_TEST: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+        run: |
+          set -uo pipefail
+          if [ ! -s "$ORPHANS" ]; then echo "Nothing to reap."; echo "- reap: nothing to reap" >>"$GITHUB_STEP_SUMMARY"; exit 0; fi
+          reaped=0 failed=0
+          while read -r n; do
+            [ -n "$n" ] || continue
+            if [ "$reaped" -ge "$MAX_REAPS" ]; then echo "PR #${n}: over this run's limit of ${MAX_REAPS}; left for the next sweep."; continue; fi
+            echo "== PR #${n}"
+            plan="${RUNNER_TEMP}/reap-plan-${n}.txt" done_file="${RUNNER_TEMP}/reap-done-${n}.txt"
+            if ! CALLER=sweep ACTION=reap DRY_RUN=false PR_NUMBER="$n" scripts/pr-env-policy-gate.sh preflight; then
+              echo "PR #${n}: skipped (policy gate)."; continue
+            fi
+            if ! PR_NUMBER="$n" DRY_RUN=true ONLY_UNTRACKED=false ITEMS_OUT="$plan" scripts/pr-env-reap.sh; then
+              echo "::error::PR #${n}: the reap dry run failed; not reaping."; failed=1; continue
+            fi
+            if ! ACTION=reap PR_NUMBER="$n" PLAN_FILE="$plan" scripts/pr-env-policy-gate.sh check-plan; then
+              failed=1; continue
+            fi
+            reaped=$(( reaped + 1 )) rc=0
+            PR_NUMBER="$n" DRY_RUN=false ONLY_UNTRACKED=false ITEMS_OUT="$done_file" scripts/pr-env-reap.sh || rc=$?
+            result=succeeded
+            [ "$rc" -eq 0 ] || { failed=1; result='**failed**'; }
+            {
+              echo "**pr-env-sweep** reaped resources left by this closed PR that no OpenTofu state tracked: ${result}. [Run](${RUN_URL})"
+              echo
+              if [ -s "$done_file" ]; then sed 's/^/- /' "$done_file"; else echo "- nothing to delete"; fi
+            } >"${RUNNER_TEMP}/reap-comment-${n}.md"
+            gh pr comment "$n" --repo "$REPO" --body-file "${RUNNER_TEMP}/reap-comment-${n}.md" \
+              || echo "::warning::Could not comment on PR #${n}."
+          done <"$ORPHANS"
+          exit "$failed"
+
+      # The red run is the notification: it fails while any closed PR still has orphans.
+      - name: Re-audit after the reap
+        if: always() && steps.audit.outcome != 'success'
         env:
           REPO: ${{ github.repository }}
           PROJECT: ${{ secrets.GCP_PROJECT_ID }}
@@ -156,3 +228,15 @@ jobs:
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: scripts/pr-env-audit.sh
+
+      - name: Report the failure on the ops-log issue
+        if: failure()
+        env:
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          log="$(gh issue list --repo "$REPO" --label ops-log --state open --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -z "$log" ]; then echo "::warning::No open issue labeled ops-log."; exit 0; fi
+          gh issue comment "$log" --repo "$REPO" \
+            --body "**pr-env-sweep failed.** Orphans left after the reap, a failed reclaim, or a failed step: see the [run](${RUN_URL}) and its summary." \
+            || echo "::warning::Could not comment on ops-log issue #${log}."

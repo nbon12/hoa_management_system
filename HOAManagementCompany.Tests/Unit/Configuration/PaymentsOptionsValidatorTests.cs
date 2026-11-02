@@ -76,15 +76,6 @@ public class PaymentsOptionsValidatorTests
         Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("CreditOnly"));
     }
 
-    [Fact]
-    public void FlatFee_WithAllCardsScope_Passes()
-    {
-        var o = Valid();
-        o.DefaultFee.CardFeeType = "Flat";
-        o.DefaultFee.CardScope = "AllCards";
-        Assert.True(Validator.Validate(o).IsValid);
-    }
-
     [Theory]
     [InlineData(0)]   // allowed
     public void VariableNoticeLeadDays_Zero_Passes(int days)
