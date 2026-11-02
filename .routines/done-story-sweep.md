@@ -16,7 +16,8 @@ This routine runs from two scheduled tasks, and each acts differently:
   Re-read every issue, PR and session fresh.
 - **Watchdog mode.** You don't have that tool. A scheduled task that starts a fresh session (such as
   "Daily done checker") never gets the session tools. Don't triage anything and don't hand anything
-  off. Do only the [watchdog check](#watchdog-check), then stop.
+  off. Do only the [watchdog check](#watchdog-check), which uses "Finding the newest report" from Step 6,
+  then stop.
 
 ## Scope
 
