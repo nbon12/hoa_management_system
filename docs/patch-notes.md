@@ -33,6 +33,28 @@ Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-
 
 ---
 
+## 2026-11-02 · Auto-merge for nbon12's PRs once every check passes · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **Auto-merge** (`.github/workflows/auto-merge.yml`): a ready PR into `main` that nbon12 opens is squash-merged once **every** check on its head has passed (not only the required ones, so `pr-env`'s end-to-end tests count) and every conversation is resolved. That includes every Claude session's PR, since sessions open PRs as nbon12. Dependabot's and anyone else's PRs are untouched.
+- It decides on each PR event and whenever CI, Security Scan, pr-env or Repowise finishes (`workflow_run`). **A new PR workflow must be added to that list**, or PRs it runs on wait for a finish the workflow never hears about.
+- **Left alone (manual):** drafts, the `hold` label, a review requesting changes, a failed or cancelled check, a guarded path (`GUARDED_PATHS` in the workflow, now the one list the merge policy points to), 300+ changed files, a base other than `main`. The run summary says which.
+- **The `auto-merge` label** marks the PRs it is handling. It only turns off auto-merge on those, so `/merge` on a guarded PR still works. `hold` turns off anyone's.
+- **Fails closed:** if a run errors, a last step turns off the PR's auto-merge (using `GITHUB_TOKEN`, so it works even when `MERGE_TOKEN` is broken). It refuses to merge if `main` loses its required checks.
+- Like `/merge`, it merges with `MERGE_TOKEN`, so the squash push still starts the push-to-main workflows.
+
+**Changes earlier assumptions**
+
+- **Settings changed alongside this PR:** `main`'s required checks are now Build & Test, Frontend (neko-hoa), Ops scripts (shellcheck + tests) and the Repowise health gate, as well as the two Trivy scans; and "Require conversation resolution before merging" is on. Before, a PR could merge while Build & Test was still running (#299 did). Labels `auto-merge` and `hold` exist now.
+- **Open a PR as a draft and mark it ready when it is ready to merge.** `.routines/merge-policy.md` and `CLAUDE.md` say so now: marking it ready is the decision to merge, because the workflow can't check the verification list in the description or the patch notes.
+- A session no longer merges its own non-guarded PR; auto-merge does. Guarded-path PRs still follow the merge policy's independent review, and the session merges them.
+- `/merge` (#297, below) works alongside this: the workflow leaves alone auto-merge that `/merge` turned on, so `/merge` is how a guarded PR, or one auto-merge left alone, gets merged once the merge policy's rules hold. Non-guarded PRs no longer need it.
+
+---
+
 ## 2026-11-02 · Email-provider removal test scans only git-tracked files · [#291](https://github.com/nbon12/hoa_management_system/pull/291) · Closes [#216](https://github.com/nbon12/hoa_management_system/issues/216)
 
 Test harness only. No application behavior, API or data change.
