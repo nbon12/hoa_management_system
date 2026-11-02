@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · PR_LINK_PENDING
+## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · [#300](https://github.com/nbon12/hoa_management_system/pull/300)
 
 Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
 
