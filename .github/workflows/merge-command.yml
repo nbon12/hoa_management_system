@@ -1,0 +1,114 @@
+# Comment `/merge` on an open PR to update its branch from main and squash-merge it once the
+# required checks pass (GitHub auto-merge). The check-and-merge is deterministic: no model in the loop.
+#
+# Who can trigger it: only the repository OWNER, typing the comment themselves. A comment that a
+# Claude session or app posts on the owner's behalf carries `performed_via_github_app` and is
+# ignored, so an agent can never merge by writing `/merge`.
+#
+# One-time setup:
+#   1. Settings → General → Pull Requests → tick "Allow auto-merge".
+#   2. Add repository secret MERGE_TOKEN: a fine-grained personal access token for this repository
+#      only, with Contents: Read and write and Pull requests: Read and write.
+#      Not GITHUB_TOKEN, because a merge made with GITHUB_TOKEN does not start the push-to-main
+#      workflows (dev deploy, image push).
+name: Merge command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {} # GITHUB_TOKEN is not used
+
+concurrency:
+  group: merge-command-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >
+      github.event.issue.pull_request &&
+      github.event.issue.state == 'open' &&
+      github.event.comment.author_association == 'OWNER' &&
+      github.event.comment.performed_via_github_app == null &&
+      startsWith(github.event.comment.body, '/merge')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Update branch and enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.MERGE_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          # The first line must be exactly `/merge` (so `/mergefoo` or `/merge please wait` do nothing).
+          first_line="$(printf '%s\n' "$COMMENT_BODY" | head -n1 | tr -d '\r' | sed -e 's/[[:space:]]*$//')"
+          if [ "$first_line" != "/merge" ]; then
+            echo "First line is not exactly /merge; ignoring."
+            exit 0
+          fi
+
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret MERGE_TOKEN is not set. Add a fine-grained token for this repository with Contents and Pull requests: Read and write."
+            exit 1
+          fi
+
+          react() {
+            gh api --method POST "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+              -f content="$1" >/dev/null 2>&1 || true
+          }
+          say() {
+            gh pr comment "$PR" --repo "$REPO" --body "$1
+
+          _Posted by the \`/merge\` workflow ([run](${RUN_URL}))._" >/dev/null || true
+          }
+          fail() {
+            react confused
+            say "$1"
+            echo "::error::$1"
+            exit 1
+          }
+
+          react eyes
+
+          if [ "$(gh pr view "$PR" --repo "$REPO" --json isDraft --jq .isDraft)" = "true" ]; then
+            gh pr ready "$PR" --repo "$REPO" || fail "Couldn't mark this draft PR ready for review, so it was not merged."
+          fi
+
+          # Bring the branch up to date with main. Conflicts stop here: auto-merge can't resolve them.
+          if ! out="$(gh pr update-branch "$PR" --repo "$REPO" 2>&1)"; then
+            fail "Couldn't update this branch from \`main\`, so it was not merged:
+
+          \`\`\`
+          ${out}
+          \`\`\`
+
+          If it's a merge conflict, resolve it (or ask Claude to merge main into this branch and resolve the conflicts), then comment \`/merge\` again."
+          fi
+          echo "$out"
+          sleep 5 # let GitHub recompute the merge state after a branch update
+
+          # Squash-merge now if every requirement is already met; otherwise GitHub merges
+          # automatically once the required checks pass.
+          if ! out="$(gh pr merge "$PR" --repo "$REPO" --squash --auto 2>&1)"; then
+            fail "Couldn't merge or enable auto-merge:
+
+          \`\`\`
+          ${out}
+          \`\`\`
+
+          If it says auto-merge isn't allowed, turn on Settings → General → \"Allow auto-merge\"."
+          fi
+          echo "$out"
+
+          state="$(gh pr view "$PR" --repo "$REPO" --json state --jq .state)"
+          react rocket
+          if [ "$state" = "MERGED" ]; then
+            say "Merged (squash)."
+          else
+            say "Auto-merge is on. GitHub will squash-merge this PR when the required checks pass. If a check fails, the PR stays open until a fix makes it pass. To cancel, use \"Disable auto-merge\" on the PR."
+          fi
