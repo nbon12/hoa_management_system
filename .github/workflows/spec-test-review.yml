@@ -8,8 +8,11 @@ name: Spec test review
 #            Claude breaks the behavior in production code, runs only that test and restores the file, so a
 #            test that still passes is a confirmed finding. Procedure: .claude/commands/review-spec-tests.md
 #            (also runs locally: /review-spec-tests <PR#>). A crashed review is retried once.
-#   fix      On blocking findings, Claude fixes the tests (test code only, guarded), or disputes a finding
-#            with evidence, and pushes. The push starts the next review. Up to MAX_FIX_ATTEMPTS per PR.
+#   fix      On blocking findings, Claude fixes the tests, or disputes a finding with evidence, and saves
+#            its changes as a patch. Read-only: it holds no token that can push. Up to MAX_FIX_ATTEMPTS per PR.
+#   push     Applies the patch to a clean checkout, guards it (test code only, no skipped or focused test,
+#            no test or assertion removed), posts the report and the attempt's comment, and pushes with
+#            MERGE_TOKEN. The push starts the next review.
 #   verdict  The "Spec test verdict" check. It passes when the review passes. With findings and a fix
 #            pushed, it fails this commit and the next pass decides. With findings and nothing left to push
 #            (attempts used up, or nothing the fixer could change), it's the last pass: the findings move
@@ -87,8 +90,9 @@ jobs:
       - name: Scope
         id: scope
         run: |
-          scope="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' \
-            | bash scripts/spec-test-review.sh scope)"
+          # Two steps, so a failed API call fails the step instead of looking like an empty, docs-only PR.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' >"$RUNNER_TEMP/files.txt"
+          scope="$(bash scripts/spec-test-review.sh scope <"$RUNNER_TEMP/files.txt")"
           echo "scope=$scope" >>"$GITHUB_OUTPUT"
           if [ "$scope" = skip ]; then
             echo "Only Markdown, docs/, specs/ or wireframes/ changed. There are no tests to review." >>"$GITHUB_STEP_SUMMARY"
@@ -168,15 +172,14 @@ jobs:
     if: needs.review.outputs.verdict == 'findings'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Read-only for the fixer. Its fixes are pushed with MERGE_TOKEN, after the guard.
+    # Read-only. The push job applies the fixer's patch to a clean checkout and pushes it.
     permissions:
       contents: read
       pull-requests: read
     outputs:
       attempt: ${{ steps.attempts.outputs.attempt }}
-      pushed: ${{ steps.push.outputs.pushed }}
-      superseded: ${{ steps.push.outputs.superseded }}
-      unresolved: ${{ steps.push.outputs.unresolved }}
+      exhausted: ${{ steps.attempts.outputs.exhausted }}
+      result: ${{ steps.fix.outputs.structured_output }}
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -188,16 +191,16 @@ jobs:
       - name: Count earlier attempts
         id: attempts
         run: |
-          earlier="$(gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '.[].commit.message' \
-            | grep -c '^Spec-Test-Review-Fix:' || true)"
+          # Two steps, so a failed API call fails the job instead of resetting the count.
+          gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '.[].commit.message' >"$RUNNER_TEMP/messages.txt"
+          earlier="$(grep -c '^Spec-Test-Review-Fix:' "$RUNNER_TEMP/messages.txt" || true)"
           echo "attempt=$((earlier + 1))" >>"$GITHUB_OUTPUT"
           if [ "$earlier" -ge "$MAX_FIX_ATTEMPTS" ]; then
             echo "exhausted=true" >>"$GITHUB_OUTPUT"
             echo "All $MAX_FIX_ATTEMPTS auto-fix attempts are used, so this is the last pass." >>"$GITHUB_STEP_SUMMARY"
           fi
 
-      # The PR head, not the merge commit, so the fix commits on top of it. No stored credentials: only the
-      # push step, after the guard, gets a token that can push.
+      # The PR head, not the merge commit, so the patch applies on top of it.
       - name: Checkout the PR head
         if: steps.attempts.outputs.exhausted != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -221,7 +224,7 @@ jobs:
       - name: Fix
         id: fix
         if: steps.attempts.outputs.exhausted != 'true'
-        # A crash is handled by the push step: it pushes an empty commit so the next pass retries.
+        # A crash is handled by the push job: it pushes an empty commit so the next pass retries.
         continue-on-error: true
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1.0.265
         with:
@@ -262,8 +265,9 @@ jobs:
             Edit only test code: `HOAManagementCompany.Tests/**`, `neko-hoa/src/**/*.spec.ts`,
             `neko-hoa/e2e/**` and `neko-hoa/cypress/**`. A guard runs after you and refuses the whole
             attempt if anything else changed, including a production break you forgot to restore. This
-            action restored `.claude/`, `CLAUDE.md` and other agent config from main. Leave them alone; the
-            guard ignores them. Don't commit or push: the workflow does that after the guard.
+            action restored `.claude/`, `CLAUDE.md` and other agent config from main. Leave them alone; they
+            are left out of your patch. Don't commit or push: the workflow does that after the guard. Never
+            remove a test or an assertion either: the guard refuses an attempt that ends with fewer.
 
             Return the IDs you fixed, your disputes with evidence, the findings left unresolved with reasons,
             and a short summary of what you changed.
@@ -277,18 +281,75 @@ jobs:
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*)"
             --json-schema '{"type":"object","properties":{"fixed":{"type":"array","items":{"type":"string"}},"disputes":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"evidence":{"type":"string"}},"required":["id","evidence"]}},"unresolved":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"reason":{"type":"string"}},"required":["id","reason"]}},"summary":{"type":"string"}},"required":["fixed","disputes","unresolved","summary"]}'
 
+      - name: Save the fix as a patch
+        if: steps.attempts.outputs.exhausted != 'true'
+        run: bash scripts/spec-test-review.sh patch "$RUNNER_TEMP/fix.patch"
+
+      - name: Upload the patch
+        if: steps.attempts.outputs.exhausted != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: spec-test-fix
+          path: ${{ runner.temp }}/fix.patch
+          if-no-files-found: ignore
+          retention-days: 3
+
+  push:
+    name: Push the fix
+    needs: [review, fix]
+    # Also after a failed fix job (it then pushes an empty commit, so the next pass retries), but not once
+    # the attempts are used up: that is the last pass, and the verdict files what's left.
+    if: >-
+      !cancelled() && needs.review.outputs.verdict == 'findings' &&
+      needs.fix.outputs.attempt != '' && needs.fix.outputs.exhausted != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      pushed: ${{ steps.push.outputs.pushed }}
+      superseded: ${{ steps.push.outputs.superseded }}
+      unresolved: ${{ steps.push.outputs.unresolved }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ATTEMPT: ${{ needs.fix.outputs.attempt }}
+      FIX_OUTPUT: ${{ needs.fix.outputs.result }}
+      REPORT: ${{ needs.review.outputs.report }}
+    steps:
+      # A clean checkout. Nothing the fixer, or the tests it ran, left behind in its tree reaches this token.
+      - name: Checkout the PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Missing when the fixer crashed before saving it.
+      - name: Download the patch
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: spec-test-fix
+          path: ${{ runner.temp }}/fix
+
       - name: Guard and push
         id: push
-        if: steps.attempts.outputs.exhausted != 'true'
         env:
-          ATTEMPT: ${{ steps.attempts.outputs.attempt }}
           MERGE_TOKEN: ${{ secrets.MERGE_TOKEN }}
-          FIX_OUTPUT: ${{ steps.fix.outputs.structured_output }}
-        run: bash scripts/spec-test-review.sh push
+        run: |
+          printf '%s\n' "$REPORT" >"$RUNNER_TEMP/report.md"
+          PATCH_FILE="$RUNNER_TEMP/fix/fix.patch" REPORT_FILE="$RUNNER_TEMP/report.md" \
+            bash scripts/spec-test-review.sh push
 
   verdict:
     name: Spec test verdict
-    needs: [review, fix]
+    needs: [review, fix, push]
     # Runs even when the review or the fix didn't: a required check that is skipped counts as passing.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -310,10 +371,11 @@ jobs:
       REVIEW_RESULT: ${{ needs.review.result }}
       VERDICT: ${{ needs.review.outputs.verdict }}
       REPORT: ${{ needs.review.outputs.report }}
-      ATTEMPT: ${{ needs.fix.outputs.attempt }}
-      PUSHED: ${{ needs.fix.outputs.pushed }}
-      SUPERSEDED: ${{ needs.fix.outputs.superseded }}
-      UNRESOLVED: ${{ needs.fix.outputs.unresolved }}
+      FIX_RESULT: ${{ needs.fix.result }}
+      PUSH_RESULT: ${{ needs.push.result }}
+      PUSHED: ${{ needs.push.outputs.pushed }}
+      SUPERSEDED: ${{ needs.push.outputs.superseded }}
+      UNRESOLVED: ${{ needs.push.outputs.unresolved }}
     steps:
       - name: Checkout the decision script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

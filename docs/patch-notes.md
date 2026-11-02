@@ -20,13 +20,15 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
   - It probes suspect tests: it breaks the behavior in production code and runs only that test. A test that survives is a confirmed finding.
   - Blocking findings are scenarios whose behavior, code or test the diff adds or changes. Gaps elsewhere in the touched stories are listed as earlier debt and don't count.
 - **Findings are fixed automatically, and the loop always ends green.**
-  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, and pushes to the PR branch. That push starts the next review. **Pull before you push again.**
-  - A guard refuses an attempt that changes anything but test code, or that skips or focuses a test.
+  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, in a read-only job. A separate job applies its patch to a clean checkout and pushes to the PR branch with `MERGE_TOKEN`, which starts the next review. **Pull before you push again.**
+  - A guard refuses an attempt that changes anything but test code, skips or focuses a test (including `Skip.If`), or ends with fewer test declarations or assertions than it started with.
   - Commits carry a `Spec-Test-Review-Fix: <n>` trailer. After three attempts, or when there's nothing the fixer can change (for example, the faithful test fails because the code is wrong), the last pass files the remaining findings in a follow-up issue, "Spec test gaps deferred from #N", and the check passes.
   - A later green pass on the same PR closes that issue.
-  - A review that crashes is retried once. If it still can't run, that is filed the same way.
+  - A review that crashes is retried once. If it still can't run (an outage, or a missing or expired Claude token), it gets its own issue, "Spec test review couldn't run on #N", and the check passes. Constitution section 14 says a credentials problem must not block a merge, but the maintainer is told. Watch for these issues: they mean PRs are merging unreviewed.
+  - If a follow-up issue can't be filed, the check fails instead of passing silently.
 - **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
 - **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
+- **Auto-merge (#306) knows about it.** `auto-merge.yml` re-decides when "Spec test review" finishes, and from that workflow it counts only `Spec test verdict`. The inner jobs ("Review tests against specs", "Fix the tests", "Push the fix") can end red on a pass that the verdict still settles green.
 - **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
 
 **Shared pieces you can reuse**
@@ -35,11 +37,43 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
   - In CI, claude-code-action restores `.claude/` and `CLAUDE.md` from `main`, so a PR is always reviewed under `main`'s procedure. A change to the procedure takes effect once it merges.
 - `scripts/spec-test-review.sh` holds the deterministic parts, each tested in `scripts/tests/spec-test-review.test.sh`:
   - `scope`: whether a PR needs review;
+  - `patch`: the fixer's changes as a patch;
   - `guard`: what a fix may commit;
   - `push`: commit and push a fix attempt;
   - `decide`: the check, including the follow-up issue;
   - `post`: the sticky comment.
 - The fix pushes use `MERGE_TOKEN`. A push made with `GITHUB_TOKEN` starts no workflows, so it would never be reviewed.
+
+---
+
+## 2026-11-02 · Done story sweep: no `@claude` in sweep comments; watchdog reads the newest report · [#312](https://github.com/nbon12/hoa_management_system/pull/312)
+
+Tooling only.
+
+- **Sweep comments no longer start the Claude workflow by accident.** The 18:20 UTC report on #290 quoted the text "@claude" while describing Step 3. It posted as nbon12, so `claude.yml` ran on the log issue (run 41499658412, "No action taken"). The routine and its worker message now forbid that mention in any comment, title or body, and the report template says "Claude workflow run" instead.
+- **The watchdog now reads the newest *report* on the `sweep-log` issue**, meaning nbon12's newest comment that starts with `Done story sweep report`, rather than the newest comment of any kind. A bot reply there can no longer cause a false "didn't run" alert.
+
+---
+
+## 2026-11-02 · Auto-merge for nbon12's PRs once every check passes · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **Auto-merge** (`.github/workflows/auto-merge.yml`): a ready PR into `main` that nbon12 opens is squash-merged once **every** check on its head has passed (not only the required ones, so `pr-env`'s end-to-end tests count) and every conversation is resolved. That includes every Claude session's PR, since sessions open PRs as nbon12. Dependabot's and anyone else's PRs are untouched.
+- It decides on each PR event and whenever CI, Security Scan, pr-env or Repowise finishes (`workflow_run`). **A new PR workflow must be added to that list**, or PRs it runs on wait for a finish the workflow never hears about.
+- **Left alone (manual):** drafts, the `hold` label, a review requesting changes, a failed or cancelled check, a guarded path (`GUARDED_PATHS` in the workflow, now the one list the merge policy points to), 300+ changed files, a base other than `main`. The run summary says which.
+- **The `auto-merge` label** marks the PRs it is handling. It only turns off auto-merge on those, so `/merge` on a guarded PR still works. `hold` turns off anyone's.
+- **Fails closed:** if a run errors, a last step turns off the PR's auto-merge (using `GITHUB_TOKEN`, so it works even when `MERGE_TOKEN` is broken). It refuses to merge if `main` loses its required checks.
+- Like `/merge`, it merges with `MERGE_TOKEN`, so the squash push still starts the push-to-main workflows.
+
+**Changes earlier assumptions**
+
+- **Settings changed alongside this PR:** `main`'s required checks are now Build & Test, Frontend (neko-hoa), Ops scripts (shellcheck + tests) and the Repowise health gate, as well as the two Trivy scans; and "Require conversation resolution before merging" is on. Before, a PR could merge while Build & Test was still running (#299 did). Labels `auto-merge` and `hold` exist now.
+- **Open a PR as a draft and mark it ready when it is ready to merge.** `.routines/merge-policy.md` and `CLAUDE.md` say so now: marking it ready is the decision to merge, because the workflow can't check the verification list in the description or the patch notes.
+- A session no longer merges its own non-guarded PR; auto-merge does. Guarded-path PRs still follow the merge policy's independent review, and the session merges them.
+- `/merge` (#297, below) works alongside this: the workflow leaves alone auto-merge that `/merge` turned on, so `/merge` is how a guarded PR, or one auto-merge left alone, gets merged once the merge policy's rules hold. Non-guarded PRs no longer need it.
 
 ---
 

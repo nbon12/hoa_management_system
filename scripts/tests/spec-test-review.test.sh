@@ -17,8 +17,8 @@ pass=0 fail=0
 
 # ── Stub ──────────────────────────────────────────────────────────────────────────────────────────────
 # gh api: a GET runs its --jq over a fixture picked by path (comments.json, issues.json). A write logs
-# "=== METHOD PATH" and its fields (a body=@file field as the file's text) to bodies and prints an html_url.
-# Every call logs "METHOD PATH" to calls.
+# "=== METHOD PATH" and its fields (a body=@file field as the file's text) to bodies and prints an html_url
+# (or 555 for --jq .id). Every call logs "METHOD PATH" to calls; one matching $STUB_FAIL fails.
 cat >"$STUB_DIR/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = api ] || { echo "stub gh: unexpected $*" >&2; exit 1; }
@@ -34,6 +34,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 echo "$method $path" >>"$STUB_DIR/calls"
+if [ -n "${STUB_FAIL:-}" ] && [[ "$method $path" =~ $STUB_FAIL ]]; then echo "stub gh: failing $method $path" >&2; exit 1; fi
 if [ "$method" != GET ]; then
   {
     echo "=== $method $path"
@@ -41,6 +42,7 @@ if [ "$method" != GET ]; then
       case "$f" in body=@*) cat "${f#body=@}"; echo ;; *) echo "$f" ;; esac
     done
   } >>"$STUB_DIR/bodies"
+  [ "$jqexpr" = .id ] && { echo 555; exit 0; }
   case "$method $path" in
     "POST repos/o/r/issues") echo "https://github.com/o/r/issues/99" ;;
     "PATCH repos/o/r/issues/"[0-9]*) echo "https://github.com/o/r/issues/${path##*/}" ;;
@@ -94,117 +96,155 @@ scope_is review "a test only" neko-hoa/src/app/features/arc/arc-table.component.
 scope_is review "spec plus code" specs/031-arc-review-refinements/tasks.md HOAManagementCompany/Domain/Entities/Vote.cs
 scope_is review "a workflow" .github/workflows/test.yml
 
-# ── guard and push: a repo whose feature branch is on a bare remote ──────────────────────────────────
-REPO_DIR="$STUB_DIR/repo" REMOTE="$STUB_DIR/remote.git"
+# ── guard, patch and push: the fixer's tree, a clean clone, and a bare remote with the feature branch ──
+REPO_DIR="$STUB_DIR/repo" CLEAN_DIR="$STUB_DIR/clean" REMOTE="$STUB_DIR/remote.git" PATCH="$STUB_DIR/fix.patch"
 mkrepo() {
-  rm -rf "$REPO_DIR" "$REMOTE"
+  rm -rf "$REPO_DIR" "$CLEAN_DIR" "$REMOTE" "$PATCH"
   git -c init.defaultBranch=main init -q --bare "$REMOTE"
   git -c init.defaultBranch=main init -q "$REPO_DIR"
   (
     cd "$REPO_DIR" || exit 1
     git config user.email t@example.com && git config user.name t
     mkdir -p HOAManagementCompany.Tests HOAManagementCompany neko-hoa/src/app .claude
-    echo 'Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);' >HOAManagementCompany.Tests/VoteTests.cs
+    printf '%s\n' '[Fact]' 'public async Task Undo_OnClosedApplication_IsRefused() {' \
+      'Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);' '}' >HOAManagementCompany.Tests/VoteTests.cs
     echo 'class VoteService {}' >HOAManagementCompany/VoteService.cs
-    echo 'it("shows the badge", () => {});' >neko-hoa/src/app/badge.spec.ts
+    echo 'it("shows the badge", () => { expect(badge).toBeTruthy(); });' >neko-hoa/src/app/badge.spec.ts
     echo '{}' >.claude/settings.json && echo '# rules' >CLAUDE.md
     git add -A && git commit -qm init && git push -q "$REMOTE" HEAD:refs/heads/feature
   )
   START="$(git -C "$REPO_DIR" rev-parse HEAD)"
 }
-edit() { printf '%s\n' "$2" >>"$REPO_DIR/$1"; } # path line
+edit() { printf '%s\n' "$2" >>"$REPO_DIR/$1"; }                 # path line
+drop() { grep -vF -- "$2" "$REPO_DIR/$1" >"$STUB_DIR/drop.tmp"; mv "$STUB_DIR/drop.tmp" "$REPO_DIR/$1"; } # path text
 run_guard() { (cd "$REPO_DIR" && bash "$SCRIPT" guard) >"$STUB_DIR/out" 2>&1; }
 out_is() { [ "$(cat "$STUB_DIR/out")" = "$1" ]; }
+guard_ok() { # name expected-output
+  run_guard; local rc=$?
+  [ "$rc" = 0 ] && out_is "$2" && ok "$1" || bad "$1" "rc=$rc $(cat "$STUB_DIR/out")"
+}
+guard_refuses() { # name expected-message
+  run_guard; local rc=$?
+  [ "$rc" = 1 ] && grep -qF -- "$2" "$STUB_DIR/out" && ok "$1" || bad "$1" "rc=$rc $(cat "$STUB_DIR/out")"
+}
+T=HOAManagementCompany.Tests/VoteTests.cs
 
 echo "guard"
-mkrepo; edit HOAManagementCompany.Tests/VoteTests.cs 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'
-run_guard; rc=$?
-[ "$rc" = 0 ] && out_is HOAManagementCompany.Tests/VoteTests.cs && ok "a changed test is allowed" \
-  || bad "a changed test is allowed" "rc=$rc $(cat "$STUB_DIR/out")"
-mkrepo; edit HOAManagementCompany/VoteService.cs '// tweak'; edit HOAManagementCompany.Tests/VoteTests.cs '// x'
-run_guard; rc=$?
-[ "$rc" = 1 ] && grep -q 'outside test code: HOAManagementCompany/VoteService.cs' "$STUB_DIR/out" \
-  && ok "a production change is refused" || bad "a production change is refused" "rc=$rc $(cat "$STUB_DIR/out")"
-mkrepo; edit .claude/settings.json '{"x":1}'; edit CLAUDE.md 'main rules'; edit HOAManagementCompany.Tests/VoteTests.cs '// x'
-run_guard; rc=$?
-[ "$rc" = 0 ] && out_is HOAManagementCompany.Tests/VoteTests.cs && ok "restored agent config is ignored, not committed" \
-  || bad "restored agent config is ignored, not committed" "rc=$rc $(cat "$STUB_DIR/out")"
-mkrepo; edit HOAManagementCompany.Tests/VoteTests.cs '// x'
+mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'
+guard_ok "a changed test is allowed" "$T"
+mkrepo; edit HOAManagementCompany/VoteService.cs '// tweak'; edit "$T" '// x'
+guard_refuses "a production change is refused" 'outside test code: HOAManagementCompany/VoteService.cs'
+mkrepo; edit .claude/settings.json '{"x":1}'; edit CLAUDE.md 'main rules'; edit "$T" '// x'
+guard_ok "restored agent config is ignored, not committed" "$T"
+mkrepo; edit "$T" '// x'
 mkdir -p "$REPO_DIR/HOAManagementCompany.Tests/TestResults" && echo '<trx/>' >"$REPO_DIR/HOAManagementCompany.Tests/TestResults/run.trx"
-run_guard; rc=$?
-[ "$rc" = 0 ] && out_is HOAManagementCompany.Tests/VoteTests.cs && ok "test-run output is ignored, not committed" \
-  || bad "test-run output is ignored, not committed" "rc=$rc $(cat "$STUB_DIR/out")"
-mkrepo; printf 'it("hides undo", () => { expect(1).toBe(1); });\n' >"$REPO_DIR/neko-hoa/src/app/undo.spec.ts"
-run_guard; rc=$?
-[ "$rc" = 0 ] && out_is neko-hoa/src/app/undo.spec.ts && ok "a new spec file is allowed" \
-  || bad "a new spec file is allowed" "rc=$rc $(cat "$STUB_DIR/out")"
-mkrepo; edit HOAManagementCompany.Tests/VoteTests.cs '[Fact(Skip = "flaky")]'
-run_guard; rc=$?
-[ "$rc" = 1 ] && grep -q 'skipped or focused' "$STUB_DIR/out" && ok "an xUnit Skip is refused" \
-  || bad "an xUnit Skip is refused" "rc=$rc $(cat "$STUB_DIR/out")"
+guard_ok "test-run output is ignored, not committed" "$T"
+mkrepo; printf 'it("hides undo", () => { expect(undo).toBeNull(); });\n' >"$REPO_DIR/neko-hoa/src/app/undo.spec.ts"
+guard_ok "a new spec file is allowed" neko-hoa/src/app/undo.spec.ts
+mkrepo; guard_ok "no changes: nothing to commit" ""
+mkrepo; edit "$T" '[Fact(Skip = "flaky")]'
+guard_refuses "an xUnit Skip is refused" 'skipped or focused'
+mkrepo; edit "$T" 'Skip.If(DateTime.Now.Hour > 12);'
+guard_refuses "Skip.If (Xunit.SkippableFact) is refused" 'skipped or focused'
 mkrepo; printf 'it.only("hides undo", () => {});\n' >"$REPO_DIR/neko-hoa/src/app/undo.spec.ts"
-run_guard; rc=$?
-[ "$rc" = 1 ] && ok "a focused test in a new file is refused" || bad "a focused test in a new file is refused" "rc=$rc"
+guard_refuses "a focused test in a new file is refused" 'skipped or focused'
 mkrepo; edit neko-hoa/src/app/badge.spec.ts 'xit("pending", () => {});'
-run_guard; rc=$?
-[ "$rc" = 1 ] && ok "xit is refused" || bad "xit is refused" "rc=$rc"
-mkrepo; run_guard; rc=$?
-[ "$rc" = 0 ] && out_is "" && ok "no changes: nothing to commit" || bad "no changes: nothing to commit" "rc=$rc"
+guard_refuses "xit is refused" 'skipped or focused'
+mkrepo; drop "$T" 'Assert.Equal(HttpStatusCode.Conflict'
+guard_refuses "removing an assertion is refused" 'removed more test declarations or assertions'
+mkrepo; rm "$REPO_DIR/neko-hoa/src/app/badge.spec.ts"
+guard_refuses "deleting a spec file is refused" 'removed more test declarations or assertions'
+mkrepo; drop "$T" 'Assert.Equal(HttpStatusCode.Conflict'; edit "$T" 'Assert.Equal(HttpStatusCode.Conflict, res.StatusCode); // moved'
+guard_ok "rewriting an assertion in place is allowed" "$T"
 
-run_push() { # FIX_OUTPUT [HEAD_SHA]
-  (cd "$REPO_DIR" && PATH="$STUB_DIR/bin:$PATH" GITHUB_OUTPUT="$STUB_DIR/ghout" REPO=o/r PR=7 HEAD_REF=feature \
-    HEAD_SHA="${2:-$START}" ATTEMPT=1 MAX_FIX_ATTEMPTS=3 MERGE_TOKEN=t PUSH_URL="$REMOTE" FIX_OUTPUT="$1" \
-    bash "$SCRIPT" push) >"$STUB_DIR/out" 2>&1
+echo "patch"
+mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; edit CLAUDE.md 'main rules'
+edit .claude/settings.json '{"restored":true}'; echo 'it("x", () => { expect(1).toBe(1); });' >"$REPO_DIR/neko-hoa/src/app/new.spec.ts"
+(cd "$REPO_DIR" && bash "$SCRIPT" patch "$PATCH") >"$STUB_DIR/out" 2>&1; rc=$?
+files="$(grep '^diff --git' "$PATCH" | awk '{print $3}' | tr '\n' ' ')"
+[ "$rc" = 0 ] && [ "$files" = "a/$T a/neko-hoa/src/app/new.spec.ts " ] \
+  && ok "the patch has the fixer's changes, not the restored config" || bad "the patch has the fixer's changes, not the restored config" "rc=$rc files=$files"
+
+# The fixer's tree makes the patch; push runs in a clean clone of the PR head.
+fixer_patch() { (cd "$REPO_DIR" && bash "$SCRIPT" patch "$PATCH") >/dev/null 2>&1; }
+mkclean() { rm -rf "$CLEAN_DIR"; git clone -q --branch feature "$REMOTE" "$CLEAN_DIR"; }
+run_push() { # FIX_OUTPUT [extra VAR=value...]
+  local fix="$1"; shift
+  (cd "$CLEAN_DIR" && env PATH="$STUB_DIR/bin:$PATH" GITHUB_OUTPUT="$STUB_DIR/ghout" REPO=o/r PR=7 HEAD_REF=feature \
+    HEAD_SHA="$START" ATTEMPT=1 MAX_FIX_ATTEMPTS=3 MERGE_TOKEN=t PUSH_URL="$REMOTE" FIX_OUTPUT="$fix" PATCH_FILE="$PATCH" \
+    REPORT_FILE="$STUB_DIR/report.md" RUN_URL=https://github.com/o/r/actions/runs/42 "$@" bash "$SCRIPT" push) >"$STUB_DIR/out" 2>&1
 }
 remote_head() { git -C "$REMOTE" rev-parse refs/heads/feature; }
 remote_msg() { git -C "$REMOTE" log -1 --format=%B refs/heads/feature; }
 remote_files() { git -C "$REMOTE" show --name-only --format= refs/heads/feature | tr '\n' ' '; }
 ghout_has() { grep -qF -- "$1" "$STUB_DIR/ghout"; }
+line_of() { grep -nF -- "$1" "$STUB_DIR/bodies" | head -n 1 | cut -d: -f1; }
 FIXED='{"fixed":["US3-AS6"],"disputes":[],"unresolved":[],"summary":"Restored the APPLICATION_CLOSED assertion."}'
 
 echo "push"
-reset; mkrepo; edit HOAManagementCompany.Tests/VoteTests.cs 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'
-edit .claude/settings.json '{"restored":true}'
+reset; mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; edit .claude/settings.json '{"restored":true}'
+fixer_patch; mkclean
 run_push "$FIXED"; rc=$?
 [ "$rc" = 0 ] && [ "$(remote_head)" != "$START" ] && ghout_has pushed=true \
-  && ok "a fix is committed and pushed" || bad "a fix is committed and pushed" "rc=$rc $(cat "$STUB_DIR/out")"
-[ "$(remote_files)" = "HOAManagementCompany.Tests/VoteTests.cs " ] && ok "only the test is committed, not restored config" \
+  && ok "a fix is applied to a clean clone, committed and pushed" \
+  || bad "a fix is applied to a clean clone, committed and pushed" "rc=$rc $(cat "$STUB_DIR/out")"
+[ "$(remote_files)" = "$T " ] && ok "only the test is committed, not restored config" \
   || bad "only the test is committed, not restored config" "$(remote_files)"
 remote_msg | grep -qx 'Spec-Test-Review-Fix: 1' && remote_msg | grep -q 'Fixed: US3-AS6' \
   && ok "the commit carries the attempt trailer" || bad "the commit carries the attempt trailer" "$(remote_msg)"
-called "POST repos/o/r/issues/7/comments" && bodies_have '**Fixed:** US3-AS6' \
-  && ok "the attempt is announced on the PR" || bad "the attempt is announced on the PR" "$(calls)"
+sticky="$(line_of "$MARK")" attempt="$(line_of '**Spec test auto-fix**')"
+[ -n "$sticky" ] && [ -n "$attempt" ] && [ "$sticky" -lt "$attempt" ] && bodies_have 'is pushing' && bodies_have '**Fixed:** US3-AS6' \
+  && ok "the report is posted before the attempt comment, both before the push" \
+  || bad "the report is posted before the attempt comment, both before the push" "sticky=$sticky attempt=$attempt $(calls)"
 
-reset; mkrepo
+reset; mkrepo; fixer_patch; mkclean
 run_push '{"fixed":[],"disputes":[{"id":"US3-AS4","evidence":"VoteTests.cs:120 casts after the lock and asserts APPLICATION_DECIDED."}],"unresolved":[],"summary":"One finding is wrong."}'
 [ "$(remote_head)" != "$START" ] && [ -z "$(remote_files)" ] && ghout_has pushed=true \
   && bodies_have '- **US3-AS4**: VoteTests.cs:120 casts after the lock' \
   && ok "a dispute alone pushes an empty commit to start the next review" \
   || bad "a dispute alone pushes an empty commit to start the next review" "$(cat "$STUB_DIR/out")"
 
-reset; mkrepo
+reset; mkrepo; fixer_patch; mkclean
 run_push '{"fixed":[],"disputes":[],"unresolved":[{"id":"US3-AS2","reason":"The faithful test fails: the decision is not withdrawn."}],"summary":"x"}'
 [ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ghout_has 'US3-AS2**: The faithful test fails' \
   && not_called '^POST' && ok "nothing fixed or disputed: no push, the reasons go on" \
   || bad "nothing fixed or disputed: no push, the reasons go on" "$(cat "$STUB_DIR/out")"
 
-reset; mkrepo; edit HOAManagementCompany/VoteService.cs '// changed'
+reset; mkrepo; edit HOAManagementCompany/VoteService.cs '// changed'; edit "$T" '// fix'; fixer_patch; mkclean
 run_push "$FIXED"
 [ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ghout_has 'was not pushed: the fix changed files outside test code' \
   && ok "a guard failure pushes nothing and says why" || bad "a guard failure pushes nothing and says why" "$(cat "$STUB_DIR/ghout")"
 
-reset; mkrepo; edit HOAManagementCompany.Tests/VoteTests.cs '// fix'
-(cd "$REPO_DIR" && git commit -qam "author pushed" && git push -q "$REMOTE" HEAD:refs/heads/feature && git reset -q --hard "$START")
-moved="$(remote_head)"; edit HOAManagementCompany.Tests/VoteTests.cs '// fix'
+reset; mkrepo; mkclean; printf 'not a patch\n' >"$PATCH"
+run_push "$FIXED"
+[ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ghout_has "its patch didn't apply" \
+  && ok "a patch that doesn't apply pushes nothing" || bad "a patch that doesn't apply pushes nothing" "$(cat "$STUB_DIR/ghout")"
+
+reset; mkrepo; edit "$T" '// fix'; fixer_patch; mkclean
+(cd "$REPO_DIR" && git commit -qam "author pushed" && git push -q "$REMOTE" HEAD:refs/heads/feature)
+moved="$(remote_head)"
 run_push "$FIXED"
 [ "$(remote_head)" = "$moved" ] && ghout_has superseded=true && not_called '^POST' \
   && ok "a branch that moved on is left to its own run" || bad "a branch that moved on is left to its own run" "$(cat "$STUB_DIR/out")"
 
-reset; mkrepo
+reset; mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; fixer_patch; mkclean
+printf '#!/bin/sh\nexit 1\n' >"$REMOTE/hooks/pre-receive" && chmod +x "$REMOTE/hooks/pre-receive"
+run_push "$FIXED"
+[ "$(remote_head)" = "$START" ] && ghout_has superseded=true && called "PATCH repos/o/r/issues/comments/555" \
+  && bodies_have 'this attempt did not land' \
+  && ok "a refused push corrects the attempt comment" || bad "a refused push corrects the attempt comment" "$(calls) $(cat "$STUB_DIR/out")"
+
+reset; mkrepo; fixer_patch; mkclean
 run_push ""
 [ "$(remote_head)" != "$START" ] && ghout_has pushed=true && remote_msg | grep -q 'did not finish' \
   && ok "a crashed attempt pushes an empty commit so the next pass retries" \
   || bad "a crashed attempt pushes an empty commit so the next pass retries" "$(cat "$STUB_DIR/out")"
+
+reset; mkrepo; fixer_patch; mkclean
+run_push "$FIXED" PUSH_URL= MERGE_TOKEN=
+[ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ghout_has "MERGE_TOKEN secret isn't set" \
+  && ok "no MERGE_TOKEN: nothing pushed, and the reason goes on" \
+  || bad "no MERGE_TOKEN: nothing pushed, and the reason goes on" "$(cat "$STUB_DIR/ghout")"
 
 # ── post ──────────────────────────────────────────────────────────────────────────────────────────────
 run_post() { # verdict
@@ -278,9 +318,20 @@ bodies_have 'state=closed' && ok "the follow-up issue is closed" || bad "the fol
 
 reset
 run_decide PUSHED=true; rc=$?
-[ "$rc" = 1 ] && bodies_have 'Auto-fix attempt 2 of 3 pushed a commit' && not_called '^POST repos/o/r/issues$' \
-  && ok "findings with a fix pushed: fail this commit, no issue" \
-  || bad "findings with a fix pushed: fail this commit, no issue" "rc=$rc $(calls)"
+[ "$rc" = 1 ] && not_called '^(POST|PATCH)' \
+  && ok "findings with a fix pushed: fail this commit, leave the comment to the next run" \
+  || bad "findings with a fix pushed: fail this commit, leave the comment to the next run" "rc=$rc $(calls)"
+
+reset
+run_decide PUSH_RESULT=failure UNRESOLVED=; rc=$?
+[ "$rc" = 0 ] && bodies_have '- The auto-fix job failed' \
+  && ok "a failed auto-fix job is named in the follow-up issue" || bad "a failed auto-fix job is named in the follow-up issue" "rc=$rc"
+
+reset
+run_decide STUB_FAIL='^POST repos/o/r/issues$'; rc=$?
+[ "$rc" = 1 ] && not_called '^PATCH repos/o/r/issues/comments' && grep -q "couldn't be filed" "$STUB_DIR/out" \
+  && ok "a follow-up issue that can't be filed fails the check" \
+  || bad "a follow-up issue that can't be filed fails the check" "rc=$rc $(cat "$STUB_DIR/out")"
 
 reset
 run_decide; rc=$?
@@ -305,6 +356,7 @@ run_decide SUPERSEDED=true; rc=$?
 reset
 run_decide REVIEW_RESULT=failure VERDICT=; rc=$?
 [ "$rc" = 0 ] && called "POST repos/o/r/issues" && bodies_have "The review couldn't run on this commit, twice" \
+  && bodies_have "title=Spec test review couldn't run on #7: test(031): weaken a test" \
   && ok "a review that crashed twice is filed and passes" \
   || bad "a review that crashed twice is filed and passes" "rc=$rc $(calls)"
 

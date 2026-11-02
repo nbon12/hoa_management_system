@@ -5,21 +5,24 @@
 #   scope   Reads the PR's changed paths on stdin and prints "review", or "skip" when every path is
 #           documentation: Markdown, docs/, specs/ or wireframes/. Spec Kit artifact PRs land before the
 #           code, so there are no tests to hold to the spec yet (CLAUDE.md, "Spec Kit workflow: PR watching").
-#   guard   In the auto-fix checkout: prints the changed paths the fix may commit (test code), ignoring the
-#           agent config claude-code-action restores from main and test-run output. Fails when the fix changed anything else
-#           or added a skipped or focused test.
-#   push    After an auto-fix attempt: guards, posts the attempt's comment, commits with a
-#           Spec-Test-Review-Fix trailer and pushes, which starts the next review. A crashed attempt
-#           pushes an empty commit so the next pass retries. Writes pushed, superseded and unresolved
-#           to $GITHUB_OUTPUT. Env: REPO PR HEAD_REF HEAD_SHA ATTEMPT MAX_FIX_ATTEMPTS MERGE_TOKEN
-#           FIX_OUTPUT (the fixer's JSON); PUSH_URL overrides the remote (tests).
-#   decide  The Spec test verdict check. Posts the report and exits 0 (pass) or 1 (fail). A pass with
-#           findings left is the last one: it files them in a follow-up issue and passes, so the loop
-#           always ends green. A later green pass closes that issue. Env: REPO PR PR_TITLE HEAD_SHA
-#           RUN_URL REVIEW_RESULT VERDICT REPORT_FILE DRAFT FORK DEPENDABOT PUSHED SUPERSEDED
-#           UNRESOLVED ATTEMPT MAX_FIX_ATTEMPTS.
-#   post    Upserts the sticky report comment (decide uses it). Env: REPO PR VERDICT (pass|findings|
-#           not_applicable|deferred) REPORT_FILE HEAD_SHA RUN_URL [NOTE].
+#   patch   In the fixer's checkout: writes its changes, minus the agent config claude-code-action
+#           restores from main, as a binary patch to $2. The push job applies it to a clean checkout, so
+#           nothing the fixer or the tests it ran left in that tree (hooks, git config) reaches the token.
+#   guard   Prints the changed paths a fix may commit: test code, minus agent config and test-run output.
+#           Fails when the fix changed anything else, skipped or focused a test, or removed more test
+#           declarations or assertions than it added.
+#   push    In a clean checkout of the PR head: applies the fixer's patch (PATCH_FILE), guards it, commits
+#           with a Spec-Test-Review-Fix trailer, posts the report and then the attempt's comment, and
+#           pushes, which starts the next review. A crashed attempt pushes an empty commit so the next pass
+#           retries. Writes pushed, superseded and unresolved to $GITHUB_OUTPUT. Env: REPO PR HEAD_REF
+#           HEAD_SHA ATTEMPT MAX_FIX_ATTEMPTS MERGE_TOKEN FIX_OUTPUT (the fixer's JSON) PATCH_FILE
+#           REPORT_FILE RUN_URL; PUSH_URL overrides the remote (tests).
+#   decide  The Spec test verdict check: exits 0 (pass) or 1 (fail). A pass with findings left is the
+#           last one: it files them in a follow-up issue and passes, so the loop always ends green. A later
+#           green pass closes that issue. Env: REPO PR PR_TITLE HEAD_SHA RUN_URL REVIEW_RESULT VERDICT
+#           REPORT_FILE DRAFT FORK DEPENDABOT FIX_RESULT PUSH_RESULT PUSHED SUPERSEDED UNRESOLVED.
+#   post    Upserts the sticky report comment. Env: REPO PR VERDICT (pass|findings|not_applicable|
+#           deferred) REPORT_FILE HEAD_SHA RUN_URL [NOTE] [MAX_FIX_ATTEMPTS].
 #
 # gh must be authenticated (GH_TOKEN). Comments are found by marker and author (BOT_LOGIN,
 # github-actions[bot] for GITHUB_TOKEN), so a re-run edits them in place.
@@ -30,9 +33,16 @@ MARKER='<!-- spec-test-review -->'
 MAX_BODY=60000 # GitHub refuses comment and issue bodies over 65,536 characters; the rest is framing
 # Agent config claude-code-action restores from main on PRs (src/github/operations/restore-config.ts).
 CONFIG_PATHS_RE='^(\.claude/|\.claude-pr/|\.mcp\.json$|\.claude\.json$|\.gitmodules$|\.ripgreprc$|CLAUDE\.md$|CLAUDE\.local\.md$|\.husky/)'
+CONFIG_EXCLUDES=(':(exclude).claude' ':(exclude).claude-pr' ':(exclude).mcp.json' ':(exclude).claude.json'
+  ':(exclude).gitmodules' ':(exclude).ripgreprc' ':(exclude)CLAUDE.md' ':(exclude)CLAUDE.local.md' ':(exclude).husky')
 TEST_PATHS_RE='^(HOAManagementCompany\.Tests/|neko-hoa/e2e/|neko-hoa/cypress/|neko-hoa/src/.*\.spec\.ts$)'
 BUILD_OUTPUT_RE='(^|/)(TestResults|bin|obj)/' # test-run output that isn't ignored everywhere
-SKIP_RE='Skip[[:space:]]*=|(^|[^[:alnum:]_.])(xit|xdescribe|fit|fdescribe)\(|\.(skip|only|fixme)\('
+# Skipped or focused tests: xUnit (Skip =, Xunit.SkippableFact's Skip.If/IfNot/SkipException), Jasmine,
+# Playwright and Cypress.
+SKIP_RE='Skip[[:space:]]*=|Skip\.If(Not)?\(|SkipException|(^|[^[:alnum:]_.])(xit|xdescribe|fit|fdescribe|pending)\(|\.(skip|only|fixme)\('
+DECL_RE='\[(Skippable)?(Fact|Theory)[]( ]|(^|[^[:alnum:]_.])(it|test)\('
+ASSERT_RE='Assert\.|expect\(|\.Should\(|\.Verify\('
+GIT=(git -c core.hooksPath=/dev/null)
 
 out() { if [ -n "${GITHUB_OUTPUT:-}" ]; then printf '%s\n' "$@" >>"$GITHUB_OUTPUT"; fi; }
 out_multi() { # name value
@@ -40,6 +50,7 @@ out_multi() { # name value
   local delim="EOF_$RANDOM$RANDOM$RANDOM"
   printf '%s<<%s\n%s\n%s\n' "$1" "$delim" "$2" "$delim" >>"$GITHUB_OUTPUT"
 }
+count() { grep -cE "$1" <<<"$2" || true; } # regex text
 
 scope() {
   local path
@@ -52,10 +63,16 @@ scope() {
   echo skip
 }
 
+make_patch() {
+  local dest="${1:?usage: patch OUT}"
+  "${GIT[@]}" add -A -- . "${CONFIG_EXCLUDES[@]}"
+  "${GIT[@]}" diff --cached --binary --no-textconv --no-ext-diff >"$dest"
+}
+
 # Changed and untracked paths, one per line; both sides of a rename.
 changed_paths() {
   local entry status
-  git status --porcelain=v1 -z --untracked-files=all | while IFS= read -r -d '' entry; do
+  "${GIT[@]}" status --porcelain=v1 -z --untracked-files=all | while IFS= read -r -d '' entry; do
     status="${entry:0:2}"
     printf '%s\n' "${entry:3}"
     case "$status" in R* | C*) IFS= read -r -d '' entry && printf '%s\n' "$entry" ;; esac
@@ -63,7 +80,7 @@ changed_paths() {
 }
 
 guard() {
-  local path added hits
+  local path diff plus="" minus="" hits
   local -a ok=() bad=()
   while IFS= read -r path; do
     if [[ "$path" =~ $CONFIG_PATHS_RE ]] || [[ "$path" =~ $BUILD_OUTPUT_RE ]]; then continue
@@ -75,23 +92,37 @@ guard() {
     return 1
   fi
   [ "${#ok[@]}" -gt 0 ] || return 0
-  added="$({
-    git diff -U0 -- "${ok[@]}" | grep '^+' | grep -v '^+++' || true
-    for path in "${ok[@]}"; do
-      if [ -f "$path" ] && ! git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then cat -- "$path"; fi
-    done
-  })"
-  if hits="$(grep -E "$SKIP_RE" <<<"$added")"; then
+  for path in "${ok[@]}"; do
+    if "${GIT[@]}" ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
+      diff="$("${GIT[@]}" diff -U0 --no-textconv --no-ext-diff HEAD -- "$path")"
+      plus+="$(grep '^+' <<<"$diff" | grep -v '^+++' || true)"$'\n'
+      minus+="$(grep '^-' <<<"$diff" | grep -v '^---' || true)"$'\n'
+    elif [ -f "$path" ]; then
+      plus+="$(cat -- "$path")"$'\n'
+    fi
+  done
+  if hits="$(grep -E "$SKIP_RE" <<<"$plus")"; then
     echo "the fix added a skipped or focused test: $(head -n 3 <<<"$hits" | tr '\n' ' ')" >&2
+    return 1
+  fi
+  # Moving a test between files is fine; ending with fewer tests or assertions is not.
+  if [ "$(count "$DECL_RE" "$minus")" -gt "$(count "$DECL_RE" "$plus")" ] ||
+    [ "$(count "$ASSERT_RE" "$minus")" -gt "$(count "$ASSERT_RE" "$plus")" ]; then
+    echo "the fix removed more test declarations or assertions than it added" >&2
     return 1
   fi
   printf '%s\n' "${ok[@]}"
 }
 
 push() {
-  : "${REPO:?}" "${PR:?}" "${HEAD_REF:?}" "${HEAD_SHA:?}" "${ATTEMPT:?}" "${MAX_FIX_ATTEMPTS:?}"
-  local url="${PUSH_URL:-https://x-access-token:${MERGE_TOKEN:?}@github.com/${REPO}.git}"
-  local fixed="" disputes="" unresolved="" summary="" paths="" why="" crashed=no remote body sha
+  : "${REPO:?}" "${PR:?}" "${HEAD_REF:?}" "${HEAD_SHA:?}" "${ATTEMPT:?}" "${MAX_FIX_ATTEMPTS:?}" "${REPORT_FILE:?}" "${RUN_URL:?}"
+  if [ -z "${PUSH_URL:-}" ] && [ -z "${MERGE_TOKEN:-}" ]; then
+    out pushed=false
+    out_multi unresolved "- The auto-fix couldn't push: the MERGE_TOKEN secret isn't set."
+    return 0
+  fi
+  local url="${PUSH_URL:-https://x-access-token:${MERGE_TOKEN}@github.com/${REPO}.git}"
+  local fixed="" disputes="" unresolved="" summary="" paths="" why="" crashed=no remote body sha id err
   if [ -n "${FIX_OUTPUT:-}" ] && jq -e 'type == "object"' >/dev/null 2>&1 <<<"$FIX_OUTPUT"; then
     fixed="$(jq -r '[.fixed[]?] | join(", ")' <<<"$FIX_OUTPUT")"
     disputes="$(jq -r '.disputes[]? | "- **\(.id)**: \(.evidence)"' <<<"$FIX_OUTPUT")"
@@ -100,19 +131,25 @@ push() {
   else
     crashed=yes
   fi
-  if [ "$crashed" = no ] && ! paths="$(guard 2>"${TMPDIR:-/tmp}/spec-test-review-guard.$$")"; then
-    why="$(cat "${TMPDIR:-/tmp}/spec-test-review-guard.$$")"
-    unresolved="${unresolved:+$unresolved$'\n'}- The auto-fix was not pushed: ${why}. Only test code may change, and no test may be skipped or focused."
-    paths="" fixed="" disputes=""
+  err="$(mktemp)"
+  if [ "$crashed" = no ] && [ -s "${PATCH_FILE:-}" ] && ! "${GIT[@]}" apply --whitespace=nowarn "$PATCH_FILE" 2>"$err"; then
+    why="its patch didn't apply ($(head -c 300 "$err" | tr '\n' ' '))"
+  elif [ "$crashed" = no ] && ! paths="$(guard 2>"$err")"; then
+    why="$(cat "$err")"
   fi
-  rm -f "${TMPDIR:-/tmp}/spec-test-review-guard.$$"
+  rm -f "$err"
+  if [ -n "$why" ]; then
+    unresolved="${unresolved:+$unresolved$'\n'}- The auto-fix was not pushed: ${why}. Only test code may change, no test may be skipped or focused, and no test or assertion may be removed."
+    paths="" disputes=""
+  fi
+  [ -n "$paths" ] || fixed=""
   out_multi unresolved "$unresolved"
   if [ "$crashed" = no ] && [ -z "$paths" ] && [ -z "$disputes" ]; then
     echo "spec-test-review: nothing to push; this is the last pass"
     out pushed=false
     return 0
   fi
-  remote="$(git ls-remote "$url" "refs/heads/$HEAD_REF" | cut -f1)"
+  remote="$("${GIT[@]}" ls-remote "$url" "refs/heads/$HEAD_REF" | cut -f1)"
   if [ "$remote" != "$HEAD_SHA" ]; then
     echo "spec-test-review: $HEAD_REF moved on (now ${remote:-gone}); its own run reviews it"
     out pushed=false superseded=true
@@ -123,7 +160,7 @@ push() {
     local -a staged=()
     local p
     while IFS= read -r p; do staged+=("$p"); done <<<"$paths"
-    git add -A -- "${staged[@]}"
+    "${GIT[@]}" add -A -- "${staged[@]}"
   fi
   {
     if [ "$crashed" = yes ]; then
@@ -134,11 +171,13 @@ push() {
       [ -z "$fixed" ] || printf '\nFixed: %s\n' "$fixed"
     fi
     printf '\nSpec-Test-Review-Fix: %s\n' "$ATTEMPT"
-  } | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+  } | "${GIT[@]}" -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
     commit -q --allow-empty -F -
-  sha="$(git rev-parse HEAD)"
+  sha="$("${GIT[@]}" rev-parse HEAD)"
 
-  # Post before pushing: the push starts the next review, which reads this comment for disputes.
+  # The report first, then this attempt's comment, then the push: the push starts the next review, and
+  # that review reads the replies after the latest report for disputes.
+  VERDICT=findings NOTE="Auto-fix attempt $ATTEMPT of $MAX_FIX_ATTEMPTS is pushing ${sha:0:7}. The review runs again on it." post >/dev/null
   body="$(mktemp)"
   {
     printf '**Spec test auto-fix**, attempt %s of %s: commit %s\n\n' "$ATTEMPT" "$MAX_FIX_ATTEMPTS" "${sha:0:7}"
@@ -151,14 +190,17 @@ push() {
       [ -z "$unresolved" ] || printf "**Couldn't fix:**\n\n%s\n" "$unresolved"
     fi
   } >"$body"
-  GH_TOKEN="${MERGE_TOKEN:-${GH_TOKEN:-}}" gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" --jq .html_url
-  rm -f "$body"
+  id="$(gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" --jq .id)"
 
-  if ! git push -q "$url" "HEAD:refs/heads/$HEAD_REF"; then
+  if ! "${GIT[@]}" push -q "$url" "HEAD:refs/heads/$HEAD_REF"; then
+    printf '\n_The push was refused because %s moved on, so this attempt did not land._\n' "$HEAD_REF" >>"$body"
+    gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" >/dev/null
+    rm -f "$body"
     echo "spec-test-review: push refused; $HEAD_REF moved on and its own run reviews it"
     out pushed=false superseded=true
     return 0
   fi
+  rm -f "$body"
   out pushed=true
 }
 
@@ -210,26 +252,25 @@ deferral_issues() {
 }
 
 # Files what is left in the PR's follow-up issue (creating or updating it) and prints the issue's URL.
+# Fails, rather than printing nothing, when the issue couldn't be written. Args: title intro.
 defer() {
-  local existing body title
-  existing="$(deferral_issues | head -n 1)"
+  local title="$1" intro="$2" existing body url=""
+  existing="$(deferral_issues | head -n 1)" || return 1
   body="$(mktemp)"
   {
-    printf '%s\n' "$(deferral_marker)"
-    printf 'The spec test review of #%s still had blocking findings after its last pass, so the check passed ' "$PR"
-    printf 'and they moved here. Each one is an acceptance scenario #%s touches without a faithful test.\n\n' "$PR"
-    printf 'Commit %s · [run](%s)\n\n' "${HEAD_SHA:0:7}" "$RUN_URL"
-    [ -z "${UNRESOLVED:-}" ] || printf "### Why the auto-fix stopped\n\n%s\n\n" "$UNRESOLVED"
+    printf '%s\n%s\n\nCommit %s · [run](%s)\n\n' "$(deferral_marker)" "$intro" "${HEAD_SHA:0:7}" "$RUN_URL"
+    [ -z "${UNRESOLVED:-}" ] || printf "### Why the auto-fix stopped\n\n%s\n\n" "$(head -c 8000 <<<"$UNRESOLVED")"
     printf '### Last review\n\n'
-    head -c "$MAX_BODY" "$REPORT_FILE"
+    head -c 50000 "$REPORT_FILE"
   } >"$body"
   if [ -n "$existing" ]; then
-    gh api -X PATCH "repos/$REPO/issues/$existing" -F "body=@$body" --jq .html_url
+    url="$(gh api -X PATCH "repos/$REPO/issues/$existing" -F "body=@$body" --jq .html_url)" || true
   else
-    title="Spec test gaps deferred from #$PR${PR_TITLE:+: $PR_TITLE}"
-    gh api -X POST "repos/$REPO/issues" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url
+    url="$(gh api -X POST "repos/$REPO/issues" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
   fi
   rm -f "$body"
+  [ -n "$url" ] || return 1
+  printf '%s\n' "$url"
 }
 
 undefer() {
@@ -244,7 +285,7 @@ undefer() {
 
 decide() {
   : "${REPO:?}" "${PR:?}" "${HEAD_SHA:?}" "${RUN_URL:?}" "${REVIEW_RESULT:?}" "${REPORT_FILE:?}"
-  local url
+  local url suffix="${PR_TITLE:+: $PR_TITLE}"
   case "$REVIEW_RESULT" in
     skipped)
       if [ "${DRAFT:-}" = true ] || [ "${DEPENDABOT:-}" = true ]; then
@@ -254,11 +295,16 @@ decide() {
       return 1 ;;
     success) ;;
     *)
-      # The review crashed twice. That's a last pass too: track it and pass.
-      printf "The review couldn't run on this commit, twice ([run](%s)). Push or re-run the workflow to review it.\n" \
+      # The review crashed twice: an outage, or a missing or expired Claude token. Per constitution
+      # section 14 that mustn't block a merge, but it must not pass quietly either: it gets its own issue.
+      printf "The review couldn't run on this commit, twice ([run](%s)). Check the Claude secret and the run log, then push or re-run the workflow.\n" \
         "$RUN_URL" >"$REPORT_FILE"
-      url="$(defer)"
-      VERDICT=deferred NOTE="The review couldn't run, so [the follow-up issue]($url) tracks it and the check passes." post
+      if ! url="$(defer "Spec test review couldn't run on #$PR$suffix" \
+        "The spec test review of #$PR couldn't run, so the check passed without it. Until it runs, #$PR's tests are unreviewed.")"; then
+        echo "::error::The review couldn't run, and its follow-up issue couldn't be filed either. Re-run the workflow."
+        return 1
+      fi
+      VERDICT=deferred NOTE="The review couldn't run. [This issue]($url) tracks it, and the check passes." post
       return 0 ;;
   esac
   case "${VERDICT:-}" in
@@ -271,20 +317,28 @@ decide() {
     echo "spec-test-review: the branch moved on; the next run reviews the new head"; return 1
   fi
   if [ "${PUSHED:-}" = true ]; then
-    NOTE="Auto-fix attempt ${ATTEMPT:-?} of ${MAX_FIX_ATTEMPTS:-3} pushed a commit. The review runs again on it." post
-    echo "::error::Blocking findings on this commit; the auto-fix pushed a commit and the review runs again on it."
+    # The push job already posted the report; the next run owns the comment now.
+    echo "::error::Blocking findings on this commit. The auto-fix pushed a commit, and the review runs again on it."
     return 1
   fi
-  url="$(defer)"
+  if [ "${FIX_RESULT:-}" = failure ] || [ "${PUSH_RESULT:-}" = failure ]; then
+    UNRESOLVED="${UNRESOLVED:+$UNRESOLVED$'\n'}- The auto-fix job failed ([run]($RUN_URL)), so these findings weren't fixed."
+  fi
+  if ! url="$(defer "Spec test gaps deferred from #$PR$suffix" \
+    "The spec test review of #$PR still had blocking findings after its last pass, so the check passed and they moved here. Each one is an acceptance scenario #$PR touches without a faithful test.")"; then
+    echo "::error::This was the last pass, but its follow-up issue couldn't be filed. Re-run the workflow."
+    return 1
+  fi
   VERDICT=deferred NOTE="This was the last pass, so the check passes. [The follow-up issue]($url) tracks the findings below." post
   return 0
 }
 
 case "${1:-}" in
   scope) scope ;;
+  patch) make_patch "${2:-}" ;;
   guard) guard ;;
   push) push ;;
   post) post ;;
   decide) decide ;;
-  *) echo "usage: $0 scope|guard|push|post|decide" >&2; exit 2 ;;
+  *) echo "usage: $0 scope|patch OUT|guard|push|post|decide" >&2; exit 2 ;;
 esac

@@ -3,9 +3,11 @@
 Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 (issue #295). Decision D1 is still open
 there. Until nbon12 answers it, sessions follow the recommended answer, which is what this file says.
 
-A session **squash-merges its own PR**, or turns on auto-merge with `mcp__github__enable_pr_auto_merge`,
-when every rule below holds on the PR's current head commit. "Its own PR" means a PR this session, or the
-session or routine that handed it the work, opened. Never merge someone else's PR under this policy.
+A session's own PR is merged by `.github/workflows/auto-merge.yml` once the session marks it ready (see
+[Auto-merge](#auto-merge)), unless it touches a guarded path: then the session **squash-merges it**
+itself, when every rule below holds on the PR's current head commit. Either way, every rule below must
+hold first. "Its own PR" means a PR this session, or the session or routine that handed it the work,
+opened. Never merge someone else's PR under this policy.
 
 ## The rules
 
@@ -21,16 +23,28 @@ session or routine that handed it the work, opened. Never merge someone else's P
 5. **Guarded paths get an independent review.** If the PR touches a guarded path (below), it has passed
    the independent automated review described below.
 
+## Auto-merge
+
+`.github/workflows/auto-merge.yml` squash-merges a PR that nbon12 opened (every session's PR is) once
+every check on it has passed, not only the required ones, and every conversation is resolved. It checks
+rule 1, rule 5, and the parts of rules 2 and 3 that GitHub can see: no review requesting changes, not a
+draft. It can't check the rest, so:
+
+- **Open your PR as a draft** (`gh pr create --draft`), and mark it ready (`gh pr ready`) only once
+  rules 1–4 hold. Marking it ready is the decision to merge.
+- **A failed check keeps the PR open,** `pr-env` included. If `pr-env` failed for a provisioning reason
+  (rule 1's exception), re-run it. If it fails the same way again, say so in the PR and merge it
+  yourself.
+- **To stop a merge,** add the `hold` label; removing it lets auto-merge carry on.
+- **A PR touching a guarded path** isn't auto-merged. Follow the independent review below, then merge it
+  yourself.
+
 ## Guarded paths
 
-These are the code that enforces the guardrails, or that moves money or identity:
-
-```
-.github/workflows/**          scripts/pr-env-*           .routines/**
-.specify/memory/constitution.md                          CLAUDE.md
-infra/**                      HOAManagementCompany/Features/Auth/**
-HOAManagementCompany/Features/Payments/**                **/Migrations/**
-```
+These are the code that enforces the guardrails, or that moves money or identity: all of `.github/`,
+`scripts/pr-env-*`, `.routines/`, the constitution, any `CLAUDE.md`, `infra/`, Auth, Payments and
+migrations. The exact list is `GUARDED_PATHS` in `.github/workflows/auto-merge.yml`, which keeps these
+PRs out of auto-merge. Change the list there, and only there.
 
 ## Independent automated review (guarded paths)
 
