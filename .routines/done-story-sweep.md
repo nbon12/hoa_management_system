@@ -130,21 +130,21 @@ If nothing needed doing, say so in one line.
 
 ## Step 6. Log and notify
 
-**Finding the newest report.** Steps 6.2 and the watchdog both need the newest report on a log issue.
+**Finding the newest report.** Step 6.1 and the watchdog both need the newest report on a log issue.
 Call `issue_read` with method `get_comments` and `perPage: 100`, starting at page 1. Keep fetching the
 next page until a page returns fewer than 100 comments, because comments come oldest first. Among all
 of them, take the last comment that was posted by nbon12 and starts with `Done story sweep report`.
 Ignore everything else, such as bot replies.
 
 1. **Log.** Find the open issue in this repo labeled `sweep-log`, titled "Done story sweep log". If
-   there is none, create it with that title and label. Use the body "Daily reports from the Done
+   there is none, create it with that title and label. **Before posting,** find its newest report as
+   below and keep it as the *previous report* for step 2. Use the body "Daily reports from the Done
    story sweep dispatcher (`.routines/done-story-sweep.md`). The watchdog reads the newest report comment
    to check that the dispatcher ran. Leave this issue open." Post the report as one comment that
    starts with the line `Done story sweep report <YYYY-MM-DD>`, using today's date in
    America/New_York. Post it even when nothing needed doing.
 2. **Notify only when something needs nbon12.** If "Needs you" has an entry that wasn't in the
-   previous report (the newest report before today's, found as in "Finding the newest report"
-   above), or a step of this routine failed, call `PushNotification` (load
+   previous report you kept in step 1 (there is none on the first run), or a step of this routine failed, call `PushNotification` (load
    it with ToolSearch). Send one line under 200 characters, such as
    "Done sweep hoa: #236 needs you (approve infra-apply); 2 handed off". Otherwise send nothing.
 
