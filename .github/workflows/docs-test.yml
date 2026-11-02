@@ -89,6 +89,9 @@ jobs:
 
       - name: Documentation tests (whole corpus)
         id: suite
+        # `shell: bash` for pipefail — the default `bash -e` would let `tee` swallow
+        # a failing suite.
+        shell: bash
         run: |
           scripts/docs-test.sh --all -- --junit-xml=docs-test-report.xml | tee docs-test.log
 
