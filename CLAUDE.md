@@ -82,6 +82,15 @@ C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard con
 
 <!-- MANUAL ADDITIONS START -->
 
+## Never at-mention Claude in what you post to GitHub
+
+Everything a session posts to GitHub posts as nbon12 (OWNER), and `.github/workflows/claude.yml` starts a
+paid run whenever a comment, review, issue title or issue body contains the at-sign followed by `claude`, in any
+letter case. Backticks, code blocks and quotes don't hide it, because the workflow matches the raw text.
+So never write it in a comment, review, issue, or PR title or body. Write "the Claude workflow" instead,
+and replace the mention the same way when you quote text that contains it. The only exception: nbon12
+asked you, in this conversation, to start that workflow on a specific issue or PR.
+
 ## Patch notes: read them, and add to them when you merge
 
 `docs/patch-notes.md` is the running log of what changed on `main`, newest first. Each entry covers behavior and contract changes, assumptions that no longer hold, shared pieces to reuse, and open follow-ups. Other agents rely on it to catch up.
