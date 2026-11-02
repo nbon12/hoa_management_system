@@ -140,13 +140,13 @@ Comments come oldest first, so read from the end:
    everything else, such as bot replies. If that page has none, step back one page at a time.
 3. If a fetch fails, retry it once. If it fails again, the lookup failed: don't use a partial list.
    - In step 6.1, still post the report, and in step 2 treat every "Needs you" entry as new.
-   - In the watchdog, say the check couldn't run for that repo, and notify.
+   - In the watchdog, mark that repo "couldn't check". Watchdog step 4 handles it.
 
 1. **Log.** Find the open issue in this repo labeled `sweep-log`, titled "Done story sweep log". If
-   there is none, create it with that title and label. **Before posting,** find its newest report as
-   below and keep it as the *previous report* for step 2. Use the body "Daily reports from the Done
+   there is none, create it with that title and label, and the body "Daily reports from the Done
    story sweep dispatcher (`.routines/done-story-sweep.md`). The watchdog reads the newest report comment
-   to check that the dispatcher ran. Leave this issue open." Post the report as one comment that
+   to check that the dispatcher ran. Leave this issue open." **Before posting,** find its newest report
+   as above and keep it as the *previous report* for step 2. Then post the report as one comment that
    starts with the line `Done story sweep report <YYYY-MM-DD>`, using today's date in
    America/New_York. Post it even when nothing needed doing.
 2. **Notify only when something needs nbon12.** If "Needs you" has an entry that wasn't in the
@@ -164,7 +164,9 @@ GitHub MCP tools.
 2. The dispatcher ran today if that report was posted in the last 20 hours and starts with
    `Done story sweep report <today's date in America/New_York>`.
 3. If it ran in both repos, end with one line: "Dispatcher ran today in both repos." Don't notify.
-4. Otherwise call `PushNotification` with one line, for example: "Done sweep dispatcher didn't run
+4. Otherwise send **one** `PushNotification` covering both repos. For a repo marked "couldn't check"
+   (a failed lookup), say "couldn't check <repo>" rather than "didn't run", and don't list the causes
+   below for it. For a missing report, write a line such as: "Done sweep dispatcher didn't run
    today (mmo-engine). Check the 'Done story sweep dispatch: mmo-engine' scheduled task and its session." Then
    end with a short note. Say which repos are missing a report, and give the newest report date you
    found in each. Also give the likely causes:
