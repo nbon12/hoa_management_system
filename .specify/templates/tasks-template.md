@@ -14,6 +14,11 @@ where the testing constitution applies.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
+**Autonomous delivery (constitution section 14)**: Every task is executed by the agent. Do not
+write a task, checkpoint, or checklist item that assigns work to a person or waits on manual
+verification, review, approval, or sign-off. A checkpoint is passed when its automated checks are
+green.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
@@ -210,7 +215,8 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Reconcile cross-spec contradictions: if this feature's tests or acceptance criteria
       directly contradict a former spec, update the superseded spec(s) so the full spec corpus
       is internally consistent and record which spec prevails and why
-- [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Run quickstart.md validation as an automated check (a script or test), not a manual walkthrough
+- [ ] TXXX Audit for human steps (constitution section 14): no task, checklist item, or acceptance step in this feature is assigned to a person or needs manual verification, review, or approval; any unavoidable human action is described as system behavior and reported once to the maintainer, off the critical path
 
 ---
 
@@ -279,15 +285,15 @@ Task: "Create [Entity2] model in backend/src/[path]/[Entity2].cs"
 1. Complete Phase 1: Setup
 2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
 3. Complete Phase 3: User Story 1
-4. **STOP and VALIDATE**: Test User Story 1 independently
-5. Deploy/demo if ready
+4. **VALIDATE**: Run User Story 1's automated tests independently; continue when they are green
+5. Deploy when the checks are green
 
 ### Incremental Delivery
 
 1. Complete Setup + Foundational → Foundation ready
-2. Add User Story 1 → Test independently → Deploy/Demo (MVP!)
-3. Add User Story 2 → Test independently → Deploy/Demo
-4. Add User Story 3 → Test independently → Deploy/Demo
+2. Add User Story 1 → Test independently → Deploy (MVP!)
+3. Add User Story 2 → Test independently → Deploy
+4. Add User Story 3 → Test independently → Deploy
 5. Each story adds value without breaking previous stories
 
 ### Parallel Team Strategy
@@ -310,5 +316,5 @@ With multiple developers:
 - Each user story should be independently completable and testable
 - Verify tests fail before implementing
 - Commit after each task or logical group
-- Stop at any checkpoint to validate story independently
+- At any checkpoint, validate the story independently with its automated tests; continue when they are green
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
