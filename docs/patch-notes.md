@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-02 · Done story sweep: no `@claude` in sweep comments; watchdog reads the newest report · [#PR_HOA](https://github.com/nbon12/hoa_management_system/pull/PR_HOA)
+## 2026-11-02 · Done story sweep: no `@claude` in sweep comments; watchdog reads the newest report · [#312](https://github.com/nbon12/hoa_management_system/pull/312)
 
 Tooling only.
 
