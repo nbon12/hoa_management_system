@@ -30,7 +30,9 @@ Read this first. Where it differs from the plan below, this section wins.
   `infra/environments/prod` exists.
 - **D3:** the default limits stay.
 
-O1–O3 are done. What's left is Z1 (S7), which is scheduled to run on its own.
+O1–O3 are done (O1 and O2 confirmed live on 2026-11-02). Z2–Z6 passed
+([results on #295](https://github.com/nbon12/hoa_management_system/issues/295)). Only Z1 of S7 is left,
+and it is scheduled to run on its own after the P3 window clears on 2026-11-03.
 
 **Done in the S1/S2/S4–S6 PR:**
 - **S1.** `pr-env-repair.yml` runs `scripts/pr-env-policy-gate.sh` in place of "Require the ops approval
@@ -293,7 +295,7 @@ built.
 **Decided (D2, 2026-11-02):** Prod promotes **automatically**, and spec 010 FR-026 is amended. Repo
 variable `PROD_OPS_AUTOMATED` = `on` (exact) turns the automation on. Unset or any other value means
 the promotion is refused and the reason is posted on the ops log, with no approval wait. The gates are:
-- Staging applied with the same commit, and green for at least 24 h;
+- the commit reached Staging at least 24 h ago, with no failed Staging apply, smoke or E2E run since;
 - the Staging smoke and E2E gates pass (the same Playwright and Cypress gates as Dev);
 - `infra-plan` for Prod has no `destroy` or `replace` on stateful resources (Neon project or
   branch, R2 buckets, secrets). Any of those stops the run and notifies the owner instead;
@@ -352,10 +354,10 @@ in "Ops scripts (shellcheck + tests)": P7's name filter must reject a shared nam
 
 ### Owner, one time
 
-- [ ] **O1.** After S1 merges: Settings → Environments → `ops` → remove **Required reviewers**. Keep
+- [x] **O1.** After S1 merges: Settings → Environments → `ops` → remove **Required reviewers**. Keep
   "Deployment branches: `main` only". (A session can't change Environment settings: the API path is
   blocked through the cloud proxy, and it needs admin.)
-- [ ] **O2.** Settings → Secrets and variables → Actions → Variables → add `OPS_AUTOMATION` = `on`.
+- [x] **O2.** Settings → Secrets and variables → Actions → Variables → add `OPS_AUTOMATION` = `on`.
   Setting it to `off` later is the kill switch.
 - [x] **O3.** Answer D1 and D2 below in a comment on the tracking issue. Until D1 is answered,
   sessions use the recommended answer. (Answered 2026-11-02; see §8.)

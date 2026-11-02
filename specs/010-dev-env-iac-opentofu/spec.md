@@ -128,8 +128,10 @@ the gated apply runs and converges the environment.
    workflow runs, **Then** it applies the change automatically to that environment; **Given** the
    change targets **Prod**, it is promoted automatically only while repo variable
    `PROD_OPS_AUTOMATED` is exactly `on` and the FR-026 gates pass. Otherwise the promotion is refused,
-   changes nothing, and reports which gate refused. It never waits for a person. (Gate tests:
-   `scripts/tests/prod-promotion-gate.test.sh`.)
+   changes nothing, and reports which gate refused. It never waits for a person. (The kill switch,
+   soak and plan gates are tested in `scripts/tests/prod-promotion-gate.test.sh`. The workflow
+   wiring, which covers "changes nothing", the ops-log report, the smoke and E2E check and the
+   rollback, gets its tests when the Prod promotion workflow is built; it is listed as open.)
 3. **Given** either workflow runs, **When** it authenticates to the cloud accounts, **Then** it does
    so without any long-lived static credentials committed to the repo.
 
@@ -306,7 +308,8 @@ new isolated state target — not duplicating or editing the resource definition
   checked by `scripts/prod-promotion-gate.sh` or a CI gate:
   - repo variable `PROD_OPS_AUTOMATED` is exactly `on`. This is the Prod kill switch: unset or any
     other value refuses the promotion and reports why on the ops log;
-  - Staging was applied with the same commit and has been green for at least 24 h;
+  - the candidate commit reached Staging at least 24 h ago, and no Staging apply, smoke or E2E run
+    has failed since (Staging may have moved on to newer commits);
   - the Staging smoke and E2E gates pass;
   - the Prod plan has no `destroy` or `replace` on a stateful resource (Neon project or branch, R2
     buckets, secrets). Any of those stops the run and reports it.

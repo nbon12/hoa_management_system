@@ -70,11 +70,12 @@ jobs:
   #                                                   sensitive, unlike an Actions `==`). On refusal,
   #                                                   post the reason on the ops-log issue: never a
   #                                                   silent job-level skip.
-  #     2. pick the newest main commit whose Staging apply succeeded ≥ 24 h ago, and check it with
-  #        scripts/prod-promotion-gate.sh soak (STAGING_SHA, STAGING_APPLIED_AT)
+  #     2. pick the newest main commit that reached Staging ≥ 24 h ago, count the Staging apply, smoke
+  #        and E2E runs that failed since then, and check both with scripts/prod-promotion-gate.sh soak
+  #        (SHA, STAGING_APPLIED_AT, STAGING_FAILURES_SINCE: must be 0)
   #     3. the Staging smoke and E2E gates are green for that commit
-  #     4. tofu plan -out, then scripts/prod-promotion-gate.sh plan on its "<actions> <address>" lines:
-  #        no delete or replace of a stateful resource
+  #     4. tofu plan -out, then `tofu show -json` to a file and scripts/prod-promotion-gate.sh plan
+  #        (PLAN_JSON): no delete or replace of a stateful resource; an empty or broken file refuses
   #     5. tofu apply the saved plan
   #     6. after the apply: watch health and error rate for 15 min; on failure, move Cloud Run traffic
   #        back to the previous revision

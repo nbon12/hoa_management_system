@@ -16,7 +16,7 @@ Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-
 - **D2: Prod is no longer gated by a required reviewer.** Spec 010 FR-026 is amended, and the clarification and acceptance scenario 2 change with it.
   - A scheduled promotion workflow promotes to Prod while repo variable **`PROD_OPS_AUTOMATED`** is exactly `on`. Unset or any other value, including `ON`, refuses the promotion and reports why.
   - These gates must also pass:
-    - Staging has run the same commit for 24 h;
+    - the commit reached Staging at least 24 h ago, with no failed Staging run since;
     - the Staging smoke and E2E gates pass;
     - the Prod plan has no delete or replace of a stateful resource.
   - After the apply, Cloud Run rolls back on its own if health fails within 15 min.
