@@ -88,6 +88,7 @@ jobs:
           GUARDED_PATHS: |
             ^\.github/
             ^scripts/pr-env-
+            ^scripts/spec-test-review
             ^\.routines/
             ^\.specify/memory/constitution\.md$
             (^|/)CLAUDE\.md$
@@ -165,12 +166,12 @@ jobs:
             fi
 
             # Every check on the head commit, by name (the latest run of each), plus commit
-            # statuses. This job's own check doesn't count, and neither do the spec test review's inner
-            # jobs: "Spec test verdict" always runs after them and speaks for them, passing on the last
-            # pass even when one of them failed (spec-test-review.yml). One API call per assignment, so
-            # set -e stops the run when any of them fails.
+            # statuses. This job's own check doesn't count. The spec test review's inner jobs hold the
+            # merge while they run, but how they ended doesn't count: "Spec test verdict" always runs after
+            # them and speaks for them, passing on the last pass even when one of them failed
+            # (spec-test-review.yml). One API call per assignment, so set -e stops the run when any fails.
             check_runs="$(gh api --paginate "repos/${REPO}/commits/${head}/check-runs?per_page=100" \
-              --jq '.check_runs[] | select(.name != "auto-merge" and .name != "Review tests against specs" and .name != "Fix the tests" and .name != "Push the fix") | [.name, (if .status == "completed" then (.conclusion // "") else "pending" end)] | @tsv')"
+              --jq '.check_runs[] | select(.name != "auto-merge") | [.name, (if .status != "completed" then "pending" elif (.name == "Review tests against specs" or .name == "Fix the tests" or .name == "Push the fix") then "skipped" else (.conclusion // "") end)] | @tsv')"
             statuses="$(gh api "repos/${REPO}/commits/${head}/status" \
               --jq '.statuses[] | [.context, (if .state == "error" then "failure" else .state end)] | @tsv')"
             checks="$(printf '%s\n%s\n' "$check_runs" "$statuses")"

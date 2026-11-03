@@ -21,14 +21,15 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
   - Blocking findings are scenarios whose behavior, code or test the diff adds or changes. Gaps elsewhere in the touched stories are listed as earlier debt and don't count.
 - **Findings are fixed automatically, and the loop always ends green.**
   - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, in a read-only job. A separate job applies its patch to a clean checkout and pushes to the PR branch with `MERGE_TOKEN`, which starts the next review. **Pull before you push again.**
-  - A guard refuses an attempt that changes anything but test code, skips or focuses a test (including `Skip.If`), or ends with fewer test declarations or assertions than it started with.
+  - A guard refuses an attempt that changes anything but test code, skips or focuses a test (including `Skip.If`), or ends with fewer test declarations or assertions than it started with. A refused attempt uses up that attempt, and the next pass retries with the refusal reason in front of it.
   - Commits carry a `Spec-Test-Review-Fix: <n>` trailer. After three attempts, or when there's nothing the fixer can change (for example, the faithful test fails because the code is wrong), the last pass files the remaining findings in a follow-up issue, "Spec test gaps deferred from #N", and the check passes.
   - A later green pass on the same PR closes that issue.
   - A review that crashes is retried once. If it still can't run (an outage, or a missing or expired Claude token), it gets its own issue, "Spec test review couldn't run on #N", and the check passes. Constitution section 14 says a credentials problem must not block a merge, but the maintainer is told. Watch for these issues: they mean PRs are merging unreviewed.
   - If a follow-up issue can't be filed, the check fails instead of passing silently.
 - **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
 - **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
-- **Auto-merge (#306) knows about it.** `auto-merge.yml` re-decides when "Spec test review" finishes, and from that workflow it counts only `Spec test verdict`. The inner jobs ("Review tests against specs", "Fix the tests", "Push the fix") can end red on a pass that the verdict still settles green.
+- **Auto-merge (#306) knows about it.** `auto-merge.yml` re-decides when "Spec test review" finishes. The inner jobs ("Review tests against specs", "Fix the tests", "Push the fix") hold the merge while they run, but how they ended doesn't count: `Spec test verdict` speaks for them.
+- **A PR can't loosen its own review.** The jobs run `main`'s copy of `scripts/spec-test-review.sh`, and claude-code-action runs `main`'s `.claude/` (the procedure). `scripts/spec-test-review*` is now a guarded path (`GUARDED_PATHS` in `auto-merge.yml`).
 - **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
 
 **Shared pieces you can reuse**

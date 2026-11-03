@@ -39,8 +39,8 @@ TEST_PATHS_RE='^(HOAManagementCompany\.Tests/|neko-hoa/e2e/|neko-hoa/cypress/|ne
 BUILD_OUTPUT_RE='(^|/)(TestResults|bin|obj)/' # test-run output that isn't ignored everywhere
 # Skipped or focused tests: xUnit (Skip =, Xunit.SkippableFact's Skip.If/IfNot/SkipException), Jasmine,
 # Playwright and Cypress.
-SKIP_RE='Skip[[:space:]]*=|Skip\.If(Not)?\(|SkipException|(^|[^[:alnum:]_.])(xit|xdescribe|fit|fdescribe|pending)\(|\.(skip|only|fixme)\('
-DECL_RE='\[(Skippable)?(Fact|Theory)[]( ]|(^|[^[:alnum:]_.])(it|test)\('
+SKIP_RE='(Fact|Theory)\([^]]*Skip[[:space:]]*=|Skip\.If(Not)?\(|SkipException|(^|[^[:alnum:]_.])(xit|xdescribe|fit|fdescribe|pending)\(|\.(skip|only|fixme)\('
+DECL_RE='(^|[[,[:space:]])(Skippable)?(Fact|Theory)[]( ,]|(^|[^[:alnum:]_.])(it|test)\('
 ASSERT_RE='Assert\.|expect\(|\.Should\(|\.Verify\('
 GIT=(git -c core.hooksPath=/dev/null)
 
@@ -141,13 +141,15 @@ push() {
     why="$(cat "$err")"
   fi
   rm -f "$err"
+  # A refused attempt uses up its attempt but not the loop: an empty commit (with any disputes) starts
+  # the next pass, which sees why in this attempt's comment.
   if [ -n "$why" ]; then
-    unresolved="${unresolved:+$unresolved$'\n'}- The auto-fix was not pushed: ${why}. Only test code may change, no test may be skipped or focused, and no test or assertion may be removed."
-    paths="" disputes=""
+    why="The changes were not pushed: ${why}. Only test code may change, no test may be skipped or focused, and no test or assertion may be removed."
+    paths=""
   fi
   [ -n "$paths" ] || fixed=""
   out_multi unresolved "$unresolved"
-  if [ "$crashed" = no ] && [ -z "$paths" ] && [ -z "$disputes" ]; then
+  if [ "$crashed" = no ] && [ -z "$why" ] && [ -z "$paths" ] && [ -z "$disputes" ]; then
     echo "spec-test-review: nothing to push; this is the last pass"
     out pushed=false
     return 0
@@ -169,6 +171,8 @@ push() {
     if [ "$crashed" = yes ]; then
       printf 'test(spec-test-review): retry after auto-fix attempt %s of %s for #%s\n\n' "$ATTEMPT" "$MAX_FIX_ATTEMPTS" "$PR"
       printf 'The attempt did not finish, so this empty commit starts the next pass.\n'
+    elif [ -n "$why" ]; then
+      printf 'test(spec-test-review): retry after refused auto-fix attempt %s of %s for #%s\n\n%s\n' "$ATTEMPT" "$MAX_FIX_ATTEMPTS" "$PR" "$why"
     else
       printf 'test(spec-test-review): auto-fix attempt %s of %s for #%s\n\n%s\n' "$ATTEMPT" "$MAX_FIX_ATTEMPTS" "$PR" "$summary"
       [ -z "$fixed" ] || printf '\nFixed: %s\n' "$fixed"
@@ -187,6 +191,7 @@ push() {
     if [ "$crashed" = yes ]; then
       printf "The attempt didn't finish, so this empty commit starts the next pass.\n"
     else
+      [ -z "$why" ] || printf '**Refused.** %s This empty commit starts the next pass.\n\n' "$why"
       [ -z "$summary" ] || printf '%s\n\n' "$summary"
       [ -z "$fixed" ] || printf '**Fixed:** %s\n\n' "$fixed"
       [ -z "$disputes" ] || printf '**Disputed.** The next review weighs this evidence:\n\n%s\n\n' "$disputes"
@@ -198,6 +203,7 @@ push() {
   if ! "${GIT[@]}" push -q "$url" "HEAD:refs/heads/$HEAD_REF"; then
     printf '\n_The push was refused because %s moved on, so this attempt did not land._\n' "$HEAD_REF" >>"$body"
     gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" >/dev/null
+    VERDICT=findings NOTE="Auto-fix attempt $ATTEMPT of $MAX_FIX_ATTEMPTS didn't land: $HEAD_REF moved on, and the new head gets its own review." post >/dev/null
     rm -f "$body"
     echo "spec-test-review: push refused; $HEAD_REF moved on and its own run reviews it"
     out pushed=false superseded=true
@@ -267,7 +273,7 @@ defer() {
     head -c 50000 "$REPORT_FILE"
   } >"$body"
   if [ -n "$existing" ]; then
-    url="$(gh api -X PATCH "repos/$REPO/issues/$existing" -F "body=@$body" --jq .html_url)" || true
+    url="$(gh api -X PATCH "repos/$REPO/issues/$existing" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
   else
     url="$(gh api -X POST "repos/$REPO/issues" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
   fi
@@ -288,14 +294,25 @@ undefer() {
 
 decide() {
   : "${REPO:?}" "${PR:?}" "${HEAD_SHA:?}" "${RUN_URL:?}" "${REVIEW_RESULT:?}" "${REPORT_FILE:?}"
-  local url suffix="${PR_TITLE:+: $PR_TITLE}"
+  local url current suffix="${PR_TITLE:+: $PR_TITLE}"
   case "$REVIEW_RESULT" in
     skipped)
       if [ "${DRAFT:-}" = true ] || [ "${DEPENDABOT:-}" = true ]; then
         echo "spec-test-review: not reviewed (draft or Dependabot)"; return 0
+      elif [ "${FORK:-}" = true ]; then
+        echo "::error::Fork PRs get no secrets, so they can't be reviewed. A maintainer reviews and merges them."
+      else
+        echo "::error::The review was skipped for an unexpected reason. Re-run the workflow."
       fi
-      echo "::error::Fork PRs get no secrets, so they can't be reviewed. A maintainer reviews and merges them."
       return 1 ;;
+  esac
+  # A re-run of an older commit's run must not overwrite the current head's report or touch its issues.
+  current="$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)"
+  if [ "$current" != "$HEAD_SHA" ]; then
+    echo "spec-test-review: ${HEAD_SHA:0:7} is no longer the PR head (${current:0:7}); leaving its report alone"
+    case "${VERDICT:-}" in findings) return 1 ;; *) return 0 ;; esac
+  fi
+  case "$REVIEW_RESULT" in
     success) ;;
     *)
       # The review crashed twice: an outage, or a missing or expired Claude token. Per constitution

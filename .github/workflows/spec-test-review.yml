@@ -17,7 +17,8 @@ name: Spec test review
 #            pushed, it fails this commit and the next pass decides. With findings and nothing left to push
 #            (attempts used up, or nothing the fixer could change), it's the last pass: the findings move
 #            to a follow-up issue and the check passes. So the loop always ends green. A later green
-#            pass closes that issue. Logic: scripts/spec-test-review.sh, tested in scripts/tests/.
+#            pass closes that issue. Logic: scripts/spec-test-review.sh, tested in scripts/tests/. The jobs run
+#            main's copy of it, so a PR can't loosen its own review.
 #
 # Runs when a PR to main is opened ready, marked ready, reopened, or pushed to while ready. Drafts,
 # Dependabot and PRs that change only Markdown, docs/, specs/ or wireframes/ pass without a review. Fork
@@ -61,6 +62,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       PR: ${{ github.event.pull_request.number }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
       # Probes run backend tests the way test.yml does.
       ASPNETCORE_ENVIRONMENT: Test
       REVIEW_PROMPT: |
@@ -87,12 +89,31 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Grade with main's copy of the script, so a PR can't loosen its own review. Only the PR that adds the
+      # script (no copy on main yet) uses its own.
+      - name: Use main's copy of the script
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/contents/scripts/spec-test-review.sh?ref=$BASE_SHA" --jq .content \
+              >"$RUNNER_TEMP/main.b64" 2>"$RUNNER_TEMP/main.err"; then
+            base64 -d <"$RUNNER_TEMP/main.b64" >"$RUNNER_TEMP/spec-test-review.sh"
+          elif grep -q 'HTTP 404' "$RUNNER_TEMP/main.err"; then
+            cp scripts/spec-test-review.sh "$RUNNER_TEMP/spec-test-review.sh"
+          else
+            cat "$RUNNER_TEMP/main.err" >&2
+            exit 1
+          fi
+
       - name: Scope
         id: scope
         run: |
-          # Two steps, so a failed API call fails the step instead of looking like an empty, docs-only PR.
-          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' >"$RUNNER_TEMP/files.txt"
-          scope="$(bash scripts/spec-test-review.sh scope <"$RUNNER_TEMP/files.txt")"
+          # Its own command, retried, so a failed API call fails the step instead of looking like an empty,
+          # docs-only PR.
+          for try in 1 2 3; do
+            gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename' >"$RUNNER_TEMP/files.txt" && break
+            [ "$try" = 3 ] && exit 1
+            sleep 15
+          done
+          scope="$(bash "$RUNNER_TEMP/spec-test-review.sh" scope <"$RUNNER_TEMP/files.txt")"
           echo "scope=$scope" >>"$GITHUB_OUTPUT"
           if [ "$scope" = skip ]; then
             echo "Only Markdown, docs/, specs/ or wireframes/ changed. There are no tests to review." >>"$GITHUB_STEP_SUMMARY"
@@ -191,8 +212,12 @@ jobs:
       - name: Count earlier attempts
         id: attempts
         run: |
-          # Two steps, so a failed API call fails the job instead of resetting the count.
-          gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '.[].commit.message' >"$RUNNER_TEMP/messages.txt"
+          # Its own command, retried, so a failed API call fails the job instead of resetting the count.
+          for try in 1 2 3; do
+            gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '.[].commit.message' >"$RUNNER_TEMP/messages.txt" && break
+            [ "$try" = 3 ] && exit 1
+            sleep 15
+          done
           earlier="$(grep -c '^Spec-Test-Review-Fix:' "$RUNNER_TEMP/messages.txt" || true)"
           echo "attempt=$((earlier + 1))" >>"$GITHUB_OUTPUT"
           if [ "$earlier" -ge "$MAX_FIX_ATTEMPTS" ]; then
@@ -271,6 +296,9 @@ jobs:
             are left out of your patch. Don't commit or push: the workflow does that after the guard. Never
             remove a test or an assertion either: the guard refuses an attempt that ends with fewer.
 
+            Earlier attempts on this PR posted **Spec test auto-fix** comments (`gh pr view <N> --comments`).
+            Read them first, and don't repeat an attempt the guard refused.
+
             Return the IDs you fixed, your disputes with evidence, the findings left unresolved with reasons,
             and a short summary of what you changed.
 
@@ -320,6 +348,7 @@ jobs:
       HEAD_REF: ${{ github.event.pull_request.head.ref }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
       ATTEMPT: ${{ needs.fix.outputs.attempt }}
       FIX_OUTPUT: ${{ needs.fix.outputs.result }}
       FIX_RESULT: ${{ needs.fix.result }}
@@ -332,6 +361,20 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      # Grade with main's copy of the script, so a PR can't loosen its own review. Only the PR that adds the
+      # script (no copy on main yet) uses its own.
+      - name: Use main's copy of the script
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/contents/scripts/spec-test-review.sh?ref=$BASE_SHA" --jq .content \
+              >"$RUNNER_TEMP/main.b64" 2>"$RUNNER_TEMP/main.err"; then
+            base64 -d <"$RUNNER_TEMP/main.b64" >"$RUNNER_TEMP/spec-test-review.sh"
+          elif grep -q 'HTTP 404' "$RUNNER_TEMP/main.err"; then
+            cp scripts/spec-test-review.sh "$RUNNER_TEMP/spec-test-review.sh"
+          else
+            cat "$RUNNER_TEMP/main.err" >&2
+            exit 1
+          fi
 
       # Missing when the fixer crashed before saving it.
       - name: Download the patch
@@ -348,7 +391,7 @@ jobs:
         run: |
           printf '%s\n' "$REPORT" >"$RUNNER_TEMP/report.md"
           PATCH_FILE="$RUNNER_TEMP/fix/fix.patch" REPORT_FILE="$RUNNER_TEMP/report.md" \
-            bash scripts/spec-test-review.sh push
+            bash "$RUNNER_TEMP/spec-test-review.sh" push
 
   verdict:
     name: Spec test verdict
@@ -367,6 +410,7 @@ jobs:
       PR: ${{ github.event.pull_request.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       DRAFT: ${{ github.event.pull_request.draft }}
       FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
@@ -387,10 +431,24 @@ jobs:
           sparse-checkout: scripts/spec-test-review.sh
           sparse-checkout-cone-mode: false
 
+      # Grade with main's copy of the script, so a PR can't loosen its own review. Only the PR that adds the
+      # script (no copy on main yet) uses its own.
+      - name: Use main's copy of the script
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/contents/scripts/spec-test-review.sh?ref=$BASE_SHA" --jq .content \
+              >"$RUNNER_TEMP/main.b64" 2>"$RUNNER_TEMP/main.err"; then
+            base64 -d <"$RUNNER_TEMP/main.b64" >"$RUNNER_TEMP/spec-test-review.sh"
+          elif grep -q 'HTTP 404' "$RUNNER_TEMP/main.err"; then
+            cp scripts/spec-test-review.sh "$RUNNER_TEMP/spec-test-review.sh"
+          else
+            cat "$RUNNER_TEMP/main.err" >&2
+            exit 1
+          fi
+
       - name: Decide
         run: |
           printf '%s\n' "$REPORT" >"$RUNNER_TEMP/report.md"
           if [ -n "$VERDICT" ]; then
             { printf '## Spec test review: %s\n\n' "$VERDICT"; cat "$RUNNER_TEMP/report.md"; } >>"$GITHUB_STEP_SUMMARY"
           fi
-          REPORT_FILE="$RUNNER_TEMP/report.md" bash scripts/spec-test-review.sh decide
+          REPORT_FILE="$RUNNER_TEMP/report.md" bash "$RUNNER_TEMP/spec-test-review.sh" decide

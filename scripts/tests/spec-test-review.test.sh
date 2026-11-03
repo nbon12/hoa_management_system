@@ -51,6 +51,7 @@ if [ "$method" != GET ]; then
   exit 0
 fi
 case "$path" in
+  */pulls/[0-9]*) fixture=pull.json ;;
   */issues/*/comments) fixture=comments.json ;;
   */issues\?*) fixture=issues.json ;;
   *) fixture=empty.json ;;
@@ -70,6 +71,7 @@ reset() {
   echo '[]' >"$STUB_DIR/comments.json"
   echo '[]' >"$STUB_DIR/issues.json"
   echo '[]' >"$STUB_DIR/empty.json"
+  echo '{"head": {"sha": "abc1234def5678"}}' >"$STUB_DIR/pull.json"
   printf '### Blocking findings\n- **US3-AS6**: asserts 409 but not `APPLICATION_CLOSED`.\n' >"$STUB_DIR/report.md"
 }
 comments() { jq -n "$1" >"$STUB_DIR/comments.json"; }
@@ -156,6 +158,11 @@ mkrepo; rm "$REPO_DIR/neko-hoa/src/app/badge.spec.ts"
 guard_refuses "deleting a spec file is refused" 'removed more test declarations or assertions'
 mkrepo; drop "$T" 'Assert.Equal(HttpStatusCode.Conflict'; edit "$T" 'Assert.Equal(HttpStatusCode.Conflict, res.StatusCode); // moved'
 guard_ok "rewriting an assertion in place is allowed" "$T"
+mkrepo; edit "$T" 'var rowsToSkip = 3; Assert.Equal(3, rowsToSkip);'
+guard_ok "a variable named like Skip is not a skipped test" "$T"
+mkrepo; printf '%s\n' '[Fact, Trait("Category", "Arc")]' 'public void A() { Assert.True(ok); }' >>"$REPO_DIR/$T"
+(cd "$REPO_DIR" && git commit -qam traits); drop "$T" 'Trait("Category", "Arc")'
+guard_refuses "removing a [Fact, Trait(...)] test counts as removing a test" 'removed more test declarations'
 
 echo "patch"
 mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; edit CLAUDE.md 'main rules'
@@ -213,14 +220,17 @@ run_push '{"fixed":[],"disputes":[],"unresolved":[{"id":"US3-AS2","reason":"The 
   || bad "nothing fixed or disputed: no push, the reasons go on" "$(cat "$STUB_DIR/out")"
 
 reset; mkrepo; edit HOAManagementCompany/VoteService.cs '// changed'; edit "$T" '// fix'; fixer_patch; mkclean
-run_push "$FIXED"
-[ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ghout_has 'was not pushed: the fix changed files outside test code' \
-  && ok "a guard failure pushes nothing and says why" || bad "a guard failure pushes nothing and says why" "$(cat "$STUB_DIR/ghout")"
+run_push '{"fixed":["US3-AS6"],"disputes":[{"id":"US3-AS4","evidence":"VoteTests.cs:120 covers it."}],"unresolved":[],"summary":"x"}'
+[ "$(remote_head)" != "$START" ] && [ -z "$(remote_files)" ] && ghout_has pushed=true \
+  && bodies_have '**Refused.** The changes were not pushed: the fix changed files outside test code' \
+  && bodies_have '- **US3-AS4**: VoteTests.cs:120 covers it.' && remote_msg | grep -q 'refused auto-fix attempt 1' \
+  && ok "a guard refusal pushes no changes, keeps the disputes, and retries on the next pass" \
+  || bad "a guard refusal pushes no changes, keeps the disputes, and retries on the next pass" "$(cat "$STUB_DIR/out")"
 
 reset; mkrepo; mkclean; printf 'not a patch\n' >"$PATCH"
 run_push "$FIXED"
-[ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ghout_has "its patch didn't apply" \
-  && ok "a patch that doesn't apply pushes nothing" || bad "a patch that doesn't apply pushes nothing" "$(cat "$STUB_DIR/ghout")"
+[ "$(remote_head)" != "$START" ] && [ -z "$(remote_files)" ] && ghout_has pushed=true && bodies_have "its patch didn't apply" \
+  && ok "a patch that doesn't apply is refused and retried" || bad "a patch that doesn't apply is refused and retried" "$(cat "$STUB_DIR/out")"
 
 reset; mkrepo; edit "$T" '// fix'; fixer_patch; mkclean
 (cd "$REPO_DIR" && git commit -qam "author pushed" && git push -q "$REMOTE" HEAD:refs/heads/feature)
@@ -233,7 +243,7 @@ reset; mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);';
 printf '#!/bin/sh\nexit 1\n' >"$REMOTE/hooks/pre-receive" && chmod +x "$REMOTE/hooks/pre-receive"
 run_push "$FIXED"
 [ "$(remote_head)" = "$START" ] && ghout_has superseded=true && called "PATCH repos/o/r/issues/comments/555" \
-  && bodies_have 'this attempt did not land' \
+  && bodies_have 'this attempt did not land' && bodies_have "Auto-fix attempt 1 of 3 didn't land" \
   && ok "a refused push corrects the attempt comment" || bad "a refused push corrects the attempt comment" "$(calls) $(cat "$STUB_DIR/out")"
 
 reset; mkrepo; fixer_patch; mkclean
@@ -353,8 +363,9 @@ bodies_have '## Spec test review: ⚠️ Deferred' && bodies_have '[The follow-u
 reset; issues "[$DEFERRED_7]"
 run_decide; rc=$?
 [ "$rc" = 0 ] && called "PATCH repos/o/r/issues/77" && not_called '^POST repos/o/r/issues$' \
-  && ok "a later last pass updates the same follow-up issue" \
-  || bad "a later last pass updates the same follow-up issue" "rc=$rc $(calls)"
+  && bodies_have 'title=Spec test gaps deferred from #7' \
+  && ok "a later last pass updates the same follow-up issue, title included" \
+  || bad "a later last pass updates the same follow-up issue, title included" "rc=$rc $(calls)"
 
 reset
 run_decide SUPERSEDED=true; rc=$?
@@ -378,8 +389,19 @@ run_decide REVIEW_RESULT=skipped VERDICT= FORK=true; rc=$?
 
 reset
 run_decide VERDICT=; rc=$?
-[ "$rc" = 0 ] && [ ! -s "$STUB_DIR/calls" ] && ok "a docs-only PR passes without a comment" \
+[ "$rc" = 0 ] && not_called '^(POST|PATCH)' && ok "a docs-only PR passes without a comment" \
   || bad "a docs-only PR passes without a comment" "rc=$rc $(calls)"
+
+reset; echo '{"head": {"sha": "fffffff0000000"}}' >"$STUB_DIR/pull.json"; issues "[$DEFERRED_7]"
+run_decide VERDICT=pass; rc=$?
+[ "$rc" = 0 ] && not_called '^(POST|PATCH)' && grep -q 'no longer the PR head' "$STUB_DIR/out" \
+  && ok "a re-run on an old commit leaves the report and the follow-up issue alone" \
+  || bad "a re-run on an old commit leaves the report and the follow-up issue alone" "rc=$rc $(calls)"
+
+reset
+run_decide REVIEW_RESULT=skipped VERDICT=; rc=$?
+[ "$rc" = 1 ] && grep -q 'unexpected reason' "$STUB_DIR/out" && ok "a review skipped for no known reason fails" \
+  || bad "a review skipped for no known reason fails" "rc=$rc $(cat "$STUB_DIR/out")"
 
 echo
 echo "$pass passed, $fail failed"
