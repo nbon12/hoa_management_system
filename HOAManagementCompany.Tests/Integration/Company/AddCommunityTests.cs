@@ -255,7 +255,9 @@ public class AddCommunityTests(TestDatabaseFixture fixture) : CompanyTestBase(fi
         { """{"legalName":"Keystone Park HOA, Inc.","communityName":"K","county":"Hamilton","formationDate":"2004-03-14","managementStartDate":"2026-11-01"}""", ["communityName"] },
         { $$"""{"legalName":"Keystone Park HOA, Inc.","communityName":"{{new string('K', 81)}}","county":"Hamilton","formationDate":"2004-03-14","managementStartDate":"2026-11-01"}""", ["communityName"] },
         { $$"""{"legalName":"Keystone Park HOA, Inc.","communityName":"Keystone Park","county":"Hamilton","formationDate":"2004-03-14","managementStartDate":"2026-11-01","description":"{{new string('D', 2001)}}"}""", ["description"] },
-        { $$"""{"legalName":"Keystone Park HOA, Inc.","communityName":"Keystone Park","county":"Hamilton","formationDate":"{{DateTime.UtcNow.AddDays(1):yyyy-MM-dd}}","managementStartDate":"2026-11-01"}""", ["formationDate"] },
+        // A fixed far-future date: MemberData is built at test discovery, so "tomorrow" computed there
+        // stops being in the future if the run crosses midnight UTC (seen 2026-11-03 on #313).
+        { """{"legalName":"Keystone Park HOA, Inc.","communityName":"Keystone Park","county":"Hamilton","formationDate":"2999-01-01","managementStartDate":"2026-11-01"}""", ["formationDate"] },
     };
 
     // US1-S9
