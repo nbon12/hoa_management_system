@@ -223,9 +223,10 @@ Two consumers need GitHub config; they overlap, so set each secret once.
 | `STRIPE_PUBLISHABLE_KEY` | the `pk_test_…` key | with the secrets (infra CI passes it as `TF_VAR_stripe_publishable_key`) |
 | `DEV_DEPLOY_ENABLED` | literal `true` | **LAST** — only after `https://api-dev.nekohoa.com/health` is green |
 
-**Protected `prod` Environment** (for later, T030): repo **Settings → Environments → New environment
-→ `prod`** → enable **Required reviewers**. This is what gates the (currently commented) Prod apply
-job in `.github/workflows/infra-apply.yml`.
+**`prod` Environment** (for later, T030, amended 2026-11-02): repo **Settings → Environments → New
+environment → `prod`**, with deployment branches limited to `main` and **no** required reviewers. Prod
+promotion is automated behind gates and the `PROD_OPS_AUTOMATED` switch (FR-026 as amended; see
+`infra/README.md`).
 
 ---
 

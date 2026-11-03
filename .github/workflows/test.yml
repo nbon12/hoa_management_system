@@ -114,8 +114,8 @@ jobs:
       - name: shellcheck
         run: >-
           shellcheck scripts/pr-env-reap.sh scripts/pr-env-clear-stale-lock.sh scripts/pr-env-audit.sh
-          scripts/pr-env-verify-ro.sh scripts/pr-env-policy-gate.sh scripts/tests/pr-env-reap.test.sh
-          scripts/tests/pr-env-ops.test.sh
+          scripts/pr-env-verify-ro.sh scripts/pr-env-policy-gate.sh scripts/prod-promotion-gate.sh
+          scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh scripts/tests/prod-promotion-gate.test.sh
           scripts/tests/pr-env-verify-ro.test.sh
       - name: pr-env-reap tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-reap.test.sh
@@ -123,6 +123,8 @@ jobs:
         run: bash scripts/tests/pr-env-ops.test.sh
       - name: pr-env-verify-ro tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-verify-ro.test.sh
+      - name: Prod promotion gate tests (no network)
+        run: bash scripts/tests/prod-promotion-gate.test.sh
 
   frontend:
     name: Frontend (neko-hoa)
