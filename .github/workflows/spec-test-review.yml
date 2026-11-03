@@ -38,6 +38,9 @@ concurrency:
 
 permissions: {}
 
+# auto-merge.yml names three of these jobs ("Review tests against specs", "Fix the tests", "Push the fix")
+# to leave their conclusions to "Spec test verdict". Rename a job in both places.
+
 env:
   # Auto-fix attempts per PR before the last pass moves what's left to a follow-up issue.
   MAX_FIX_ATTEMPTS: 3
@@ -201,6 +204,7 @@ jobs:
       attempt: ${{ steps.attempts.outputs.attempt }}
       exhausted: ${{ steps.attempts.outputs.exhausted }}
       result: ${{ steps.fix.outputs.structured_output }}
+      patched: ${{ steps.patch.outputs.patched }}
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -311,9 +315,14 @@ jobs:
             --allowedTools "Read,Glob,Grep,Edit,Write,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git status:*),Bash(git diff:*),Bash(git restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(npm --prefix neko-hoa ci:*),Bash(npm --prefix neko-hoa run test:ci:*),Bash(head:*),Bash(tail:*),Bash(grep:*),Bash(docker info:*)"
             --json-schema '{"type":"object","properties":{"fixed":{"type":"array","items":{"type":"string"}},"disputes":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"evidence":{"type":"string"}},"required":["id","evidence"]}},"unresolved":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"reason":{"type":"string"}},"required":["id","reason"]}},"summary":{"type":"string"}},"required":["fixed","disputes","unresolved","summary"]}'
 
+      # The PR's copy is fine here: what lands is checked by main's guard in the push job. `patched` lets
+      # the push job tell a lost patch from no changes.
       - name: Save the fix as a patch
+        id: patch
         if: steps.attempts.outputs.exhausted != 'true'
-        run: bash scripts/spec-test-review.sh patch "$RUNNER_TEMP/fix.patch"
+        run: |
+          bash scripts/spec-test-review.sh patch "$RUNNER_TEMP/fix.patch"
+          if [ -s "$RUNNER_TEMP/fix.patch" ]; then echo "patched=true" >>"$GITHUB_OUTPUT"; fi
 
       - name: Upload the patch
         if: steps.attempts.outputs.exhausted != 'true'
@@ -352,6 +361,7 @@ jobs:
       ATTEMPT: ${{ needs.fix.outputs.attempt }}
       FIX_OUTPUT: ${{ needs.fix.outputs.result }}
       FIX_RESULT: ${{ needs.fix.result }}
+      PATCHED: ${{ needs.fix.outputs.patched }}
       REPORT: ${{ needs.review.outputs.report }}
     steps:
       # A clean checkout. Nothing the fixer, or the tests it ran, left behind in its tree reaches this token.

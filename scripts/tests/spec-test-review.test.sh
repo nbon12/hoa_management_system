@@ -11,6 +11,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/spec-test-review.sh"
 STUB_DIR="$(mktemp -d)"
 export STUB_DIR
+export RETRY_SLEEP=0 # gh_api retries without waiting
 trap 'rm -rf "$STUB_DIR"' EXIT
 mkdir -p "$STUB_DIR/bin"
 pass=0 fail=0
@@ -160,6 +161,15 @@ mkrepo; drop "$T" 'Assert.Equal(HttpStatusCode.Conflict'; edit "$T" 'Assert.Equa
 guard_ok "rewriting an assertion in place is allowed" "$T"
 mkrepo; edit "$T" 'var rowsToSkip = 3; Assert.Equal(3, rowsToSkip);'
 guard_ok "a variable named like Skip is not a skipped test" "$T"
+mkrepo; edit "$T" 'if (options.Skip == 3) { Assert.True(ok); }'
+guard_ok "comparing a Skip property is not a skipped test" "$T"
+mkrepo; edit "$T" '[InlineData(1, Skip = "flaky")]'
+guard_refuses "a skipped data row is refused" 'skipped or focused'
+mkrepo; printf '%s\n' '[Theory(DisplayName = "x",' '    Skip = "flaky")]' >>"$REPO_DIR/$T"
+guard_refuses "a Skip on its own line of a multi-line attribute is refused" 'skipped or focused'
+mkrepo; printf '%s\n' '[Theory]' '[InlineData(1)]' '[InlineData(2)]' 'public void B(int n) { Assert.True(n > 0); }' >>"$REPO_DIR/$T"
+(cd "$REPO_DIR" && git commit -qam rows); drop "$T" '[InlineData(2)]'
+guard_refuses "removing a Theory data row counts as removing a test" 'removed more test declarations'
 mkrepo; printf '%s\n' '[Fact, Trait("Category", "Arc")]' 'public void A() { Assert.True(ok); }' >>"$REPO_DIR/$T"
 (cd "$REPO_DIR" && git commit -qam traits); drop "$T" 'Trait("Category", "Arc")'
 guard_refuses "removing a [Fact, Trait(...)] test counts as removing a test" 'removed more test declarations'
@@ -240,11 +250,24 @@ run_push "$FIXED"
   && ok "a branch that moved on is left to its own run" || bad "a branch that moved on is left to its own run" "$(cat "$STUB_DIR/out")"
 
 reset; mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; fixer_patch; mkclean
-printf '#!/bin/sh\nexit 1\n' >"$REMOTE/hooks/pre-receive" && chmod +x "$REMOTE/hooks/pre-receive"
+printf '#!/bin/sh\necho "protected branch" >&2\nexit 1\n' >"$REMOTE/hooks/pre-receive" && chmod +x "$REMOTE/hooks/pre-receive"
 run_push "$FIXED"
-[ "$(remote_head)" = "$START" ] && ghout_has superseded=true && called "PATCH repos/o/r/issues/comments/555" \
-  && bodies_have 'this attempt did not land' && bodies_have "Auto-fix attempt 1 of 3 didn't land" \
-  && ok "a refused push corrects the attempt comment" || bad "a refused push corrects the attempt comment" "$(calls) $(cat "$STUB_DIR/out")"
+[ "$(remote_head)" = "$START" ] && ghout_has pushed=false && ! ghout_has superseded=true && ghout_has "couldn't push" \
+  && called "PATCH repos/o/r/issues/comments/555" && bodies_have 'The push failed' \
+  && ok "a push refused without the branch moving is the last pass, and says why" \
+  || bad "a push refused without the branch moving is the last pass, and says why" "$(calls) $(cat "$STUB_DIR/ghout")"
+
+reset; mkrepo; edit "$T" 'Assert.Equal(ArcErrorCodes.ApplicationClosed, code);'; fixer_patch; mkclean
+(cd "$REPO_DIR" && git commit -q --allow-empty -m other && git push -q "$REMOTE" HEAD:refs/heads/other)
+other="$(git -C "$REMOTE" rev-parse refs/heads/other)"
+# The hook moves the branch (as another push would) and then refuses this one.
+printf '#!/bin/sh\nenv -u GIT_QUARANTINE_PATH git update-ref refs/heads/feature %s\nexit 1\n' "$other" >"$REMOTE/hooks/pre-receive"
+chmod +x "$REMOTE/hooks/pre-receive"
+run_push "$FIXED"
+[ "$(remote_head)" = "$other" ] && ghout_has superseded=true && bodies_have 'this attempt did not land' \
+  && bodies_have "Auto-fix attempt 1 of 3 didn't land" \
+  && ok "a push refused because the branch moved on is left to the new head's run" \
+  || bad "a push refused because the branch moved on is left to the new head's run" "$(remote_head) $(cat "$STUB_DIR/ghout") $(cat "$STUB_DIR/out")"
 
 reset; mkrepo; fixer_patch; mkclean
 run_push ""
@@ -257,6 +280,12 @@ run_push "$FIXED" FIX_RESULT=failure
 [ "$(remote_head)" != "$START" ] && [ -z "$(remote_files)" ] && remote_msg | grep -q 'did not finish' \
   && ok "a failed fix job (no patch) retries instead of deferring" \
   || bad "a failed fix job (no patch) retries instead of deferring" "$(cat "$STUB_DIR/out")"
+
+reset; mkrepo; mkclean; rm -f "$PATCH"
+run_push "$FIXED" PATCHED=true
+[ "$(remote_head)" != "$START" ] && [ -z "$(remote_files)" ] && remote_msg | grep -q 'did not finish' \
+  && ok "a patch that was made but didn't arrive retries instead of deferring" \
+  || bad "a patch that was made but didn't arrive retries instead of deferring" "$(cat "$STUB_DIR/out")"
 
 reset; mkrepo; fixer_patch; mkclean
 run_push "$FIXED" PUSH_URL= MERGE_TOKEN=
@@ -391,6 +420,13 @@ reset
 run_decide VERDICT=; rc=$?
 [ "$rc" = 0 ] && not_called '^(POST|PATCH)' && ok "a docs-only PR passes without a comment" \
   || bad "a docs-only PR passes without a comment" "rc=$rc $(calls)"
+
+reset; issues "[$DEFERRED_7]"
+comments "[{id: 111, user: {login: \"$BOT\"}, body: \"$MARK\nold findings\"}]"
+run_decide VERDICT=; rc=$?
+[ "$rc" = 0 ] && called "PATCH repos/o/r/issues/comments/111" && bodies_have '➖ Not applicable' && called "PATCH repos/o/r/issues/77" \
+  && ok "a PR that became docs-only clears its old report and follow-up issue" \
+  || bad "a PR that became docs-only clears its old report and follow-up issue" "rc=$rc $(calls)"
 
 reset; echo '{"head": {"sha": "fffffff0000000"}}' >"$STUB_DIR/pull.json"; issues "[$DEFERRED_7]"
 run_decide VERDICT=pass; rc=$?

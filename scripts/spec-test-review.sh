@@ -15,8 +15,8 @@
 #           with a Spec-Test-Review-Fix trailer, posts the report and then the attempt's comment, and
 #           pushes, which starts the next review. A crashed attempt pushes an empty commit so the next pass
 #           retries. Writes pushed, superseded and unresolved to $GITHUB_OUTPUT. Env: REPO PR HEAD_REF
-#           HEAD_SHA ATTEMPT MAX_FIX_ATTEMPTS MERGE_TOKEN FIX_OUTPUT (the fixer's JSON) FIX_RESULT PATCH_FILE
-#           REPORT_FILE RUN_URL; PUSH_URL overrides the remote (tests).
+#           HEAD_SHA ATTEMPT MAX_FIX_ATTEMPTS MERGE_TOKEN FIX_OUTPUT (the fixer's JSON) FIX_RESULT PATCHED
+#           PATCH_FILE REPORT_FILE RUN_URL; PUSH_URL overrides the remote (tests).
 #   decide  The Spec test verdict check: exits 0 (pass) or 1 (fail). A pass with findings left is the
 #           last one: it files them in a follow-up issue and passes, so the loop always ends green. A later
 #           green pass closes that issue. Env: REPO PR PR_TITLE HEAD_SHA RUN_URL REVIEW_RESULT VERDICT
@@ -37,10 +37,10 @@ CONFIG_EXCLUDES=(':(exclude).claude' ':(exclude).claude-pr' ':(exclude).mcp.json
   ':(exclude).gitmodules' ':(exclude).ripgreprc' ':(exclude)CLAUDE.md' ':(exclude)CLAUDE.local.md' ':(exclude).husky')
 TEST_PATHS_RE='^(HOAManagementCompany\.Tests/|neko-hoa/e2e/|neko-hoa/cypress/|neko-hoa/src/.*\.spec\.ts$)'
 BUILD_OUTPUT_RE='(^|/)(TestResults|bin|obj)/' # test-run output that isn't ignored everywhere
-# Skipped or focused tests: xUnit (Skip =, Xunit.SkippableFact's Skip.If/IfNot/SkipException), Jasmine,
-# Playwright and Cypress.
-SKIP_RE='(Fact|Theory)\([^]]*Skip[[:space:]]*=|Skip\.If(Not)?\(|SkipException|(^|[^[:alnum:]_.])(xit|xdescribe|fit|fdescribe|pending)\(|\.(skip|only|fixme)\('
-DECL_RE='(^|[[,[:space:]])(Skippable)?(Fact|Theory)[]( ,]|(^|[^[:alnum:]_.])(it|test)\('
+# Skipped or focused tests: xUnit (a Skip = argument on Fact, Theory or a data row; Xunit.SkippableFact's
+# Skip.If/IfNot/SkipException), Jasmine, Playwright and Cypress. Tests count Theory data rows too.
+SKIP_RE='(^|[^[:alnum:]_.])Skip[[:space:]]*=[^=]|Skip\.If(Not)?\(|SkipException|(^|[^[:alnum:]_.])(xit|xdescribe|fit|fdescribe|pending)\(|\.(skip|only|fixme)\('
+DECL_RE='(^|[[,[:space:]])(Skippable)?(Fact|Theory)[]( ,]|\[(InlineData|MemberData|ClassData)[](]|(^|[^[:alnum:]_.])(it|test)\('
 ASSERT_RE='Assert\.|expect\(|\.Should\(|\.Verify\('
 GIT=(git -c core.hooksPath=/dev/null)
 
@@ -51,6 +51,15 @@ out_multi() { # name value
   printf '%s<<%s\n%s\n%s\n' "$1" "$delim" "$2" "$delim" >>"$GITHUB_OUTPUT"
 }
 count() { grep -cE "$1" <<<"$2" || true; } # regex text
+# gh api, retried: a transient API error mustn't turn a settled pass into a red check.
+gh_api() {
+  local try
+  for try in 1 2 3; do
+    gh api "$@" && return 0
+    [ "$try" = 3 ] || sleep "${RETRY_SLEEP:-10}"
+  done
+  return 1
+}
 
 scope() {
   local path
@@ -118,15 +127,19 @@ guard() {
 
 push() {
   : "${REPO:?}" "${PR:?}" "${HEAD_REF:?}" "${HEAD_SHA:?}" "${ATTEMPT:?}" "${MAX_FIX_ATTEMPTS:?}" "${REPORT_FILE:?}" "${RUN_URL:?}"
+  local fixed="" disputes="" unresolved="" summary="" paths="" why="" crashed=no remote body sha id err
+  # Every way out reports what's still unresolved, once.
+  finish() { out_multi unresolved "$unresolved"; out "$@"; }
   if [ -z "${PUSH_URL:-}" ] && [ -z "${MERGE_TOKEN:-}" ]; then
-    out pushed=false
-    out_multi unresolved "- The auto-fix couldn't push: the MERGE_TOKEN secret isn't set."
+    unresolved="- The auto-fix couldn't push: the MERGE_TOKEN secret isn't set."
+    finish pushed=false
     return 0
   fi
   local url="${PUSH_URL:-https://x-access-token:${MERGE_TOKEN}@github.com/${REPO}.git}"
-  local fixed="" disputes="" unresolved="" summary="" paths="" why="" crashed=no remote body sha id err
-  # A failed fix job (FIX_RESULT) counts as a crash too: its patch may be missing even when its JSON isn't.
-  if [ "${FIX_RESULT:-success}" = success ] && [ -n "${FIX_OUTPUT:-}" ] && jq -e 'type == "object"' >/dev/null 2>&1 <<<"$FIX_OUTPUT"; then
+  # A failed fix job (FIX_RESULT), or a patch it made that didn't arrive (PATCHED), counts as a crash: the
+  # next pass retries instead of reading "no patch" as "nothing to fix".
+  if [ "${FIX_RESULT:-success}" = success ] && [ -n "${FIX_OUTPUT:-}" ] && jq -e 'type == "object"' >/dev/null 2>&1 <<<"$FIX_OUTPUT" &&
+    { [ "${PATCHED:-}" != true ] || [ -s "${PATCH_FILE:-}" ]; }; then
     fixed="$(jq -r '[.fixed[]?] | join(", ")' <<<"$FIX_OUTPUT")"
     disputes="$(jq -r '.disputes[]? | "- **\(.id)**: \(.evidence)"' <<<"$FIX_OUTPUT")"
     unresolved="$(jq -r '.unresolved[]? | "- **\(.id)**: \(.reason)"' <<<"$FIX_OUTPUT")"
@@ -140,7 +153,6 @@ push() {
   elif [ "$crashed" = no ] && ! paths="$(guard 2>"$err")"; then
     why="$(cat "$err")"
   fi
-  rm -f "$err"
   # A refused attempt uses up its attempt but not the loop: an empty commit (with any disputes) starts
   # the next pass, which sees why in this attempt's comment.
   if [ -n "$why" ]; then
@@ -148,16 +160,17 @@ push() {
     paths=""
   fi
   [ -n "$paths" ] || fixed=""
-  out_multi unresolved "$unresolved"
   if [ "$crashed" = no ] && [ -z "$why" ] && [ -z "$paths" ] && [ -z "$disputes" ]; then
+    rm -f "$err"
     echo "spec-test-review: nothing to push; this is the last pass"
-    out pushed=false
+    finish pushed=false
     return 0
   fi
   remote="$("${GIT[@]}" ls-remote "$url" "refs/heads/$HEAD_REF" | cut -f1)"
   if [ "$remote" != "$HEAD_SHA" ]; then
+    rm -f "$err"
     echo "spec-test-review: $HEAD_REF moved on (now ${remote:-gone}); its own run reviews it"
-    out pushed=false superseded=true
+    finish pushed=false superseded=true
     return 0
   fi
 
@@ -198,19 +211,31 @@ push() {
       [ -z "$unresolved" ] || printf "**Couldn't fix:**\n\n%s\n" "$unresolved"
     fi
   } >"$body"
-  id="$(gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" --jq .id)"
+  id="$(gh_api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" --jq .id)"
 
-  if ! "${GIT[@]}" push -q "$url" "HEAD:refs/heads/$HEAD_REF"; then
-    printf '\n_The push was refused because %s moved on, so this attempt did not land._\n' "$HEAD_REF" >>"$body"
-    gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" >/dev/null
-    VERDICT=findings NOTE="Auto-fix attempt $ATTEMPT of $MAX_FIX_ATTEMPTS didn't land: $HEAD_REF moved on, and the new head gets its own review." post >/dev/null
-    rm -f "$body"
-    echo "spec-test-review: push refused; $HEAD_REF moved on and its own run reviews it"
-    out pushed=false superseded=true
+  if "${GIT[@]}" push -q "$url" "HEAD:refs/heads/$HEAD_REF" 2>"$err"; then
+    rm -f "$body" "$err"
+    finish pushed=true
     return 0
   fi
-  rm -f "$body"
-  out pushed=true
+  # Refused. If the branch moved on, the new head gets its own review. If it didn't (a token that can't
+  # write, a branch rule), nothing will run again: that is the last pass, and the verdict files it.
+  remote="$("${GIT[@]}" ls-remote "$url" "refs/heads/$HEAD_REF" | cut -f1)" || remote=""
+  if [ -n "$remote" ] && [ "$remote" != "$HEAD_SHA" ]; then
+    printf '\n_The push was refused because %s moved on, so this attempt did not land._\n' "$HEAD_REF" >>"$body"
+    gh_api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" >/dev/null
+    VERDICT=findings NOTE="Auto-fix attempt $ATTEMPT of $MAX_FIX_ATTEMPTS didn't land: $HEAD_REF moved on, and the new head gets its own review." post >/dev/null
+    echo "spec-test-review: push refused; $HEAD_REF moved on and its own run reviews it"
+    finish pushed=false superseded=true
+  else
+    why="$(head -c 300 "$err" | tr '\n' ' ')"
+    printf "\n_The push failed (%s), so this attempt did not land._\n" "$why" >>"$body"
+    gh_api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" >/dev/null
+    unresolved="${unresolved:+$unresolved$'\n'}- The auto-fix couldn't push ($why)."
+    echo "spec-test-review: push failed and $HEAD_REF didn't move; this is the last pass"
+    finish pushed=false
+  fi
+  rm -f "$body" "$err"
 }
 
 post() {
@@ -224,7 +249,7 @@ post() {
     *) echo "spec-test-review: unknown verdict '$VERDICT'" >&2; return 2 ;;
   esac
 
-  existing="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+  existing="$(gh_api --paginate "repos/$REPO/issues/$PR/comments" \
     --jq ".[] | select(.user.login == \"$bot\" and (.body | contains(\"$MARKER\"))) | .id" | tail -n 1)"
   if [ "$VERDICT" = not_applicable ] && [ -z "$existing" ]; then
     echo "spec-test-review: not applicable and no earlier report; nothing posted"
@@ -247,16 +272,16 @@ post() {
   } >"$body"
 
   if [ -n "$existing" ]; then
-    gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F "body=@$body" --jq .html_url
+    gh_api -X PATCH "repos/$REPO/issues/comments/$existing" -F "body=@$body" --jq .html_url
   else
-    gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" --jq .html_url
+    gh_api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" --jq .html_url
   fi
   rm -f "$body"
 }
 
 deferral_marker() { printf '<!-- spec-test-review-deferred: #%s -->' "$PR"; }
 deferral_issues() {
-  gh api --paginate "repos/$REPO/issues?state=open&per_page=100" \
+  gh_api --paginate "repos/$REPO/issues?state=open&per_page=100" \
     --jq ".[] | select(.pull_request == null and ((.body // \"\") | contains(\"$(deferral_marker)\"))) | .number"
 }
 
@@ -273,9 +298,9 @@ defer() {
     head -c 50000 "$REPORT_FILE"
   } >"$body"
   if [ -n "$existing" ]; then
-    url="$(gh api -X PATCH "repos/$REPO/issues/$existing" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
+    url="$(gh_api -X PATCH "repos/$REPO/issues/$existing" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
   else
-    url="$(gh api -X POST "repos/$REPO/issues" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
+    url="$(gh_api -X POST "repos/$REPO/issues" -f "title=${title:0:200}" -F "body=@$body" --jq .html_url)" || true
   fi
   rm -f "$body"
   [ -n "$url" ] || return 1
@@ -285,9 +310,9 @@ defer() {
 undefer() {
   local n
   for n in $(deferral_issues); do
-    gh api -X POST "repos/$REPO/issues/$n/comments" \
+    gh_api -X POST "repos/$REPO/issues/$n/comments" \
       -f "body=Resolved: the spec test review of #$PR passed on commit ${HEAD_SHA:0:7} ([run]($RUN_URL))." >/dev/null
-    gh api -X PATCH "repos/$REPO/issues/$n" -f state=closed -f state_reason=completed >/dev/null
+    gh_api -X PATCH "repos/$REPO/issues/$n" -f state=closed -f state_reason=completed >/dev/null
     echo "spec-test-review: closed #$n"
   done
 }
@@ -307,7 +332,7 @@ decide() {
       return 1 ;;
   esac
   # A re-run of an older commit's run must not overwrite the current head's report or touch its issues.
-  current="$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)"
+  current="$(gh_api "repos/$REPO/pulls/$PR" --jq .head.sha)"
   if [ "$current" != "$HEAD_SHA" ]; then
     echo "spec-test-review: ${HEAD_SHA:0:7} is no longer the PR head (${current:0:7}); leaving its report alone"
     case "${VERDICT:-}" in findings) return 1 ;; *) return 0 ;; esac
@@ -328,7 +353,12 @@ decide() {
       return 0 ;;
   esac
   case "${VERDICT:-}" in
-    '') echo "spec-test-review: only documentation changed; nothing to review"; return 0 ;;
+    '')
+      # Only documentation changes now. Clear an earlier report and follow-up issue, if any.
+      printf 'Only Markdown, docs/, specs/ or wireframes/ change now, so there are no tests to review.\n' >"$REPORT_FILE"
+      VERDICT=not_applicable post
+      undefer
+      return 0 ;;
     pass | not_applicable) post; undefer; return 0 ;;
     findings) ;;
     *) echo "spec-test-review: unknown verdict '$VERDICT'" >&2; return 2 ;;
