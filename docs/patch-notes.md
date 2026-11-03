@@ -6,6 +6,24 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · One "never at-mention Claude" rule in `CLAUDE.md`; sweep finds the newest report by paging · [#313](https://github.com/nbon12/hoa_management_system/pull/313)
+
+Tooling only. These are the review fixes for #312, which merged before they landed.
+
+**Changes earlier assumptions**
+
+- **Root `CLAUDE.md` holds the full rule** ("Never at-mention Claude in what you post to GitHub"). The Done story sweep routine and its worker message restate it in one line, for long-lived sessions that loaded `CLAUDE.md` before the rule existed, and point to it. Every session posts as nbon12: reviewers, hygiene, workers and the dispatcher. The rule:
+  - lists the real triggers: comments, PR review comments, submitted review bodies, and an issue's title or body when it is opened or **assigned**. PR titles and bodies aren't checked;
+  - covers any letter case and text inside backticks or quotes;
+  - forbids opening or assigning an issue that contains the mention.
+- **One rule finds the newest report** on the `sweep-log` issue (Step 6, "Finding the newest report"), for both the notify step (before it posts) and the watchdog. It reads the comment count, fetches only the last page with `perPage: 100`, and steps back a page only if needed. A failed fetch is retried once, then treated as a failed lookup, never as a partial list. Without it, once the log passed 30 comments, bot replies included, either step could read an old report: the notify step would send repeat pushes, and the watchdog would raise a false "didn't run" alert.
+
+**Left open**
+
+- A prompt rule depends on every writer remembering it. The root-cause fix is a guard in `.github/workflows/claude.yml` that tells sessions' text apart from nbon12's own, for example running only when the comment *starts* with the mention, or skipping text that carries the session footer. A label-based guard such as skipping `sweep-log` would only cover the log issue. This is a workflow change, so it needs a separate, guarded-path PR.
+
+---
+
 ## 2026-11-02 · Spec test review: tests are checked against the spec, and fixed automatically · [#304](https://github.com/nbon12/hoa_management_system/pull/304)
 
 Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI only. No application behavior, API or data change.
@@ -86,11 +104,11 @@ Process and agent guidance only. No application behavior, API or data change.
 
 ---
 
-## 2026-11-02 · Done story sweep: no `@claude` in sweep comments; watchdog reads the newest report · [#312](https://github.com/nbon12/hoa_management_system/pull/312)
+## 2026-11-02 · Done story sweep: no Claude at-mentions in sweep comments; watchdog reads the newest report · [#312](https://github.com/nbon12/hoa_management_system/pull/312)
 
 Tooling only.
 
-- **Sweep comments no longer start the Claude workflow by accident.** The 18:20 UTC report on #290 quoted the text "@claude" while describing Step 3. It posted as nbon12, so `claude.yml` ran on the log issue (run 41499658412, "No action taken"). The routine and its worker message now forbid that mention in any comment, title or body, and the report template says "Claude workflow run" instead.
+- **Sweep comments no longer start the Claude workflow by accident.** The 18:20 UTC report on #290 quoted the at-sign mention of Claude while describing Step 3. It posted as nbon12, so `claude.yml` ran on the log issue (run 41499658412, "No action taken"). The routine and its worker message now forbid that mention, and the report template says "Claude workflow run" instead. #313 moved the rule into the root `CLAUDE.md`.
 - **The watchdog now reads the newest *report* on the `sweep-log` issue**, meaning nbon12's newest comment that starts with `Done story sweep report`, rather than the newest comment of any kind. A bot reply there can no longer cause a false "didn't run" alert.
 
 ---
@@ -128,7 +146,7 @@ Test harness only. No application behavior, API or data change.
 
 ---
 
-## 2026-11-02 · `/merge` comment command; `@claude` can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
+## 2026-11-02 · `/merge` comment command; the Claude workflow can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
 
 Tooling only. No application behavior, API or data change.
 
@@ -140,7 +158,7 @@ Tooling only. No application behavior, API or data change.
 
 **Changes earlier assumptions**
 
-- **`@claude` (`claude.yml`) can now check and update a PR branch.** It has a full-history checkout, plus `git fetch/log/diff/status/merge/merge-base/rev-parse` and `gh pr view/checks/diff/update-branch`. It still has **no merge tool on purpose**. Before this, "is it ready / update the branch" failed with permission denials (seen on #291).
+- **The Claude workflow (`claude.yml`) can now check and update a PR branch.** It has a full-history checkout, plus `git fetch/log/diff/status/merge/merge-base/rev-parse` and `gh pr view/checks/diff/update-branch`. It still has **no merge tool on purpose**. Before this, "is it ready / update the branch" failed with permission denials (seen on #291).
 - A Claude session subscribed to a PR still won't merge because a GitHub comment asked it to. Merge with `/merge`, the button, or by asking in the session itself.
 
 ---
@@ -234,7 +252,7 @@ Tooling only. No application behavior, API or data change.
 
 - **A scheduled task that starts a fresh session never gets the session tools.** These are `list_sessions`, `create_session`, `send_message` and the rest. This holds whether the task was made in the claude.ai UI or from a session (both tested 2026-11-02). Its `claude-code-remote` server has at most `add_repo` and the PR subscribe tools. That is why the "Daily done checker" run on 2026-11-02 did nothing.
 - **A session started from another session does have them** (origin `claude_code_mcp_seed`), and so does a scheduled task that messages that session.
-- **The `@claude` workflow (`claude.yml`) works as of 2026-11-02.** Before that, every real run failed with "Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN … is required". The first successful run was [41497347693](https://github.com/nbon12/hoa_management_system/actions/runs/41497347693). The sweep doesn't start `@claude` runs. It hands off to sessions, and only counts an `@claude` run already in progress as "agent already on it" (Step 3).
+- **The Claude workflow (`claude.yml`) works as of 2026-11-02.** Before that, every real run failed with "Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN … is required". The first successful run was [41497347693](https://github.com/nbon12/hoa_management_system/actions/runs/41497347693). The sweep doesn't start Claude workflow runs. It hands off to sessions, and only counts a Claude workflow run already in progress as "agent already on it" (Step 3).
 
 **How the sweep runs now** (`.routines/done-story-sweep.md`, Step 0 picks the mode)
 
@@ -254,7 +272,7 @@ Tooling only. No application behavior, API or data change.
 
 **Left open**
 
-- If the dispatcher keeps failing, the watchdog could fall back to posting `@claude` comments in this repo. It doesn't do that today, to avoid duplicate handoffs. mmo-engine has no `claude.yml` at all.
+- ~~If the dispatcher keeps failing, the watchdog could fall back to posting Claude at-mention comments in this repo.~~ Dropped: sweep comments must never at-mention Claude (2026-11-02, #312 and #313). mmo-engine has no `claude.yml` at all.
 
 ---
 
