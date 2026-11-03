@@ -1,8 +1,10 @@
 # Merge policy: when a session merges its own PR
 
-Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 (issue #295). Decision D1 is still open
-there. Until nbon12 answers it, sessions follow the recommended answer, which is what this file says.
-Since #311, the independent review runs in a subagent rather than the handoff's separate session (see
+Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 and its §8 decision D1 (issue #295), which
+nbon12 answered on 2026-11-02 ([decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)): guarded-path PRs get an automated review and merge without asking for
+permission. Constitution §14 ("Merge on green, always") requires the same thing. Never ask nbon12 to
+review, approve or merge a PR. The one exception is a constitution amendment (below). Since #311, the
+independent review runs in a subagent rather than the handoff's separate session (see
 `docs/patch-notes.md`).
 
 A session's own PR is merged by `.github/workflows/auto-merge.yml` once the session marks it ready (see

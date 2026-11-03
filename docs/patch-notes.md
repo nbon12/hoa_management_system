@@ -47,6 +47,33 @@ Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI on
 
 ---
 
+## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · [#308](https://github.com/nbon12/hoa_management_system/pull/308)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §5 and §8 (#295, [decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)). Spec: [`specs/010-dev-env-iac-opentofu/spec.md`](../specs/010-dev-env-iac-opentofu/spec.md) FR-026 (amended). No application change.
+
+**Changes earlier assumptions**
+
+- **D1: never ask nbon12 to review, approve or merge a PR.** A guarded-path PR gets the independent automated review in [`.routines/merge-policy.md`](../.routines/merge-policy.md) and then merges, followed by a notification. Constitution amendments are the only exception (§13, §14).
+- **D2: Prod is no longer gated by a required reviewer.** Spec 010 FR-026 is amended, and the clarification and acceptance scenario 2 change with it.
+  - A scheduled promotion workflow promotes to Prod while repo variable **`PROD_OPS_AUTOMATED`** is exactly `on`. Unset or any other value, including `ON`, refuses the promotion and reports why.
+  - These gates must also pass:
+    - the commit reached Staging at least 24 h ago, with no failed Staging run since;
+    - the Staging smoke and E2E gates pass;
+    - the Prod plan has no delete or replace of a stateful resource.
+  - After the apply, Cloud Run rolls back on its own if health fails within 15 min.
+  - The `prod` GitHub Environment stays: it limits deploys to `main` and scopes the Prod secrets. It just has no reviewer.
+
+**Shared pieces to reuse**
+
+- `scripts/prod-promotion-gate.sh switch|soak|plan`, tested in `scripts/tests/prod-promotion-gate.test.sh`, which CI runs under "Ops scripts". Nothing calls it until Prod exists.
+
+**Left open**
+
+- Build `prod-promote.yml` when `infra/environments/prod` is added. Its shape is sketched at the bottom of `infra-apply.yml`. `PROD_OPS_AUTOMATED` doesn't need setting until then.
+- Z1 (#295 S7) runs on its own once the P3 window clears on 2026-11-03.
+
+---
+
 ## 2026-11-02 · Merge policy: the independent review runs in a subagent · [#311](https://github.com/nbon12/hoa_management_system/pull/311)
 
 Process and agent guidance only. No application behavior, API or data change.

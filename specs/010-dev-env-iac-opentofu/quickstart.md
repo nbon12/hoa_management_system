@@ -81,8 +81,9 @@ the real image to `nekohoa-api-dev` (infra `ignore_changes` keeps it from being 
 ## Day-2: making changes
 
 - Edit HCL → open a PR → `infra-plan.yml` posts a plan (no changes applied).
-- Merge → `infra-apply.yml` auto-applies **Dev**. (Prod, when added, pauses for required-reviewer
-  approval via a protected GitHub Environment.)
+- Merge → `infra-apply.yml` auto-applies **Dev**. (Prod, when added, is promoted automatically by a
+  scheduled workflow behind automated gates while `PROD_OPS_AUTOMATED` is `on`, with no approval wait.
+  See FR-026, amended 2026-11-02.)
 - Re-running `tofu plan` on an unchanged env shows **no drift**.
 
 ## Validation checklist (maps to Success Criteria)

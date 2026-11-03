@@ -22,6 +22,18 @@ can't be read through the cloud session's proxy, so their current values are tak
 
 Read this first. Where it differs from the plan below, this section wins.
 
+**Decisions answered (2026-11-02, [record on #295](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)):**
+- **D1:** guarded-path PRs get the automated review in §3, then merge without asking nbon12.
+- **D2:** Prod is promoted automatically behind the §5 gates while `PROD_OPS_AUTOMATED` is exactly `on`.
+  The `prod` Environment stays (`main` only, Prod secrets) with no reviewer. The gate checks are in
+  `scripts/prod-promotion-gate.sh`, with tests. The scheduled promotion workflow is built when
+  `infra/environments/prod` exists.
+- **D3:** the default limits stay.
+
+O1–O3 are done (O1 and O2 confirmed live on 2026-11-02). Z2–Z6 passed
+([results on #295](https://github.com/nbon12/hoa_management_system/issues/295)). Only Z1 of S7 is left,
+and it is scheduled to run on its own after the P3 window clears on 2026-11-03.
+
 **Done in the S1/S2/S4–S6 PR:**
 - **S1.** `pr-env-repair.yml` runs `scripts/pr-env-policy-gate.sh` in place of "Require the ops approval
   gate". `preflight` checks P1, P3, P4, P5 and P8 before any credential is minted. `check-plan` runs P7 on a
@@ -235,7 +247,7 @@ infra/**                      HOAManagementCompany/Features/Auth/**
 HOAManagementCompany/Features/Payments/**                **/Migrations/**
 ```
 
-**Independent automated review (recommended answer to D1):**
+**Independent automated review (D1, answered 2026-11-02: this, with no permission asked):**
 - **Who reviews:** a *separate* session, started with `create_session` and given only the PR link
   and the diff. It runs the `code-review` skill at `high` and posts its findings on the PR.
 - **What happens next:** the authoring session fixes every confirmed blocking finding, then merges.
@@ -280,8 +292,10 @@ None of these is needed once G1 is gone.
 Prod doesn't exist (`infra/environments/prod` is absent), so G5 isn't urgent. Decide before Prod is
 built.
 
-**Recommended:** amend spec 010 FR-026 so that Prod promotes **automatically** behind these gates:
-- Staging applied with the same commit, and green for at least 24 h;
+**Decided (D2, 2026-11-02):** Prod promotes **automatically**, and spec 010 FR-026 is amended. Repo
+variable `PROD_OPS_AUTOMATED` = `on` (exact) turns the automation on. Unset or any other value means
+the promotion is refused and the reason is posted on the ops log, with no approval wait. The gates are:
+- the commit reached Staging at least 24 h ago, with no failed Staging apply, smoke or E2E run since;
 - the Staging smoke and E2E gates pass (the same Playwright and Cypress gates as Dev);
 - `infra-plan` for Prod has no `destroy` or `replace` on stateful resources (Neon project or
   branch, R2 buckets, secrets). Any of those stops the run and notifies the owner instead;
@@ -290,8 +304,10 @@ built.
 
 The owner is notified of each Prod promotion.
 
-The alternative is to keep FR-026's required reviewer for Prod only. That's the one remaining click,
-and it guards real customer data.
+The gate checks are in `scripts/prod-promotion-gate.sh` (`switch`, `soak` and `plan`), with tests.
+The scheduled `prod-promote.yml` that runs them is built when `infra/environments/prod` is created. Its
+shape is sketched at the bottom of `infra-apply.yml`. The `prod` Environment keeps `main` only and the
+Prod secrets, with no reviewer.
 
 ## 6. Verification
 
@@ -338,15 +354,28 @@ in "Ops scripts (shellcheck + tests)": P7's name filter must reject a shared nam
 
 ### Owner, one time
 
-- [ ] **O1.** After S1 merges: Settings → Environments → `ops` → remove **Required reviewers**. Keep
+- [x] **O1.** After S1 merges: Settings → Environments → `ops` → remove **Required reviewers**. Keep
   "Deployment branches: `main` only". (A session can't change Environment settings: the API path is
   blocked through the cloud proxy, and it needs admin.)
-- [ ] **O2.** Settings → Secrets and variables → Actions → Variables → add `OPS_AUTOMATION` = `on`.
+- [x] **O2.** Settings → Secrets and variables → Actions → Variables → add `OPS_AUTOMATION` = `on`.
   Setting it to `off` later is the kill switch.
-- [ ] **O3.** Answer D1 and D2 below in a comment on the tracking issue. Until D1 is answered,
-  sessions use the recommended answer.
+- [x] **O3.** Answer D1 and D2 below in a comment on the tracking issue. Until D1 is answered,
+  sessions use the recommended answer. (Answered 2026-11-02; see §8.)
 
 ## 8. Decisions for the owner
+
+**Answered by nbon12 on 2026-11-02:**
+- **D1: automated review, never ask.** PRs that touch guarded paths get the independent automated review
+  in §3, then merge without asking nbon12 for permission. nbon12 gets a notification after the merge.
+  Constitution amendments are the only PRs nbon12 still merges, under constitution §13 and §14.
+- **D2: Prod is fully automated**, behind the gates in §5, with its own kill switch: the repo variable
+  `PROD_OPS_AUTOMATED`. When it is exactly `on`, Prod promotes on its own. When it is unset or
+  anything else, the promotion is refused and the reason is posted on the ops log; it never waits for a
+  person. Spec 010 FR-026 is amended
+  to match.
+- **D3** keeps the default limits.
+
+The original options:
 
 - **D1. Guarded paths: automated review, or human merge?**
   - **Recommended:** an independent automated review plus a notification after the merge (§3).
