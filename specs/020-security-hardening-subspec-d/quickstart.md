@@ -23,7 +23,7 @@ npm start                                          # http://localhost:4200
 2. **Re-hydration (hint-gated)** — reload: still signed in; Network shows one `POST /api/v1/auth/refresh` (withCredentials). Log out, reload: **no** refresh call fires.
 3. **Cross-tab single-flight (FR-D5)** — open two tabs, let the access token expire (or force 401): exactly one `/auth/refresh` across both tabs (second tab adopts via BroadcastChannel).
 4. **CSP (FR-D2)** —
-   ```bash
+   ```bash cwd=neko-hoa
    npm run build && node scripts/stamp-headers.mjs http://localhost:5212
    grep -q "__API_ORIGIN__" dist/neko-hoa/browser/_headers && echo "FAIL: unstamped" || echo "stamped OK"
    ```

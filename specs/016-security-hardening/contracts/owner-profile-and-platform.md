@@ -15,7 +15,7 @@
 - Deployed non-local environments (incl. Dev) return `{ error: <generic message>, correlationId }` with no type/stack/internals. Full detail only in local `Development` and server-side logs keyed by `correlationId`. Production unchanged.
 
 ## Security headers (C FR-C7)
-- API responses carry the hardened baseline via repo-controlled app middleware: `X-Content-Type-Options: nosniff`, frame options, and `Strict-Transport-Security` where applicable. Asserted by test. (Frontend CSP is delivered separately via `neko-hoa/src/_headers`, copied to the build root by `angular.json` and stamped per deployment by `scripts/stamp-headers.mjs`, enforcing — Sub-spec D, `specs/020-security-hardening-subspec-d/`.)
+- API responses carry the hardened baseline via repo-controlled app middleware: `X-Content-Type-Options: nosniff`, frame options, and `Strict-Transport-Security` where applicable. Asserted by test. (Frontend CSP is delivered separately via `neko-hoa/src/_headers`, copied to the build root by `angular.json` and stamped per deployment by `neko-hoa/scripts/stamp-headers.mjs`, enforcing — Sub-spec D, `specs/020-security-hardening-subspec-d/`.)
 
 ## Rate limiting (C FR-C3/FR-C4)
 - Telemetry proxy limiter partitions by trusted-edge client identity (not the edge address). A global default limiter applies to endpoints without a specific policy, including anonymous registration.

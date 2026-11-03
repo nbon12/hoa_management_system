@@ -44,7 +44,7 @@ concurrency:
    → migrations apply + seed run at candidate startup against the **Neon Dev** DB.
 2. **Health gate**: poll the candidate tagged URL `…/health` until `Healthy` (with timeout that
    accommodates startup migration time). Fail the job on timeout/unhealthy.
-3. **Deploy frontend preview**: `npm ci`; point `src/environments/environment.dev.ts` at the **candidate** URL; `npm run build -- --configuration=dev`; stamp `_headers` for that origin (`scripts/stamp-headers.mjs`); then `pages deploy dist/neko-hoa/browser --project-name=nekohoa-dev --branch=preview-<sha>`. *(Amended by PR #120, a 020-D follow-up: cookie auth binds the refresh token to its login origin, so the pre-promotion frontend must call the candidate.)*
+3. **Deploy frontend preview**: `npm ci`; point `src/environments/environment.dev.ts` at the **candidate** URL; `npm run build -- --configuration=dev`; stamp `_headers` for that origin (`neko-hoa/scripts/stamp-headers.mjs`); then `pages deploy dist/neko-hoa/browser --project-name=nekohoa-dev --branch=preview-<sha>`. *(Amended by PR #120, a 020-D follow-up: cookie auth binds the refresh token to its login origin, so the pre-promotion frontend must call the candidate.)*
 4. **E2E gates**: (a) the Cypress suite (`npm run e2e:dev`) against the preview URL; (b) read `<SHARED_SECRET_PREFIX or dev>-scheduler-secret` from Secret Manager (PR #100, 017-A) and run the Playwright `@smoke` subset (`npm run e2e:playwright-smoke`) against the preview URL and candidate API (specs/012; curated by specs/014 FR-005, PR #71). Fail the job on any failure.
 5. **Promote (only if steps 1–4 pass)**:
    - Backend: `gcloud run services update-traffic nekohoa-api-dev --to-tags candidate=100`.

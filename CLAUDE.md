@@ -244,4 +244,29 @@ whenever a change implements, modifies, or claims to complete a Spec Kit feature
   Whatever is left after the last pass moves to a follow-up issue and the **Spec test verdict** check
   passes, so it never blocks for good. To dispute a finding, reply on the PR with its ID and evidence.
 
+## Documentation is executable: the docs gate runs on every PR
+
+`scripts/docs-test.sh` runs the examples and claims in our Markdown, and
+`.github/workflows/docs-test.yml` gates every pull request to `main` or `develop` on the
+documents it touches.
+Run `scripts/docs-test.sh --changed origin/main` before you push a documentation change.
+What it holds you to:
+
+- A **backticked path rooted at a top-level directory is a claim that the path exists** —
+  `neko-hoa/src/_headers`, `HOAManagementCompany/Program.cs`. Prose with a slash in it, and a
+  path with an ellipsis in it, are not claims. When you write about something that was
+  removed, leave the path as prose instead of backticking it.
+- A **documented command has to be real**: `npm run <script>` must exist in
+  `neko-hoa/package.json`, `dotnet … --project <path>` must point at a project, and
+  `docker compose <command> <service>` must name a service the compose file defines.
+- **Shell blocks must parse** as bash (`<placeholders>` are fine), and **`json` and `yaml`
+  blocks must parse**. A block that is a fragment rather than a whole document says so with
+  `docs-test=skip reason="..."` on its fence line.
+- `tasks.md`, `plan.md`, `research.md`, handoffs and `docs/patch-notes.md` are
+  **point-in-time**: the backticked paths in their prose are not checked, which matches
+  constitution section 11. Their links and their examples still are. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
+
+The annotation contract — including how to make a block actually execute in CI — is in
+`docs-tests/README.md`.
+
 <!-- MANUAL ADDITIONS END -->

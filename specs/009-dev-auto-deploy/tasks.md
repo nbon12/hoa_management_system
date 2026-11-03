@@ -41,7 +41,7 @@ frontend; US3 makes deploys safe; US4 verifies isolation.
 
 **Deferred (NOT in PR #35):**
 - **Phase 1 provisioning (T001–T006)** → delivered declaratively by the **IaC feature** instead of
-  by hand. See [`HANDOFF-infra-as-code.md`](./HANDOFF-infra-as-code.md) (OpenTofu).
+  by hand. See [`010-dev-env-iac-opentofu`](../010-dev-env-iac-opentofu/spec.md) (OpenTofu).
 - **Phase 6 isolation verification (T028–T031, T031a)** and **Phase 7 live polish (T032, T033,
   T035)** → require the provisioned, deployed Dev environment; verify after the first live deploy.
 - **Known limitation:** the E2E gate (T023/T024) is currently frontend-only (Cypress specs stub the

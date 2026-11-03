@@ -6,7 +6,7 @@
 > **Delivery status (PR #35):** The backend startup refactor, frontend `dev` config, and the
 > (gated-off) `deploy-dev` pipeline are shipped. **Deferred:** environment **provisioning** is moved
 > to a follow-up Infrastructure-as-Code feature (OpenTofu) — see
-> [`HANDOFF-infra-as-code.md`](./HANDOFF-infra-as-code.md) — and **live verification** runs after the
+> [`010-dev-env-iac-opentofu`](../010-dev-env-iac-opentofu/spec.md) — and **live verification** runs after the
 > first real deploy. Full breakdown in [`spec.md`](./spec.md) → "Delivery Status & Deferred Scope"
 > and [`tasks.md`](./tasks.md) → "Status & deferred scope".
 

@@ -11,3 +11,13 @@ updates:
     labels:
       - dependencies
       - github-actions
+
+  # The documentation test harness (Sybil, pytest, PyYAML) is version-pinned.
+  - package-ecosystem: pip
+    directory: /docs-tests
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies

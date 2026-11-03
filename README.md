@@ -45,3 +45,19 @@ open http://localhost:5212/swagger
 - **Frontend (canonical)**: [`neko-hoa/`](neko-hoa/) — Angular app
 - **Tests**: backend `dotnet test --filter "Category!=Sandbox"` from repo root (Docker required for Testcontainers; see [`HOAManagementCompany.Tests/README.md`](HOAManagementCompany.Tests/README.md)); frontend `npm run test:ci` from `neko-hoa/`
 <!-- REPOWISE:END -->
+
+## Documentation tests
+
+Our Markdown is executable. `scripts/docs-test.sh --changed origin/main` runs the
+examples and checks the claims in the documents a change touches — shell blocks
+parse, documented commands and paths exist, JSON and YAML payloads parse, links
+resolve — and annotated blocks really run. The
+[Docs Tests](.github/workflows/docs-test.yml) workflow gates pull requests on the
+documents they touch and sweeps the whole corpus weekly.
+
+```bash
+scripts/docs-test.sh --changed origin/main   # the documents this change touches
+scripts/docs-test.sh --all                   # everything
+```
+
+See [`docs-tests/README.md`](docs-tests/README.md) for the annotation contract.
