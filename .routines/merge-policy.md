@@ -46,7 +46,7 @@ draft. It can't check the rest, so:
 ## Guarded paths
 
 These are the code that enforces the guardrails, or that moves money or identity: all of `.github/`,
-`scripts/pr-env-*`, `.routines/`, the constitution, any `CLAUDE.md`, `infra/`, Auth, Payments and
+`scripts/pr-env-*`, `scripts/spec-test-review*`, `.routines/`, the constitution, any `CLAUDE.md`, `infra/`, Auth, Payments and
 migrations. The exact list is `GUARDED_PATHS` in `.github/workflows/auto-merge.yml`, which keeps these
 PRs out of auto-merge. Change the list there, and only there.
 

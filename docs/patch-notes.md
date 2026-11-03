@@ -6,6 +6,47 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-02 · Spec test review: tests are checked against the spec, and fixed automatically · [#304](https://github.com/nbon12/hoa_management_system/pull/304)
+
+Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **PRs to `main` get a new check, `Spec test verdict`** (`.github/workflows/spec-test-review.yml`).
+  - **When it runs:** when a PR is opened ready, marked ready, reopened, or pushed to while ready.
+  - **What passes without a review:** drafts, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/`.
+  - **Fork PRs fail it.** They get no secrets, so a maintainer merges those.
+- **The `CLAUDE.md` NLT rule is now enforced, not only advisory.** Claude maps each Acceptance Scenario and Independent Test the PR touches (`US3-AS4`, `US3-IT`) to its test and judges the test Faithful, Weak, Missing or Skipped.
+  - It probes suspect tests: it breaks the behavior in production code and runs only that test. A test that survives is a confirmed finding.
+  - Blocking findings are scenarios whose behavior, code or test the diff adds or changes. Gaps elsewhere in the touched stories are listed as earlier debt and don't count.
+- **Findings are fixed automatically, and the loop always ends green.**
+  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, in a read-only job. A separate job applies its patch to a clean checkout and pushes to the PR branch with `MERGE_TOKEN`, which starts the next review. **Pull before you push again.**
+  - A guard refuses an attempt that changes anything but test code, skips or focuses a test (including `Skip.If`), or ends with fewer test declarations or assertions than it started with. A refused attempt uses up that attempt, and the next pass retries with the refusal reason in front of it.
+  - Commits carry a `Spec-Test-Review-Fix: <n>` trailer. After three attempts, or when there's nothing the fixer can change (for example, the faithful test fails because the code is wrong), the last pass files the remaining findings in a follow-up issue, "Spec test gaps deferred from #N", and the check passes.
+  - A later green pass on the same PR closes that issue.
+  - A review that crashes is retried once. If it still can't run (an outage, or a missing or expired Claude token), it gets its own issue, "Spec test review couldn't run on #N", and the check passes. Constitution section 14 says a credentials problem must not block a merge, but the maintainer is told. Watch for these issues: they mean PRs are merging unreviewed.
+  - If a follow-up issue can't be filed, the check fails instead of passing silently.
+- **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
+- **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
+- **Auto-merge (#306) knows about it.** `auto-merge.yml` re-decides when "Spec test review" finishes. The inner jobs ("Review tests against specs", "Fix the tests", "Push the fix") hold the merge while they run, but how they ended doesn't count: `Spec test verdict` speaks for them.
+- **A PR can't loosen its own review.** The jobs run `main`'s copy of `scripts/spec-test-review.sh`, and claude-code-action runs `main`'s `.claude/` (the procedure). `scripts/spec-test-review*` is now a guarded path (`GUARDED_PATHS` in `auto-merge.yml`).
+- **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
+
+**Shared pieces you can reuse**
+
+- `/review-spec-tests <PR#>` (`.claude/commands/review-spec-tests.md`) runs the same review in a session before you mark a PR ready. Probes edit the working tree, so they only run on a clean checkout of the PR.
+  - In CI, claude-code-action restores `.claude/` and `CLAUDE.md` from `main`, so a PR is always reviewed under `main`'s procedure. A change to the procedure takes effect once it merges.
+- `scripts/spec-test-review.sh` holds the deterministic parts, each tested in `scripts/tests/spec-test-review.test.sh`:
+  - `scope`: whether a PR needs review;
+  - `patch`: the fixer's changes as a patch;
+  - `guard`: what a fix may commit;
+  - `push`: commit and push a fix attempt;
+  - `decide`: the check, including the follow-up issue;
+  - `post`: the sticky comment.
+- The fix pushes use `MERGE_TOKEN`. A push made with `GITHUB_TOKEN` starts no workflows, so it would never be reviewed.
+
+---
+
 ## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · [#308](https://github.com/nbon12/hoa_management_system/pull/308)
 
 Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §5 and §8 (#295, [decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)). Spec: [`specs/010-dev-env-iac-opentofu/spec.md`](../specs/010-dev-env-iac-opentofu/spec.md) FR-026 (amended). No application change.
