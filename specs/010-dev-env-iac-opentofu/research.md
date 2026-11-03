@@ -119,13 +119,15 @@ Decision / Rationale / Alternatives.
   via `google-github-actions/auth` (WIF, `workload_identity_provider` + `service_account`), runs
   `tofu init/fmt -check/validate/plan` for `environments/dev`, and posts the plan summary to the PR.
   `infra-apply.yml` triggers on `push` to `main` with `paths: [infra/**]`; the Dev apply job runs
-  automatically; a Prod apply job (added when Prod exists) targets a protected GitHub **Environment**
-  (`prod`) with a required reviewer so it pauses for approval (clarified, FR-026). Cloudflare/Neon
+  automatically. A Prod apply job (added when Prod exists) also runs automatically behind the FR-026
+  gates while `PROD_OPS_AUTOMATED` is `on` (amended 2026-11-02, decision D2, which replaced the
+  required-reviewer Environment). Cloudflare/Neon
   credentials come from GitHub **secrets** consumed as `TF_VAR_*`; no secret is committed.
 - **Rationale**: Path-filtered, WIF-authenticated, environment-gated — matches FR-025/FR-026/FR-027
   and the clarified per-env gate policy.
 - **Alternatives**: Apply everything behind manual approval (rejected per clarification for
-  Dev/Staging); auto-apply Prod (rejected — Prod must be gated).
+  Dev/Staging). A required reviewer on Prod was the original choice, replaced on 2026-11-02 by
+  automated gates and a kill switch (constitution §14).
 
 ## 9. Secrets handling & outputs
 

@@ -1,7 +1,11 @@
 # Merge policy: when a session merges its own PR
 
-Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 (issue #295). Decision D1 is still open
-there. Until nbon12 answers it, sessions follow the recommended answer, which is what this file says.
+Source: `docs/handoffs/2026-11-02-zero-touch-operations.md` §3 and its §8 decision D1 (issue #295), which
+nbon12 answered on 2026-11-02 ([decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)): guarded-path PRs get an automated review and merge without asking for
+permission. Constitution §14 ("Merge on green, always") requires the same thing. Never ask nbon12 to
+review, approve or merge a PR. The one exception is a constitution amendment (below). Since #311, the
+independent review runs in a subagent rather than the handoff's separate session (see
+`docs/patch-notes.md`).
 
 A session's own PR is merged by `.github/workflows/auto-merge.yml` once the session marks it ready (see
 [Auto-merge](#auto-merge)), unless it touches a guarded path: then the session **squash-merges it**
@@ -42,19 +46,28 @@ draft. It can't check the rest, so:
 ## Guarded paths
 
 These are the code that enforces the guardrails, or that moves money or identity: all of `.github/`,
-`scripts/pr-env-*`, `.routines/`, the constitution, any `CLAUDE.md`, `infra/`, Auth, Payments and
+`scripts/pr-env-*`, `scripts/spec-test-review*`, `.routines/`, the constitution, any `CLAUDE.md`, `infra/`, Auth, Payments and
 migrations. The exact list is `GUARDED_PATHS` in `.github/workflows/auto-merge.yml`, which keeps these
 PRs out of auto-merge. Change the list there, and only there.
 
 ## Independent automated review (guarded paths)
 
-1. **Start a separate reviewer session.** Use `create_session` with this repo as the source, titled
-   "Review <owner>/<repo>#<n>". Give it only the PR link and tell it to read the diff from the PR.
-   Don't give it your own summary or conclusions. Its prompt: run the `code-review` skill at `high`
-   against that PR with `--comment`, so its findings are posted on the PR, and then end its turn.
+1. **Start an independent reviewer.** Spawn a fresh subagent (the `Agent` tool, `general-purpose`) and
+   pass it the `model` this session runs on, so the review never falls to a cheaper default. This
+   policy, linked from `CLAUDE.md`, is nbon12's standing request for that subagent: don't ask first. It
+   runs in any turn with no click. If it fails to start or errors, retry it once.
+   - **Fallback, only if the retry fails too:** a separate session titled "Review <owner>/<repo>#<n>".
+     In a cloud or routine session, `create_session` starts one with no click. In the desktop app,
+     `start_session` starts one only on nbon12's own message. From any other turn it becomes a card
+     nbon12 has to click, so don't leave it at that. Say on the PR that the merge is waiting for a
+     reviewer and why, then start the reviewer yourself in the next turn nbon12 starts.
+
+   Either way, give the reviewer only the PR link and tell it to read the diff from the PR. Don't give it
+   your own summary or conclusions. Its prompt: run the `code-review` skill at `high` against that PR
+   with `--comment`, so its findings are posted on the PR, and then end its turn.
 2. **Fix every confirmed blocking finding.** Push the fixes, and answer each finding on the PR: fixed, or
-   why it isn't a problem. If you make more than a small, targeted fix, have a new reviewer session check
-   it again.
+   why it isn't a problem. If you make more than a small, targeted fix, have a new reviewer check it
+   again.
 3. **Merge, then notify.** When rules 1–4 hold again, merge. Then send nbon12 one push notification
    (`PushNotification`), such as "merged #N touching guarded paths: <paths>", so they can review it after
    the fact.
