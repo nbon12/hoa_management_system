@@ -187,6 +187,11 @@ two ways:
 - **Weekly sweep** — the whole corpus with pinned .NET and Node, so annotated
   blocks run against the versions we ship, plus an external link check. It files
   one issue when something has rotted and closes it when the sweep is clean again.
+  The link check skips what our documentation *names* rather than links to —
+  localhost and private addresses, Stripe and GitHub OIDC endpoints cited as CSP
+  origins, environments that come and go, and URLs with a placeholder in them.
+  The exclusions are listed in the workflow; add to them rather than letting the
+  sweep cry wolf.
 
 A pull request that touches no documents collects no document tests, so the gate
 costs nothing on code-only changes.

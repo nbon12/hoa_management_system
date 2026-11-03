@@ -107,10 +107,23 @@ jobs:
         if: always()
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
+          # The excludes are URLs our documentation *names* rather than links to:
+          # localhost and private ranges (examples), API endpoints and CSP origins
+          # that answer nothing to a GET, environments that come and go, and URL
+          # shapes with a placeholder in them. Checked against the corpus before
+          # this landed — without them the first sweep files an issue about ten
+          # URLs, none of which is documentation rot.
           args: >-
             --no-progress
             --max-retries 2
-            --accept 200,204,206,429
+            --accept 200,204,206,401,403,429
+            --exclude-all-private
+            --exclude '^https?://(api|api-dev|www)?\.?nekohoa\.com'
+            --exclude 'nekohoa-dev\.pages\.dev'
+            --exclude '^https?://(pr-|nekohoa-api-pr-)'
+            --exclude '^https?://(api|hooks)\.stripe\.com'
+            --exclude '^https?://token\.actions\.githubusercontent\.com'
+            --exclude 'github\.com/users/nbon12/projects'
             --exclude-path node_modules
             --exclude-path .cursor
             --exclude-path .claude
