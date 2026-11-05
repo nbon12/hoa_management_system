@@ -30,9 +30,11 @@ Read this first. Where it differs from the plan below, this section wins.
   `infra/environments/prod` exists.
 - **D3:** the default limits stay.
 
-O1–O3 are done (O1 and O2 confirmed live on 2026-11-02). Z2–Z6 passed
-([results on #295](https://github.com/nbon12/hoa_management_system/issues/295)). Only Z1 of S7 is left,
-and it is scheduled to run on its own after the P3 window clears on 2026-11-03.
+O1–O3 are done (O1 and O2 confirmed live on 2026-11-02). Z1–Z6 all passed
+([results on #295](https://github.com/nbon12/hoa_management_system/issues/295)). Z1 ran on 2026-11-05 in
+[run 42112153298](https://github.com/nbon12/hoa_management_system/actions/runs/42112153298): the policy gate
+passed, P6 refused with "PR #217 has no state lock", and the run started without an approval wait. Every
+task is done, and #295 is closed.
 
 **Done in the S1/S2/S4–S6 PR:**
 - **S1.** `pr-env-repair.yml` runs `scripts/pr-env-policy-gate.sh` in place of "Require the ops approval
@@ -349,7 +351,7 @@ in "Ops scripts (shellcheck + tests)": P7's name filter must reject a shared nam
   `sweep-log`). Workflows comment on it on failure.
 - [x] **S6.** Check the ruleset's `require_extra_approval_for_unattributed_changes` against GitHub's
   documentation, and confirm a session's squash merge isn't blocked by it. Record the result here.
-- [ ] **S7.** After O1 and O2: run Z1–Z6, post the results, and close the tracking issue when they
+- [x] **S7.** After O1 and O2: run Z1–Z6, post the results, and close the tracking issue when they
   all pass.
 
 ### Owner, one time
