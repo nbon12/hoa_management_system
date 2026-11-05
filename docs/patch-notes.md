@@ -6,6 +6,30 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-05 · Done story sweep: the hoa dispatcher was archived; repaired, and dispatchers now refuse to be archivable · [#320](https://github.com/nbon12/hoa_management_system/pull/320)
+
+Tooling only.
+
+**What happened**
+
+- **The hoa dispatcher session was archived on 2026-11-02 at 18:20 UTC**, seconds after its verification re-run. The session itself didn't do it, and the cause isn't known.
+- **Its scheduled task didn't turn off.** On 2026-11-03 it rebound to a fresh scheduled session with no session tools or repo, so the 11-03, 11-04 and 11-05 dispatch runs did nothing.
+- **The watchdog caught it** and pushed "didn't run" each day. mmo-engine's dispatcher ran normally.
+
+**Repair (2026-11-05)**
+
+- A new dispatcher session, "Done story sweep dispatcher: hoa_management_system (scheduled daily; do not archive)", now has a new daily task at 5:17 AM America/New_York (`CRON_TZ=America/New_York 17 5 * * *`), "Done story sweep dispatch: hoa_management_system". The broken task was deleted, and a catch-up sweep ran the same day.
+- **Assumption that no longer holds:** "archiving the dispatcher disables its task" (the #289 entry). The task keeps running, bound to a session that can't sweep, so the watchdog is the only signal. Repair it as the #289 entry says.
+
+**Changes**
+
+- `.routines/done-story-sweep.md` Step 0:
+  - **Lost dispatcher:** a run that starts from the dispatch task's prompt but has no session tools means the dispatcher session is gone, or someone pressed "Run now" on the dispatch task. It pushes at once, saying to check that the dispatcher session is still active and to recreate it only if not, and stops, instead of falling into watchdog mode. This only fires if that session can read the routine: the fresh sessions seen on 2026-11-02 had no GitHub access, so it may not, and the 6:30 watchdog stays the guaranteed signal.
+  - **Never archivable:** the dispatcher ends every reply by saying the chat must not be archived, and answers no when asked. Sessions now end replies with an "archivable" note.
+  - The watchdog's likely-cause text no longer says archiving disables the task.
+
+---
+
 ## 2026-11-02 · Documentation is executable: a docs gate on every PR · [#309](https://github.com/nbon12/hoa_management_system/pull/309)
 
 No application code. It adds a blocking pull request check over the Markdown a change touches, so it will fail your PR if a document says something that is not true.
@@ -293,9 +317,9 @@ Tooling only. No application behavior, API or data change.
 
 **Dispatcher setup / repair** (if the watchdog says the dispatcher didn't run)
 
-1. The usual cause is that the dispatcher session was archived, which disables its scheduled task. From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
+1. The usual cause is that the dispatcher session was archived~~, which disables its scheduled task~~. (Corrected 2026-11-05: the task keeps running, rebound to a fresh session that can't sweep; see that entry.) From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
 2. Point a daily task at it: `create_trigger` with `persistent_session_id` set to the new session, the old task's cron and the old task's prompt. Then delete the old task.
-3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools, and that session only runs the watchdog check (seen 2026-11-02). Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
+3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools (seen 2026-11-02). Since 2026-11-05 that session takes the routine's "Lost dispatcher" path and pushes a false alarm, so check that the dispatcher session is still active before recreating anything. Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
 
 **Left open**
 
