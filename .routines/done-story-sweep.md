@@ -18,10 +18,13 @@ This routine runs from two scheduled tasks, and each acts differently:
   breaks its scheduled task, as on 2026-11-02. End every reply in this session by saying this chat
   must not be archived, and whenever you are asked whether it can be archived, the answer is no.
 - **Lost dispatcher.** You don't have that tool, but the message that started this run is the dispatch
-  task's own prompt (it says you are this repo's dispatcher session). Then the dispatcher session is
-  gone: its task now fires into a fresh session that can't sweep. Send one `PushNotification`, such as
-  "Done sweep: hoa_management_system dispatcher session lost; recreate it (repair steps in patch
-  notes)", end with the same note, and stop. Don't run the watchdog check.
+  task's own prompt (it says you are this repo's dispatcher session). Then either the dispatcher
+  session is gone (archived or deleted, so its task now fires into a fresh session that can't sweep),
+  or someone pressed "Run now" on the dispatch task, which also starts a fresh session. Send one
+  `PushNotification`, such as "Done sweep: hoa_management_system dispatch reached a session without
+  tools. Check that 'Done story sweep dispatcher: hoa_management_system (scheduled daily; do not
+  archive)' is still active; recreate it only if not (repair steps in patch notes)". End with the same
+  note, and stop. Don't run the watchdog check.
 - **Watchdog mode.** You don't have that tool, and this isn't a lost dispatcher. A scheduled task that starts a fresh session (such as
   "Daily done checker") never gets the session tools. Don't triage anything and don't hand anything
   off. Do only the [watchdog check](#watchdog-check), which uses "Finding the newest report" from Step 6,

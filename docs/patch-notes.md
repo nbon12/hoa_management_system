@@ -24,7 +24,7 @@ Tooling only.
 **Changes**
 
 - `.routines/done-story-sweep.md` Step 0:
-  - **Lost dispatcher:** a run that starts from the dispatch task's prompt but has no session tools means the dispatcher is gone. It now pushes "dispatcher session lost; recreate it" at once and stops, instead of falling into watchdog mode.
+  - **Lost dispatcher:** a run that starts from the dispatch task's prompt but has no session tools means the dispatcher session is gone, or someone pressed "Run now" on the dispatch task. It pushes at once, saying to check that the dispatcher session is still active and to recreate it only if not, and stops, instead of falling into watchdog mode.
   - **Never archivable:** the dispatcher ends every reply by saying the chat must not be archived, and answers no when asked. Sessions now end replies with an "archivable" note.
   - The watchdog's likely-cause text no longer says archiving disables the task.
 
@@ -319,7 +319,7 @@ Tooling only. No application behavior, API or data change.
 
 1. The usual cause is that the dispatcher session was archived~~, which disables its scheduled task~~. (Corrected 2026-11-05: the task keeps running, rebound to a fresh session that can't sweep; see that entry.) From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
 2. Point a daily task at it: `create_trigger` with `persistent_session_id` set to the new session, the old task's cron and the old task's prompt. Then delete the old task.
-3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools, and that session only runs the watchdog check (seen 2026-11-02). Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
+3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools (seen 2026-11-02). Since 2026-11-05 that session takes the routine's "Lost dispatcher" path and pushes a false alarm, so check that the dispatcher session is still active before recreating anything. Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
 
 **Left open**
 
