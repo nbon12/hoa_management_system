@@ -6,7 +6,7 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-05 · Done story sweep: the hoa dispatcher was archived; repaired, and dispatchers now refuse to be archivable · [#PR_HOA](https://github.com/nbon12/hoa_management_system/pull/PR_HOA)
+## 2026-11-05 · Done story sweep: the hoa dispatcher was archived; repaired, and dispatchers now refuse to be archivable · [#320](https://github.com/nbon12/hoa_management_system/pull/320)
 
 Tooling only.
 
