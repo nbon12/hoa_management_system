@@ -18,12 +18,15 @@ Tooling only.
 
 **Repair (2026-11-05)**
 
-- A new dispatcher session, "Done story sweep dispatcher: hoa_management_system", now has a new daily 5:17 task, "Done story sweep dispatch: hoa_management_system". The broken task was deleted, and a catch-up sweep ran the same day.
+- A new dispatcher session, "Done story sweep dispatcher: hoa_management_system (scheduled daily; do not archive)", now has a new daily task at 5:17 AM America/New_York (`CRON_TZ=America/New_York 17 5 * * *`), "Done story sweep dispatch: hoa_management_system". The broken task was deleted, and a catch-up sweep ran the same day.
 - **Assumption that no longer holds:** "archiving the dispatcher disables its task" (the #289 entry). The task keeps running, bound to a session that can't sweep, so the watchdog is the only signal. Repair it as the #289 entry says.
 
 **Changes**
 
-- `.routines/done-story-sweep.md` Step 0: the dispatcher must never be archived. Sessions now end replies with an "archivable" note; a dispatcher must always answer no.
+- `.routines/done-story-sweep.md` Step 0:
+  - **Lost dispatcher:** a run that starts from the dispatch task's prompt but has no session tools means the dispatcher is gone. It now pushes "dispatcher session lost; recreate it" at once and stops, instead of falling into watchdog mode.
+  - **Never archivable:** the dispatcher ends every reply by saying the chat must not be archived, and answers no when asked. Sessions now end replies with an "archivable" note.
+  - The watchdog's likely-cause text no longer says archiving disables the task.
 
 ---
 
@@ -314,7 +317,7 @@ Tooling only. No application behavior, API or data change.
 
 **Dispatcher setup / repair** (if the watchdog says the dispatcher didn't run)
 
-1. The usual cause is that the dispatcher session was archived, which disables its scheduled task. From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
+1. The usual cause is that the dispatcher session was archived~~, which disables its scheduled task~~. (Corrected 2026-11-05: the task keeps running, rebound to a fresh session that can't sweep; see that entry.) From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
 2. Point a daily task at it: `create_trigger` with `persistent_session_id` set to the new session, the old task's cron and the old task's prompt. Then delete the old task.
 3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools, and that session only runs the watchdog check (seen 2026-11-02). Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
 

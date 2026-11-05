@@ -10,13 +10,19 @@ This routine runs from two scheduled tasks, and each acts differently:
 
 - **Dispatch mode.** You have `mcp__claude-code-remote__list_sessions` (check with ToolSearch
   `select:mcp__claude-code-remote__list_sessions`). Only the long-lived **dispatcher session**
-  for this repo has it. It is titled "Done story sweep dispatcher: hoa_management_system", and its
+  for this repo has it. It is titled "Done story sweep dispatcher: hoa_management_system (scheduled
+  daily; do not archive)", and its
   daily scheduled task "Done story sweep dispatch: hoa_management_system" messages it every morning.
   Do Steps 1 to 6 below. This session keeps its earlier days' turns, so treat them as history only.
   Re-read every issue, PR and session fresh. **This session must never be archived**: archiving it
-  breaks its scheduled task, as on 2026-11-02. Whenever you are asked whether this chat can be
-  archived, the answer is no.
-- **Watchdog mode.** You don't have that tool. A scheduled task that starts a fresh session (such as
+  breaks its scheduled task, as on 2026-11-02. End every reply in this session by saying this chat
+  must not be archived, and whenever you are asked whether it can be archived, the answer is no.
+- **Lost dispatcher.** You don't have that tool, but the message that started this run is the dispatch
+  task's own prompt (it says you are this repo's dispatcher session). Then the dispatcher session is
+  gone: its task now fires into a fresh session that can't sweep. Send one `PushNotification`, such as
+  "Done sweep: hoa_management_system dispatcher session lost; recreate it (repair steps in patch
+  notes)", end with the same note, and stop. Don't run the watchdog check.
+- **Watchdog mode.** You don't have that tool, and this isn't a lost dispatcher. A scheduled task that starts a fresh session (such as
   "Daily done checker") never gets the session tools. Don't triage anything and don't hand anything
   off. Do only the [watchdog check](#watchdog-check), which uses "Finding the newest report" from Step 6,
   then stop.
@@ -180,11 +186,12 @@ GitHub MCP tools.
    today (mmo-engine). Check the 'Done story sweep dispatch: mmo-engine' scheduled task and its session." Then
    end with a short note. Say which repos are missing a report, and give the newest report date you
    found in each. Also give the likely causes:
-   - the dispatcher session was archived, which disables its scheduled task;
+   - the dispatcher session was archived: its task keeps running, but in a fresh session that can't
+     sweep;
    - the task was paused;
    - a run is still going.
 
-   The repair steps are under "Dispatcher setup / repair" in nbon12/hoa_management_system's docs/patch-notes.md, entry "2026-11-02 · Done story sweep: dispatcher session + watchdog" (https://github.com/nbon12/hoa_management_system/blob/main/docs/patch-notes.md).
+   The repair steps are under "Dispatcher setup / repair" in nbon12/hoa_management_system's docs/patch-notes.md, entry "2026-11-02 · Done story sweep: dispatcher session + watchdog", corrected by the 2026-11-05 entry (https://github.com/nbon12/hoa_management_system/blob/main/docs/patch-notes.md).
 
 ## Worker message
 
