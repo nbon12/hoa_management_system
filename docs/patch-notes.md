@@ -6,6 +6,27 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-05 · Done story sweep: the hoa dispatcher was archived; repaired, and dispatchers now refuse to be archivable · [#PR_HOA](https://github.com/nbon12/hoa_management_system/pull/PR_HOA)
+
+Tooling only.
+
+**What happened**
+
+- **The hoa dispatcher session was archived on 2026-11-02 at 18:20 UTC**, seconds after its verification re-run. The session itself didn't do it, and the cause isn't known.
+- **Its scheduled task didn't turn off.** On 2026-11-03 it rebound to a fresh scheduled session with no session tools or repo, so the 11-03, 11-04 and 11-05 dispatch runs did nothing.
+- **The watchdog caught it** and pushed "didn't run" each day. mmo-engine's dispatcher ran normally.
+
+**Repair (2026-11-05)**
+
+- A new dispatcher session, "Done story sweep dispatcher: hoa_management_system", now has a new daily 5:17 task, "Done story sweep dispatch: hoa_management_system". The broken task was deleted, and a catch-up sweep ran the same day.
+- **Assumption that no longer holds:** "archiving the dispatcher disables its task" (the #289 entry). The task keeps running, bound to a session that can't sweep, so the watchdog is the only signal. Repair it as the #289 entry says.
+
+**Changes**
+
+- `.routines/done-story-sweep.md` Step 0: the dispatcher must never be archived. Sessions now end replies with an "archivable" note; a dispatcher must always answer no.
+
+---
+
 ## 2026-11-02 · Documentation is executable: a docs gate on every PR · [#309](https://github.com/nbon12/hoa_management_system/pull/309)
 
 No application code. It adds a blocking pull request check over the Markdown a change touches, so it will fail your PR if a document says something that is not true.

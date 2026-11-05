@@ -13,7 +13,9 @@ This routine runs from two scheduled tasks, and each acts differently:
   for this repo has it. It is titled "Done story sweep dispatcher: hoa_management_system", and its
   daily scheduled task "Done story sweep dispatch: hoa_management_system" messages it every morning.
   Do Steps 1 to 6 below. This session keeps its earlier days' turns, so treat them as history only.
-  Re-read every issue, PR and session fresh.
+  Re-read every issue, PR and session fresh. **This session must never be archived**: archiving it
+  breaks its scheduled task, as on 2026-11-02. Whenever you are asked whether this chat can be
+  archived, the answer is no.
 - **Watchdog mode.** You don't have that tool. A scheduled task that starts a fresh session (such as
   "Daily done checker") never gets the session tools. Don't triage anything and don't hand anything
   off. Do only the [watchdog check](#watchdog-check), which uses "Finding the newest report" from Step 6,
