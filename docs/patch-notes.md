@@ -6,6 +6,390 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-05 · Done story sweep: the hoa dispatcher was archived; repaired, and dispatchers now refuse to be archivable · [#320](https://github.com/nbon12/hoa_management_system/pull/320)
+
+Tooling only.
+
+**What happened**
+
+- **The hoa dispatcher session was archived on 2026-11-02 at 18:20 UTC**, seconds after its verification re-run. The session itself didn't do it, and the cause isn't known.
+- **Its scheduled task didn't turn off.** On 2026-11-03 it rebound to a fresh scheduled session with no session tools or repo, so the 11-03, 11-04 and 11-05 dispatch runs did nothing.
+- **The watchdog caught it** and pushed "didn't run" each day. mmo-engine's dispatcher ran normally.
+
+**Repair (2026-11-05)**
+
+- A new dispatcher session, "Done story sweep dispatcher: hoa_management_system (scheduled daily; do not archive)", now has a new daily task at 5:17 AM America/New_York (`CRON_TZ=America/New_York 17 5 * * *`), "Done story sweep dispatch: hoa_management_system". The broken task was deleted, and a catch-up sweep ran the same day.
+- **Assumption that no longer holds:** "archiving the dispatcher disables its task" (the #289 entry). The task keeps running, bound to a session that can't sweep, so the watchdog is the only signal. Repair it as the #289 entry says.
+
+**Changes**
+
+- `.routines/done-story-sweep.md` Step 0:
+  - **Lost dispatcher:** a run that starts from the dispatch task's prompt but has no session tools means the dispatcher session is gone, or someone pressed "Run now" on the dispatch task. It pushes at once, saying to check that the dispatcher session is still active and to recreate it only if not, and stops, instead of falling into watchdog mode. This only fires if that session can read the routine: the fresh sessions seen on 2026-11-02 had no GitHub access, so it may not, and the 6:30 watchdog stays the guaranteed signal.
+  - **Never archivable:** the dispatcher ends every reply by saying the chat must not be archived, and answers no when asked. Sessions now end replies with an "archivable" note.
+  - The watchdog's likely-cause text no longer says archiving disables the task.
+
+---
+
+## 2026-11-02 · Documentation is executable: a docs gate on every PR · [#309](https://github.com/nbon12/hoa_management_system/pull/309)
+
+No application code. It adds a blocking pull request check over the Markdown a change touches, so it will fail your PR if a document says something that is not true.
+
+**Changes earlier assumptions**
+
+- **A backticked repository path is now a claim.** `scripts/docs-test.sh` checks that every backticked path in a document exists, so writing about something that was removed means leaving the path as prose instead of backticking it.
+- **Documented commands have to be real.** `npm run <script>` must exist in `neko-hoa/package.json`, `dotnet … --project <path>` must point at a project, `docker compose <command> <service>` must name a service the compose file defines, and `gh workflow run <file>` must name a workflow.
+- **Shell, JSON and YAML blocks have to parse.** Shell blocks go through `bash -n` with `<placeholders>` substituted first; a block that is a fragment rather than a whole document says so with `docs-test=skip reason="..."` on its fence line.
+- **`tasks.md`, `plan.md`, `research.md`, handoffs and this file are point-in-time**, as constitution section 11 says: their examples and links are still checked; the backticked paths in their prose are not. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
+- A block annotated `docs-test=run` is **executed** in CI, on the pull request that introduces it, in a job with no secrets, an unpersisted read-only token and a 10-minute cap. The annotation contract — `cwd`, `needs`, `timeout`, `exit`, `expect`, and the denylist that keeps runnable examples hermetic — is in `docs-tests/README.md`.
+
+**Shared pieces you can reuse**
+
+- `scripts/docs-test.sh --changed origin/main` is what the gate runs; `--all` is the weekly sweep; `--no-exec` skips execution. It builds `.venv-docs-tests/` itself.
+- `.github/workflows/docs-test.yml` has both depths: the PR gate (Python only, seconds) and a Monday sweep over the whole corpus with .NET and Node available plus an external link check. The sweep keeps one issue open while documentation is rotten and closes it when clean.
+- The harness is [Sybil](https://sybil.readthedocs.io/) plus this repository's parsers in `docs-tests/docs_test/`. To check a new fence language, add it to `DEFAULT_LANGUAGES`, write an evaluator, register it in `fences.py`.
+- Scope lives in `docs-tests/docs-test.toml` (corpus, point-in-time documents, deliberately hypothetical paths).
+
+**Fixed on the way in**
+
+`npm run lint` in 008's quickstart (never existed), three links in 009 to a handoff note that was never written (the work shipped as 010), 007's SendGrid sandbox contract pointing at the provider 026 removed, 025's citation of the 021 spec's location, the CSP `_headers` path in 016's contract, two `appsettings` fragments fenced as whole JSON documents, and 020's quickstart commands that only work from `neko-hoa/`. `.claude/settings.local.json` is now git-ignored, as 016's checklist assumes.
+
+**Left open**
+
+- `csharp`, `sql` and `hcl` blocks are not checked at all — checking them needs a toolchain the gate does not have.
+- External links are checked weekly, not per PR, because they are flaky.
+## 2026-11-02 · One "never at-mention Claude" rule in `CLAUDE.md`; sweep finds the newest report by paging · [#313](https://github.com/nbon12/hoa_management_system/pull/313)
+
+Tooling only. These are the review fixes for #312, which merged before they landed.
+
+**Changes earlier assumptions**
+
+- **Root `CLAUDE.md` holds the full rule** ("Never at-mention Claude in what you post to GitHub"). The Done story sweep routine and its worker message restate it in one line, for long-lived sessions that loaded `CLAUDE.md` before the rule existed, and point to it. Every session posts as nbon12: reviewers, hygiene, workers and the dispatcher. The rule:
+  - lists the real triggers: comments, PR review comments, submitted review bodies, and an issue's title or body when it is opened or **assigned**. PR titles and bodies aren't checked;
+  - covers any letter case and text inside backticks or quotes;
+  - forbids opening or assigning an issue that contains the mention.
+- **One rule finds the newest report** on the `sweep-log` issue (Step 6, "Finding the newest report"), for both the notify step (before it posts) and the watchdog. It reads the comment count, fetches only the last page with `perPage: 100`, and steps back a page only if needed. A failed fetch is retried once, then treated as a failed lookup, never as a partial list. Without it, once the log passed 30 comments, bot replies included, either step could read an old report: the notify step would send repeat pushes, and the watchdog would raise a false "didn't run" alert.
+
+**Left open**
+
+- A prompt rule depends on every writer remembering it. The root-cause fix is a guard in `.github/workflows/claude.yml` that tells sessions' text apart from nbon12's own, for example running only when the comment *starts* with the mention, or skipping text that carries the session footer. A label-based guard such as skipping `sweep-log` would only cover the log issue. This is a workflow change, so it needs a separate, guarded-path PR.
+
+---
+
+## 2026-11-02 · Spec test review: tests are checked against the spec, and fixed automatically · [#304](https://github.com/nbon12/hoa_management_system/pull/304)
+
+Issue: [#302](https://github.com/nbon12/hoa_management_system/issues/302). CI only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **PRs to `main` get a new check, `Spec test verdict`** (`.github/workflows/spec-test-review.yml`).
+  - **When it runs:** when a PR is opened ready, marked ready, reopened, or pushed to while ready.
+  - **What passes without a review:** drafts, Dependabot, and PRs that change only Markdown, `docs/`, `specs/` or `wireframes/`.
+  - **Fork PRs fail it.** They get no secrets, so a maintainer merges those.
+- **The `CLAUDE.md` NLT rule is now enforced, not only advisory.** Claude maps each Acceptance Scenario and Independent Test the PR touches (`US3-AS4`, `US3-IT`) to its test and judges the test Faithful, Weak, Missing or Skipped.
+  - It probes suspect tests: it breaks the behavior in production code and runs only that test. A test that survives is a confirmed finding.
+  - Blocking findings are scenarios whose behavior, code or test the diff adds or changes. Gaps elsewhere in the touched stories are listed as earlier debt and don't count.
+- **Findings are fixed automatically, and the loop always ends green.**
+  - On blocking findings, Claude fixes the tests, or disputes a finding with evidence, in a read-only job. A separate job applies its patch to a clean checkout and pushes to the PR branch with `MERGE_TOKEN`, which starts the next review. **Pull before you push again.**
+  - A guard refuses an attempt that changes anything but test code, skips or focuses a test (including `Skip.If`), or ends with fewer test declarations or assertions than it started with. A refused attempt uses up that attempt, and the next pass retries with the refusal reason in front of it.
+  - Commits carry a `Spec-Test-Review-Fix: <n>` trailer. After three attempts, or when there's nothing the fixer can change (for example, the faithful test fails because the code is wrong), the last pass files the remaining findings in a follow-up issue, "Spec test gaps deferred from #N", and the check passes.
+  - A later green pass on the same PR closes that issue.
+  - A review that crashes is retried once. If it still can't run (an outage, or a missing or expired Claude token), it gets its own issue, "Spec test review couldn't run on #N", and the check passes. Constitution section 14 says a credentials problem must not block a merge, but the maintainer is told. Watch for these issues: they mean PRs are merging unreviewed.
+  - If a follow-up issue can't be filed, the check fails instead of passing silently.
+- **The report is one comment with nothing to resolve.** It is an issue comment, not a review thread, and each run rewrites it in place. Each fix attempt also posts a short "Spec test auto-fix" comment.
+- **The check is a merge gate.** Under `.routines/merge-policy.md` rule 1 it blocks a session's merge while it is red. GitHub blocks everyone once `Spec test verdict` is a required status check on `main`.
+- **Auto-merge (#306) knows about it.** `auto-merge.yml` re-decides when "Spec test review" finishes. The inner jobs ("Review tests against specs", "Fix the tests", "Push the fix") hold the merge while they run, but how they ended doesn't count: `Spec test verdict` speaks for them.
+- **A PR can't loosen its own review.** The jobs run `main`'s copy of `scripts/spec-test-review.sh`, and claude-code-action runs `main`'s `.claude/` (the procedure). `scripts/spec-test-review*` is now a guarded path (`GUARDED_PATHS` in `auto-merge.yml`).
+- **Disputing a finding:** reply on the PR with its ID and evidence, then push or re-run the workflow. The next review weighs the evidence and withdraws the finding if it holds.
+
+**Shared pieces you can reuse**
+
+- `/review-spec-tests <PR#>` (`.claude/commands/review-spec-tests.md`) runs the same review in a session before you mark a PR ready. Probes edit the working tree, so they only run on a clean checkout of the PR.
+  - In CI, claude-code-action restores `.claude/` and `CLAUDE.md` from `main`, so a PR is always reviewed under `main`'s procedure. A change to the procedure takes effect once it merges.
+- `scripts/spec-test-review.sh` holds the deterministic parts, each tested in `scripts/tests/spec-test-review.test.sh`:
+  - `scope`: whether a PR needs review;
+  - `patch`: the fixer's changes as a patch;
+  - `guard`: what a fix may commit;
+  - `push`: commit and push a fix attempt;
+  - `decide`: the check, including the follow-up issue;
+  - `post`: the sticky comment.
+- The fix pushes use `MERGE_TOKEN`. A push made with `GITHUB_TOKEN` starts no workflows, so it would never be reviewed.
+
+---
+
+## 2026-11-02 · Decisions D1 and D2: guarded-path PRs merge without asking; Prod deploys are automated · [#308](https://github.com/nbon12/hoa_management_system/pull/308)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §5 and §8 (#295, [decision record](https://github.com/nbon12/hoa_management_system/issues/295#issuecomment-6590561424)). Spec: [`specs/010-dev-env-iac-opentofu/spec.md`](../specs/010-dev-env-iac-opentofu/spec.md) FR-026 (amended). No application change.
+
+**Changes earlier assumptions**
+
+- **D1: never ask nbon12 to review, approve or merge a PR.** A guarded-path PR gets the independent automated review in [`.routines/merge-policy.md`](../.routines/merge-policy.md) and then merges, followed by a notification. Constitution amendments are the only exception (§13, §14).
+- **D2: Prod is no longer gated by a required reviewer.** Spec 010 FR-026 is amended, and the clarification and acceptance scenario 2 change with it.
+  - A scheduled promotion workflow promotes to Prod while repo variable **`PROD_OPS_AUTOMATED`** is exactly `on`. Unset or any other value, including `ON`, refuses the promotion and reports why.
+  - These gates must also pass:
+    - the commit reached Staging at least 24 h ago, with no failed Staging run since;
+    - the Staging smoke and E2E gates pass;
+    - the Prod plan has no delete or replace of a stateful resource.
+  - After the apply, Cloud Run rolls back on its own if health fails within 15 min.
+  - The `prod` GitHub Environment stays: it limits deploys to `main` and scopes the Prod secrets. It just has no reviewer.
+
+**Shared pieces to reuse**
+
+- `scripts/prod-promotion-gate.sh switch|soak|plan`, tested in `scripts/tests/prod-promotion-gate.test.sh`, which CI runs under "Ops scripts". Nothing calls it until Prod exists.
+
+**Left open**
+
+- Build `prod-promote.yml` when `infra/environments/prod` is added. Its shape is sketched at the bottom of `infra-apply.yml`. `PROD_OPS_AUTOMATED` doesn't need setting until then.
+- Z1 (#295 S7) runs on its own once the P3 window clears on 2026-11-03.
+
+---
+
+## 2026-11-02 · Merge policy: the independent review runs in a subagent · [#311](https://github.com/nbon12/hoa_management_system/pull/311)
+
+Process and agent guidance only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **A guarded-path PR is reviewed by a fresh subagent, not a separate session** (`.routines/merge-policy.md`, the independent review's step 1). Pass it your session's `model`. The policy is nbon12's standing request for that subagent, so don't ask first. This replaces "a separate session" in #299's entry below and in the zero-touch handoff's §3.
+- **Why:** in the desktop app, a session can start another session only on nbon12's own message. From an automated turn (an Auto-fix alert, a finished session) the start becomes a card nbon12 has to click, which happened twice on #306.
+- **Fallback:** if the subagent fails twice, start a separate session: `create_session` in the cloud, `start_session` on the desktop. If that can only be a card, say on the PR that it's waiting for a reviewer, and start the reviewer in the next turn nbon12 starts.
+
+---
+
+## 2026-11-02 · Done story sweep: no Claude at-mentions in sweep comments; watchdog reads the newest report · [#312](https://github.com/nbon12/hoa_management_system/pull/312)
+
+Tooling only.
+
+- **Sweep comments no longer start the Claude workflow by accident.** The 18:20 UTC report on #290 quoted the at-sign mention of Claude while describing Step 3. It posted as nbon12, so `claude.yml` ran on the log issue (run 41499658412, "No action taken"). The routine and its worker message now forbid that mention, and the report template says "Claude workflow run" instead. #313 moved the rule into the root `CLAUDE.md`.
+- **The watchdog now reads the newest *report* on the `sweep-log` issue**, meaning nbon12's newest comment that starts with `Done story sweep report`, rather than the newest comment of any kind. A bot reply there can no longer cause a false "didn't run" alert.
+
+---
+
+## 2026-11-02 · Auto-merge for nbon12's PRs once every check passes · [#306](https://github.com/nbon12/hoa_management_system/pull/306)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **Auto-merge** (`.github/workflows/auto-merge.yml`): a ready PR into `main` that nbon12 opens is squash-merged once **every** check on its head has passed (not only the required ones, so `pr-env`'s end-to-end tests count) and every conversation is resolved. That includes every Claude session's PR, since sessions open PRs as nbon12. Dependabot's and anyone else's PRs are untouched.
+- It decides on each PR event and whenever CI, Security Scan, pr-env or Repowise finishes (`workflow_run`). **A new PR workflow must be added to that list**, or PRs it runs on wait for a finish the workflow never hears about.
+- **Left alone (manual):** drafts, the `hold` label, a review requesting changes, a failed or cancelled check, a guarded path (`GUARDED_PATHS` in the workflow, now the one list the merge policy points to), 300+ changed files, a base other than `main`. The run summary says which.
+- **The `auto-merge` label** marks the PRs it is handling. It only turns off auto-merge on those, so `/merge` on a guarded PR still works. `hold` turns off anyone's.
+- **Fails closed:** if a run errors, a last step turns off the PR's auto-merge (using `GITHUB_TOKEN`, so it works even when `MERGE_TOKEN` is broken). It refuses to merge if `main` loses its required checks.
+- Like `/merge`, it merges with `MERGE_TOKEN`, so the squash push still starts the push-to-main workflows.
+
+**Changes earlier assumptions**
+
+- **Settings changed alongside this PR:** `main`'s required checks are now Build & Test, Frontend (neko-hoa), Ops scripts (shellcheck + tests) and the Repowise health gate, as well as the two Trivy scans; and "Require conversation resolution before merging" is on. Before, a PR could merge while Build & Test was still running (#299 did). Labels `auto-merge` and `hold` exist now.
+- **Open a PR as a draft and mark it ready when it is ready to merge.** `.routines/merge-policy.md` and `CLAUDE.md` say so now: marking it ready is the decision to merge, because the workflow can't check the verification list in the description or the patch notes.
+- A session no longer merges its own non-guarded PR; auto-merge does. Guarded-path PRs still follow the merge policy's independent review, and the session merges them.
+- `/merge` (#297, below) works alongside this: the workflow leaves alone auto-merge that `/merge` turned on, so `/merge` is how a guarded PR, or one auto-merge left alone, gets merged once the merge policy's rules hold. Non-guarded PRs no longer need it.
+
+---
+
+## 2026-11-02 · Email-provider removal test scans only git-tracked files · [#291](https://github.com/nbon12/hoa_management_system/pull/291) · Closes [#216](https://github.com/nbon12/hoa_management_system/issues/216)
+
+Test harness only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- `EmailProviderRemovalTests` (026 SC-006) now scans the files `git ls-files` lists under `HOAManagementCompany/`, `HOAManagementCompany.Tests/` and `.github/workflows/`. Untracked and gitignored files, such as a local `appsettings.Secrets.json` with a stale pre-026 email-provider section, no longer fail it. Without git, it falls back to every file on disk, as before.
+- With failure 2 already fixed in #280, a plain local `dotnet test` no longer fails because of a developer's local secrets file. This resolves #216.
+
+---
+
+## 2026-11-02 · `/merge` comment command; the Claude workflow can update PR branches · [#297](https://github.com/nbon12/hoa_management_system/pull/297)
+
+Tooling only. No application behavior, API or data change.
+
+**New**
+
+- **`/merge`** (`.github/workflows/merge-command.yml`): when the owner comments `/merge` (first line, exactly) on an open PR, the workflow marks a draft ready, runs `gh pr update-branch`, then `gh pr merge --squash --auto`. It merges at once if every requirement is met, otherwise GitHub merges when the required checks pass. Conflicts stop it with a comment. No model is involved.
+- It runs only for an owner comment that no app posted: `author_association == OWNER` **and** no `performed_via_github_app`. Comments that Claude cloud sessions post as nbon12 carry `performed_via_github_app: claude`, so **cloud sessions can't trigger `/merge`**. A local agent that comments through nbon12's own `gh` login or browser can, and nbon12 allows it: agents may post `/merge`.
+- It uses the `MERGE_TOKEN` secret (fine-grained PAT: Contents + Pull requests, read/write), not `GITHUB_TOKEN`, so the squash push to `main` still starts the push-to-main workflows. It also needs Settings → "Allow auto-merge".
+
+**Changes earlier assumptions**
+
+- **The Claude workflow (`claude.yml`) can now check and update a PR branch.** It has a full-history checkout, plus `git fetch/log/diff/status/merge/merge-base/rev-parse` and `gh pr view/checks/diff/update-branch`. It still has **no merge tool on purpose**. Before this, "is it ready / update the branch" failed with permission denials (seen on #291).
+- A Claude session subscribed to a PR still won't merge because a GitHub comment asked it to. Merge with `/merge`, the button, or by asking in the session itself.
+
+---
+
+## 2026-11-02 · Constitution 3.2.0: no human gates, human input is feedback after merge · [#300](https://github.com/nbon12/hoa_management_system/pull/300)
+
+Spec: none (constitution amendment). Process and agent guidance only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **The maintainer is no longer a step in the pipeline.** New constitution section 14 ("Autonomous Delivery & Human Input", numbered after Governance so section 13 citations stay valid). New and changed specs, plans, tasks, checklists, quickstarts and PR descriptions must not contain:
+  - tasks or checklist items assigned to a person;
+  - manual verification or QA;
+  - "STOP and validate", approval or sign-off checkpoints;
+  - "things only a human can do" sections.
+
+  Every check is an automated test or CI check. Existing specs are not rewritten only to remove an earlier human step.
+- **Ambiguity is decided, not asked.** Pick the most defensible default, record it under the spec's Assumptions, and continue. No `[NEEDS CLARIFICATION]` markers and no mid-workflow questions. `CLAUDE.md` says this overrides the upstream Spec Kit text that asks the user: the clarification questions in `/speckit.specify` and the "incomplete checklists, proceed anyway?" prompt in `/speckit.implement`.
+- **Unless otherwise specified:** when the maintainer themselves runs `/speckit.specify` or `/speckit.clarify` (or says they want to be involved), the agent engages and asks in those two phases. Plan, tasks, analyze, implement, the PR and the merge stay hands-off either way. Commands an agent, scheduled task or routine starts on its own are never maintainer-driven. The exception relaxes only "decide, don't ask": no human steps in artifacts and merge on green still apply.
+- **A green PR always merges.** When every required check passes, the agent merges it or enables auto-merge, and nobody is asked to review at that stage. CI/CD or ops controls are automated guards (dry run, rate limit, kill switch, audit trail), not required reviewers. Product features where people act (a board vote, a moderation queue) are unaffected.
+- **Exceptions are narrow:** third-party accounts and root credentials, billing, admin-only settings, amending the constitution, and an irreversible action on production data or real money that no guard bounds. Even then the work ships inert and safe by default, the maintainer is told once with exact steps, and nothing blocks a merge.
+- **Templates changed.** The spec template's Constitution Requirements and Assumptions text, the plan template's Constitution Check, and the tasks template: "STOP and VALIDATE" is now "VALIDATE … continue when green", "Deploy/Demo" is "Deploy", quickstart validation is an automated check, and the Polish phase has a human-step audit task.
+- **Testing constitution 2.1:** "approved in writing" now reads "documented in the plan", so it can't be read as an approval gate.
+
+**Left open**
+
+- Amendments to the constitution stay owner-merged under section 13. This one merged on the owner's explicit approval. The owner can relax the rule by amending section 13.
+
+**Read together with the merge policy.** [`.routines/merge-policy.md`](../.routines/merge-policy.md) (#299, handoff task S3) landed first and agrees with section 14: no human review, and guarded paths get an independent *automated* review. `CLAUDE.md` now links it, which closes the open item in the #299 entry below.
+
+---
+
+## 2026-11-02 · Merge policy: sessions merge their own PRs · [#299](https://github.com/nbon12/hoa_management_system/pull/299)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) §3–4 (#295, task S3). Tooling only.
+
+**Changes earlier assumptions**
+
+- **Sessions now squash-merge their own PRs under [`.routines/merge-policy.md`](../.routines/merge-policy.md).** The conditions are:
+  - checks are green;
+  - no unresolved review threads and no "changes requested" review;
+  - the PR is ready, and its description lists what was verified;
+  - patch notes are included when required.
+
+  A PR that touches guarded paths also needs an independent automated review by a separate session, and nbon12 gets a push notification after the merge. These paths are workflows, `scripts/pr-env-*`, `.routines/`, `CLAUDE.md`, `infra/`, Auth, Payments and migrations. Constitution changes stay owner-merged.
+- **The Done story sweep's OWNER ONLY class no longer includes approvals or "merges reserved for the owner".** Workers merge under the policy. The sweep also skips the `ops-log` issue (#296).
+
+**Left open**
+
+- `CLAUDE.md` doesn't link the merge policy yet. The session's auto-mode check refuses `CLAUDE.md` edits.
+
+---
+
+## 2026-11-02 · Zero-touch ops: a policy gate replaces the `ops` approval, the sweep reaps orphans · [#298](https://github.com/nbon12/hoa_management_system/pull/298)
+
+Handoff: [`docs/handoffs/2026-11-02-zero-touch-operations.md`](handoffs/2026-11-02-zero-touch-operations.md) (#295). Tooling only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **`pr-env-repair` writes no longer need a person to approve them.** This takes effect once nbon12 removes the `ops` Environment's required reviewer (handoff task O1). Until then, runs wait for approval *and* pass the new checks. The job now refuses, changes nothing and goes red unless all of these hold (`scripts/pr-env-policy-gate.sh`):
+  - **P1:** repo variable `OPS_AUTOMATION` is `on`. This is the kill switch: unset or `off` refuses.
+  - **P3:** there have been at most 3 write dispatches in 24 h, refused ones included.
+  - **P4:** no other pr-env, teardown or repair run for the PR is unfinished.
+  - **P5:** for `destroy` and `reap`, the PR is closed.
+  - **P8:** the dispatcher has write access.
+  - **P7:** a dry run in the same job plans only this PR's per-PR names (at most 10 resources), or, for `destroy`, only deletes under `module.pr_environment`.
+- **The `allow_open_pr` input is removed.** An open PR's leftovers are reaped by its own next `pr-env` run.
+- **The run-name is now `pr-env-repair <action> dry_run=<bool> (pr-<n>)`.** It still ends in `(pr-<n>)`. P3 counts the `dry_run=false` ones.
+- **`pr-env-sweep` reaps orphans by name on its own.** These are closed PRs' leftovers with no state prefix, the PR 217 class. It acts only once the PR has been closed 24 h, does at most 3 PRs a run, and goes through the same gate and P7 check. The job is red only if orphans remain after the reap.
+- **Failures are reported on the ops log issue [#296](https://github.com/nbon12/hoa_management_system/issues/296)** (label `ops-log`). Each repair write is also summarised on its PR.
+- **#234's Verification 8 and task O10 are superseded** (decision 7 in the 2026-10-26 handoff). Run the new handoff's Z1–Z6 instead, in the order its Status section gives.
+
+**Shared pieces to reuse**
+
+- `scripts/pr-env-policy-gate.sh preflight|check-plan`: callers `repair` and `sweep`.
+- `pr-env-reap.sh` `ITEMS_OUT=<file>` lists what a run would delete or did delete. Stripe and Pages lines now name their host or branch.
+- `pr-env-audit.sh` `ORPHANS_OUT=<file>` lists the closed PRs that have orphans.
+
+**Left open**
+
+- Owner tasks O1 (remove the `ops` reviewer, after this merges), O2 (set `OPS_AUTOMATION=on`) and O3 (answer decisions D1 and D2).
+- S7: run Z1–Z6 once O1 and O2 are done.
+
+---
+
+## 2026-11-02 · Done story sweep: dispatcher session + watchdog · [#289](https://github.com/nbon12/hoa_management_system/pull/289)
+
+Tooling only. No application behavior, API or data change.
+
+**Changes earlier assumptions**
+
+- **A scheduled task that starts a fresh session never gets the session tools.** These are `list_sessions`, `create_session`, `send_message` and the rest. This holds whether the task was made in the claude.ai UI or from a session (both tested 2026-11-02). Its `claude-code-remote` server has at most `add_repo` and the PR subscribe tools. That is why the "Daily done checker" run on 2026-11-02 did nothing.
+- **A session started from another session does have them** (origin `claude_code_mcp_seed`), and so does a scheduled task that messages that session.
+- **The Claude workflow (`claude.yml`) works as of 2026-11-02.** Before that, every real run failed with "Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN … is required". The first successful run was [41497347693](https://github.com/nbon12/hoa_management_system/actions/runs/41497347693). The sweep doesn't start Claude workflow runs. It hands off to sessions, and only counts a Claude workflow run already in progress as "agent already on it" (Step 3).
+
+**How the sweep runs now** (`.routines/done-story-sweep.md`, Step 0 picks the mode)
+
+- **Dispatch:** each repo has a long-lived dispatcher session and a daily scheduled task that messages it:
+  - "Done story sweep dispatcher: hoa_management_system (scheduled daily; do not archive)", messaged by **"Done story sweep dispatch: hoa_management_system"** at 5:17 AM America/New_York;
+  - the mmo-engine pair, messaged at 5:29 AM.
+
+  Each dispatcher runs its own repo's routine: triage, hand off to worker sessions, then post a `Done story sweep report <date>` comment on the open `sweep-log` issue. It sends a push notification only when something new needs nbon12, or a step failed. There is one dispatcher per repo because a session started from a session can't `add_repo` a second repo: auto mode denies it.
+- **Watchdog:** the existing **"Daily done checker"** task (6:30 AM, a fresh session, push notifications on) runs the same file. With no session tools, it only checks that today's report exists in both repos, and pushes a notification if one is missing.
+- The sweep skips the `sweep-log` issue as a candidate.
+
+**Dispatcher setup / repair** (if the watchdog says the dispatcher didn't run)
+
+1. The usual cause is that the dispatcher session was archived~~, which disables its scheduled task~~. (Corrected 2026-11-05: the task keeps running, rebound to a fresh session that can't sweep; see that entry.) From any interactive cloud session, create a new dispatcher session with `create_session`, using that repo as the source and the same title.
+2. Point a daily task at it: `create_trigger` with `persistent_session_id` set to the new session, the old task's cron and the old task's prompt. Then delete the old task.
+3. To test it, don't use "Run now" (`fire_trigger`). On a task bound to a session, it starts a fresh session with no session tools (seen 2026-11-02). Since 2026-11-05 that session takes the routine's "Lost dispatcher" path and pushes a false alarm, so check that the dispatcher session is still active before recreating anything. Instead, create a one-shot task with `run_once_at` and the same `persistent_session_id`, or `send_message` the task's prompt to the session. Then check that today's report appears on the `sweep-log` issue.
+
+**Left open**
+
+- ~~If the dispatcher keeps failing, the watchdog could fall back to posting Claude at-mention comments in this repo.~~ Dropped: sweep comments must never at-mention Claude (2026-11-02, #312 and #313). mmo-engine has no `claude.yml` at all.
+
+---
+
+## 2026-10-31 · Repo hygiene sweep: dead code, duplicate tests, spec/doc reconciliation, small spec fixes · [#280](https://github.com/nbon12/hoa_management_system/pull/280)
+
+One-time first pass of the planned nightly hygiene routine. No API, data or UI change for residents or staff.
+
+**Changes earlier assumptions**
+
+- **Removed shared pieces. Don't call them; use the replacements.**
+  - `ClaimsPrincipalExtensions` (`RequirePropertyId`/`RequireCommunityId`): resident endpoints use `ResidentAccess.RequireAsync` (030).
+  - `AllocationService.ApplyPaymentAsync`: use `LedgerService.AddPaymentAsync`.
+  - `LedgerService.RecomputeBalancesAsync`: running balances are computed per append, and 006 FR-007d forbids mutating ledger entries.
+  - Frontend `BoardService.getMemberships/createMembership/updateMembership` and `ArchitecturalService.getSettings/putSettings`: use `CommunitySettingsService`.
+  - `CommunityService.searchDocuments` and `PaymentsService.getBalance`.
+  - `scripts/setup-test-db.sh` and `HOAManagementCompany.Tests/run-playwright-tests.sh`: tests always use Testcontainers, and the .NET Playwright tests were deleted in June.
+- **Backend OTLP traces and metrics now go to `<OTEL_EXPORTER_OTLP_ENDPOINT>/v1/traces` and `/v1/metrics`.** Before, they went to the bare base URL, which HTTP/protobuf uses verbatim (005 FR-022). Logs and the browser proxy already appended their paths. Set the endpoint to the OTLP *base* URL.
+- **Sign-in lockout settings are validated at startup.**
+  - `Identity:Lockout:MaxFailedAttempts` (1–100) and `LockoutMinutes` (1–1440) are now `IdentityLockoutOptions`.
+  - A bad value fails startup instead of silently weakening lockout. Defaults are unchanged (10 / 30).
+- **The Sandbox test tier skips, rather than errors, without provider secrets.**
+  - The harness now blanks every Twilio key unless both Twilio test credentials are set.
+  - A plain local `dotnet test` with no secrets goes from 10 failures to 8 skipped. This resolves failure 2 of #216.
+- **API fixes from spec 003/006:**
+  - A missing or invalid token now gets `401 { code: "UNAUTHORIZED", message }`; the body used to be empty.
+  - The dashboard `currentBalance` follows ledger `Sequence`, not `EntryDate`, so a backdated payment no longer leaves a stale balance. Same-date ledger rows list by `Sequence`.
+  - `GET /community/documents?pinned=` filters, and `GET /community/events?category=A&category=B` returns the union.
+- **Payment webhook fixes (006):**
+  - A refund that includes the card fee restores only the principal on the owner's ledger (FR-004d).
+  - `charge.refund.updated` is no longer cast to `Charge`, so it no longer fails every time.
+  - A one-time ACH return no longer sends a failure alert (FR-014c: recurring only).
+  - `PUT /payments/recurring` is rate-limited with the `payments` policy.
+- **Manual `security-scan` runs** (`workflow_dispatch`) scan the published `sakurapatch/nekohoa-api:latest`, as the 011 quickstart says. PR and push runs are unchanged.
+- **Per-PR Stripe webhooks** also subscribe to `charge.dispute.created` and `charge.dispute.closed`. They still skip `charge.refund.updated`: its payload is a Refund object, which `WebhookProcessor` can't read.
+- **Spec text now matches what shipped**, with "Amended by PR #…" / "Superseded by specs/NNN" notes. Older specs (005–030) were updated for later specs and for deliberate changes such as Artifact Registry (#242), ARC refinements (031) and SES (026). Stale READMEs were refreshed; the tests README describes Testcontainers.
+
+**Left open**
+
+- Spec gaps too large or too risky for an unattended pass are tracked as `spec-gap` issues: #263–#271 and #273–#279.
+  - The most urgent is #275: nothing schedules `run-drafts`/`reconcile` in deployed environments.
+- The constitution's Docker Hub mandate versus Artifact Registry is #272.
+- Pre-existing: the skipped Cypress test in `alert-preferences.cy.ts` stays parked under #215. Test factories in `HOAManagementCompany.Tests/Factories` are unused but kept, as the constitution's prescribed pattern.
+
+---
+
+## 2026-10-31 · Architecture Police: nightly duplicate-pattern consolidation · [#259](https://github.com/nbon12/hoa_management_system/pull/259)
+
+Tooling only. No application behavior, API or data change.
+
+**What changes for people working nearby**
+
+- The **Architecture Police** scheduled task runs nightly at 4:41 AM America/New_York. It follows `.claude/skills/architecture-police/SKILL.md`.
+- Each run consolidates **one** duplicated pattern into a single shared implementation, with no behavior change. It squash-merges a `refactor(architecture-police): …` PR from an `architecture-police/<date>` branch, but only once every check is green.
+- Each of those PRs adds its own entry here, naming the canonical piece and the removed variants. Read those entries before re-adding a helper.
+- It skips candidates that touch files in other open PRs. A branch opened later may still need a rebase after a night's merge.
+- It never changes `infra/**`, `.github/**`, migrations, `specs/` or `.specify/`. Duplicates found there go into the PR description as findings.
+
+**Shared pieces you can reuse**
+
+- `.claude/skills/architecture-police/find_clones.py` is a standard-library clone finder:
+  - `python3 -I find_clones.py [--fuzzy] [--min-lines N] PATH…`;
+  - `--fuzzy` also matches copies with renamed identifiers;
+  - it is useful before adding a helper, to check whether one already exists.
+
+---
+
 ## 2026-10-29 · Time zone dropdown and plain lapse-rule wording · [#247](https://github.com/nbon12/hoa_management_system/pull/247)
 
 Frontend only, no API or data change. It touches the architectural review form shared by Community settings › Architectural review and Company defaults (030 briefs 07 and 08).

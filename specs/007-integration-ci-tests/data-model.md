@@ -8,6 +8,8 @@ Stage 2 introduces **no database entities and no schema migrations**. The "entit
 
 ### `SendGridOptions` (modified — `Features/Payments/PaymentOptions.cs`)
 
+> **Superseded by specs/026-ses-email-provider (PR #208):** `SendGridOptions` was removed. Email uses `SesOptions`: `Region`, `FromEmail`, `FromName` (default "NekoHOA"), optional `AccessKeyId`/`SecretAccessKey`, and `SimulatorOnly` (default `false`; the sole no-deliver guardrail, which limits recipients to `@simulator.amazonses.com`). `IsConfigured` = `Region` and `FromEmail` non-blank. Stage 2 refuses to send unless `Ses:SimulatorOnly == true` (`RequireSes()`). The table below is historical.
+
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `ApiKey` | string | "" | existing |
@@ -27,9 +29,9 @@ Stage 2 introduces **no database entities and no schema migrations**. The "entit
 | `ApiKeySecret` | string | "" | existing |
 | **`AuthToken`** | **string** | **""** | **NEW** — test-credential Auth Token; enables basic-auth `Init(AccountSid, AuthToken)` when `ApiKeySid` is empty |
 | `FromNumber` | string | "" | existing — must be magic `+15005550006` under test creds |
-| `IsConfigured` | bool (computed) | — | existing: AccountSid + ApiKeySid + ApiKeySecret + FromNumber non-blank |
+| `IsConfigured` | bool (computed) | — | AccountSid + FromNumber non-blank **and** either (ApiKeySid + ApiKeySecret) or AuthToken |
 
-**Note**: `IsConfigured` keeps its current API-key-oriented definition for production. The Stage 2 harness checks the basic-auth fields (`AccountSid`+`AuthToken`+`FromNumber`) explicitly rather than relying on `IsConfigured`, so production semantics are untouched.
+**Note** *(amended 2026-10-31; commit 53ebab3 / PR #29)*: `IsConfigured` accepts either auth pairing, mirroring the adapter's auth selection, so an Auth-Token-only test credential is not reported as "not configured". Production (API-key) behavior is unchanged, and the 008 `TwilioOptionsValidator` uses the same pairing rule. The Stage 2 harness still checks `AccountSid` + `AuthToken` explicitly in `RequireTwilio()`.
 
 ### `StripeOptions` (unchanged)
 
@@ -66,7 +68,7 @@ State is not persisted; it is the xUnit result of each `[Fact]`/`[Theory]`, prod
 These exist only in the providers' sandbox accounts and are created fresh per run (shared-account isolation, Clarifications Q4 — assertions target only self-created objects):
 
 - **Stripe**: test Customer, SetupIntent, PaymentMethod (`pm_card_visa`), PaymentIntent, Charge.
-- **SendGrid**: a sandbox-mode send (validated, never delivered) — no persisted artifact.
+- **SES**: sends to SES mailbox-simulator addresses (`success@` / `bounce@simulator.amazonses.com`). These get a real API response but are never delivered to a person, and no persisted artifact is created. (Previously a SendGrid sandbox-mode send; superseded by specs/026-ses-email-provider.)
 - **Twilio**: a test-credential message attempt against magic numbers — no real message.
 
 ---

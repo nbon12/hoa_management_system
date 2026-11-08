@@ -118,6 +118,17 @@ public class StartupValidationTests
         Assert.NotEmpty(ex.Failures);
     }
 
+    // 016-A FR-A4 / constitution §8: lockout thresholds are validated, not read raw. Zero would
+    // silently weaken or disable per-account lockout.
+    [Theory]
+    [InlineData("Identity:Lockout:MaxFailedAttempts", "0")]
+    [InlineData("Identity:Lockout:LockoutMinutes", "0")]
+    public void InvalidLockoutThreshold_AbortsStartup_NamingTheKey(string key, string value)
+    {
+        var ex = AssertStartupThrows(new Dictionary<string, string?> { [key] = value });
+        Assert.Contains(ex.Failures, f => f.Contains(key, StringComparison.Ordinal));
+    }
+
     [Fact]
     public void PercentageFeeWithAllCardsScope_AbortsStartup()
     {

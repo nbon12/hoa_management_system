@@ -2,7 +2,7 @@
 
 **Feature**: `029-resident-arc-requests` | **Date**: 2026-10-08 (revised after 027 merged) | **Research**: [research.md](./research.md)
 
-029 adds one forward-only EF Core migration, `<timestamp>_AddResidentArcSubmission`, applied idempotently at Cloud Run startup. It adds **two draft tables** and extends the tables `027-board-arc-review` created (migration `20261007011110_AddArchitecturalReview`, merged in #209). It does **not** change the nullability, unique index `(CommunityId, ApplicationNumber, Revision)`, or any existing column of the 027 tables, so every 027 board query, the sweep and the seeder keep working unchanged. Enums are stored as strings, so new values need no DB type change.
+029 adds one forward-only EF Core migration, `20261008222445_AddResidentArcSubmission`, applied idempotently at Cloud Run startup. It adds **two draft tables** and extends the tables `027-board-arc-review` created (migration `20261007011110_AddArchitecturalReview`, merged in #209). It does **not** change the nullability, unique index `(CommunityId, ApplicationNumber, Revision)`, or any existing column of the 027 tables, so every 027 board query, the sweep and the seeder keep working unchanged. Enums are stored as strings, so new values need no DB type change.
 
 > **Why drafts get their own table** (research R3): in the merged code `ArchitecturalApplication.ApplicationNumber`, `ReceivedDate` and `DueDate` are non-nullable and `ArcApplicationFactory` only creates submitted (`Open`) rows. A draft maps 1:1 onto the factory's `ArcNewApplication` input, so submitting a draft is just a call to `CreateFromSettingsAsync` (new request) or `CreateRevisionAsync` (revise and resubmit).
 
@@ -17,7 +17,7 @@
 | `PropertyId` | `uuid` FK → `Properties` (cascade) | Scope: the caller's active property |
 | `CreatedByUserId` | `text` FK → `AspNetUsers` (set null) | |
 | `PreviousRevisionId` | `uuid?` FK → `ArchitecturalApplications` (restrict) | Set for a revise-and-resubmit draft; **unique (filtered, non-null)** — one open revision draft per denied application |
-| `ProjectType` | `varchar(32)` (`ArcProjectType` string) | Required |
+| `ProjectType` | `varchar(30)` (`ArcProjectType` string) | Required |
 | `ProjectTitle` | `varchar(200)` | May be blank while drafting; required at submit |
 | `Description` | `varchar(4000)` | |
 | `PlannedStartDate` | `date?` | Required at submit |

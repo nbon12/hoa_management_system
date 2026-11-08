@@ -144,12 +144,6 @@ interface ApiDraftEntry {
   transactionStatus: string | null;
 }
 
-interface ApiBalance {
-  currentBalance: number;
-  balanceDueDate: string;
-  monthlyAssessment: number;
-}
-
 @Injectable({ providedIn: 'root' })
 export class PaymentsService {
   private readonly base = environment.apiBaseUrl;
@@ -164,20 +158,6 @@ export class PaymentsService {
       this.http.get<ApiLedgerPage>(`${this.base}/payments/ledger`, { params })
     );
     return res.items.map(e => this._mapLedger(e));
-  }
-
-  // ── Balance ───────────────────────────────────────────────────────────────
-
-  async getBalance(): Promise<ApiBalance> {
-    const page = await firstValueFrom(
-      this.http.get<ApiLedgerPage>(`${this.base}/payments/ledger?page=1&pageSize=1`)
-    );
-    const latest = page.items[0];
-    return {
-      currentBalance:    latest?.runningBalance ?? 0,
-      balanceDueDate:    '',
-      monthlyAssessment: 250,
-    };
   }
 
   // ── Drafts ────────────────────────────────────────────────────────────────

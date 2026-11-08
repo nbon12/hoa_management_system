@@ -20,7 +20,6 @@ const MOCK_TRANSACTIONS: TransactionSummary[] = [
 function makeMockPaymentsService(): Partial<PaymentsService> {
   return {
     getLedger:       jasmine.createSpy().and.returnValue(Promise.resolve(MOCK_LEDGER)),
-    getBalance:      jasmine.createSpy().and.returnValue(Promise.resolve({ currentBalance: 300, balanceDueDate: '2026-03-01', monthlyAssessment: 250 })),
     getDrafts:       jasmine.createSpy().and.returnValue(Promise.resolve([])),
     getTransactions: jasmine.createSpy('getTransactions').and.returnValue(Promise.resolve(MOCK_TRANSACTIONS)),
   } as any;

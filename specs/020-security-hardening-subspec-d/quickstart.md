@@ -23,7 +23,7 @@ npm start                                          # http://localhost:4200
 2. **Re-hydration (hint-gated)** — reload: still signed in; Network shows one `POST /api/v1/auth/refresh` (withCredentials). Log out, reload: **no** refresh call fires.
 3. **Cross-tab single-flight (FR-D5)** — open two tabs, let the access token expire (or force 401): exactly one `/auth/refresh` across both tabs (second tab adopts via BroadcastChannel).
 4. **CSP (FR-D2)** —
-   ```bash
+   ```bash cwd=neko-hoa
    npm run build && node scripts/stamp-headers.mjs http://localhost:5212
    grep -q "__API_ORIGIN__" dist/neko-hoa/browser/_headers && echo "FAIL: unstamped" || echo "stamped OK"
    ```
@@ -42,7 +42,7 @@ WHERE "UserId" = (SELECT "Id" FROM "AspNetUsers" WHERE "Email" = 'resident@nekoh
   AND "RevokedAt" IS NULL;
 ```
 
-CI is unaffected: `e2e/global-setup.ts` regenerates auth state at runtime.
+CI is unaffected: no auth state is stored. Each Playwright test logs in for itself through `e2e/helpers/auth.ts` `establishSession`, and `e2e/global-setup.ts` only resets seed state (`DELETE /api/v1/e2e/cleanup`). *(Amended 2026-10-31 by PR #103, commit "test(020-D): per-context API login replaces shared storageState snapshot": strict one-time-use refresh rotation makes a shared cookie snapshot unusable.)*
 
 ## CI wiring
 

@@ -14,9 +14,6 @@ const MOCK_DOCS: HOADocument[] = [
 function makeMockCommunityService(): Partial<CommunityService> {
   return {
     getDocuments:    jasmine.createSpy().and.returnValue(Promise.resolve([...MOCK_DOCS])),
-    searchDocuments: jasmine.createSpy().and.callFake((q: string) =>
-      Promise.resolve(MOCK_DOCS.filter(d => d.name.toLowerCase().includes(q.toLowerCase())))
-    ),
     getDocumentDownloadUrl: jasmine.createSpy().and.returnValue(
       Promise.resolve({ url: 'http://minio.test/hoa-documents/test.pdf', expiresAt: '2026-05-25T12:00:00Z' }),
     ),

@@ -26,9 +26,11 @@
            ASPNETCORE_ENVIRONMENT: Test
            Stripe__SecretKey:            ${{ secrets.STRIPE_SECRET_KEY_TEST }}
            Stripe__WebhookSigningSecret: ${{ secrets.STRIPE_WEBHOOK_SIGNING_SECRET_TEST }}
-           SendGrid__ApiKey:             ${{ secrets.SENDGRID_API_KEY }}
-           SendGrid__FromEmail:          ${{ secrets.SENDGRID_FROM_EMAIL }}
-           SendGrid__Sandbox:            'true'
+           Ses__Region:                  ${{ secrets.SES_REGION }}
+           Ses__FromEmail:               ${{ secrets.SES_FROM_EMAIL }}
+           Ses__AccessKeyId:             ${{ secrets.SES_ACCESS_KEY_ID }}
+           Ses__SecretAccessKey:         ${{ secrets.SES_SECRET_ACCESS_KEY }}
+           Ses__SimulatorOnly:           'true'
            Twilio__AccountSid:           ${{ secrets.TWILIO_TEST_ACCOUNT_SID }}
            Twilio__AuthToken:            ${{ secrets.TWILIO_TEST_AUTH_TOKEN }}
            Twilio__FromNumber:           '+15005550006'
@@ -47,10 +49,14 @@
 |--------|----------|-------|
 | `STRIPE_SECRET_KEY_TEST` | Stripe | `sk_test_…`/`rk_test_…` |
 | `STRIPE_WEBHOOK_SIGNING_SECRET_TEST` | Stripe | `whsec_…` for the test endpoint |
-| `SENDGRID_API_KEY` | SendGrid | any key; safety is sandbox mode, not the key |
-| `SENDGRID_FROM_EMAIL` | SendGrid | a verified sender |
+| `SES_REGION` | SES | e.g. `us-east-1` |
+| `SES_FROM_EMAIL` | SES | verified sender, e.g. `no-reply@mail.nekohoa.com` |
+| `SES_ACCESS_KEY_ID` | SES | send-only IAM user; safety is `Ses__SimulatorOnly`, not the key |
+| `SES_SECRET_ACCESS_KEY` | SES | send-only IAM user |
 | `TWILIO_TEST_ACCOUNT_SID` | Twilio | test Account SID (`AC…`) |
 | `TWILIO_TEST_AUTH_TOKEN` | Twilio | test Auth Token |
+
+(SES replaced SendGrid: specs/026-ses-email-provider/contracts/ci-sandbox-ses.md.)
 
 All are **test-scoped** and distinct from production secrets. `.NET` reads `Section__Key` env vars into `IConfiguration` automatically.
 

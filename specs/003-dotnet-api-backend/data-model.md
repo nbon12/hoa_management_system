@@ -6,7 +6,7 @@
 
 ## Overview
 
-All entities are EF Core classes mapped to PostgreSQL tables. Identity entities (`AspNetUsers`, `AspNetRoles`, etc.) are managed by ASP.NET Core Identity and extended via `ApplicationUser`. Community-scoped entities carry a `CommunityId` string (e.g., `"SAKURA"`) serving as the HOA tenant boundary.
+All entities are EF Core classes mapped to PostgreSQL tables. Identity entities (`AspNetUsers`, `AspNetRoles`, etc.) are managed by ASP.NET Core Identity and extended via `ApplicationUser`. Community-scoped entities carry a `CommunityId` (`uuid`, FK → `Communities.Id`) serving as the HOA tenant boundary. *(Superseded by specs/025-board-overall-design FR-004/FR-006, PR #174: before 2026-08-28 these were `varchar(20)` strings such as `"SAKURA"`.)*
 
 ---
 
@@ -21,7 +21,7 @@ ApplicationUser ──< UserProperty >── Property ──< Owner
                                          ├──< RecurringPayment ──< DraftEntry
                                          └──< Violation
 
-Community (CommunityId string)
+Community (Communities table; CommunityId is a uuid FK since 025)
   ├──< Announcement
   ├── Poll ──< PollOption
   │         └──< PollVote (UserId FK)
@@ -39,10 +39,10 @@ Community (CommunityId string)
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| Id | `uuid` | PK | IdentityUser default |
+| Id | `text` | PK | IdentityUser default (a GUID string). Every `UserId` FK below is `text` too |
 | Email | `varchar(256)` | UNIQUE, NOT NULL | Identity default |
 | NormalizedEmail | `varchar(256)` | UNIQUE | Identity default |
-| PasswordHash | `text` | NOT NULL | Bcrypt via Identity |
+| PasswordHash | `text` | NULL | ASP.NET Core Identity default `PasswordHasher` (PBKDF2) |
 | FirstName | `varchar(100)` | NOT NULL | Extended field |
 | LastName | `varchar(100)` | NOT NULL | Extended field |
 | *Standard Identity columns* | — | — | UserName, SecurityStamp, etc. |
@@ -57,7 +57,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| UserId | `uuid` | FK → AspNetUsers.Id, NOT NULL | Cascade delete |
+| UserId | `text` | FK → AspNetUsers.Id, NOT NULL | Cascade delete |
 | PropertyId | `uuid` | FK → Properties.Id, NOT NULL | Cascade delete |
 | LinkedAt | `timestamptz` | NOT NULL, DEFAULT NOW() |  |
 
@@ -72,7 +72,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| UserId | `uuid` | FK → AspNetUsers.Id, NOT NULL | Cascade delete |
+| UserId | `text` | FK → AspNetUsers.Id, NOT NULL | Cascade delete |
 | TokenHash | `varchar(64)` | NOT NULL | SHA-256 hex of plaintext token |
 | ExpiresAt | `timestamptz` | NOT NULL |  |
 | CreatedAt | `timestamptz` | NOT NULL, DEFAULT NOW() |  |
@@ -89,8 +89,7 @@ Community (CommunityId string)
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
 | AccountNumber | `varchar(50)` | UNIQUE, NOT NULL | HOA account identifier, used at registration |
-| CommunityId | `varchar(20)` | NOT NULL | HOA tenant boundary (e.g., `"SAKURA"`) |
-| CommunityName | `varchar(100)` | NOT NULL |  |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | HOA tenant boundary (025 FR-004). The community name is read from `Communities.CommunityName`; the stored `CommunityName` column was removed |
 | Address | `varchar(200)` | NOT NULL |  |
 | City | `varchar(100)` | NOT NULL |  |
 | State | `varchar(10)` | NOT NULL |  |
@@ -181,11 +180,14 @@ Community (CommunityId string)
 | ChargeAmount | `decimal(10,2)` | NOT NULL, DEFAULT 0 |  |
 | PaymentAmount | `decimal(10,2)` | NOT NULL, DEFAULT 0 |  |
 | RunningBalance | `decimal(10,2)` | NOT NULL |  |
-| EntryType | `varchar(30)` | NOT NULL | `RegularAssessment` \| `Payment` \| `LateFee` \| `FinanceCharge` |
+| EntryType | `varchar(30)` | NOT NULL | `RegularAssessment` \| `Payment` \| `LateFee` \| `FinanceCharge`; 006 adds `Refund` \| `Reversal` \| `Chargeback` \| `ReturnedPaymentFee` \| `Credit` \| `Adjustment` |
+| Sequence | `bigint` | NOT NULL | Monotonic per-property order key; the authoritative order for `RunningBalance` (006 FR-007d) |
+| TransactionId | `uuid` | NULL | FK → PaymentTransactions.Id (006 FR-007e) |
+| FundCode | `varchar(50)` | NULL | Optional GL hook (006 FR-038) |
 | CreatedAt | `timestamptz` | NOT NULL, DEFAULT NOW() |  |
 
 **Index**: `PropertyId`, `EntryDate DESC`  
-**`currentBalance`**: `RunningBalance` of the most recent entry for the property.
+**`currentBalance`**: `RunningBalance` of the entry with the highest `Sequence` for the property (006 FR-007d). This is not necessarily the entry with the latest `EntryDate`, because entries can arrive out of date order.
 
 ---
 
@@ -201,19 +203,15 @@ Community (CommunityId string)
 | Method | `varchar(10)` | NOT NULL | `ach` \| `card` |
 | DraftDay | `int` | NOT NULL, CHECK (1–28) |  |
 | Status | `varchar(10)` | NOT NULL | `active` \| `inactive` |
-| ProcessingFee | `decimal(10,2)` | NOT NULL, DEFAULT 0 | $1.95 for card |
-| — ACH fields — | | | |
-| RoutingNumberMasked | `varchar(20)` | NULL | Last 4 digits only |
-| AccountNumberMasked | `varchar(20)` | NULL | Last 4 digits only |
-| AccountType | `varchar(10)` | NULL | `checking` \| `savings` |
-| — Card fields — | | | |
-| CardNumberMasked | `varchar(10)` | NULL | Last 4 digits only |
-| CardExpiry | `varchar(7)` | NULL | `MM/YY` |
-| CardholderName | `varchar(100)` | NULL |  |
-| BillingZip | `varchar(10)` | NULL |  |
+| ProcessingFee | `decimal(10,2)` | NOT NULL, DEFAULT 0 | Derived per method from `HoaPaymentConfig` at draft time (006 FR-010d); no longer a fixed $1.95 |
+| VaultedPaymentMethodId | `varchar(255)` | NULL | Stripe `pm_…` reference (006 FR-009) |
+| MethodBrand | `varchar(50)` | NULL | Card brand or bank name, display only |
+| MethodLast4 | `varchar(4)` | NULL | Last 4, display only |
+| MethodFunding | `text` | NULL | Card funding type (006 FR-004b) |
+| CurrentAuthorizationId | `uuid` | NULL | FK → PaymentAuthorizations.Id (006 FR-011b) |
 | UpdatedAt | `timestamptz` | NOT NULL, DEFAULT NOW() |  |
 
-**Sensitive data rule**: Full card numbers, CVV, and routing numbers are **never persisted**. Only masked representations are stored.
+**Sensitive data rule**: No card or bank numbers are stored, raw or masked. Only the Stripe vaulted-method reference and the display brand and last 4 are kept. *(Superseded by specs/006-stripe-payments/data-model.md "RecurringPayment (modified)", PR #19: the masked ACH and card columns were dropped by migration `RecurringVaultedMethod`.)*
 
 ---
 
@@ -239,7 +237,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| CommunityId | `varchar(20)` | NOT NULL | HOA tenant boundary |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | HOA tenant boundary (025 FR-006) |
 | Title | `varchar(300)` | NOT NULL |  |
 | Body | `text` | NOT NULL |  |
 | PublishedAt | `timestamptz` | NOT NULL |  |
@@ -261,7 +259,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| CommunityId | `varchar(20)` | NOT NULL | HOA tenant boundary |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | HOA tenant boundary (025 FR-006) |
 | Question | `varchar(500)` | NOT NULL |  |
 | ClosingLabel | `varchar(100)` | NOT NULL | e.g., `"Closes June 30, 2026"` |
 | TotalVotes | `int` | NOT NULL, DEFAULT 0 |  |
@@ -289,7 +287,7 @@ Community (CommunityId string)
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
 | PollId | `uuid` | FK → Polls.Id, NOT NULL |  |
-| UserId | `uuid` | FK → AspNetUsers.Id, NOT NULL |  |
+| UserId | `text` | FK → AspNetUsers.Id, NOT NULL |  |
 | OptionIndex | `int` | NOT NULL |  |
 | VotedAt | `timestamptz` | NOT NULL, DEFAULT NOW() |  |
 
@@ -304,7 +302,7 @@ Community (CommunityId string)
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
 | PropertyId | `uuid` | FK → Properties.Id, NOT NULL |  |
-| CommunityId | `varchar(20)` | NOT NULL |  |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | Set from the property's community (025 FR-006) |
 | Title | `varchar(300)` | NOT NULL |  |
 | Description | `text` | NULL |  |
 | Category | `varchar(20)` | NOT NULL | `Maintenance` \| `Landscape` \| `Architectural` \| `Parking` \| `Noise` \| `Other` |
@@ -326,7 +324,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| CommunityId | `varchar(20)` | NOT NULL | HOA tenant boundary |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | HOA tenant boundary (025 FR-006) |
 | Title | `varchar(300)` | NOT NULL |  |
 | Description | `text` | NULL |  |
 | EventDate | `timestamptz` | NOT NULL |  |
@@ -345,7 +343,7 @@ Community (CommunityId string)
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
 | EventId | `uuid` | FK → CalendarEvents.Id, NOT NULL | Cascade delete |
-| UserId | `uuid` | FK → AspNetUsers.Id, NOT NULL |  |
+| UserId | `text` | FK → AspNetUsers.Id, NOT NULL |  |
 | Attending | `bool` | NOT NULL |  |
 | RsvpdAt | `timestamptz` | NOT NULL, DEFAULT NOW() |  |
 
@@ -359,7 +357,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| CommunityId | `varchar(20)` | NOT NULL | HOA tenant boundary |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | HOA tenant boundary (025 FR-006) |
 | Name | `varchar(300)` | NOT NULL |  |
 | Category | `varchar(20)` | NOT NULL | `Forms` \| `Rules` \| `Governing` \| `Budgets` \| `Minutes` |
 | EffectiveDate | `date` | NOT NULL |  |
@@ -379,7 +377,7 @@ Community (CommunityId string)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | Id | `uuid` | PK |  |
-| CommunityId | `varchar(20)` | NOT NULL | HOA tenant boundary |
+| CommunityId | `uuid` | FK → Communities.Id, NOT NULL | HOA tenant boundary (025 FR-006) |
 | Label | `varchar(100)` | NOT NULL | e.g., `"Landscaping"` |
 | Color | `varchar(20)` | NOT NULL | CSS hex or named color |
 | Amount | `decimal(10,2)` | NOT NULL |  |
@@ -393,11 +391,10 @@ Community (CommunityId string)
 
 | Migration | Description |
 |-----------|-------------|
-| `20260524_InitialSchema` | Creates all tables listed above (except Identity tables, which are handled by `AddDefaultIdentity`) |
-| `20260524_SeedCommunityConstants` | Optional: seeds community metadata row for `SAKURA` |
+| `20260524200408_InitialSchema` | Creates all tables listed above, including the ASP.NET Core Identity tables (`AddIdentityCore` + `AddEntityFrameworkStores`). Seed data comes from the seeder (`--seed`), not a migration |
 
-**Naming convention**: `YYYYMMDD_PascalCaseDescription`  
-**Auto-apply**: `await db.Database.MigrateAsync()` on startup, guarded by environment checks for Production.  
+**Naming convention**: EF Core's default `YYYYMMDDHHMMSS_PascalCaseDescription` (e.g. `20260524200408_InitialSchema`). Later migrations are in `HOAManagementCompany/Infrastructure/Persistence/Migrations/`.  
+**Auto-apply**: `MigrateAsync()` runs on startup when `Startup:ApplyMigrations` or `Startup:SeedData` is on. By default that is only in `Development` and `Dev` (009; `StartupOptions`, `StartupTasks.ApplyStartupDatabaseAsync`).  
 **Rollback**: EF Core down-migrations generated for every migration; destructive changes require an explicit data-preservation plan documented in the migration file's comments.
 
 ---
@@ -407,11 +404,12 @@ Community (CommunityId string)
 | Entity / Field | Rule |
 |----------------|------|
 | `RegisterRequest.password` | Min 8 chars, requires digit + uppercase + non-alphanumeric (Identity default) |
-| `RegisterRequest.accountNumber` | Required; must match an existing unclaimed `Property.AccountNumber` |
+| `RegisterRequest.verificationToken` / `claimCode` | Both required; a valid, unconsumed email-verification proof and an active single-use claim code for an unclaimed property (017 FR-A1/FR-A3; replaces `accountNumber`) |
 | `LoginRequest.email` | Valid email format |
-| `OneTimePaymentRequest.routingNumber` (ACH) | Exactly 9 digits |
-| `OneTimePaymentRequest.cardExpiry` | `MM/YY` format |
-| `OneTimePaymentRequest.amount` | > 0 |
+| `CreateIntentRequest.amount` (`POST /payments/intent`) | > 0 |
+| `CreateIntentRequest.method` | `card` \| `ach` |
+| `RecurringPaymentRequest.setupIntentId` | Required |
+| `RecurringPaymentRequest.mandateAccepted` | Must be `true` |
 | `RecurringPaymentRequest.draftDay` | 1–28 |
 | `RecurringPaymentRequest.fixedAmount` | Required (non-null) when `amountType = fixed` |
 | Pagination `page` | Min 1 |

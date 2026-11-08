@@ -14,7 +14,6 @@ namespace HOAManagementCompany.Tests.Fixtures;
 public sealed class FakeStripeGateway : IStripeGateway
 {
     private readonly ConcurrentDictionary<string, StripePaymentIntentResult> _outcomes = new();
-    private readonly ConcurrentDictionary<string, StripeChargeResult> _charges = new();
     private readonly ConcurrentDictionary<string, StripeVaultedMethod> _vaultedMethods = new();
     private readonly ConcurrentDictionary<string, StripePaymentIntentResult> _offSessionOutcomes = new();
 
@@ -30,9 +29,6 @@ public sealed class FakeStripeGateway : IStripeGateway
     /// <summary>Overrides the result returned by <see cref="GetPaymentIntentAsync"/> for an intent.</summary>
     public void SetOutcome(string paymentIntentId, StripePaymentIntentResult result) =>
         _outcomes[paymentIntentId] = result;
-
-    /// <summary>Registers a settlement result returned by <see cref="GetChargeAsync"/>.</summary>
-    public void SetCharge(string chargeId, StripeChargeResult result) => _charges[chargeId] = result;
 
     /// <summary>Registers the vaulted method a given SetupIntent resolves to (else a default card is used).</summary>
     public void SetVaultedMethod(string setupIntentId, StripeVaultedMethod method) =>
@@ -71,9 +67,8 @@ public sealed class FakeStripeGateway : IStripeGateway
                 0, "usd", "card", $"ch_test_{Guid.NewGuid():N}", CardFunding.Credit, "visa", "4242"));
 
     public Task<StripeChargeResult?> GetChargeAsync(string chargeId, CancellationToken ct = default) =>
-        Task.FromResult(_charges.TryGetValue(chargeId, out var r)
-            ? r
-            : new StripeChargeResult(chargeId, $"txn_test_{Guid.NewGuid():N}", 0m, null, 0m));
+        Task.FromResult<StripeChargeResult?>(
+            new StripeChargeResult(chargeId, $"txn_test_{Guid.NewGuid():N}", 0m, null, 0m));
 
     /// <summary>
     /// Offline event construction. A <c>signatureHeader</c> of <c>"invalid"</c> simulates a failed

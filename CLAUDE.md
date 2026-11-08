@@ -82,12 +82,32 @@ C# / .NET 9.0 (backend); TypeScript / Angular 21 (frontend): Follow standard con
 
 <!-- MANUAL ADDITIONS START -->
 
+## Never at-mention Claude in what you post to GitHub
+
+Everything a session posts to GitHub posts as nbon12 (OWNER). `.github/workflows/claude.yml` starts a job
+(and a Claude run, if the action's own trigger check also matches) when the at-sign followed by `claude` appears, in any letter case, in:
+- an issue or PR comment, a PR review comment, or a submitted review's body;
+- an issue's title or body, when the issue is **opened or assigned**.
+
+PR titles and bodies aren't checked. Backticks, code blocks and quotes don't hide the mention, because
+the workflow matches the raw text. So:
+- **Never write it** in a comment, review or issue. Write "the Claude workflow" instead, and replace
+  the mention the same way when you quote or copy text that contains it.
+- **Never open or assign an issue** whose title or body contains it.
+
+The only exception: nbon12 asked you, in this conversation, to start that workflow on a specific issue
+or PR. Routines that post to GitHub restate this rule in one line and point here. Keep them in step.
+
 ## Patch notes: read them, and add to them when you merge
 
 `docs/patch-notes.md` is the running log of what changed on `main`, newest first. Each entry covers behavior and contract changes, assumptions that no longer hold, shared pieces to reuse, and open follow-ups. Other agents rely on it to catch up.
 
 - **Before starting work**, skim the entries newer than the last merge you know about, especially any that touch the area you're changing.
 - **When a PR merges a feature or a behavior-changing fix**, add an entry at the top of `docs/patch-notes.md` **in that same PR**. Follow the existing entry's shape: date, title, spec link, PR link, then the sections that apply. Keep it to what someone working nearby needs to know. Dependency bumps and doc-only changes don't need an entry.
+
+## Merging your own PR
+
+Open your PR as a draft, and mark it ready only once [`.routines/merge-policy.md`](.routines/merge-policy.md)'s rules hold: green checks, settled reviews, a ready description and patch notes when required. Marking it ready is the decision to merge: `.github/workflows/auto-merge.yml` then squash-merges it once every check passes and every conversation is resolved. A PR that touches guarded paths (`.github/`, `scripts/pr-env-*`, `.routines/`, `CLAUDE.md`, `infra/`, Auth, Payments, migrations) isn't auto-merged: it needs an independent automated review, then the session merges it and sends nbon12 a push notification. Constitution changes stay owner-merged.
 
 ## Spec Kit workflow: PR watching
 
@@ -148,6 +168,42 @@ parallelizable. Because of this:
 - This does not apply to genuine hard dependencies that are explicitly documented (see
   constitution section 12) — those must still be sequenced correctly.
 
+## No human gates: decide, build, report after
+
+Per the constitution's Autonomous Delivery & Human Input section (section 14), the maintainer is
+not a step in the pipeline. Human input arrives as feedback **after** work merges, not as a gate
+before it. This is a side project; the maintainer wants to review as little as possible.
+
+- Do **not** add to specs, plans, tasks, checklists, quickstarts, or PR descriptions: tasks or
+  checklist items assigned to a person, manual verification or QA, "STOP and validate" or
+  approval/sign-off checkpoints, or "things only a human can do" sections. Every check is an
+  automated test or CI check.
+- Do **not** ask clarifying questions mid-workflow, and do not leave `[NEEDS CLARIFICATION]`
+  markers. Where a Spec Kit command says to ask the user or wait for a reply (the clarification
+  questions in `/speckit.specify`, the "incomplete checklists, proceed anyway? (yes/no)" prompt in
+  `/speckit.implement`), that text does not apply: pick the most defensible default, record it under
+  **Assumptions**, and continue.
+- **Unless otherwise specified:** when the maintainer themselves runs `/speckit.specify` or
+  `/speckit.clarify` in the session (or says they want to be involved), follow their lead and ask
+  what those commands call for. That covers those two phases only. Plan, tasks, analyze, implement,
+  the PR and the merge stay hands-off whether or not they drove the earlier phases, and an
+  explicit instruction from them applies only to the scope they named. A command that an agent,
+  scheduled task or routine starts on its own is never maintainer-driven.
+- Do **not** ask the maintainer to review a PR or leave it waiting on a review. The automated
+  checks are the merge gate: when every required check passes, merge (or enable auto-merge)
+  under `.routines/merge-policy.md`, without waiting for a person. This always holds, even if the
+  maintainer drove specify or clarify. Report judgment calls after the fact, in the PR description
+  and the `docs/patch-notes.md` entry.
+- Do **not** add a required reviewer or manual approval as a control in CI/CD or ops. Build an
+  automated guard (dry run, rate limit, kill switch, audit trail) instead.
+- The only exceptions are things no automation can do: creating third-party accounts or rotating
+  root credentials, billing, admin-only settings, amending the constitution, or an irreversible
+  action on production data or real money that no guard bounds. Do everything else first, ship the
+  work inert and safe by default, tell the maintainer once with the exact steps, and keep going. It
+  never blocks a merge and never becomes a task in `tasks.md`.
+- This governs how work is built and delivered, not what the product does. Product features where
+  people act (a board vote, a moderation queue) are specified normally.
+
 ## Code review: every natural-language test MUST map to a real, faithful automated test
 
 A **natural-language test (NLT)** in this repo is any Given/When/Then **Acceptance Scenario**
@@ -181,5 +237,36 @@ whenever a change implements, modifies, or claims to complete a Spec Kit feature
   text from `spec.md` and naming either the missing test or the test whose assertions do not match
   the scenario. A finding without both the cited scenario and the cited test-or-gap is not a
   finding.
+- **Enforced in CI.** `.github/workflows/spec-test-review.yml` runs this review when a PR is ready
+  for review and again on every push. It follows `.claude/commands/review-spec-tests.md`, which you
+  can also run yourself before marking a PR ready: `/review-spec-tests <PR#>`. On blocking findings,
+  Claude fixes the tests and pushes to the PR branch, up to three times, so pull before you push again.
+  Whatever is left after the last pass moves to a follow-up issue and the **Spec test verdict** check
+  passes, so it never blocks for good. To dispute a finding, reply on the PR with its ID and evidence.
+
+## Documentation is executable: the docs gate runs on every PR
+
+`scripts/docs-test.sh` runs the examples and claims in our Markdown, and
+`.github/workflows/docs-test.yml` gates every pull request to `main` or `develop` on the
+documents it touches.
+Run `scripts/docs-test.sh --changed origin/main` before you push a documentation change.
+What it holds you to:
+
+- A **backticked path rooted at a top-level directory is a claim that the path exists** —
+  `neko-hoa/src/_headers`, `HOAManagementCompany/Program.cs`. Prose with a slash in it, and a
+  path with an ellipsis in it, are not claims. When you write about something that was
+  removed, leave the path as prose instead of backticking it.
+- A **documented command has to be real**: `npm run <script>` must exist in
+  `neko-hoa/package.json`, `dotnet … --project <path>` must point at a project, and
+  `docker compose <command> <service>` must name a service the compose file defines.
+- **Shell blocks must parse** as bash (`<placeholders>` are fine), and **`json` and `yaml`
+  blocks must parse**. A block that is a fragment rather than a whole document says so with
+  `docs-test=skip reason="..."` on its fence line.
+- `tasks.md`, `plan.md`, `research.md`, handoffs and `docs/patch-notes.md` are
+  **point-in-time**: the backticked paths in their prose are not checked, which matches
+  constitution section 11. Their links and their examples still are. `spec.md`, `quickstart.md`, contracts and READMEs are held to the present.
+
+The annotation contract — including how to make a block actually execute in CI — is in
+`docs-tests/README.md`.
 
 <!-- MANUAL ADDITIONS END -->

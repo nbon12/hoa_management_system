@@ -2,7 +2,7 @@
 
 **Feature Branch**: `010-dev-env-iac-opentofu`  
 **Created**: 2026-06-13  
-**Status**: Implemented — Dev applied & live as of 2026-06-14 (backend `nekohoa-api-dev` healthy; frontend live at `dev.nekohoa.com`). Custom API domain `api-dev.nekohoa.com` is created and awaiting Google managed-cert issuance. See **Implementation Notes & Deviations (2026-06-14)** at the end for what changed during implementation.  
+**Status**: Implemented — Dev applied & live as of 2026-06-14 (backend `nekohoa-api-dev` healthy; frontend live at `dev.nekohoa.com`). Custom API domain `api-dev.nekohoa.com` is live: the managed cert was issued and the record is proxied at Full(strict) (PR #53, 2026-06-14). The Dev root defaults `enable_api_domain = true` and `api_dns_proxied = true`. See **Implementation Notes & Deviations (2026-06-14)** at the end for what changed during implementation.  
 **Input**: User description: "Create a declarative Infrastructure-as-Code setup, committed in the repo under infra/, using OpenTofu, that provisions the entire Dev environment for the 009-dev-auto-deploy pipeline so no cloud resources are created by hand."
 
 ## Why This Feature Exists
@@ -24,7 +24,7 @@ rest with no further manual cloud setup.
 ### Session 2026-06-13
 
 - Q: How should the OpenTofu code under `infra/` be structured for multi-environment reuse with isolated state? → A: A reusable shared module (`infra/modules/*`) called by per-environment directories (`infra/environments/dev`, `.../staging`, `.../prod`), each with its own tfvars and backend config.
-- Q: What gate should guard the apply-on-merge workflow? → A: **Prod** apply requires manual approval (protected GitHub Environment with a required reviewer); **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
+- Q: What gate should guard the apply-on-merge workflow? → A: ~~**Prod** apply requires manual approval (protected GitHub Environment with a required reviewer)~~ **Amended 2026-11-02** (decision D2, `docs/handoffs/2026-11-02-zero-touch-operations.md` §5; constitution §14): **Prod** is promoted automatically by a scheduled workflow behind automated gates, while repo variable `PROD_OPS_AUTOMATED` is exactly `on`. The `prod` GitHub Environment stays, limited to `main` and holding the Prod secrets, with no required reviewer. **Dev** and **Staging** auto-apply on merge to `main` with no approval step.
 - Q: How should remote state (GCS) be isolated across environments? → A: A single versioned GCS state bucket with a distinct prefix/path per environment (e.g. `state/dev`, `state/staging`, `state/prod`).
 - Q: Beyond restricting deployer-SA impersonation to this repo, should the WIF trust also be ref-restricted? → A: No — repo-scoped only (any branch/ref in this repo may impersonate the deployer); this keeps PR plan-only runs able to authenticate without a second identity.
 
@@ -126,8 +126,12 @@ the gated apply runs and converges the environment.
    **Then** it produces a plan only and makes no changes to live resources.
 2. **Given** an infrastructure change to **Dev** (or Staging) is merged, **When** the apply
    workflow runs, **Then** it applies the change automatically to that environment; **Given** the
-   change targets **Prod**, the apply MUST pause for a required reviewer's approval (protected
-   environment) before touching live resources.
+   change targets **Prod**, it is promoted automatically only while repo variable
+   `PROD_OPS_AUTOMATED` is exactly `on` and the FR-026 gates pass. Otherwise the promotion is refused,
+   changes nothing, and reports which gate refused. It never waits for a person. (The kill switch,
+   soak and plan gates are tested in `scripts/tests/prod-promotion-gate.test.sh`. The workflow
+   wiring, which covers "changes nothing", the ops-log report, the smoke and E2E check and the
+   rollback, gets its tests when the Prod promotion workflow is built; it is listed as open.)
 3. **Given** either workflow runs, **When** it authenticates to the cloud accounts, **Then** it does
    so without any long-lived static credentials committed to the repo.
 
@@ -296,11 +300,24 @@ new isolated state target — not duplicating or editing the resource definition
 
 - **FR-025**: A GitHub Actions workflow MUST run a **plan-only** preview on pull requests that touch
   the infrastructure definitions, making **no** changes to live resources.
-- **FR-026**: A GitHub Actions workflow MUST run an **apply** on merge to `main`. For **Dev** (and
-  Staging) the apply runs **automatically** with no approval step; for **Prod** the apply MUST be
-  **gated** behind a protected GitHub Environment requiring a reviewer's manual approval before any
-  live change. (This feature delivers the Dev path; the gate configuration MUST be designed so Prod
-  is approval-gated when added.)
+- **FR-026** (amended 2026-11-02, decision D2): A GitHub Actions workflow MUST run an **apply** on
+  merge to `main`. For **Dev** (and Staging), the apply runs **automatically** with no approval step.
+  **Prod** is promoted automatically by a scheduled workflow, with no required reviewer or manual
+  approval (constitution §14). It runs in the `prod` GitHub Environment, which is limited to `main` and
+  holds the Prod secrets, so they are never repo-wide. It promotes only when all of these hold, each
+  checked by `scripts/prod-promotion-gate.sh` or a CI gate:
+  - repo variable `PROD_OPS_AUTOMATED` is exactly `on`. This is the Prod kill switch: unset or any
+    other value refuses the promotion and reports why on the ops log;
+  - the candidate commit reached Staging at least 24 h ago, and no Staging apply, smoke or E2E run
+    has failed since (Staging may have moved on to newer commits);
+  - the Staging smoke and E2E gates pass;
+  - the Prod plan has no `destroy` or `replace` on a stateful resource (Neon project or branch, R2
+    buckets, secrets). Any of those stops the run and reports it.
+
+  After a promotion, Cloud Run traffic MUST roll back to the previous revision on its own if the
+  health or error-rate gate fails within 15 minutes. Each promotion is reported after the fact. This
+  feature delivers the Dev path. The Prod job is built with these gates when `infra/environments/prod`
+  is added.
 - **FR-027**: The automation workflows MUST authenticate to the cloud accounts without committing
   long-lived static credentials to the repo (using the federated identity from FR-011).
 - **FR-028**: The configuration MUST be idempotent: re-running the plan against an unchanged
@@ -361,7 +378,7 @@ new isolated state target — not duplicating or editing the resource definition
   (§10, §3).
 - **Authorization**: No application endpoints are added. Infrastructure access control is enforced
   by least-privilege service identities and a repository-scoped federation trust condition (§7);
-  the deployer identity gets only deploy + impersonation rights and the runtime identity only
+  the deployer identity gets deploy + impersonation rights and, per the FR-010 deviation, project Owner (bounded by the repo-scoped federation condition and `main` protection), and the runtime identity only
   secret access.
 - **Database/runtime**: Provisions the isolated **Dev** managed-PostgreSQL database with pooled
   connections (the connection-string output uses the pooled endpoint per §8 low-connection/pooling
@@ -433,8 +450,8 @@ new isolated state target — not duplicating or editing the resource definition
 - **Tool is OpenTofu** and the layout lives under `infra/` in the repo, as decided in the handoff.
 - **The community database provider `kislerdm/neon`** is acceptable despite being
   community-maintained (not vendor-verified); its version is pinned and the risk is documented.
-- **The application image** `sakurapatch/nekohoa-api:<sha>` is built and published by the existing
-  `009` pipeline (Docker Hub); this feature references/pulls images and never builds them. A
+- **The application image** `<region>-docker.pkg.dev/<project>/images-dev/nekohoa-api:<sha>` is built by the existing
+  `009` pipeline and pushed to the Artifact Registry repository `images-${env_name}` that this configuration provisions (`infra/modules/environment/artifact_registry.tf`); this feature references/pulls images and never builds them. *(Amended 2026-10-28 by PR #242: Cloud Run used to pull `sakurapatch/nekohoa-api:<sha>` from Docker Hub via mirror.gcr.io, which returns 429 for uncached tags. main's image is still mirrored to Docker Hub for the nightly Trivy re-scan. The first-create placeholder is now `us-docker.pkg.dev/cloudrun/container/hello`.)* A
   placeholder/bootstrap image may be used for the very first service creation before the pipeline
   has pushed a real revision.
 - **The custom-domain certificate ordering** for `api-dev.nekohoa.com` may require a documented

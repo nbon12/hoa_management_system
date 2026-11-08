@@ -54,6 +54,30 @@ public class LoginLogoutTests(TestDatabaseFixture fixture) : IntegrationTestBase
     {
         var response = await Client.GetAsync("/api/v1/auth/me");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertUnauthorizedBodyAsync(response);
+    }
+
+    // 003 AS7: a missing or invalid token gets 401 with the standard { code: "UNAUTHORIZED" } body.
+    [Theory]
+    [InlineData("not-a-jwt")]
+    [InlineData("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl")] // well-formed, wrong signature
+    public async Task GetMe_WithInvalidToken_Returns401WithErrorBody(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await AssertUnauthorizedBodyAsync(response);
+    }
+
+    private static async Task AssertUnauthorizedBodyAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        Assert.NotNull(body);
+        Assert.Equal("UNAUTHORIZED", body!["code"]!.ToString());
+        Assert.False(string.IsNullOrWhiteSpace(body["message"]?.ToString()));
     }
 
     [Fact]

@@ -11,7 +11,8 @@ public class RecurringUpsertEndpoint(ResidentAccess access, PaymentService payme
     public override void Configure()
     {
         Put("/payments/recurring");
-        Description(x => x.WithName("UpsertRecurring").WithTags("Payments"));
+        // 006 FR-028: autopay enrollment calls Stripe, so it is throttled like the other setup endpoints.
+        Description(x => x.WithName("UpsertRecurring").WithTags("Payments").RequireRateLimiting("payments"));
     }
 
     public override async Task HandleAsync(RecurringPaymentRequest req, CancellationToken ct)

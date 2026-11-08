@@ -30,8 +30,6 @@ public sealed class ArcAttachmentValidator(IOptions<ArcUploadOptions> options)
     // ISO-BMFF major brands used by HEIC/HEIF still images. Video brands (mp42, isom, …) are refused.
     private static readonly HashSet<string> HeifBrands = ["heic", "heix", "heim", "heis", "mif1", "heif"];
 
-    public ArcUploadOptions Limits => options.Value;
-
     /// <summary>The canonical content type for the bytes, or null when they aren't an allowed type.</summary>
     public static string? Sniff(ReadOnlySpan<byte> header)
     {

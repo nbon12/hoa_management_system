@@ -10,7 +10,7 @@ Supersedes `specs/016-security-hardening/contracts/auth-session.md` (SameSite an
 
 ## POST /api/v1/auth/refresh
 - **Auth**: anonymous; refresh token read **only** from the `neko_refresh` cookie; request body empty. Requires `withCredentials` on the client.
-- **CSRF**: request `Origin` (fallback `Referer`) MUST match the configured CORS allowlist/suffixes; mismatch → `401` (generic).
+- **CSRF**: when the request carries an `Origin` header (or, failing that, a `Referer`), it MUST match the resolved CORS allowlist/suffixes, including the local-Development localhost fallback; mismatch → `401` (generic). A request with neither header is treated as a non-browser client (tests, tooling) and allowed, since it cannot ride a victim's cookie jar.
 - **Response 200**: `{ token, expiresAt, user }` + rotated `Set-Cookie` (strict one-time-use rotation preserved).
 - **Errors**: `401 INVALID_REFRESH_TOKEN` **with cookie cleared** (`Max-Age=0`) on invalid/expired/rotated-away token or Origin mismatch.
 
@@ -30,6 +30,6 @@ Supersedes `specs/016-security-hardening/contracts/auth-session.md` (SameSite an
 `SameSite` is sourced from validated configuration (`Auth:RefreshCookie:SameSite`) per environment; `None` requires the Origin check above (always on) as CSRF defense.
 
 ## Client obligations
-- Send `withCredentials: true` on `/api/v1/auth/*` calls only.
+- Send `withCredentials: true` only on calls that set, read or clear the refresh cookie: the `/api/v1/auth/*` session calls and, since spec 030, `POST /api/v1/invitations/register`, which sets the cookie (`specs/030-company-administration/contracts/invitations-and-auth.md`).
 - Attach the bearer token only to requests targeting `environment.apiBaseUrl` (FR-D4).
 - Maintain the non-credential `neko_has_session` hint; only call refresh at startup when present (research D-R2).

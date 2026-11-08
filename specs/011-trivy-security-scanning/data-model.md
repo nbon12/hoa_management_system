@@ -75,5 +75,5 @@ The machine-readable output uploaded to GitHub Code Scanning.
   scanner DB unavailable ──────────────► FAIL (no false clean)    (FR-012)
         │ pass
         ▼
-[Push to Docker Hub] ─► [009 Cloud Run deploy]
+[Push to Artifact Registry + Docker Hub] ─► [009 Cloud Run deploy (pulls from Artifact Registry)]
 ```

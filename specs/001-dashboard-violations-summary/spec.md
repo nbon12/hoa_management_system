@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-dashboard-violations-summary`  
 **Created**: 2025-03-14  
-**Status**: Implemented  
+**Status**: Implemented (PR #9), then superseded by 003-dotnet-api-backend (PR #10); see the note under User Scenarios & Testing  
 **Input**: User description: "As a homeowner and/or board member (who MAY also be a homeowner) I want to be able to login and see the Dashboard when I login. Upon logging in, I should see four boxes. One of these boxes should show me the count of violations I have, and if I click that number, it should take me to the 'My Violations' page, which shows any violations associated to me."
 
 ## Clarifications
@@ -23,6 +23,12 @@
 > member sees association-wide data; that mode is additive and does not change any behavior
 > described here. The property-scoped dashboard below remains correct for resident mode (025
 > FR-015 / SC-006).
+>
+> **Superseded by 003-dotnet-api-backend (amended 2026-10-31).** This feature was built on the former Blazor app and its `frontend/` Angular client (PR #9). PR #10 (2026-06-04) replaced both with the FastEndpoints API and the `neko-hoa` app, as 003's 2026-05-24 clarification decided. What holds now:
+> - **Scope**: the violation count and list cover the **selected property**, which is the JWT `propertyId` claim and changes with `POST /auth/switch-property`. They no longer cover every property the user owns (003 Clarifications, FR-006a, FR-033; 030 FR-024g). Read FR-003, FR-005, FR-010, SC-003 and the Key Entities that way.
+> - **Data**: the count is `openViolations` from `GET /api/v1/dashboard` (003 FR-008). The list is `GET /api/v1/community/violations`, with `status` (`open`/`closed`), `category` and `page`/`pageSize` (003 FR-033). This spec's `contracts/` and `data-model.md` describe the removed endpoints and schema.
+> - **UI**: the resident dashboard shows four cards in one row: Balance, Violations, Next event, Documents. There are no Work Orders or Architecture Requests placeholders, and the Violations count is not a link. The violations page (`/app/community/violations`) has Open and Closed tabs, so closed violations are no longer deferred. The dashboard has one loading state and one error message for the whole page. FR-002, FR-004, FR-006, FR-007, FR-008, FR-009 and User Story 3 describe the removed UI.
+> - **Landing**: a board member whose last-used mode is Board lands in board mode (025 FR-022). A user without a usable home lands per 030 FR-036a.
 
 ### User Story 1 - View Dashboard After Login (Priority: P1)
 

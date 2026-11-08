@@ -50,10 +50,18 @@ packages/
 _ReSharper.*/
 [Tt]humbs.db
 
+# Claude Code per-developer settings overlay (the tracked file is .claude/settings.json)
+.claude/settings.local.json
+
 # Repowise local index and secrets (see repowise/.env.example)
 .repowise/
 .repowise/.env
 .venv-repowise/
+
+# Documentation test harness venv and caches (scripts/docs-test.sh creates them)
+.venv-docs-tests/
+__pycache__/
+.pytest_cache/
 
 # Env files with secrets (tracked examples like repowise/.env.example are allowed)
 .env

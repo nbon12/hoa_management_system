@@ -46,7 +46,7 @@ jobs:
       # Steps are skipped (not failed) when SONAR_HOST_URL is not configured.
       - name: SonarQube scan
         if: env.SONAR_HOST_URL != ''
-        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -114,14 +114,20 @@ jobs:
       - name: shellcheck
         run: >-
           shellcheck scripts/pr-env-reap.sh scripts/pr-env-clear-stale-lock.sh scripts/pr-env-audit.sh
-          scripts/pr-env-verify-ro.sh scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh
-          scripts/tests/pr-env-verify-ro.test.sh
+          scripts/pr-env-verify-ro.sh scripts/pr-env-policy-gate.sh scripts/prod-promotion-gate.sh
+          scripts/docs-test.sh
+          scripts/tests/pr-env-reap.test.sh scripts/tests/pr-env-ops.test.sh scripts/tests/prod-promotion-gate.test.sh
+          scripts/tests/pr-env-verify-ro.test.sh scripts/spec-test-review.sh scripts/tests/spec-test-review.test.sh
       - name: pr-env-reap tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-reap.test.sh
-      - name: pr-env lock + audit tests (stubbed providers, no network)
+      - name: pr-env lock, audit + policy gate tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-ops.test.sh
       - name: pr-env-verify-ro tests (stubbed providers, no network)
         run: bash scripts/tests/pr-env-verify-ro.test.sh
+      - name: Prod promotion gate tests (no network)
+        run: bash scripts/tests/prod-promotion-gate.test.sh
+      - name: spec-test-review tests (stubbed gh, no network)
+        run: bash scripts/tests/spec-test-review.test.sh
 
   frontend:
     name: Frontend (neko-hoa)

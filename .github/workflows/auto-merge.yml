@@ -1,0 +1,294 @@
+# Squash-merge pull requests that nbon12 opens once every check on them passes. Claude sessions open
+# pull requests as nbon12, so this covers them too, and only nbon12 can push to this repository, so
+# every commit on them is nbon12's or comes from an app nbon12 installed. Other authors' pull
+# requests, Dependabot's included, are left alone (AUTHORS below).
+#
+# It decides on every pull request event, and again whenever one of the pull request workflows in
+# the workflow_run list below finishes:
+#   - Manual, so it leaves the pull request alone and turns off auto-merge it turned on: a draft;
+#     the `hold` label; a review that requested changes; a failed or cancelled check; a guarded path
+#     (GUARDED_PATHS below, the list .routines/merge-policy.md points to); 300 or more changed
+#     files, more than the compare API lists; a base other than main.
+#   - Waiting: a check is still running, or a required check hasn't reported yet.
+#   - Merge: every check passed. It squash-merges at once or, if GitHub still holds the pull request
+#     (an unresolved conversation), turns on auto-merge so GitHub merges it once that clears.
+# It waits for every check, not only the required ones (pr-env's end-to-end tests aren't required,
+# because pr-env only runs for app changes). So add any new pull request workflow to the
+# workflow_run list, or a pull request it runs on will wait for a finish this never hears about.
+#
+# Open a draft, and mark it ready once the merge policy's rules hold: marking it ready is the
+# decision to merge.
+#
+# The `auto-merge` label marks the pull requests it is handling, and it only turns off auto-merge
+# on those. It leaves alone auto-merge that the owner turned on, for example with /merge on a
+# guarded pull request, except that `hold` turns off anyone's.
+#
+# It fails closed. If the run errors, the last step turns off any auto-merge on the pull request.
+# With REQUIRE_CHECKS, it refuses to merge while main has no required checks, so losing branch
+# protection can't turn it into merge-on-open.
+#
+# It runs on pull_request_target and workflow_run, so it always runs this file as it is on main: a
+# pull request can't loosen these rules for itself. It never checks out or runs pull request code.
+#
+# It merges with MERGE_TOKEN (fine-grained token for this repository only: Contents and Pull
+# requests, Read and write), not GITHUB_TOKEN, because a merge made with GITHUB_TOKEN doesn't start
+# the push-to-main workflows (dev deploy, image push). The fail-closed step uses GITHUB_TOKEN, so it
+# works even when MERGE_TOKEN is missing or expired. It also needs Settings → General → "Allow
+# auto-merge".
+name: Auto-merge own PRs
+
+on:
+  pull_request_target:
+    # No branch filter: `edited` must also see a pull request retargeted away from main.
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled, unlabeled, edited]
+  workflow_run:
+    # Every workflow that runs on pull requests into main, so the last check to finish brings the
+    # decision back here.
+    workflows: [CI, Security Scan (Trivy), pr-env, Repowise, Spec test review]
+    types: [completed]
+
+permissions: {}
+
+# Runs for a pull request queue instead of cancelling each other: adding or removing the
+# `auto-merge` label starts another run, which must not cut this one short. Each run decides from
+# the pull request as it is then, so the queue settles on the current state.
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    name: auto-merge
+    # A pull request from a branch in this repository (a fork's branch lives in the fork; GitHub
+    # lists no pull requests on a workflow_run from a fork). The script checks the author.
+    if: >
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.pull_requests[0] != null)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # GITHUB_TOKEN is used only by the fail-closed step, to turn auto-merge off.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Merge, wait, or leave it
+        env:
+          GH_TOKEN: ${{ secrets.MERGE_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          AUTHORS: nbon12 # space-separated logins
+          MARK: auto-merge
+          REQUIRE_CHECKS: "true"
+          # Extended regexes, one per line, matched against each changed path and the old path of a
+          # rename. .routines/merge-policy.md points here: this is the one list of guarded paths.
+          GUARDED_PATHS: |
+            ^\.github/
+            ^scripts/pr-env-
+            ^scripts/spec-test-review
+            ^\.routines/
+            ^\.specify/memory/constitution\.md$
+            (^|/)CLAUDE\.md$
+            ^infra/
+            ^HOAManagementCompany/Features/Auth/
+            ^HOAManagementCompany/Features/Payments/
+            (^|/)Migrations/
+        run: |
+          set -euo pipefail
+
+          report() {
+            echo "::notice::$1"
+            echo "$1" >> "$GITHUB_STEP_SUMMARY"
+          }
+          list() { sed '/^$/d' | sort -u | paste -sd ',' - | sed 's/,/, /g'; }
+
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret MERGE_TOKEN is not set. Add a fine-grained token for this repository with Contents and Pull requests: Read and write."
+            exit 1
+          fi
+
+          # Read the pull request now rather than trusting the event: an earlier run may have
+          # changed it since.
+          pr="$(gh pr view "$PR" --repo "$REPO" --json state,author,isCrossRepository,isDraft,baseRefName,headRefOid,labels,autoMergeRequest,reviewDecision)"
+          author="$(jq -r .author.login <<<"$pr")"
+          if ! tr ' ' '\n' <<<"$AUTHORS" | grep -qxF -- "$author" || [ "$(jq -r .isCrossRepository <<<"$pr")" = "true" ]; then
+            echo "#${PR} is ${author}'s, or from a fork. Not handled here."
+            exit 0
+          fi
+          state="$(jq -r .state <<<"$pr")"
+          base="$(jq -r .baseRefName <<<"$pr")"
+          head="$(jq -r .headRefOid <<<"$pr")"
+          auto_on="$(jq -r '.autoMergeRequest != null' <<<"$pr")"
+          marked="$(jq -r --arg m "$MARK" '.labels | any(.name == $m)' <<<"$pr")"
+          held="$(jq -r '.labels | any(.name == "hold")' <<<"$pr")"
+          if [ "$state" != "OPEN" ]; then
+            echo "#${PR} is ${state}. Nothing to do."
+            exit 0
+          fi
+
+          reasons=()
+          waiting=""
+          if [ "$base" != "$DEFAULT_BRANCH" ]; then
+            reasons+=("it targets ${base}, not ${DEFAULT_BRANCH}")
+          else
+            if [ "$(jq -r .isDraft <<<"$pr")" = "true" ]; then
+              reasons+=("it is a draft")
+            fi
+            if [ "$held" = "true" ]; then
+              reasons+=("it has the hold label")
+            fi
+            if [ "$(jq -r .reviewDecision <<<"$pr")" = "CHANGES_REQUESTED" ]; then
+              reasons+=("a review requested changes")
+            fi
+
+            # The files of the commit that would merge, compared from where it left the base, as the
+            # pull request's diff is. The pull request's own file list is recomputed after a push and
+            # can lag behind its head.
+            cmp="$(gh api "repos/${REPO}/compare/${base}...${head}")"
+            if [ "$(jq '.files // [] | length' <<<"$cmp")" -ge 300 ]; then
+              reasons+=("it changes 300 or more files, more than the compare API lists")
+            fi
+            paths="$(jq -r '(.files // [])[] | .filename, (.previous_filename // empty)' <<<"$cmp")"
+            patterns="$(printf '%s\n' "$GUARDED_PATHS" | sed '/^[[:space:]]*$/d')"
+            # grep exits 1 when nothing matches. Anything above that, such as a broken pattern, must
+            # fail the run rather than read as "no guarded paths".
+            grep_status=0
+            guarded="$(printf '%s\n' "$paths" | grep -E -f <(printf '%s\n' "$patterns"))" || grep_status=$?
+            if [ "$grep_status" -gt 1 ]; then
+              echo "::error::grep failed on GUARDED_PATHS (exit ${grep_status}); a pattern is probably invalid."
+              exit 1
+            fi
+            if [ -n "$guarded" ]; then
+              reasons+=("it touches guarded paths: $(list <<<"$guarded")")
+            fi
+
+            # Every check on the head commit, by name (the latest run of each), plus commit
+            # statuses. This job's own check doesn't count. The spec test review's inner jobs hold the
+            # merge while they run, but how they ended doesn't count: "Spec test verdict" always runs after
+            # them and speaks for them, passing on the last pass even when one of them failed
+            # (spec-test-review.yml). One API call per assignment, so set -e stops the run when any fails.
+            check_runs="$(gh api --paginate "repos/${REPO}/commits/${head}/check-runs?per_page=100" \
+              --jq '.check_runs[] | select(.name != "auto-merge") | [.name, (if .status != "completed" then "pending" elif (.name == "Review tests against specs" or .name == "Fix the tests" or .name == "Push the fix") then "skipped" else (.conclusion // "") end)] | @tsv')"
+            statuses="$(gh api "repos/${REPO}/commits/${head}/status" \
+              --jq '.statuses[] | [.context, (if .state == "error" then "failure" else .state end)] | @tsv')"
+            checks="$(printf '%s\n%s\n' "$check_runs" "$statuses")"
+            failed="$(awk -F'\t' 'NF && $2 != "pending" && $2 !~ /^(success|neutral|skipped)$/ {print $1}' <<<"$checks")"
+            pending="$(awk -F'\t' 'NF && $2 == "pending" {print $1}' <<<"$checks")"
+            if [ -n "$failed" ]; then
+              reasons+=("these checks failed: $(list <<<"$failed")")
+            fi
+
+            # Required checks, from branch protection and rulesets, so one that hasn't reported yet
+            # counts as waiting.
+            required_classic="$(gh api "repos/${REPO}/branches/${base}" \
+              --jq '.protection.required_status_checks.contexts // [] | .[]')"
+            required_rulesets="$(gh api "repos/${REPO}/rules/branches/${base}" \
+              --jq '.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context')"
+            required="$(printf '%s\n%s\n' "$required_classic" "$required_rulesets" | sed '/^$/d' | sort -u)"
+            missing="$(comm -23 <(printf '%s\n' "$required") <(cut -f1 <<<"$checks" | sed '/^$/d' | sort -u) | sed '/^$/d')"
+            waiting="$(printf '%s\n%s\n' "$pending" "$missing" | sed '/^$/d' | sort -u)"
+          fi
+
+          if [ "${#reasons[@]}" -gt 0 ]; then
+            why="$(printf '%s; ' "${reasons[@]}")"
+            why="${why%; }"
+            # Only auto-merge this workflow turned on (it carries the label) is turned off, so the
+            # owner's /merge on a guarded pull request stands. `hold` turns off anyone's.
+            if [ "$auto_on" = "true" ] && { [ "$marked" = "true" ] || [ "$held" = "true" ]; }; then
+              gh pr merge "$PR" --repo "$REPO" --disable-auto
+              report "Auto-merge turned off for #${PR} because ${why}."
+            elif [ "$auto_on" = "true" ]; then
+              report "Auto-merge left on for #${PR}: this workflow didn't turn it on, though ${why}."
+            else
+              report "Left #${PR} alone because ${why}."
+            fi
+            if [ "$marked" = "true" ]; then
+              gh api --method DELETE "repos/${REPO}/issues/${PR}/labels/${MARK}" >/dev/null
+            fi
+            exit 0
+          fi
+
+          if [ "$REQUIRE_CHECKS" = "true" ] && [ -z "$required" ]; then
+            # With no required checks GitHub has nothing to hold a merge for.
+            echo "::error::${base} has no required checks, so #${PR} was not merged. Restore them, or set REQUIRE_CHECKS to \"false\" if that is intended."
+            exit 1
+          fi
+
+          if [ "$auto_on" = "true" ] && [ "$marked" != "true" ]; then
+            report "Auto-merge is on for #${PR}, turned on by the owner. Leaving it."
+            exit 0
+          fi
+
+          # Label first: a label left behind by a failed run is harmless, but auto-merge without
+          # the label is auto-merge this workflow could never turn back off.
+          if [ "$marked" != "true" ]; then
+            gh api --method POST "repos/${REPO}/issues/${PR}/labels" -f "labels[]=${MARK}" >/dev/null
+          fi
+
+          if [ -n "$waiting" ]; then
+            # GitHub's auto-merge waits only for required checks, so it stays off while any check
+            # runs; the workflow_run trigger brings the decision back when they finish.
+            if [ "$auto_on" = "true" ]; then
+              gh pr merge "$PR" --repo "$REPO" --disable-auto
+              report "Auto-merge paused for #${PR} until these checks finish: $(list <<<"$waiting")."
+            else
+              report "#${PR} merges once these checks pass: $(list <<<"$waiting")."
+            fi
+            exit 0
+          fi
+
+          if [ "$auto_on" = "true" ]; then
+            report "Auto-merge is already on for #${PR}."
+            exit 0
+          fi
+
+          # Mergeability is UNKNOWN for a few seconds after a push while GitHub computes it.
+          merge_state=UNKNOWN
+          for _ in $(seq 1 12); do
+            now="$(gh pr view "$PR" --repo "$REPO" --json mergeStateStatus,headRefOid)"
+            if [ "$(jq -r .headRefOid <<<"$now")" != "$head" ]; then
+              echo "#${PR} has a newer commit. The run that push started decides."
+              exit 0
+            fi
+            merge_state="$(jq -r .mergeStateStatus <<<"$now")"
+            if [ "$merge_state" != "UNKNOWN" ]; then
+              break
+            fi
+            sleep 5
+          done
+
+          # --match-head-commit: only the commit whose files and checks were just read can merge.
+          case "$merge_state" in
+            DIRTY)
+              report "#${PR} has merge conflicts. Pushing a resolution runs this again."
+              ;;
+            CLEAN|HAS_HOOKS|UNSTABLE)
+              gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$head"
+              report "Squash-merged #${PR}: every check passed."
+              ;;
+            *)
+              # BLOCKED or BEHIND with every check passed: GitHub is holding it for something else,
+              # such as an unresolved conversation. Still UNKNOWN: try anyway; an error fails the
+              # run, closed.
+              gh pr merge "$PR" --repo "$REPO" --squash --auto --match-head-commit "$head"
+              report "Every check passed on #${PR}, but GitHub is holding it (${merge_state}), for example for an unresolved conversation. Auto-merge is on, so it merges once that clears."
+              ;;
+          esac
+
+      - name: Fail closed (turn auto-merge off)
+        if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          if [ "$(gh pr view "$PR" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
+            gh pr merge "$PR" --repo "$REPO" --disable-auto
+            echo "::error::The run failed, so auto-merge was turned off for #${PR}. Fix the cause, then push or change a label to run it again."
+          else
+            echo "::error::The run failed. Auto-merge was not on for #${PR}, so nothing was turned off."
+          fi

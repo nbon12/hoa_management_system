@@ -10,13 +10,13 @@
 - .NET 9 SDK
 - Node.js 20+
 - A Stripe test-mode account (free at stripe.com)
-- Optional: Twilio trial account, SendGrid free tier
+- Optional: Twilio trial account; an AWS account with an SES-verified sender (email; superseded by specs/026-ses-email-provider, which replaced SendGrid)
 
 ---
 
 ## 1. Backend: Environment Variables
 
-Add to `appsettings.Development.json` or your local `secrets.json` (never commit):
+Add to `HOAManagementCompany/appsettings.Secrets.json` (gitignored; copy `appsettings.Secrets.json.example`). Never commit secrets:
 
 ```json
 {
@@ -26,7 +26,6 @@ Add to `appsettings.Development.json` or your local `secrets.json` (never commit
     "WebhookSigningSecret": "whsec_..."
   },
   "Payments": {
-    "AutoPayPageUrl": "http://localhost:4200/payments/recurring",
     "VariableNoticeLeadDays": 10,
     "ReconcilePendingAchAfterHours": 96,
     "DefaultFee": { "CardFeeType": "Percentage", "CardFeeValue": 0.03, "CardScope": "CreditOnly", "AchFeeValue": 0.00, "SurchargingEnabled": true },
@@ -40,10 +39,12 @@ Add to `appsettings.Development.json` or your local `secrets.json` (never commit
     "AuthToken": "...",
     "FromNumber": "+15005550006"
   },
-  "SendGrid": {
-    "ApiKey": "SG...",
-    "FromEmail": "noreply@nekohoa.test",
-    "FromName": "NekoHOA"
+  "Ses": {
+    "Region": "us-east-1",
+    "FromEmail": "no-reply@mail.nekohoa.com",
+    "FromName": "NekoHOA",
+    "AccessKeyId": "...",
+    "SecretAccessKey": "..."
   }
 }
 ```
@@ -51,20 +52,20 @@ Add to `appsettings.Development.json` or your local `secrets.json` (never commit
 **Stripe test keys**: Dashboard → Developers → API keys → "Reveal test key".  
 **Webhook signing secret**: See step 3 (Stripe CLI).  
 **Twilio test number**: `+15005550006` is Twilio's magic test-from number (no real SMS sent in trial).  
-**SendGrid**: Use a sandbox/test mode API key; emails are suppressed in sandbox.
+**SES**: Use a send-only IAM key, or leave the keys blank to use the AWS default credential chain. `Ses:SimulatorOnly=true` limits recipients to the SES mailbox simulator (see `specs/026-ses-email-provider/quickstart.md`).
 
 ---
 
 ## 2. Run Migrations
 
-After the migration is generated (`dotnet ef migrations add StripePayments`), apply it:
+The payments migrations (`20260606211720_StripePayments` and later) are already in `Infrastructure/Persistence/Migrations`; apply them with:
 
 ```bash
 cd HOAManagementCompany
 dotnet ef database update
 ```
 
-Or let the app apply it at startup (configured in `Program.cs`).
+Or let the app apply them at startup (`Startup:ApplyMigrations`, on by default in Development; see `Infrastructure/Configuration/StartupTasks.cs`).
 
 ---
 
@@ -80,7 +81,7 @@ stripe login
 Forward Stripe events to your local backend:
 
 ```bash
-stripe listen --forward-to http://localhost:5000/api/v1/payments/webhooks/stripe
+stripe listen --forward-to http://localhost:5212/api/v1/payments/webhooks/stripe
 ```
 
 The CLI prints a `whsec_...` signing secret — paste it into `Stripe:WebhookSigningSecret` in your local config.
@@ -89,21 +90,21 @@ The CLI prints a `whsec_...` signing secret — paste it into `Stripe:WebhookSig
 
 ## 4. Frontend: Environment Config
 
-In `neko-hoa/src/environments/environment.ts`:
+In `neko-hoa/src/environments/environment.development.ts` (used by `ng serve`; `environment.ts` is the production build):
 
 ```ts
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:5000',
+  apiBaseUrl: 'http://localhost:5212/api/v1',
   stripePublishableKey: 'pk_test_...'
 };
 ```
 
-Install Stripe.js dependencies:
+Stripe.js dependencies (`@stripe/stripe-js`, `ngx-stripe`) are already in `package.json`; install them with:
 
 ```bash
 cd neko-hoa
-npm install @stripe/stripe-js ngx-stripe
+npm ci
 ```
 
 ---
@@ -114,8 +115,8 @@ npm install @stripe/stripe-js ngx-stripe
 ```bash
 cd HOAManagementCompany
 dotnet run
-# API at http://localhost:5000
-# Swagger at http://localhost:5000/swagger
+# API at http://localhost:5212
+# Swagger at http://localhost:5212/swagger
 ```
 
 **Frontend**:
@@ -127,7 +128,7 @@ npm start
 
 **Stripe CLI** (in a third terminal):
 ```bash
-stripe listen --forward-to http://localhost:5000/api/v1/payments/webhooks/stripe
+stripe listen --forward-to http://localhost:5212/api/v1/payments/webhooks/stripe
 ```
 
 ---
@@ -135,8 +136,8 @@ stripe listen --forward-to http://localhost:5000/api/v1/payments/webhooks/stripe
 ## 6. Test the One-Time Payment Flow
 
 1. Log in as a resident with an outstanding balance.
-2. Navigate to **Payments → Pay Now**.
-3. Select "Current balance" preset → summary shows Amount + Fee + Total.
+2. Navigate to **Payments → One-time**.
+3. Select the **Current** preset → summary shows Amount + Fee + Total.
 4. In the Stripe Payment Element, enter test card:
    - **Visa success**: `4242 4242 4242 4242`, any future expiry, any CVV
    - **Decline (insufficient funds)**: `4000 0000 0000 9995`
@@ -149,8 +150,8 @@ Test cards reference: https://stripe.com/docs/testing#cards
 
 ## 7. Test the Recurring Setup Flow
 
-1. Navigate to **Payments → Auto-Pay**.
-2. Toggle auto-pay ON.
+1. Navigate to **Payments → Recurring**.
+2. Click **Set up auto-pay**.
 3. Select amount type and draft day.
 4. Enter a test payment method in the SetupIntent Element.
 5. Accept the mandate and save.
@@ -158,12 +159,12 @@ Test cards reference: https://stripe.com/docs/testing#cards
 
 To simulate a draft locally (Cloud Scheduler → internal job endpoint in prod):
 ```bash
-# Drafts due today — auth via the dev shared secret (Cloud Scheduler OIDC in prod)
-curl -X POST http://localhost:5000/api/v1/payments/jobs/run-drafts \
+# Drafts due today — auth via the X-Scheduler-Secret shared secret (the same header in deployed environments)
+curl -X POST http://localhost:5212/api/v1/payments/jobs/run-drafts \
   -H "X-Scheduler-Secret: dev-only-local-secret"
 
 # Reconciliation sweep + outbox flush + webhook-inbox retry
-curl -X POST http://localhost:5000/api/v1/payments/jobs/reconcile \
+curl -X POST http://localhost:5212/api/v1/payments/jobs/reconcile \
   -H "X-Scheduler-Secret: dev-only-local-secret"
 
 # Or run the tests
@@ -211,7 +212,7 @@ Stripe is mocked via `IStripeGateway` — no real Stripe API calls in tests. Ale
 
 To run only payment tests:
 ```bash
-dotnet test --filter "Integration/Payments"
+dotnet test --filter "FullyQualifiedName~Integration.Payments"
 ```
 
 ---
@@ -221,19 +222,20 @@ dotnet test --filter "Integration/Payments"
 | Config Key | Default | Notes |
 |-----------|---------|-------|
 | `Stripe:SecretKey` | — | Required; `sk_test_...` for dev |
-| `Stripe:PublishableKey` | — | Passed to frontend via `/payments/options` or env |
+| `Stripe:PublishableKey` | — | Returned by `POST /payments/recurring/setup-intent`; the SPA mounts Stripe.js with its own `stripePublishableKey` environment value |
+| `Stripe:WebhookToleranceSeconds` | `300` | Signature timestamp tolerance (FR-030) |
 | `Stripe:WebhookSigningSecret` | — | Required; from Stripe CLI or Dashboard |
 | `Payments:DefaultFee:*` | Percentage/0.03/CreditOnly | Seeds `HoaPaymentConfig`; per-HOA overrides in DB. Percentage ⇒ CreditOnly (debit never %-surcharged, FR-004b) |
 | `Payments:Nsf:*` | disabled / $25 | Returned-payment fee (FR-014e); per-HOA toggle in DB |
 | `Payments:VariableNoticeLeadDays` | `10` | NACHA variable-amount advance notice lead (FR-011c) |
 | `Payments:ReconcilePendingAchAfterHours` | `96` | Window before the sweep chases a stuck ACH `Pending` (FR-033) |
-| `Jobs:SchedulerSharedSecret` | — | Auth for `/payments/jobs/*` in local/dev (Cloud Scheduler OIDC in prod) |
-| `Payments:AutoPayPageUrl` | — | Link included in failure alerts |
+| `Jobs:SchedulerSharedSecret` | — | Auth for `/payments/jobs/*` (`X-Scheduler-Secret` header) in every environment; there is no OIDC path |
 | `Twilio:AccountSid` | — | Optional; alerts disabled if absent |
 | `Twilio:AuthToken` | — | Optional |
 | `Twilio:FromNumber` | — | Optional |
-| `SendGrid:ApiKey` | — | Optional; alerts disabled if absent |
-| `SendGrid:FromEmail` | — | Optional |
+| `Ses:Region` | — | Optional; email is disabled unless `Region` and `FromEmail` are set |
+| `Ses:FromEmail` | — | Optional; verified sender |
+| `Ses:AccessKeyId` / `Ses:SecretAccessKey` | — | Optional; AWS default credential chain otherwise |
 
 ---
 
@@ -256,8 +258,8 @@ reconstruct anything that crosses the money boundary.
 | Concern | Target | Mechanism |
 |---------|--------|-----------|
 | **Backups** | Continuous | Neon Postgres automated backups (managed). Local/CI uses ephemeral Testcontainers — no backup needed. |
-| **PITR** | 7-day window (Neon plan-dependent) | Neon branch-from-timestamp restore. Promote a recovery branch, repoint `ConnectionStrings:Default`, redeploy. |
-| **RPO** (max data loss) | ≤ 5 min | Bounded by Neon WAL shipping cadence. The webhook **inbox** (`ProcessedWebhookEvents`) is written *before* the 2xx ack, so any event accepted by Stripe is durably recorded or never acked → Stripe redelivers. |
+| **PITR** | 7-day window (Neon plan-dependent) | Neon branch-from-timestamp restore. Promote a recovery branch, repoint `ConnectionStrings:DefaultConnection`, redeploy. |
+| **RPO** (max data loss) | ≤ 5 min | Bounded by Neon WAL shipping cadence. The webhook **inbox** (`WebhookEventInbox`) is written *before* the 2xx ack, so any event accepted by Stripe is durably recorded or never acked → Stripe redelivers. |
 | **RTO** (max downtime) | ≤ 1 hr | Stateless Cloud Run service: redeploy + restore Neon branch. No local disk state to recover. |
 
 ### Stripe-based reconstruction

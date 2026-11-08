@@ -24,11 +24,16 @@ Per environment the module provisions:
   pool/provider so this GitHub repo deploys without long-lived keys.
 - **Cloudflare** — Pages project `nekohoa-${env_name}`, the R2 documents bucket, and the
   `dev.nekohoa.com` / `api-dev.nekohoa.com` DNS records.
+- **Cloud Scheduler** (`nekohoa-arc-sweep-${env_name}`, spec 027) — an hourly `POST` to the API's
+  `/api/v1/architectural/jobs/sweep`, authenticated by the `X-Scheduler-Secret` header. The header takes
+  the operator `scheduler-secret` value from tfvars / `TF_VAR_OPERATOR_SECRETS`, so rotate it there and
+  not out-of-band. PR environments get no job.
 
 The one-time **state bucket** is created by [`bootstrap/state-bucket`](./bootstrap/state-bucket)
 (local state) to resolve the backend chicken-and-egg. Two workflows wrap the lifecycle:
-`infra-plan.yml` (plan-only on PRs touching `infra/`) and `infra-apply.yml` (apply on merge; Prod
-gated behind a protected GitHub Environment).
+`infra-plan.yml` (plan-only on PRs touching `infra/`) and `infra-apply.yml` (apply on merge). Prod,
+when added, is promoted by a scheduled workflow behind automated gates, with no reviewer (FR-026,
+amended 2026-11-02).
 
 **Every resource name/value is pinned to the
 [009 environment matrix](../specs/009-dev-auto-deploy/contracts/environment-matrix.md);** a mismatch
@@ -42,7 +47,8 @@ In short:
 
 1. **Bootstrap** the state bucket once — [`bootstrap/state-bucket`](./bootstrap/state-bucket).
 2. **Configure** `environments/dev`: copy `terraform.tfvars.example` → `terraform.tfvars` (gitignored)
-   and set `bucket`/`prefix` in `backend.tf`.
+   and set `bucket`/`prefix` in `backend.tf`, plus the same bucket as the module's `state_bucket` input in
+   `main.tf` (the deployer SA is granted `roles/storage.objectAdmin` on it so CI can read and write state).
 3. **Apply** twice for the cert flip: grey-cloud (`api_dns_proxied = false`) → wait for the Cloud Run
    domain-mapping cert → proxied (`api_dns_proxied = true`).
 4. **Wire GitHub** from `tofu output` (see
@@ -103,9 +109,11 @@ run `dotnet run --project HOAManagementCompany -- --grant-company-admin owner@ex
 | Path | Purpose |
 |------|---------|
 | `bootstrap/state-bucket/` | One-time, local-state bootstrap of the versioned GCS state bucket + GCP API enablement. |
-| `modules/environment/` | The single reusable environment definition (Neon + Cloud Run + IAM/WIF + Secrets + Cloudflare). |
-| `environments/dev/` | Dev instantiation: backend prefix `state/dev`, tfvars, module block. |
+| `modules/environment/` | The single reusable environment definition (Neon + Cloud Run + Artifact Registry + IAM/WIF + Secrets + Cloudflare + the ARC sweep Cloud Scheduler job). |
+| `environments/dev/` | Dev instantiation: backend prefix `state/dev`, tfvars, module block, and the account-level PR-environment billing budget (`budget.tf`, 013 SC-008). |
 | `environments/staging/` | Reuse skeleton (not applied) proving Staging/Prod need no module edits. |
+| `modules/pr-environment/` | One PR's environment (013): Neon branch `pr-<n>` forked from `pr-base`, R2 bucket `nekohoa-pr-<n>-documents`, Cloud Run `nekohoa-api-pr-<n>`, and the `pr-<n>-db-connection` / `pr-<n>-stripe-webhook` secrets. Reuses Dev's GCP project, Neon project, runtime service account and operator secrets. |
+| `environments/pr/` | Per-PR root (013): one root serves every PR, with state prefix `state/pr/<n>` supplied at `tofu init -backend-config`. |
 
 > Never commit `*.tfvars` (except `*.example`), `*.tfstate*`, or `*.tfplan` — see `.gitignore`.
 
@@ -114,30 +122,40 @@ run `dotnet run --project HOAManagementCompany -- --grant-company-admin owner@ex
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
 | `infra-plan.yml` | PR touching `infra/**` | WIF auth → `fmt -check` / `init` / `validate` / `plan` for `environments/dev`, posts the plan to the PR. **No live changes** (SC-007). |
-| `infra-apply.yml` | push to `main` touching `infra/**` | WIF auth → `apply` for `environments/dev` **automatically**. A commented, `environment: prod`-gated Prod job is included to enable when `environments/prod` exists (FR-026). |
+| `infra-apply.yml` | push to `main` touching `infra/**` | WIF auth → `apply` for `environments/dev` **automatically**. A comment at the bottom sketches the scheduled Prod promotion workflow to build when `environments/prod` exists (FR-026, amended 2026-11-02). |
+
+Neither workflow plans or applies the per-PR root. `pr-env.yml` provisions it, `pr-env-teardown.yml`
+destroys it when the PR closes, `pr-env-sweep.yml` reclaims orphaned or inactive ones daily (see
+[013 contracts/workflows.md](../specs/013-ephemeral-pr-envs/contracts/workflows.md)), and
+`pr-env-repair.yml` is the manually dispatched repair path (issue #234).
 
 ### Required GitHub configuration
 
 **Repository secrets** (consumed by both workflows): `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SERVICE_ACCOUNT`,
 `GCP_PROJECT_ID`, `NEON_API_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
-`CLOUDFLARE_ZONE_ID`, `DEPLOY_ALERT_WEBHOOK_URL`, and `TF_VAR_OPERATOR_SECRETS` (a **JSON object** of
+`CLOUDFLARE_ZONE_ID`, `DEPLOY_ALERT_WEBHOOK_URL`, `TF_VAR_BILLING_ACCOUNT_ID` (the GCP billing account,
+`XXXXXX-XXXXXX-XXXXXX`, that the 013 PR-environment budget in `environments/dev/budget.tf` is created
+under), and `TF_VAR_OPERATOR_SECRETS` (a **JSON object** of
 the eight operator secret values, e.g. `{"jwt-secret":"…","sentry-dsn":"…",…}`). The first two come
 straight from `tofu output` (`wif_provider`, `deployer_service_account`).
+
+**Repository variable** (consumed by both workflows): `STRIPE_PUBLISHABLE_KEY`, the non-secret
+`pk_test_…` key. It is passed as `TF_VAR_stripe_publishable_key` and set on Cloud Run as
+`Stripe__PublishableKey`; the API refuses to start without it.
 
 > These wire the **infra workflows** (which run OpenTofu). They are separate from the **009 deploy**
 > secrets/variables an operator sets from `tofu output` (see
 > [`contracts/github-actions-wiring.md`](../specs/010-dev-env-iac-opentofu/contracts/github-actions-wiring.md)).
 
-### Protected `prod` Environment (T030)
+### `prod` Environment (T030, amended 2026-11-02)
 
-Before enabling the Prod apply job, create a **protected GitHub Environment** so Prod pauses for human
-approval (auto-apply Dev/Staging, gate Prod — FR-026):
+Prod has **no required reviewer**: FR-026 was amended by decision D2, and constitution §14 forbids
+approval gates. Prod is promoted automatically by a scheduled workflow, whose shape is sketched at the
+bottom of `infra-apply.yml`. It runs only while repo variable `PROD_OPS_AUTOMATED` is exactly `on`,
+and only if the gates in `scripts/prod-promotion-gate.sh` pass. When Prod is added:
 
-1. Repo **Settings → Environments → New environment** → name it `prod`.
-2. Enable **Required reviewers** and add the approver(s).
-3. (Optional) Restrict deployment branches to `main`.
-4. Add the `PROD_*` secrets referenced by the commented `apply-prod` job, then uncomment that job and
-   point its `working-directory` at `infra/environments/prod`.
-
-The `prod` Environment's required-reviewer gate is what makes `infra-apply.yml` stop for approval on
-Prod while Dev applies straight through.
+1. Create the `prod` Environment with **Deployment branches: `main` only**, and **no** required
+   reviewers. It exists to scope the `PROD_*` secrets to `main`, not to wait for approval.
+2. Add the `PROD_*` secrets listed in the sketch to that Environment, not to the repo.
+3. Build the promotion workflow from the sketch, and point it at `infra/environments/prod`.
+4. Set `PROD_OPS_AUTOMATED` = `on`. Any other value, or none, refuses promotion.

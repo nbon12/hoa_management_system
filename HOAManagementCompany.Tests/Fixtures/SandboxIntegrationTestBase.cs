@@ -33,31 +33,47 @@ public abstract class SandboxIntegrationTestBase : IntegrationTestBase
     /// is intentionally left unset so the Twilio adapter takes its basic-auth (test-credential) path.
     /// </summary>
     protected override IEnumerable<KeyValuePair<string, string?>> ExtraConfiguration() =>
-        new Dictionary<string, string?>
-        {
-            ["Stripe:SecretKey"] = Env("Stripe__SecretKey"),
-            ["Stripe:WebhookSigningSecret"] = Env("Stripe__WebhookSigningSecret"),
+        BuildSandboxConfiguration(Env);
 
-            ["Ses:Region"] = Env("Ses__Region"),
-            ["Ses:FromEmail"] = Env("Ses__FromEmail"),
-            ["Ses:AccessKeyId"] = Env("Ses__AccessKeyId"),
-            ["Ses:SecretAccessKey"] = Env("Ses__SecretAccessKey"),
+    /// <summary>The <see cref="ExtraConfiguration"/> values for any environment, so it can be unit-tested.</summary>
+    internal static IReadOnlyList<KeyValuePair<string, string?>> BuildSandboxConfiguration(Func<string, string?> env)
+    {
+        // Twilio is all-or-nothing. Without both test credentials every Twilio key is blanked
+        // (empty strings also override Twilio__* environment variables such as the FromNumber CI
+        // always exports). A lone FromNumber would leave Twilio half-configured, the 008
+        // TwilioOptionsValidator would abort host startup, and every Stage 2 test — Stripe and SES
+        // included — would error instead of the Twilio tests skipping (007 FR-004, 026 FR-012).
+        var twilio = env("Twilio__AccountSid") is not null && env("Twilio__AuthToken") is not null;
+
+        return new Dictionary<string, string?>
+        {
+            ["Stripe:SecretKey"] = env("Stripe__SecretKey"),
+            ["Stripe:WebhookSigningSecret"] = env("Stripe__WebhookSigningSecret"),
+
+            ["Ses:Region"] = env("Ses__Region"),
+            ["Ses:FromEmail"] = env("Ses__FromEmail"),
+            ["Ses:AccessKeyId"] = env("Ses__AccessKeyId"),
+            ["Ses:SecretAccessKey"] = env("Ses__SecretAccessKey"),
             ["Ses:FromName"] = "NekoHOA Sandbox",
             // Default SimulatorOnly ON — the sole no-deliver guardrail for email.
-            ["Ses:SimulatorOnly"] = Env("Ses__SimulatorOnly") ?? "true",
+            ["Ses:SimulatorOnly"] = env("Ses__SimulatorOnly") ?? "true",
 
-            ["Twilio:AccountSid"] = Env("Twilio__AccountSid"),
-            ["Twilio:AuthToken"] = Env("Twilio__AuthToken"),
+            ["Twilio:AccountSid"] = twilio ? env("Twilio__AccountSid") : "",
+            ["Twilio:AuthToken"] = twilio ? env("Twilio__AuthToken") : "",
             // Force the basic-auth path: blank out any ApiKeySid that appsettings.Secrets.json
             // (or another config source) might supply, so the adapter authenticates with
             // AccountSid + AuthToken — the only auth that honors Twilio magic numbers. The empty
-            // string survives the null-filter below and overrides the inherited value.
+            // string survives the null-filter below and overrides the inherited value. ApiKeySecret
+            // goes too, so a lingering half of an API-key pairing (e.g. from a local
+            // appsettings.Secrets.json, issue #216) can't make Twilio look half-configured.
             ["Twilio:ApiKeySid"] = "",
+            ["Twilio:ApiKeySecret"] = "",
             // Magic From required under test credentials; non-magic throws.
-            ["Twilio:FromNumber"] = Env("Twilio__FromNumber") ?? "+15005550006",
+            ["Twilio:FromNumber"] = twilio ? env("Twilio__FromNumber") ?? "+15005550006" : "",
         }
         .Where(kv => kv.Value is not null)
         .ToList();
+    }
 
     private IConfiguration Config => Services.GetRequiredService<IConfiguration>();
 

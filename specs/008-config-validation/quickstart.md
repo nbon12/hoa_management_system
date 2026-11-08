@@ -36,10 +36,10 @@ How to implement, verify, and extend this feature.
 
    ```csharp
    builder.Services.AddValidatedOptions<PaymentsOptions, PaymentsOptionsValidator>(
-       PaymentsOptions.SectionName);
+       builder.Configuration, PaymentsOptions.SectionName);
    ```
 
-3. Repeat for `Stripe`, `Jobs`, `Twilio`, `SendGrid`, `Storage`, `Observability`. Remove the
+3. Repeat for `Stripe`, `Jobs`, `Twilio`, `Ses` (replaced `SendGrid`; see specs/026-ses-email-provider), `Storage`, `Observability`. Remove the
    null-forgiving `GetSection("Storage").Get<StorageOptions>()!` and resolve
    `IOptions<StorageOptions>` for the `IAmazonS3` singleton instead.
 
@@ -49,7 +49,7 @@ How to implement, verify, and extend this feature.
 # Fails fast with a clear error (bad value):
 Payments__DefaultFee__CardFeeType=Percentage Payments__DefaultFee__CardScope=AllCards \
   dotnet run --project HOAManagementCompany
-# → OptionsValidationException: "PaymentsOptions: Percentage fees must be scoped to CreditOnly."
+# → OptionsValidationException: "PaymentsOptions.DefaultFee: Payments:DefaultFee — a Percentage CardFeeType requires CardScope 'CreditOnly'."
 
 # Starts cleanly with valid config + placeholder secrets.
 dotnet run --project HOAManagementCompany
@@ -68,7 +68,6 @@ dotnet test HOAManagementCompany.Tests \
 cd neko-hoa
 # Production build with an empty publishable key → full-page config error on load.
 npm test            # Jasmine/Karma unit tests for the guard
-npm run lint
 ```
 
 ## Definition of done (maps to spec)

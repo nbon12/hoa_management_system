@@ -21,8 +21,9 @@ The technical approach is a **reusable shared module** (`infra/modules/environme
 tfvars and a **GCS backend** keyed by a per-environment prefix in one versioned state bucket. The
 state bucket itself is created by a tiny **local-state bootstrap** (`infra/bootstrap/state-bucket`)
 to resolve the chicken-and-egg. Two GitHub Actions workflows wrap the lifecycle: **plan-only on PRs**
-touching `infra/`, and **apply on merge** — auto-applying Dev/Staging, but gating **Prod** behind a
-protected GitHub Environment with a required reviewer. All credentials are supplied via a
+touching `infra/`, and **apply on merge**. It auto-applies Dev and Staging. **Prod** also applies
+automatically behind automated gates, while repo variable `PROD_OPS_AUTOMATED` is `on` (FR-026,
+amended 2026-11-02). All credentials are supplied via a
 **gitignored tfvars file** (a committed `*.example` documents the shape); CI authenticates via the
 WIF provider, never long-lived keys. Outputs print the exact GitHub Actions secret/variable values an
 operator must set, ending with the instruction to flip `DEV_DEPLOY_ENABLED=true` **last**. Every

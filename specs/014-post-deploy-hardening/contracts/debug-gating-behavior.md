@@ -6,6 +6,8 @@ Verified by `HOAManagementCompany.Tests/Unit/Configuration/DebugGatingTests.cs` 
 
 Response shape is unchanged: `{ code, message, detail }`. Only `detail` population is gated.
 
+> *DG-1 and DG-5 describe current behavior. They are superseded by specs/016-security-hardening Sub-spec C FR-C5: deployed `Dev` must not return exception detail (generic message + correlation ID). Not yet implemented.*
+
 | # | Environment | `DevTools:ExposeExceptionDetail` | Expected `detail` | Maps to |
 |---|-------------|----------------------------------|-------------------|---------|
 | DG-1 | `Dev` (deployed) | unset (default) | populated (`exception.ToString()`) | US3 #1; SC-006 |

@@ -18,7 +18,7 @@ public sealed record AllocationResult(IReadOnlyList<ChargeAllocation> Allocation
 /// category (FR-007b). Surplus beyond all open charges becomes a credit (FR-007c). The priority
 /// order is configurable per HOA via <see cref="HoaPaymentConfig.AllocationOrderJson"/>.
 /// </summary>
-public sealed class AllocationService(LedgerService ledger)
+public sealed class AllocationService
 {
     /// <summary>Default statutory order when a config provides none.</summary>
     public static readonly IReadOnlyList<LedgerEntryType> DefaultOrder = new[]
@@ -76,13 +76,4 @@ public sealed class AllocationService(LedgerService ledger)
 
         return new AllocationResult(allocations, remaining);
     }
-
-    /// <summary>
-    /// Books a payment to the ledger as a single deterministic <c>Payment</c> entry linked to its
-    /// audit transaction. Overpayment naturally drives the running balance negative (credit, FR-007c).
-    /// </summary>
-    public Task<LedgerEntry> ApplyPaymentAsync(
-        Guid propertyId, Guid transactionId, decimal amount, string description,
-        DateOnly? entryDate = null, string? documentNumber = null, CancellationToken ct = default) =>
-        ledger.AddPaymentAsync(propertyId, transactionId, amount, description, entryDate, documentNumber, ct);
 }

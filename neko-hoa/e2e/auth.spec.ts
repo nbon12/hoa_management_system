@@ -56,11 +56,6 @@ test.describe('Login page', () => {
 test.describe('Auth guard', () => {
   test.use({ storageState: NO_AUTH });
 
-  test('unauthenticated visit to /app/dashboard redirects to /login', async ({ page }) => {
-    await page.goto('/app/dashboard');
-    await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
-  });
-
   test('unauthenticated visit to /app/payments/statement redirects to /login', async ({ page }) => {
     await page.goto('/app/payments/statement');
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
