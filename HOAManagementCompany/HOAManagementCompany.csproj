@@ -58,6 +58,15 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
     <PackageReference Include="Npgsql.OpenTelemetry" Version="9.*" />
+
+    <!-- Pinned to the net9.0 servicing line on purpose. The floating OpenTelemetry/instrumentation
+         references above can drag in a System.Diagnostics.DiagnosticSource < 9.0 transitively, which
+         then overrides the .NET 9 shared-framework copy in the output. ASP.NET Core 9's
+         Microsoft.AspNetCore.Hosting.HostingMetrics ctor calls
+         InstrumentAdvice<T>.set_HistogramBucketBoundaries (added in 9.0), so an older copy makes the
+         host crash at startup with MissingMethodException (breaks every integration test and the
+         Cloud Run startup probe). Forcing 9.0.* keeps DiagnosticSource aligned with the runtime. -->
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="9.0.*" />
   </ItemGroup>
 
   <ItemGroup>

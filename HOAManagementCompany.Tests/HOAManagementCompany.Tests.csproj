@@ -35,6 +35,12 @@
 
     <!-- OpenTelemetry in-memory exporter for trace/metric assertions (test-only) -->
     <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.*" />
+
+    <!-- Same pin as the main project: the test output resolves its own dependency graph, so the
+         floating OpenTelemetry/Mvc.Testing references here can otherwise pull a
+         System.Diagnostics.DiagnosticSource < 9.0 that crashes the test host's startup in
+         HostingMetrics. Keep this in lockstep with HOAManagementCompany.csproj. -->
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="9.0.*" />
   </ItemGroup>
 
   <ItemGroup>
