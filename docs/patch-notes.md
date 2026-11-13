@@ -6,22 +6,22 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
-## 2026-11-13 · Backend host startup fixed: pin System.Diagnostics.DiagnosticSource to the net9.0 line · [#332](https://github.com/nbon12/hoa_management_system/pull/332)
+## 2026-11-13 · Backend host startup fixed: pin the .NET 9 runtime package family against .NET 11 drift · [#332](https://github.com/nbon12/hoa_management_system/pull/332)
 
-Dependency pin; no application behavior change beyond restoring startup.
+Dependency pins; no application behavior change beyond restoring startup.
 
 **What was broken**
 
 - `main`'s CI `Build & Test` job was red and every ephemeral PR environment's Cloud Run container failed its startup probe (`HEALTH_CHECK_CONTAINER_ERROR`). 1155/1661 backend integration tests failed at host startup with `System.MissingMethodException: … InstrumentAdvice\`1.set_HistogramBucketBoundaries`.
-- **Root cause:** the backend references NuGet packages with floating ranges (`Version="1.*"`, `"9.*"`), so restores are non-deterministic. A transitive resolve pulled `System.Diagnostics.DiagnosticSource` < 9.0, which overrode the .NET 9 shared-framework copy; ASP.NET Core 9's `HostingMetrics` ctor needs the 9.0 `set_HistogramBucketBoundaries` setter, so the host crashed at boot.
+- **Root cause:** .NET 11 released on 2026-11-13. The backend references NuGet packages with floating ranges (`Version="1.*"`, `"9.*"`), so transitive resolution pulled `Microsoft.Extensions.Logging`/`…Logging.Abstractions` **11.0.0**, which require `System.Diagnostics.DiagnosticSource >= 11.0.0`. The .NET 11 `DiagnosticSource` changed the `InstrumentAdvice<T>.set_HistogramBucketBoundaries` signature that the .NET 9 `HostingMetrics` ctor was built against, so the net9.0 host crashed at boot.
 
 **Fix**
 
-- Explicit `System.Diagnostics.DiagnosticSource` `9.0.*` pin added to both `HOAManagementCompany.csproj` and `HOAManagementCompany.Tests.csproj` (keep them in lockstep). An explicit top-level reference wins over the transitive one; 9.0.x is API-compatible with the older copy, so nothing else changes.
+- Explicit `9.0.*` pins for `Microsoft.Extensions.Logging`, `Microsoft.Extensions.Logging.Abstractions`, and `System.Diagnostics.DiagnosticSource` added to both `HOAManagementCompany.csproj` and `HOAManagementCompany.Tests.csproj` (keep them in lockstep). These ship with the .NET 9 runtime; pinning the family keeps restore aligned with the net9.0 target regardless of what the floating references pull in.
 
 **Assumption that no longer holds / open follow-up**
 
-- Floating `*` version ranges across the backend make every CI run non-deterministic and can reintroduce drift like this. The durable fix is NuGet lock files (`RestorePackagesWithLockFile`) or Central Package Management with pinned versions — left as a dedicated follow-up.
+- Floating `*` version ranges across the backend make every CI run non-deterministic and let a new .NET major (11) leak incompatible BCL packages into a net9.0 build. The durable fix is NuGet lock files (`RestorePackagesWithLockFile`) or Central Package Management with pinned versions — left as a dedicated follow-up.
 
 ---
 
