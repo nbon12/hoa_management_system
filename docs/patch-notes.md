@@ -6,6 +6,25 @@ What changed on `main`, written for the next agent or developer. **Newest first.
 
 ---
 
+## 2026-11-13 · Backend host startup fixed: pin OpenTelemetry to 1.20.* (1.21.0 dropped net9.0) · [#332](https://github.com/nbon12/hoa_management_system/pull/332)
+
+Dependency pins; no application behavior change beyond restoring startup.
+
+**What was broken**
+
+- `main`'s CI `Build & Test` job was red and every ephemeral PR environment's Cloud Run container failed its startup probe (`HEALTH_CHECK_CONTAINER_ERROR`). 1155/1661 backend integration tests failed at host startup with `System.MissingMethodException: … InstrumentAdvice\`1.set_HistogramBucketBoundaries`.
+- **Root cause:** OpenTelemetry **1.21.0** (released alongside .NET 11 on 2026-11-13) dropped its `net8.0`/`net9.0` target assets — it ships `net10.0`/`net11.0`/`netstandard2.0` only. Because the OTel packages were referenced with a floating `1.*`, the net9.0 backend resolved 1.21.0 and fell back to the `netstandard2.0` asset, whose dependencies require `Microsoft.Extensions.*` and `System.Diagnostics.DiagnosticSource >= 11.0.0`. The .NET 11 `DiagnosticSource` changed the `InstrumentAdvice<T>.set_HistogramBucketBoundaries` signature that the net9.0 `HostingMetrics` ctor binds to, so the host crashed at boot.
+
+**Fix**
+
+- Pin the OpenTelemetry packages to `1.20.*` (the last line with real net8.0/net9.0 assets and 9.0.x `Microsoft.Extensions.*` deps) in `HOAManagementCompany.csproj` (`OpenTelemetry.Extensions.Hosting`, `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, `OpenTelemetry.Exporter.OpenTelemetryProtocol`) and `HOAManagementCompany.Tests.csproj` (`OpenTelemetry.Exporter.InMemory`). With no `>= 11` floor, `Microsoft.Extensions.*`/`DiagnosticSource` resolve back to 9.0.x and the host starts.
+
+**Assumption that no longer holds / open follow-up**
+
+- Floating `*` version ranges across the backend make every CI run non-deterministic and let a new-TFM package release (here, OTel dropping net9.0 for .NET 11) break a net9.0 build. The durable fix is NuGet lock files (`RestorePackagesWithLockFile`) or Central Package Management with pinned versions — left as a dedicated follow-up. **Revisit the OTel pin** when OpenTelemetry ships a net9.0 asset again or the backend moves to net10.0.
+
+---
+
 ## 2026-11-05 · Done story sweep: the hoa dispatcher was archived; repaired, and dispatchers now refuse to be archivable · [#320](https://github.com/nbon12/hoa_management_system/pull/320)
 
 Tooling only.
