@@ -33,16 +33,11 @@
     <!-- ASP.NET Core Testing -->
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.*" />
 
-    <!-- OpenTelemetry in-memory exporter for trace/metric assertions (test-only) -->
-    <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.*" />
-
-    <!-- Same pin as the main project (keep in lockstep). The test output resolves its own graph:
-         Testcontainers etc. otherwise pull Microsoft.Extensions.Logging.Abstractions 11.0.0, which
-         requires System.Diagnostics.DiagnosticSource >= 11.0.0 and crashes the test host's startup in
-         HostingMetrics. Pin the .NET 9 runtime family to 9.0.* so restore stays net9.0-aligned. -->
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.*" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.*" />
-    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="9.0.*" />
+    <!-- OpenTelemetry in-memory exporter for trace/metric assertions (test-only).
+         Pinned to 1.20.* for the same reason as the main project: OpenTelemetry 1.21.0 dropped its
+         net8.0/net9.0 assets, dragging Microsoft.Extensions.* / System.Diagnostics.DiagnosticSource to
+         11.0.0 via the netstandard2.0 fallback and crashing the net9.0 test host in HostingMetrics. -->
+    <PackageReference Include="OpenTelemetry.Exporter.InMemory" Version="1.20.*" />
   </ItemGroup>
 
   <ItemGroup>
