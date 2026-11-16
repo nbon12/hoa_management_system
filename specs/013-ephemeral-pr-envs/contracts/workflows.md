@@ -65,8 +65,13 @@ per-PR image tags. The `images-dev` Artifact Registry cleanup policy deletes `pr
 - Verify the `pr-base` Neon branch (`NEON_PR_BASE_BRANCH_ID`) exists; if it is missing, log an `::error::` annotation (the step does not fail the run). Recreating and re-seeding `pr-base` is a manual operator step (`scripts/create-pr-base.sh`, then seed it and update the secret): the sweep alerts rather than self-heals because seeding is app-driven (implemented this way since PR #70).
 - Audit by name (`scripts/pr-env-audit.sh`, tested by `scripts/tests/pr-env-ops.test.sh`): every
   `nekohoa-api-pr-<n>` service, `pr-<n>-*` secret, Neon `pr-<n>` branch and `nekohoa-pr-<n>-documents`
-  bucket whose PR has no `state/pr/<n>` prefix. A closed PR's fail the run (reap with `pr-env-repair`
-  `action=reap`); an open PR's are a warning, since its next `pr-env` run reaps them.
+  bucket whose PR has no `state/pr/<n>` prefix. An open PR's are a warning, since its next `pr-env` run
+  reaps them.
+- Reap a closed PR's by name in the same run (amended by PR #298): at most 3 PRs a run, each only after
+  `scripts/pr-env-policy-gate.sh preflight` passes (kill switch P1 `OPS_AUTOMATION=on`, no live run P4,
+  PR closed at least 24 h P5), then a dry run of `scripts/pr-env-reap.sh`, the plan check
+  (`check-plan`, P7), the real reap and a comment on the PR. The run fails if a reap's dry run fails or
+  a re-audit afterwards still finds a closed PR's orphans, and a failure is also commented on the open `ops-log` issue.
 
 **Guarantee**: after a sweep, zero resources labeled `pr-env=true` belong to a closed PR, or the run
 fails and names them.
@@ -75,8 +80,10 @@ fails and names them.
 
 | Aspect | Value |
 |--------|-------|
-| Trigger | `workflow_dispatch` on `main` only: `pr_number`, `action` (`diagnose`, `unlock`, `destroy`, `reap`, `verify`), `lock_id`, `dry_run` (default `true`), `allow_open_pr` (default `false`) |
-| Jobs | `diagnose` always: read-only, WIF as `nekohoa-agent-ro-dev`, read-only provider tokens, no approval. `repair` for a real change or a destroy dry run: `environment: ops` (operator approval), the deployer SA and CI's tokens |
+| Trigger | `workflow_dispatch` on `main` only: `pr_number`, `action` (`diagnose`, `unlock`, `destroy`, `reap`, `verify`), `lock_id`, `dry_run` (default `true`). The `allow_open_pr` input was removed by PR #298 |
+| Run name | `pr-env-repair <action> dry_run=<bool> (pr-<n>)`: the policy gate matches live runs by the `(pr-<n>)` suffix and counts `dry_run=false` runs for P3 |
+| Jobs | `diagnose` always: read-only, WIF as `nekohoa-agent-ro-dev`, read-only provider tokens, no approval. `repair` for a real change or a destroy dry run: the deployer SA and CI's tokens, after the policy gate `scripts/pr-env-policy-gate.sh` passes (amended by PR #298; it replaces the operator approval). `environment: ops` stays, to limit the job to `main` and scope its secrets, with no required reviewer |
+| Policy gate | `preflight` before any credential is minted: P1 kill switch (repo variable `OPS_AUTOMATION` exactly `on`), P3 at most 3 write dispatches in 24 h, P4 (writes) no other unfinished `pr-env`, teardown or repair run for the PR, P5 `destroy`/`reap` only on a closed PR, P8 the dispatcher has write access. P6 (`unlock`) and P7 (`check-plan`: a dry run's plan deletes only this PR's per-PR names, at most 10, for a reap, or only addresses inside `module.pr_environment` for a destroy) run next to what they check. A refusal changes nothing and fails the run |
 | Concurrency | `repair` only: `group: pr-env-<n>`, `cancel-in-progress: false` (serialises with provision and teardown) |
 
 **Actions**: `diagnose` lists the state objects and every per-PR resource by exact name
@@ -84,5 +91,5 @@ fails and names them.
 `state/pr/<n>/default.tflock` only if `lock_id` is its generation and it is ≥ 45 min old. `destroy` plans and
 applies a destroy from the existing state and deletes the state only if it succeeded. `reap` deletes the
 leftovers no state tracks, by exact name and label (`scripts/pr-env-reap.sh`, tested by
-`scripts/tests/pr-env-reap.test.sh`). `destroy` and `reap` refuse an open PR unless `allow_open_pr`. `verify` (added by PR #246) runs `scripts/pr-env-verify-ro.sh` (tested by `scripts/tests/pr-env-verify-ro.test.sh`) in the `diagnose` job only, with no approval. Every read by the read-only identities must work, and every write or secret read must be refused. `pr_number` is ignored (pass 0).
+`scripts/tests/pr-env-reap.test.sh`). `destroy` and `reap` refuse an open PR (P5). `verify` (added by PR #246) runs `scripts/pr-env-verify-ro.sh` (tested by `scripts/tests/pr-env-verify-ro.test.sh`) in the `diagnose` job only, with no approval. Every read by the read-only identities must work, and every write or secret read must be refused. `pr_number` is ignored (pass 0).
 Design and runbook: `docs/handoffs/2026-10-26-agent-cloud-access.md`.
