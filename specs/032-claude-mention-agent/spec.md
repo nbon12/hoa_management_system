@@ -75,6 +75,10 @@ that issue with the answer and a link to the run. (Done manually on issue #292 o
    `npm run test:ci` as shell commands. It pushes its work to a new branch (or, for a request on a
    PR, to that PR's head branch), never pushes to `main` or merges anything, and its reply links to
    the branch or offers a link to open the PR.
+   *(Amended 2026-11-16 by PR #297: it may also run the read-only `git fetch`, `git log`,
+   `git diff`, `git status`, `git merge-base` and `git rev-parse`, `gh pr view`, `gh pr checks` and
+   `gh pr diff`, plus `git merge` and `gh pr update-branch` to bring a PR branch up to date with
+   `main`. It still has no merge tool. See FR-010.)*
 
 ---
 
@@ -141,7 +145,7 @@ is required.
 - **Workflow changes on a branch**: `issue_comment` and `issues` workflows always run from `main`.
   A change to `claude.yml` takes effect only after it merges.
 - **Commands outside the allowlist**: Claude cannot run shell commands other than those in
-  Story 1, scenario 5. A change that needs anything else (Testcontainers, Playwright, OpenTofu) is
+  Story 1, scenario 5, and FR-010. A change that needs anything else (Testcontainers, Playwright, OpenTofu) is
   left for CI on the PR to verify.
 - **Untrusted text in the thread**: Claude reads the whole issue or PR, including comments by
   people without write access. That text can try to steer the agent (prompt injection). The gate
@@ -178,7 +182,12 @@ is required.
 - **FR-010**: The job MUST install the .NET 9 SDK and Node 20 (npm cache keyed on
   `neko-hoa/package-lock.json`). It MUST allow only the shell commands `dotnet restore`,
   `dotnet build`, `dotnet test`, `npm ci`, `npm run build` and `npm run test:ci`, matching the
-  commands in `CLAUDE.md`.
+  commands in `CLAUDE.md`. *Amended 2026-11-16 by PR #297: the allowlist also has `git fetch`, `git log`,
+  `git diff`, `git status`, `git merge`, `git merge-base`, `git rev-parse`, `gh pr view`,
+  `gh pr checks`, `gh pr diff` and `gh pr update-branch`, and the checkout fetches full history
+  (`fetch-depth: 0`), so Claude can check a PR's readiness and update its branch from `main`.
+  There is still no merge command (FR-009); the owner merges with `/merge`
+  (`.github/workflows/merge-command.yml`). PR #297 merged before this spec, which missed it.*
 - **FR-011**: If no credential is configured, the run MUST fail with an error that names the
   missing secret.
 
